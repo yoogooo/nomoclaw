@@ -1,0 +1,349 @@
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from "vue";
+import {
+  Bot,
+  Briefcase,
+  Brain,
+  BookOpen,
+  Code2,
+  Cpu,
+  Database,
+  FileSearch,
+  Globe,
+  Headphones,
+  Lightbulb,
+  Palette,
+  PenTool,
+  Rocket,
+  Scale,
+  Shield,
+  Sparkles,
+  User,
+  Wrench
+} from "lucide-vue-next";
+import { NTabPane, NTabs } from "naive-ui";
+import DirectoryRail from "@/components/chat/DirectoryRail.vue";
+import AppPageHeader from "@/components/layout/AppPageHeader.vue";
+import AgentBasicTab from "@/components/agents/AgentBasicTab.vue";
+import AgentCreateModal from "@/components/agents/AgentCreateModal.vue";
+import AgentDetailPanel from "@/components/agents/AgentDetailPanel.vue";
+import AgentDocsTab from "@/components/agents/AgentDocsTab.vue";
+import AgentListPane from "@/components/agents/AgentListPane.vue";
+import AgentSkillDrawer from "@/components/agents/AgentSkillDrawer.vue";
+import ImportSkillModal from "@/components/agents/ImportSkillModal.vue";
+import AgentSkillsTab from "@/components/agents/AgentSkillsTab.vue";
+import AgentTipsTab from "@/components/agents/AgentTipsTab.vue";
+import AgentToolsTab from "@/components/agents/AgentToolsTab.vue";
+import type {
+  AvatarIconOption,
+  DocKey
+} from "@/components/agents/agentManagementTypes";
+import { themeTokens } from "@/themeTokens";
+import type { ImportedSkillResponse } from "@/types/api";
+import { approxBytes, formatRelativeTime, joinPath } from "@/components/agents/domain/agentManagementDomain";
+import { useAgentsManagement } from "@/components/agents/useAgentsManagement";
+
+const detailTab = ref("basic");
+const selectedAgentUid = ref("");
+const showEditor = ref(false);
+const selectedDocKey = ref<DocKey>("soul");
+const docEditable = ref(false);
+const skillDrawerVisible = ref(false);
+const selectedSkillId = ref("");
+const importSkillVisible = ref(false);
+
+const avatarIconOptions: AvatarIconOption[] = [
+  { key: "bot", label: "Bot", icon: Bot },
+  { key: "user", label: "User", icon: User },
+  { key: "sparkles", label: "Sparkles", icon: Sparkles },
+  { key: "brain", label: "Brain", icon: Brain },
+  { key: "book", label: "Book", icon: BookOpen },
+  { key: "tool", label: "Tool", icon: Wrench },
+  { key: "shield", label: "Shield", icon: Shield },
+  { key: "briefcase", label: "Briefcase", icon: Briefcase },
+  { key: "code", label: "Code", icon: Code2 },
+  { key: "database", label: "Database", icon: Database },
+  { key: "globe", label: "Globe", icon: Globe },
+  { key: "search", label: "Search", icon: FileSearch },
+  { key: "rocket", label: "Rocket", icon: Rocket },
+  { key: "palette", label: "Palette", icon: Palette },
+  { key: "idea", label: "Idea", icon: Lightbulb },
+  { key: "audio", label: "Audio", icon: Headphones },
+  { key: "legal", label: "Legal", icon: Scale },
+  { key: "chip", label: "Chip", icon: Cpu },
+  { key: "design", label: "Design", icon: PenTool }
+];
+const DEFAULT_AVATAR_ICON = "bot";
+const DEFAULT_AVATAR_COLOR: string = themeTokens.component.agent.avatarColors[0];
+const avatarColorOptions: string[] = [...themeTokens.component.agent.avatarColors];
+
+const management = useAgentsManagement({
+  avatarIconOptions,
+  avatarColorOptions,
+  defaultAvatarIcon: DEFAULT_AVATAR_ICON,
+  defaultAvatarColor: DEFAULT_AVATAR_COLOR
+});
+
+const sortedAgents = computed(() =>
+  [...management.agents.value].sort((a, b) => {
+    if (a.sortIndex !== b.sortIndex) return a.sortIndex - b.sortIndex;
+    return (a.displayName || a.agentName).localeCompare(b.displayName || b.agentName, "zh-CN");
+  })
+);
+
+const selectedAgent = computed(() =>
+  sortedAgents.value.find((item) => item.agentUid === selectedAgentUid.value) || null
+);
+
+const docItems = computed(() => [
+  { key: "soul" as DocKey, label: "SOUL.md" },
+  { key: "agent" as DocKey, label: "AGENT.md" },
+  { key: "memory" as DocKey, label: "MEMORY.md" },
+  { key: "tools" as DocKey, label: "TOOLS.md" },
+  { key: "identity" as DocKey, label: "IDENTITY.md" }
+]);
+
+const selectedDocLabel = computed(() =>
+  docItems.value.find((item) => item.key === selectedDocKey.value)?.label || "SOUL.md"
+);
+
+const selectedDocPath = computed(() => {
+  const agentName = selectedAgent.value?.agentName || "default";
+  return joinPath(management.agentsRootDir.value, agentName, selectedDocLabel.value);
+});
+
+const selectedDocEnabled = computed(() =>
+  management.docEnabledOf(selectedAgent.value, selectedDocKey.value)
+);
+
+const selectedDocContent = computed(() =>
+  management.docContentOf(selectedAgent.value, selectedDocKey.value)
+);
+
+const docListItems = computed(() =>
+  docItems.value.map((item) => ({
+    ...item,
+    enabled: management.docEnabledOf(selectedAgent.value, item.key),
+    sizeBytes: approxBytes(management.docContentOf(selectedAgent.value, item.key)),
+    updatedText: formatRelativeTime(management.docUpdatedAtOf(selectedAgent.value, item.key))
+  }))
+);
+
+const selectedSkill = computed(() =>
+  selectedAgent.value?.managedSkills.find((item) => item.id === selectedSkillId.value) || null
+);
+
+function onSelectAgent(agentUid: string) {
+  selectedAgentUid.value = agentUid;
+  management.syncDocsFormFromSelection(selectedAgent.value);
+  management.syncBasicFormFromSelection(selectedAgent.value);
+}
+
+function openCreate() {
+  management.resetCreateForm();
+  showEditor.value = true;
+}
+
+async function onSaveAgent() {
+  const createdUid = await management.saveAgent();
+  if (!createdUid) return;
+  selectedAgentUid.value = management.ensureSelectedAgent(createdUid);
+  management.syncDocsFormFromSelection(selectedAgent.value);
+  management.syncBasicFormFromSelection(selectedAgent.value);
+  if (selectedAgentUid.value) {
+    await management.loadAgentWorkspace(selectedAgentUid.value);
+  }
+  showEditor.value = false;
+}
+
+function onRemoveAgent() {
+  if (!selectedAgent.value) return;
+  management.removeAgent(selectedAgent.value, () => {
+    selectedAgentUid.value = management.ensureSelectedAgent(selectedAgentUid.value);
+    management.syncDocsFormFromSelection(selectedAgent.value);
+    management.syncBasicFormFromSelection(selectedAgent.value);
+  });
+}
+
+function openSkillDrawer(skillId: string) {
+  selectedSkillId.value = skillId;
+  skillDrawerVisible.value = true;
+}
+
+function onToggleSkill(skillId: string, enabled: boolean) {
+  management.setSkillEnabled(selectedAgent.value, skillId, enabled);
+}
+
+function onToggleTool(toolId: string, enabled: boolean) {
+  management.setToolEnabled(selectedAgent.value, toolId, enabled);
+}
+
+function onToggleDoc(key: string, enabled: boolean) {
+  management.setDocEnabled(selectedAgent.value, key as DocKey, enabled);
+}
+
+async function handleSkillImported(skill: ImportedSkillResponse) {
+  if (!selectedAgent.value) return;
+  await management.handleSkillImported(selectedAgent.value, skill);
+  selectedSkillId.value = `skill_${skill.skillKey || skill.displayName}`;
+  skillDrawerVisible.value = true;
+  detailTab.value = "skills";
+}
+
+onMounted(async () => {
+  try {
+    await management.init();
+  } catch {
+    return;
+  }
+  selectedAgentUid.value = management.ensureSelectedAgent(selectedAgentUid.value);
+  management.syncDocsFormFromSelection(selectedAgent.value);
+  management.syncBasicFormFromSelection(selectedAgent.value);
+});
+
+watch([selectedDocKey, detailTab, selectedAgentUid], () => {
+  docEditable.value = false;
+  if (detailTab.value !== "skills" || !selectedAgent.value?.managedSkills.some((item) => item.id === selectedSkillId.value)) {
+    skillDrawerVisible.value = false;
+    selectedSkillId.value = "";
+  }
+});
+
+watch(selectedAgentUid, async (agentUid) => {
+  if (!agentUid) return;
+  await management.loadAgentWorkspace(agentUid);
+});
+</script>
+
+<template>
+  <div class="page-frame app-page-shell">
+    <div class="app-layout app-layout-responsive">
+      <DirectoryRail />
+      <main class="app-main-content">
+        <div class="app-page-content agents-page">
+          <AppPageHeader
+            title="Agent 管理"
+            subtitle="统一管理 Agent 的基本信息、技能、工具、锦囊和配置文件。"
+          />
+
+          <div class="agent-main-grid">
+            <AgentListPane
+              :agents="sortedAgents"
+              :selected-agent-uid="selectedAgentUid"
+              :avatar-icon-options="avatarIconOptions"
+              :default-avatar-color="DEFAULT_AVATAR_COLOR"
+              @create="openCreate"
+              @select="onSelectAgent"
+            />
+
+            <AgentDetailPanel :selected-agent="selectedAgent">
+              <n-tabs v-if="selectedAgent" v-model:value="detailTab" type="line" animated>
+                <n-tab-pane name="basic" tab="基本信息">
+                  <AgentBasicTab
+                    :selected-agent="selectedAgent"
+                    :basic-form="management.basicForm"
+                    :avatar-icon-options="avatarIconOptions"
+                    :avatar-color-options="avatarColorOptions"
+                    @save="management.saveBasicInfo(selectedAgent)"
+                    @remove="onRemoveAgent"
+                    @update:display-name="management.basicForm.displayName = $event"
+                    @update:description="management.basicForm.description = $event"
+                    @update:avatar="management.basicForm.avatar = $event"
+                    @update:avatar-color="management.basicForm.avatarColor = $event"
+                  />
+                </n-tab-pane>
+
+                <n-tab-pane name="skills" tab="技能">
+                  <AgentSkillsTab
+                    :skills="selectedAgent.managedSkills"
+                    @import="importSkillVisible = true"
+                    @open="openSkillDrawer"
+                    @toggle="onToggleSkill"
+                  />
+                </n-tab-pane>
+
+                <n-tab-pane name="tools" tab="工具">
+                  <AgentToolsTab
+                    :tools="selectedAgent.managedTools"
+                    @toggle="onToggleTool"
+                  />
+                </n-tab-pane>
+
+                <n-tab-pane name="tips" tab="锦囊">
+                  <AgentTipsTab
+                    :tips="selectedAgent.tips"
+                    :tip-title="management.tipForm.title"
+                    :tip-content="management.tipForm.content"
+                    @add="management.addTip(selectedAgent)"
+                    @remove="management.removeTip(selectedAgent, $event)"
+                    @update:title="management.tipForm.title = $event"
+                    @update:content="management.tipForm.content = $event"
+                  />
+                </n-tab-pane>
+
+                <n-tab-pane name="docs" tab="配置文件">
+                  <AgentDocsTab
+                    :doc-items="docListItems"
+                    :selected-doc-key="selectedDocKey"
+                    :selected-doc-label="selectedDocLabel"
+                    :selected-doc-path="selectedDocPath"
+                    :selected-doc-enabled="selectedDocEnabled"
+                    :doc-editable="docEditable"
+                    :selected-doc-content="selectedDocContent"
+                    @select-doc="selectedDocKey = $event as DocKey"
+                    @toggle-doc="onToggleDoc"
+                    @toggle-edit="docEditable = !docEditable"
+                    @save="management.saveDocs(selectedAgent, selectedDocKey)"
+                    @update-content="management.updateDocContent(selectedDocKey, $event)"
+                  />
+                </n-tab-pane>
+              </n-tabs>
+            </AgentDetailPanel>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <AgentSkillDrawer
+    :show="skillDrawerVisible"
+    :skill="selectedSkill"
+    @update:show="skillDrawerVisible = $event"
+  />
+
+  <ImportSkillModal
+    :show="importSkillVisible"
+    :agent-uid="selectedAgent?.agentUid || ''"
+    @update:show="importSkillVisible = $event"
+    @success="handleSkillImported"
+  />
+
+  <AgentCreateModal
+    :show="showEditor"
+    :form="management.createForm"
+    :avatar-icon-options="avatarIconOptions"
+    :avatar-color-options="avatarColorOptions"
+    @update:show="showEditor = $event"
+    @save="onSaveAgent"
+    @update:display-name="management.createForm.displayName = $event"
+    @update:agent-name="management.createForm.agentName = $event"
+    @update:description="management.createForm.description = $event"
+    @update:avatar="management.createForm.avatar = $event"
+    @update:avatar-color="management.createForm.avatarColor = $event"
+  />
+</template>
+
+<style scoped>
+.agent-main-grid {
+  display: grid;
+  grid-template-columns: var(--size-320) minmax(0, 1fr);
+  gap: var(--space-4);
+  min-height: 0;
+}
+
+@media (max-width: var(--size-breakpoint-lg)) {
+  .agent-main-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

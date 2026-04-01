@@ -1,0 +1,284 @@
+.cron-form-grid {
+  display: grid;
+  align-items: start;
+  grid-template-columns: 1fr;
+  gap: var(--size-18);
+}
+
+.cron-form-main {
+  min-width: 0;
+}
+
+.cron-form-side {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--size-18);
+}
+
+.basic-card,
+.schedule-card,
+.preview-card {
+  padding: var(--size-18);
+  border: var(--size-1) solid var(--color-border-panel);
+  border-radius: var(--size-20);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.schedule-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.basic-card {
+  padding-bottom: var(--space-4);
+}
+
+.basic-card :deep(.n-form-item:last-child) {
+  margin-bottom: 0;
+}
+
+.basic-card :deep(.task-content-item.n-form-item) {
+  margin-bottom: 0;
+}
+
+.basic-meta-grid {
+  margin-top: var(--space-5);
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+.section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-heading);
+}
+
+.schedule-dynamic-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.schedule-dynamic-block + .schedule-field {
+  margin-top: 0;
+}
+
+.segmented-group {
+  margin-top: var(--space-2);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--size-2);
+  padding: var(--size-2);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-bg-surface-soft) 80%, #e2e8f2);
+}
+
+.segmented-group-multi {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.segmented-item {
+  min-height: var(--size-40);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-bg-surface-soft) 84%, #edf2f8);
+  color: color-mix(in srgb, var(--color-text-secondary) 74%, #2b3f5f);
+  font-size: var(--font-size-sm);
+  font-weight: 400;
+  cursor: pointer;
+  transition: background-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.segmented-item:hover {
+  color: var(--color-text-primary);
+  background: color-mix(in srgb, var(--color-bg-surface) 92%, white);
+}
+
+.segmented-item.active {
+  color: var(--color-text-primary);
+  background: var(--color-bg-surface);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
+}
+
+.field-label {
+  display: block;
+  margin-bottom: var(--space-2);
+  color: var(--color-text-heading);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
+.hour-sub-label {
+  margin-top: var(--space-4);
+}
+
+.field-hint {
+  margin-top: var(--space-2);
+  color: var(--color-text-cool-gray);
+  font-size: var(--font-size-xs);
+}
+
+.field-error {
+  margin-top: 0;
+  color: var(--color-semantic-danger, #dc2626);
+  font-size: var(--font-size-sm);
+}
+
+.inline-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2_5);
+}
+
+.native-date-input,
+.native-time-input {
+  width: 100%;
+  min-height: var(--size-44);
+  padding: 0 var(--size-14);
+  border: var(--size-1) solid var(--color-border-panel);
+  border-radius: var(--radius-m);
+  background: #fff;
+  color: var(--color-text-primary);
+  font: inherit;
+}
+
+.weekday-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.weekday-pill {
+  min-height: var(--size-40);
+  border: var(--size-1) solid var(--color-border-panel);
+  border-radius: var(--radius-pill);
+  background: #fff;
+  color: var(--color-text-cool-gray);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.weekday-pill.active {
+  border-color: #111827;
+  background: #111827;
+  color: #fff;
+}
+
+.minute-input {
+  width: 100%;
+}
+
+.preview-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.preview-summary {
+  margin-top: var(--space-3);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-text-heading-deep);
+}
+
+.preview-expression {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--size-14);
+  background: #0f172a;
+  color: #e2e8f0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--font-size-sm);
+  word-break: break-all;
+}
+
+.preview-next {
+  margin-top: var(--space-3_5);
+}
+
+.preview-next-title {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.preview-timeline {
+  position: relative;
+  margin-top: var(--space-2);
+  padding-left: 0;
+}
+
+.preview-timeline::before {
+  content: "";
+  position: absolute;
+  top: var(--space-1);
+  bottom: var(--space-1);
+  left: var(--size-8);
+  width: var(--size-1);
+  background: color-mix(in srgb, var(--color-border-panel) 78%, #cdd8ea);
+}
+
+.preview-timeline-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--size-16) 1fr;
+  column-gap: var(--space-2_5);
+  align-items: center;
+  min-height: var(--size-30);
+  padding: var(--space-1) 0;
+}
+
+.preview-timeline-icon {
+  justify-self: center;
+  z-index: 1;
+  color: color-mix(in srgb, var(--color-text-cool-gray) 78%, #6b7a94);
+  background: #fff;
+  border-radius: 999px;
+  padding: 1px;
+}
+
+.preview-timeline-text {
+  color: color-mix(in srgb, var(--color-text-secondary) 82%, #5b6e8c);
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.preview-next-empty {
+  margin-top: var(--space-2);
+  color: var(--color-text-cool-gray);
+  font-size: var(--font-size-sm);
+}
+
+.preview-once-time {
+  margin-top: var(--space-2);
+  color: color-mix(in srgb, var(--color-text-secondary) 82%, #5b6e8c);
+  font-size: var(--font-size-sm);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+@media (max-width: 1280px) {
+  .cron-form-side {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .segmented-group-multi {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .inline-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .weekday-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

@@ -1,0 +1,14 @@
+package ai.nomoclaw.bot.model;
+
+public enum AgentEventType {
+    PLAN_CREATED,
+    STEP_STARTED,
+    STEP_WAITING_APPROVAL,
+    STEP_REJECTED,
+    STEP_FINISHED,
+    STEP_FAILED,
+    ROUND_TOKEN_USAGE,
+    LOOP_LIMIT_REACHED,
+    MESSAGE_COMPLETED,
+    MESSAGE_CANCELED
+}

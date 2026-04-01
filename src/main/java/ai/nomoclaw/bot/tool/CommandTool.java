@@ -1,0 +1,138 @@
+package ai.nomoclaw.bot.tool;
+
+import ai.nomoclaw.bot.model.ToolRequest;
+import ai.nomoclaw.bot.model.ToolResult;
+import ai.nomoclaw.bot.orchestrator.MessageCancellationRegistry;
+import ai.nomoclaw.bot.policy.tool.ToolPermissionPolicyService;
+import ai.nomoclaw.bot.policy.tool.ToolPolicyContext;
+import ai.nomoclaw.bot.policy.tool.ToolPolicyDecisionResult;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+import tools.jackson.databind.node.JsonNodeFactory;
+import tools.jackson.databind.node.ObjectNode;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+
+@Component
+@Slf4j
+public class CommandTool implements Tool {
+
+    private final MessageCancellationRegistry cancellationRegistry;
+    private final ToolPermissionPolicyService toolPermissionPolicyService;
+
+    public CommandTool(MessageCancellationRegistry cancellationRegistry,
+                       ToolPermissionPolicyService toolPermissionPolicyService) {
+        this.cancellationRegistry = cancellationRegistry;
+        this.toolPermissionPolicyService = toolPermissionPolicyService;
+    }
+
+    @Override
+    public String name() {
+        return "command_tool";
+    }
+
+    @Override
+    public ToolResult execute(ToolRequest request) {
+        long start = System.currentTimeMillis();
+        String command = request.args().path("command").asText("");
+        String cwd = request.args().path("cwd").asText("");
+        log.info("[Tool][command] execute conversationUid={} messageUid={} stepUid={} cwd={} cmd={}",
+                request.conversationUid(), request.messageUid(), request.stepUid(), cwd, command);
+        if (command.isBlank()) {
+            return ToolResult.failure("INVALID_ARGS", "command is required", metric(start, -1, false));
+        }
+
+        ToolPolicyDecisionResult policyDecision = toolPermissionPolicyService.evaluate(new ToolPolicyContext(
+                name(),
+                request.args(),
+                request.agentWorkspacePath(),
+                "",
+                request.conversationUid(),
+                request.messageUid(),
+                request.stepUid()
+        ));
+        if (policyDecision.denied() || policyDecision.asks()) {
+            return ToolResult.failure(
+                    policyDecision.reasonCode().name(),
+                    policyDecision.message().isBlank() ? "当前命令被安全策略阻止。" : policyDecision.message(),
+                    metric(start, -1, false)
+            );
+        }
+
+        Path workingDir = cwd == null || cwd.isBlank()
+                ? request.agentWorkspacePath()
+                : PathResolver.resolveInAgentWorkspace(cwd, request);
+        if (!workingDir.toFile().exists() || !workingDir.toFile().isDirectory()) {
+            return ToolResult.failure("INVALID_ARGS", "cwd is not a directory: " + workingDir, metric(start, -1, false));
+        }
+
+        ProcessBuilder processBuilder = new ProcessBuilder("bash", "-lc", command);
+        processBuilder.directory(workingDir.toFile());
+
+        try {
+            Process process = processBuilder.start();
+            CompletableFuture<String> stdoutFuture = CompletableFuture.supplyAsync(() -> readText(process.getInputStream()));
+            CompletableFuture<String> stderrFuture = CompletableFuture.supplyAsync(() -> readText(process.getErrorStream()));
+            long deadline = System.currentTimeMillis() + request.timeoutMs();
+            while (System.currentTimeMillis() < deadline) {
+                if (cancellationRegistry.isCanceled(request.messageUid())) {
+                    process.destroyForcibly();
+                    return ToolResult.failure("CANCELLED", "message canceled", metric(start, -1, false));
+                }
+                if (process.waitFor(200, TimeUnit.MILLISECONDS)) {
+                    int exitCode = process.exitValue();
+                    String stdout = stdoutFuture.join();
+                    String stderr = stderrFuture.join();
+                    log.info("[Tool][command] finished stepUid={} exitCode={} stdoutLen={} stderrLen={}",
+                            request.stepUid(), exitCode, stdout.length(), stderr.length());
+                    ObjectNode artifacts = JsonNodeFactory.instance.objectNode();
+                    artifacts.put("cwd", workingDir.toString());
+                    artifacts.put("command", command);
+                    artifacts.put("stdout", ToolTextUtils.truncateTail(stdout));
+                    artifacts.put("stderr", ToolTextUtils.truncateTail(stderr));
+                    artifacts.put("exitCode", exitCode);
+                    String output = """
+                            <returncode>%d</returncode>
+                            <stdout>
+                            %s
+                            </stdout>
+                            <stderr>
+                            %s
+                            </stderr>
+                            """.formatted(exitCode, ToolTextUtils.truncateTail(stdout), ToolTextUtils.truncateTail(stderr)).trim();
+                    if (exitCode == 0) {
+                        return ToolResult.success(output, artifacts, metric(start, exitCode, false));
+                    }
+                    return ToolResult.failure("NON_ZERO_EXIT", output, metric(start, exitCode, false));
+                }
+            }
+            process.destroyForcibly();
+            return ToolResult.failure("TIMEOUT", "command timed out", metric(start, -1, true));
+        } catch (Exception ex) {
+            log.warn("[Tool][command] failed stepUid={} err={}", request.stepUid(), ex.getMessage());
+            return ToolResult.failure("COMMAND_ERROR", ex.getMessage(), metric(start, -1, false));
+        }
+    }
+
+    private String readText(java.io.InputStream inputStream) {
+        try (inputStream) {
+            return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            return "";
+        }
+    }
+
+    private ObjectNode metric(long start, int exitCode, boolean timeout) {
+        ObjectNode metrics = JsonNodeFactory.instance.objectNode();
+        metrics.put("durationMs", System.currentTimeMillis() - start);
+        metrics.put("exitCode", exitCode);
+        metrics.put("timeout", timeout);
+        metrics.put("ts", Instant.now().toString());
+        return metrics;
+    }
+}

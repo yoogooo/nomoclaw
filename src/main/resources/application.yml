@@ -1,0 +1,83 @@
+spring:
+  application:
+    name: bot
+  profiles:
+    default: local
+  datasource:
+    url: "${MYSQL_URL:jdbc:mysql://localhost:3306/bot?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}"
+    username: "${MYSQL_USER:}"
+    password: "${MYSQL_PASSWORD:}"
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      initialization-fail-timeout: 0
+  quartz:
+    job-store-type: jdbc
+    jdbc:
+      initialize-schema: never
+    overwrite-existing-jobs: false
+    properties:
+      "org.quartz.scheduler.instanceName": NomoClawScheduler
+      "org.quartz.scheduler.instanceId": AUTO
+      "org.quartz.jobStore.isClustered": false
+      "org.quartz.jobStore.misfireThreshold": 60000
+      "org.quartz.threadPool.threadCount": 5
+    # initialize-schema can be enabled with:
+    # spring:
+    #   sql:
+    #     init:
+    #       mode: always
+    #       schema-locations: classpath:db/schema.sql
+
+server:
+  address: 127.0.0.1
+
+agent:
+  command:
+    timeout-seconds: 60
+  browser:
+    step-timeout-seconds: 10
+    headless: false
+  retry:
+    max-attempts: 2
+  loop:
+    max-rounds: 200
+  approval:
+    high-risk-enabled: true
+  api:
+    local-only-enabled: true
+
+nomoclaw:
+  root-dir: "${NOMOCLAW_ROOT_DIR:${user.home}/.nomoclaw}"
+
+llm:
+  provider: dashscope
+  timeout: 180s
+  max-retries: 1
+  codex:
+    model-name: gpt-5.4
+    instructions: "You are a task planner and execution assistant."
+  ollama:
+    base-url: "http://localhost:11434"
+    model-name: qwen3:8b
+  qwen:
+    api-key: "${DASHSCOPE_API_KEY:}"
+    base-url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    model-name: qwen3.5-plus
+  gemini:
+    api-key: "${GEMINI_API_KEY:}"
+    base-url: "https://generativelanguage.googleapis.com/v1beta/openai"
+    model-name: gemini-2.5-flash
+  kimi:
+    api-key: "${KIMI_API_KEY:}"
+    base-url: "https://api.moonshot.cn/v1"
+    model-name: kimi-latest
+  minimax:
+    api-key: "${MINIMAX_API_KEY:}"
+    base-url: "https://api.minimaxi.com/v1"
+    model-name: MiniMax-M2.7
+  model-config:
+    encryption-key: "${LLM_MODEL_CONFIG_ENCRYPTION_KEY:}"
+
+logging:
+  level:
+    "ai.nomoclaw.bot": INFO

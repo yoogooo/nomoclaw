@@ -1,0 +1,9 @@
+package ai.nomoclaw.bot.policy.tool;
+
+public enum ToolPolicyReasonCode {
+    NONE,
+    POLICY_BLOCKED_SYSTEM_PATH_WRITE,
+    POLICY_BLOCKED_BY_DENY_RULE,
+    POLICY_WRITE_OUTSIDE_ALLOWED_SCOPE,
+    POLICY_REQUIRE_APPROVAL_HIGH_RISK
+}
