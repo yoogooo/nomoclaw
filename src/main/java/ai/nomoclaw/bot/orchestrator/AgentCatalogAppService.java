@@ -20,11 +20,14 @@ public class AgentCatalogAppService {
 
     private final AgentApplicationService facade;
     private final SkillImportApplicationService skillImportApplicationService;
+    private final AgentTipApplicationService agentTipApplicationService;
 
     public AgentCatalogAppService(AgentApplicationService facade,
-                                  SkillImportApplicationService skillImportApplicationService) {
+                                  SkillImportApplicationService skillImportApplicationService,
+                                  AgentTipApplicationService agentTipApplicationService) {
         this.facade = facade;
         this.skillImportApplicationService = skillImportApplicationService;
+        this.agentTipApplicationService = agentTipApplicationService;
     }
 
     public List<AgentCatalogGroupDto> listAgentGroups() {
@@ -68,14 +71,14 @@ public class AgentCatalogAppService {
     }
 
     public List<AgentTipDto> listAgentTips(String agentUid) {
-        return facade.listAgentTips(agentUid);
+        return agentTipApplicationService.listAgentTips(agentUid);
     }
 
     public AgentTipDto createAgentTip(String agentUid, CreateAgentTipCommand command) {
-        return facade.createAgentTip(agentUid, command);
+        return agentTipApplicationService.createAgentTip(agentUid, command);
     }
 
     public void deleteAgentTip(String agentUid, String tipUid) {
-        facade.deleteAgentTip(agentUid, tipUid);
+        agentTipApplicationService.deleteAgentTip(agentUid, tipUid);
     }
 }

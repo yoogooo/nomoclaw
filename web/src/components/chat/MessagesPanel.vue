@@ -20,6 +20,14 @@ const jinnangStore = useJinnangStore();
 const copiedMessageMap = ref<Record<string, boolean>>({});
 const savingTipMap = ref<Record<string, boolean>>({});
 const savedTipMap = ref<Record<string, boolean>>({});
+const savedTipMessageUidSet = computed(() => {
+  const uidSet = new Set<string>();
+  for (const tip of jinnangStore.tips) {
+    const uid = (tip.sourceMessageUid || "").trim();
+    if (uid) uidSet.add(uid);
+  }
+  return uidSet;
+});
 
 const latestMessageUid = computed(() => {
   const items = conversationStore.messages;
@@ -85,7 +93,7 @@ async function copyAssistantMessage(messageItem: ConversationMessage) {
 
 async function saveJinnang(messageItem: ConversationMessage) {
   const key = messageActionKey(messageItem);
-  if (savingTipMap.value[key]) return;
+  if (savingTipMap.value[key] || isTipSaved(messageItem)) return;
   const conversationAgentUid = conversationStore.conversations.find((item) => item.conversationUid === conversationStore.currentConversationUid)?.agentUid || "";
   const targetAgentUid = (conversationAgentUid || agentCatalogStore.selectedAgentUid || "").trim();
   if (!targetAgentUid) {
@@ -103,7 +111,8 @@ async function saveJinnang(messageItem: ConversationMessage) {
       messageUid: messageItem.messageUid,
       content: messageItem.content,
       sourceTime: messageItem.createdTime,
-      conversationUid: conversationStore.currentConversationUid || ""
+      conversationUid: conversationStore.currentConversationUid || "",
+      generateBestPractice: true
     });
     saved = true;
   } catch {
@@ -121,12 +130,6 @@ async function saveJinnang(messageItem: ConversationMessage) {
     ...savedTipMap.value,
     [key]: true
   };
-  window.setTimeout(() => {
-    savedTipMap.value = {
-      ...savedTipMap.value,
-      [key]: false
-    };
-  }, 1400);
 }
 
 function formatAttachmentSize(sizeBytes = 0) {
@@ -175,6 +178,14 @@ function messageTokenUsageText(messageItem: ConversationMessage) {
   const usage = resolveMessageTokenUsage(messageItem);
   if (!usage) return "";
   return `Total ${usage.total}`;
+}
+
+function isTipSaved(messageItem: ConversationMessage) {
+  if (savedTipMap.value[messageActionKey(messageItem)]) {
+    return true;
+  }
+  const messageUid = (messageItem.messageUid || "").trim();
+  return !!messageUid && savedTipMessageUidSet.value.has(messageUid);
 }
 </script>
 
@@ -267,7 +278,7 @@ function messageTokenUsageText(messageItem: ConversationMessage) {
               <div class="save-tip-wrap">
                 <n-popconfirm
                   :show-icon="false"
-                  :disabled="savingTipMap[messageActionKey(message)]"
+                  :disabled="savingTipMap[messageActionKey(message)] || isTipSaved(message)"
                   positive-text="确定"
                   negative-text="取消"
                   @positive-click="saveJinnang(message)"
@@ -277,20 +288,20 @@ function messageTokenUsageText(messageItem: ConversationMessage) {
                       class="message-action-btn icon-only"
                       :class="{
                         loading: savingTipMap[messageActionKey(message)],
-                        saved: savedTipMap[messageActionKey(message)]
+                        saved: isTipSaved(message)
                       }"
-                      :disabled="savingTipMap[messageActionKey(message)]"
+                      :disabled="savingTipMap[messageActionKey(message)] || isTipSaved(message)"
                       type="button"
-                      title="保存为锦囊"
-                      aria-label="保存为锦囊"
+                      :title="isTipSaved(message) ? '锦囊已保存' : '保存为锦囊'"
+                      :aria-label="isTipSaved(message) ? '锦囊已保存' : '保存为锦囊'"
                     >
-                      <Check v-if="savedTipMap[messageActionKey(message)] && !savingTipMap[messageActionKey(message)]" :size="14" />
+                      <Check v-if="isTipSaved(message) && !savingTipMap[messageActionKey(message)]" :size="14" />
                       <Sparkles v-else-if="!savingTipMap[messageActionKey(message)]" :size="14" />
                     </button>
                   </template>
                   保存为锦囊？
                 </n-popconfirm>
-                <span v-if="savedTipMap[messageActionKey(message)]" class="message-action-hint">已保存为锦囊</span>
+                <span v-if="isTipSaved(message)" class="message-action-hint">已保存为锦囊</span>
               </div>
             </div>
           </div>

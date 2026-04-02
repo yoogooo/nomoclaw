@@ -6,6 +6,7 @@ public record CreateAgentTipCommand(
         String sourceContent,
         String sourceConversationUid,
         String sourceMessageUid,
-        String sourceTime
+        String sourceTime,
+        Boolean generateBestPractice
 ) {
 }

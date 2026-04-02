@@ -415,7 +415,8 @@ public final class ApiDtoMapper {
                 request == null ? null : request.sourceContent(),
                 request == null ? null : request.sourceConversationUid(),
                 request == null ? null : request.sourceMessageUid(),
-                request == null ? null : request.sourceTime()
+                request == null ? null : request.sourceTime(),
+                request == null ? null : request.generateBestPractice()
         );
     }
 

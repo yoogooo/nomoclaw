@@ -39,7 +39,6 @@ import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
 import ai.nomoclaw.bot.store.entity.AgentGroupDefinitionEntity;
 import ai.nomoclaw.bot.store.entity.AgentGroupMemberEntity;
 import ai.nomoclaw.bot.store.entity.AgentSkillRelationEntity;
-import ai.nomoclaw.bot.store.entity.AgentTipEntity;
 import ai.nomoclaw.bot.store.entity.AgentToolRelationEntity;
 import ai.nomoclaw.bot.store.entity.SkillDefinitionEntity;
 import ai.nomoclaw.bot.store.entity.ToolDefinitionEntity;
@@ -47,7 +46,6 @@ import ai.nomoclaw.bot.store.repository.AgentDefinitionRepository;
 import ai.nomoclaw.bot.store.repository.AgentGroupDefinitionRepository;
 import ai.nomoclaw.bot.store.repository.AgentGroupMemberRepository;
 import ai.nomoclaw.bot.store.repository.AgentSkillRelationRepository;
-import ai.nomoclaw.bot.store.repository.AgentTipRepository;
 import ai.nomoclaw.bot.store.repository.AgentToolRelationRepository;
 import ai.nomoclaw.bot.store.repository.SkillDefinitionRepository;
 import ai.nomoclaw.bot.store.repository.ToolDefinitionRepository;
@@ -132,7 +130,7 @@ public class AgentApplicationService {
     private final AgentDefinitionRepository agentDefinitionRepository;
     private final SkillDefinitionRepository skillDefinitionRepository;
     private final AgentSkillRelationRepository agentSkillRelationRepository;
-    private final AgentTipRepository agentTipRepository;
+    private final AgentTipApplicationService agentTipApplicationService;
     private final ToolDefinitionRepository toolDefinitionRepository;
     private final AgentToolRelationRepository agentToolRelationRepository;
     private final ModelConfigAppService modelConfigAppService;
@@ -157,7 +155,7 @@ public class AgentApplicationService {
                                    AgentDefinitionRepository agentDefinitionRepository,
                                    SkillDefinitionRepository skillDefinitionRepository,
                                    AgentSkillRelationRepository agentSkillRelationRepository,
-                                   AgentTipRepository agentTipRepository,
+                                   AgentTipApplicationService agentTipApplicationService,
                                    ToolDefinitionRepository toolDefinitionRepository,
                                    AgentToolRelationRepository agentToolRelationRepository,
                                    ModelConfigAppService modelConfigAppService,
@@ -180,7 +178,7 @@ public class AgentApplicationService {
         this.agentDefinitionRepository = agentDefinitionRepository;
         this.skillDefinitionRepository = skillDefinitionRepository;
         this.agentSkillRelationRepository = agentSkillRelationRepository;
-        this.agentTipRepository = agentTipRepository;
+        this.agentTipApplicationService = agentTipApplicationService;
         this.toolDefinitionRepository = toolDefinitionRepository;
         this.agentToolRelationRepository = agentToolRelationRepository;
         this.modelConfigAppService = modelConfigAppService;
@@ -532,86 +530,15 @@ public class AgentApplicationService {
     }
 
     public List<AgentTipDto> listAgentTips(String agentUid) {
-        String normalizedAgentUid = normalizeAgentUid(agentUid);
-        return agentTipRepository.listActiveByAgentUid(normalizedAgentUid).stream()
-                .map(this::toAgentTipResponse)
-                .toList();
+        return agentTipApplicationService.listAgentTips(agentUid);
     }
 
     public AgentTipDto createAgentTip(String agentUid, CreateAgentTipCommand request) {
-        if (request == null) {
-            request = new CreateAgentTipCommand(null, null, null, null, null, null);
-        }
-        String normalizedAgentUid = normalizeAgentUid(agentUid);
-        if (agentDefinitionRepository.findByUid(normalizedAgentUid) == null) {
-            throw new IllegalArgumentException("agent not found: " + normalizedAgentUid);
-        }
-
-        String sourceContent = request == null || request.sourceContent() == null ? "" : request.sourceContent().trim();
-        String title = request == null || request.title() == null ? "" : request.title().trim();
-        String summary = request == null || request.summary() == null ? "" : request.summary().trim();
-        if (sourceContent.isBlank() && summary.isBlank() && title.isBlank()) {
-            throw new IllegalArgumentException("tip content must not be blank");
-        }
-        if (title.isBlank()) {
-            title = buildTipTitle(sourceContent.isBlank() ? summary : sourceContent);
-        }
-        if (summary.isBlank()) {
-            summary = buildTipSummary(sourceContent.isBlank() ? title : sourceContent);
-        }
-        if (sourceContent.isBlank()) {
-            sourceContent = summary;
-        }
-
-        String sourceMessageUid = request == null || request.sourceMessageUid() == null ? "" : request.sourceMessageUid().trim();
-        AgentTipEntity existing = sourceMessageUid.isBlank()
-                ? null
-                : agentTipRepository.findByAgentUidAndSourceMessageUid(normalizedAgentUid, sourceMessageUid);
-        LocalDateTime now = LocalDateTime.now();
-        if (existing != null) {
-            existing.setTitle(title);
-            existing.setSummary(summary);
-            existing.setSourceContent(sourceContent);
-            existing.setSourceConversationUid(emptyToNull(request.sourceConversationUid()));
-            existing.setSourceMessageUid(emptyToNull(sourceMessageUid));
-            existing.setSourceTime(parseNullableLocalDateTime(request.sourceTime()));
-            existing.setStatus("ACTIVE");
-            existing.setUpdatedTime(now);
-            agentTipRepository.updateById(existing);
-            return toAgentTipResponse(existing);
-        }
-
-        AgentTipEntity tip = new AgentTipEntity();
-        tip.setTipUid(UUID.randomUUID().toString());
-        tip.setAgentUid(normalizedAgentUid);
-        tip.setTitle(title);
-        tip.setSummary(summary);
-        tip.setSourceContent(sourceContent);
-        tip.setSourceConversationUid(emptyToNull(request.sourceConversationUid()));
-        tip.setSourceMessageUid(emptyToNull(sourceMessageUid));
-        tip.setSourceTime(parseNullableLocalDateTime(request.sourceTime()));
-        tip.setStatus("ACTIVE");
-        tip.setSortIndex(0);
-        tip.setExtConfig("{}");
-        tip.setCreatedTime(now);
-        tip.setUpdatedTime(now);
-        agentTipRepository.save(tip);
-        return toAgentTipResponse(tip);
+        return agentTipApplicationService.createAgentTip(agentUid, request);
     }
 
     public void deleteAgentTip(String agentUid, String tipUid) {
-        String normalizedAgentUid = normalizeAgentUid(agentUid);
-        String normalizedTipUid = tipUid == null ? "" : tipUid.trim();
-        if (normalizedTipUid.isBlank()) {
-            throw new IllegalArgumentException("tipUid must not be blank");
-        }
-        AgentTipEntity tip = agentTipRepository.findByAgentUidAndTipUid(normalizedAgentUid, normalizedTipUid);
-        if (tip == null) {
-            throw new IllegalArgumentException("tip not found: " + normalizedTipUid);
-        }
-        tip.setStatus("DISABLED");
-        tip.setUpdatedTime(LocalDateTime.now());
-        agentTipRepository.updateById(tip);
+        agentTipApplicationService.deleteAgentTip(agentUid, tipUid);
     }
 
     public List<ConversationMessageRunDto> listMessageRuns(String conversationUid) {
@@ -2110,21 +2037,6 @@ public class AgentApplicationService {
         );
     }
 
-    private AgentTipDto toAgentTipResponse(AgentTipEntity tip) {
-        return new AgentTipDto(
-                tip.getTipUid(),
-                tip.getAgentUid(),
-                tip.getTitle(),
-                tip.getSummary(),
-                tip.getSourceContent(),
-                tip.getSourceConversationUid(),
-                tip.getSourceMessageUid(),
-                tip.getSourceTime(),
-                tip.getCreatedTime(),
-                tip.getUpdatedTime()
-        );
-    }
-
     private ObjectNode readExtConfigObject(String extConfigRaw) {
         if (extConfigRaw == null || extConfigRaw.isBlank()) {
             return JsonNodeFactory.instance.objectNode();
@@ -2260,49 +2172,6 @@ public class AgentApplicationService {
             log.warn("[Agent] failed to parse string array json={}", summarize(rawJson), ex);
             return List.of();
         }
-    }
-
-    private LocalDateTime parseNullableLocalDateTime(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return null;
-        }
-        try {
-            return LocalDateTime.parse(raw);
-        } catch (DateTimeParseException ignore) {
-            try {
-                return Instant.parse(raw).atZone(java.time.ZoneId.systemDefault()).toLocalDateTime();
-            } catch (DateTimeParseException ex) {
-                log.warn("[Agent] invalid date time value={}", raw);
-                return null;
-            }
-        }
-    }
-
-    private String buildTipTitle(String content) {
-        String normalized = normalizeText(content);
-        if (normalized.isBlank()) {
-            return "锦囊";
-        }
-        String firstLine = normalized.split("[。！？\\n]")[0].trim();
-        if (firstLine.isBlank()) {
-            firstLine = normalized;
-        }
-        return abbreviate(firstLine, 18);
-    }
-
-    private String buildTipSummary(String content) {
-        String normalized = normalizeText(content);
-        if (normalized.isBlank()) {
-            return "围绕当前任务沉淀了可复用执行步骤与注意事项。";
-        }
-        return abbreviate(normalized, 80);
-    }
-
-    private String normalizeText(String text) {
-        if (text == null) {
-            return "";
-        }
-        return text.replaceAll("\\s+", " ").trim();
     }
 
     private String summarize(String text) {

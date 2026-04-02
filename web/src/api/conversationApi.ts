@@ -91,6 +91,7 @@ export const conversationApi = {
     sourceConversationUid?: string;
     sourceMessageUid?: string;
     sourceTime?: string;
+    generateBestPractice?: boolean;
   }) {
     return requestJson<AgentTip>(`/api/agents/${agentUid}/tips`, {
       method: "POST",
