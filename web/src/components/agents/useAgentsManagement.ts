@@ -304,6 +304,26 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
     message.success("锦囊已删除");
   }
 
+  async function updateTip(selectedAgent: ManagedAgent | null, payload: { tipId: string; title: string; content: string }) {
+    if (!selectedAgent) return;
+    const title = payload.title.trim();
+    const content = payload.content.trim();
+    if (!title || !content) {
+      message.warning("请填写锦囊标题和内容");
+      return;
+    }
+    const updated = await conversationApi.updateAgentTip(selectedAgent.agentUid, payload.tipId, {
+      title,
+      sourceContent: content
+    });
+    const tip = mapApiTip(updated);
+    updateAgent(selectedAgent.agentUid, (agent) => ({
+      ...agent,
+      tips: agent.tips.map((item) => (item.id === payload.tipId ? tip : item))
+    }));
+    message.success("锦囊已更新");
+  }
+
   function docContentOf(selectedAgent: ManagedAgent | null, key: DocKey) {
     if (selectedAgent) {
       return docsForm[key];
@@ -427,6 +447,7 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
     setSkillEnabled,
     setToolEnabled,
     addTip,
+    updateTip,
     removeTip,
     docContentOf,
     updateDocContent,

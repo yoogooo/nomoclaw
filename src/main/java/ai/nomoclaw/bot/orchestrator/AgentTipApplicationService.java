@@ -1,6 +1,7 @@
 package ai.nomoclaw.bot.orchestrator;
 
 import ai.nomoclaw.bot.application.command.CreateAgentTipCommand;
+import ai.nomoclaw.bot.application.command.UpdateAgentTipCommand;
 import ai.nomoclaw.bot.application.dto.AgentTipDto;
 import ai.nomoclaw.bot.domain.AgentConversation;
 import ai.nomoclaw.bot.domain.AgentMessage;
@@ -143,6 +144,41 @@ public class AgentTipApplicationService {
         tip.setStatus("DISABLED");
         tip.setUpdatedTime(LocalDateTime.now());
         agentTipRepository.updateById(tip);
+    }
+
+    public AgentTipDto updateAgentTip(String agentUid, String tipUid, UpdateAgentTipCommand request) {
+        String normalizedAgentUid = normalizeAgentUid(agentUid);
+        String normalizedTipUid = tipUid == null ? "" : tipUid.trim();
+        if (normalizedTipUid.isBlank()) {
+            throw new IllegalArgumentException("tipUid must not be blank");
+        }
+        AgentTipEntity tip = agentTipRepository.findByAgentUidAndTipUid(normalizedAgentUid, normalizedTipUid);
+        if (tip == null || !"ACTIVE".equals(tip.getStatus())) {
+            throw new IllegalArgumentException("tip not found: " + normalizedTipUid);
+        }
+
+        String title = request == null || request.title() == null ? "" : request.title().trim();
+        String summary = request == null || request.summary() == null ? "" : request.summary().trim();
+        String sourceContent = request == null || request.sourceContent() == null ? "" : request.sourceContent().trim();
+        if (title.isBlank() && summary.isBlank() && sourceContent.isBlank()) {
+            throw new IllegalArgumentException("tip content must not be blank");
+        }
+        if (title.isBlank()) {
+            title = buildTipTitle(sourceContent.isBlank() ? summary : sourceContent);
+        }
+        if (summary.isBlank()) {
+            summary = buildTipSummary(sourceContent.isBlank() ? title : sourceContent);
+        }
+        if (sourceContent.isBlank()) {
+            sourceContent = summary;
+        }
+
+        tip.setTitle(title);
+        tip.setSummary(truncateByChars(summary, 300));
+        tip.setSourceContent(truncateByChars(sourceContent, 2000));
+        tip.setUpdatedTime(LocalDateTime.now());
+        agentTipRepository.updateById(tip);
+        return toAgentTipResponse(tip);
     }
 
     private BestPracticeTip generateBestPracticeTip(String sourceConversationUid, String sourceMessageUid) {

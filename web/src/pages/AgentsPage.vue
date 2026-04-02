@@ -275,6 +275,7 @@ watch(selectedAgentUid, async (agentUid) => {
                     :tip-title="management.tipForm.title"
                     :tip-content="management.tipForm.content"
                     @add="management.addTip(selectedAgent)"
+                    @update-tip="management.updateTip(selectedAgent, $event)"
                     @remove="management.removeTip(selectedAgent, $event)"
                     @update:title="management.tipForm.title = $event"
                     @update:content="management.tipForm.content = $event"

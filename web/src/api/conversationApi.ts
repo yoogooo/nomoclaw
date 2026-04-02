@@ -104,6 +104,17 @@ export const conversationApi = {
       method: "DELETE"
     });
   },
+  updateAgentTip(agentUid: string, tipUid: string, payload: {
+    title?: string;
+    summary?: string;
+    sourceContent?: string;
+  }) {
+    return requestJson<AgentTip>(`/api/agents/${agentUid}/tips/${tipUid}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+  },
   updateAgentSkillStatus(agentUid: string, skillKey: string, enabled: boolean) {
     return requestJson<AgentSkill>(`/api/agents/${agentUid}/skills/${skillKey}`, {
       method: "PATCH",

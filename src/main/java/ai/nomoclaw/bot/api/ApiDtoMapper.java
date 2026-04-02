@@ -6,6 +6,7 @@ import ai.nomoclaw.bot.application.command.CreateCronJobCommand;
 import ai.nomoclaw.bot.application.command.CreateSkillCommand;
 import ai.nomoclaw.bot.application.command.ImportSkillFromUrlCommand;
 import ai.nomoclaw.bot.application.command.UpdateAgentBasicInfoCommand;
+import ai.nomoclaw.bot.application.command.UpdateAgentTipCommand;
 import ai.nomoclaw.bot.application.command.UpdateCronJobCommand;
 import ai.nomoclaw.bot.application.dto.*;
 import ai.nomoclaw.bot.application.dto.AgentSkillDto;
@@ -417,6 +418,14 @@ public final class ApiDtoMapper {
                 request == null ? null : request.sourceMessageUid(),
                 request == null ? null : request.sourceTime(),
                 request == null ? null : request.generateBestPractice()
+        );
+    }
+
+    public static UpdateAgentTipCommand toCommand(UpdateAgentTipRequest request) {
+        return new UpdateAgentTipCommand(
+                request == null ? null : request.title(),
+                request == null ? null : request.summary(),
+                request == null ? null : request.sourceContent()
         );
     }
 

@@ -144,6 +144,14 @@ public class AgentController {
         return ApiDtoMapper.toAgentTip(agentCatalogAppService.createAgentTip(agentUid, ApiDtoMapper.toCommand(request)));
     }
 
+    @PutMapping("/agents/{agentUid}/tips/{tipUid}")
+    public AgentTipResponse updateAgentTip(@PathVariable String agentUid,
+                                           @PathVariable String tipUid,
+                                           @RequestBody(required = false) UpdateAgentTipRequest request) {
+        log.info("[AgentAPI] updateAgentTip agentUid={} tipUid={}", agentUid, tipUid);
+        return ApiDtoMapper.toAgentTip(agentCatalogAppService.updateAgentTip(agentUid, tipUid, ApiDtoMapper.toCommand(request)));
+    }
+
     @DeleteMapping("/agents/{agentUid}/tips/{tipUid}")
     public SimpleResponse deleteAgentTip(@PathVariable String agentUid, @PathVariable String tipUid) {
         log.info("[AgentAPI] deleteAgentTip agentUid={} tipUid={}", agentUid, tipUid);
