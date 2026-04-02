@@ -91,6 +91,7 @@ export const conversationApi = {
     sourceConversationUid?: string;
     sourceMessageUid?: string;
     sourceTime?: string;
+    generateBestPractice?: boolean;
   }) {
     return requestJson<AgentTip>(`/api/agents/${agentUid}/tips`, {
       method: "POST",
@@ -101,6 +102,17 @@ export const conversationApi = {
   deleteAgentTip(agentUid: string, tipUid: string) {
     return requestJson<SimpleResponse>(`/api/agents/${agentUid}/tips/${tipUid}`, {
       method: "DELETE"
+    });
+  },
+  updateAgentTip(agentUid: string, tipUid: string, payload: {
+    title?: string;
+    summary?: string;
+    sourceContent?: string;
+  }) {
+    return requestJson<AgentTip>(`/api/agents/${agentUid}/tips/${tipUid}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
     });
   },
   updateAgentSkillStatus(agentUid: string, skillKey: string, enabled: boolean) {

@@ -136,9 +136,20 @@ public class AgentController {
     @PostMapping("/agents/{agentUid}/tips")
     public AgentTipResponse createAgentTip(@PathVariable String agentUid,
                                            @RequestBody(required = false) CreateAgentTipRequest request) {
-        log.info("[AgentAPI] createAgentTip agentUid={} sourceMessageUid={}",
-                agentUid, request == null ? null : request.sourceMessageUid());
+        log.info("[AgentAPI] createAgentTip agentUid={} sourceConversationUid={} sourceMessageUid={} generateBestPractice={}",
+                agentUid,
+                request == null ? null : request.sourceConversationUid(),
+                request == null ? null : request.sourceMessageUid(),
+                request == null ? null : request.generateBestPractice());
         return ApiDtoMapper.toAgentTip(agentCatalogAppService.createAgentTip(agentUid, ApiDtoMapper.toCommand(request)));
+    }
+
+    @PutMapping("/agents/{agentUid}/tips/{tipUid}")
+    public AgentTipResponse updateAgentTip(@PathVariable String agentUid,
+                                           @PathVariable String tipUid,
+                                           @RequestBody(required = false) UpdateAgentTipRequest request) {
+        log.info("[AgentAPI] updateAgentTip agentUid={} tipUid={}", agentUid, tipUid);
+        return ApiDtoMapper.toAgentTip(agentCatalogAppService.updateAgentTip(agentUid, tipUid, ApiDtoMapper.toCommand(request)));
     }
 
     @DeleteMapping("/agents/{agentUid}/tips/{tipUid}")

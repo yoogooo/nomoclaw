@@ -5,6 +5,7 @@ import ai.nomoclaw.bot.application.command.CreateAgentTipCommand;
 import ai.nomoclaw.bot.application.command.CreateSkillCommand;
 import ai.nomoclaw.bot.application.command.ImportSkillFromUrlCommand;
 import ai.nomoclaw.bot.application.command.UpdateAgentBasicInfoCommand;
+import ai.nomoclaw.bot.application.command.UpdateAgentTipCommand;
 import ai.nomoclaw.bot.application.dto.AgentCatalogAgentDto;
 import ai.nomoclaw.bot.application.dto.AgentCatalogGroupDto;
 import ai.nomoclaw.bot.application.dto.AgentSkillDto;
@@ -20,11 +21,14 @@ public class AgentCatalogAppService {
 
     private final AgentApplicationService facade;
     private final SkillImportApplicationService skillImportApplicationService;
+    private final AgentTipApplicationService agentTipApplicationService;
 
     public AgentCatalogAppService(AgentApplicationService facade,
-                                  SkillImportApplicationService skillImportApplicationService) {
+                                  SkillImportApplicationService skillImportApplicationService,
+                                  AgentTipApplicationService agentTipApplicationService) {
         this.facade = facade;
         this.skillImportApplicationService = skillImportApplicationService;
+        this.agentTipApplicationService = agentTipApplicationService;
     }
 
     public List<AgentCatalogGroupDto> listAgentGroups() {
@@ -68,14 +72,18 @@ public class AgentCatalogAppService {
     }
 
     public List<AgentTipDto> listAgentTips(String agentUid) {
-        return facade.listAgentTips(agentUid);
+        return agentTipApplicationService.listAgentTips(agentUid);
     }
 
     public AgentTipDto createAgentTip(String agentUid, CreateAgentTipCommand command) {
-        return facade.createAgentTip(agentUid, command);
+        return agentTipApplicationService.createAgentTip(agentUid, command);
+    }
+
+    public AgentTipDto updateAgentTip(String agentUid, String tipUid, UpdateAgentTipCommand command) {
+        return agentTipApplicationService.updateAgentTip(agentUid, tipUid, command);
     }
 
     public void deleteAgentTip(String agentUid, String tipUid) {
-        facade.deleteAgentTip(agentUid, tipUid);
+        agentTipApplicationService.deleteAgentTip(agentUid, tipUid);
     }
 }

@@ -10,6 +10,7 @@ export interface JinnangTip {
   summary: string;
   sourceContent: string;
   conversationUid: string;
+  sourceMessageUid: string;
   sourceTime: string;
   createdTime: string;
 }
@@ -21,6 +22,7 @@ function toJinnangTip(item: AgentTip): JinnangTip {
     summary: item.summary || "",
     sourceContent: item.sourceContent || "",
     conversationUid: item.sourceConversationUid || "",
+    sourceMessageUid: item.sourceMessageUid || "",
     sourceTime: item.sourceTime || "",
     createdTime: item.createdTime || item.updatedTime
   };
@@ -54,6 +56,7 @@ export const useJinnangStore = defineStore("jinnang", () => {
     summary?: string;
     sourceTime: string;
     conversationUid: string;
+    generateBestPractice?: boolean;
   }) {
     const targetAgentUid = (params.agentUid || "").trim();
     if (!targetAgentUid) {
@@ -65,7 +68,8 @@ export const useJinnangStore = defineStore("jinnang", () => {
       sourceContent: params.content,
       sourceConversationUid: params.conversationUid,
       sourceMessageUid: params.messageUid,
-      sourceTime: params.sourceTime
+      sourceTime: params.sourceTime,
+      generateBestPractice: params.generateBestPractice
     });
     if (loadedAgentUid.value !== targetAgentUid || !loaded.value) {
       await restoreTips(targetAgentUid);
