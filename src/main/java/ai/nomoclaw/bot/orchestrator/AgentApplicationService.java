@@ -7,6 +7,7 @@ import ai.nomoclaw.bot.application.dto.ConversationSummaryDto;
 import ai.nomoclaw.bot.application.dto.ConversationAttachmentDto;
 import ai.nomoclaw.bot.application.dto.AgentCatalogAgentDto;
 import ai.nomoclaw.bot.application.dto.AgentCatalogGroupDto;
+import ai.nomoclaw.bot.application.dto.AgentDocDto;
 import ai.nomoclaw.bot.application.dto.AgentSkillDto;
 import ai.nomoclaw.bot.application.dto.AgentTipDto;
 import ai.nomoclaw.bot.application.dto.AgentToolDto;
@@ -83,6 +84,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -90,10 +92,12 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 /**
  * Agent 领域的应用层总入口（历史上承担了较多职责）。
@@ -118,6 +122,15 @@ public class AgentApplicationService {
     private static final String CUSTOM_AGENT_GROUP_UID = "group_custom_agents";
     private static final String CUSTOM_AGENT_GROUP_NAME = "custom_agents";
     private static final int CONVERSATION_CONTEXT_LIMIT = 30;
+    private static final Map<String, String> AGENT_DOC_FILES = new LinkedHashMap<>();
+    static {
+        AGENT_DOC_FILES.put("soul", "SOUL.md");
+        AGENT_DOC_FILES.put("agent", "AGENT.md");
+        AGENT_DOC_FILES.put("memory", "MEMORY.md");
+        AGENT_DOC_FILES.put("tools", "TOOLS.md");
+        AGENT_DOC_FILES.put("identity", "IDENTITY.md");
+        AGENT_DOC_FILES.put("user", "USER.md");
+    }
 
     private final AgentStore store;
     private final Planner planner;
@@ -233,13 +246,13 @@ public class AgentApplicationService {
                 .toList();
         List<AgentGroupMemberEntity> members = agentGroupMemberRepository.listActiveByGroupUids(groupUids);
         Map<String, List<AgentGroupMemberEntity>> membersByGroup = members.stream()
-                .collect(java.util.stream.Collectors.groupingBy(AgentGroupMemberEntity::getAgentGroupUid, LinkedHashMap::new, java.util.stream.Collectors.toList()));
+                .collect(Collectors.groupingBy(AgentGroupMemberEntity::getAgentGroupUid, LinkedHashMap::new, Collectors.toList()));
         List<String> agentUids = members.stream()
                 .map(AgentGroupMemberEntity::getAgentUid)
                 .distinct()
                 .toList();
         Map<String, AgentDefinitionEntity> agentsByUid = agentDefinitionRepository.listActiveByUids(agentUids).stream()
-                .collect(java.util.stream.Collectors.toMap(AgentDefinitionEntity::getAgentUid, agent -> agent, (left, right) -> left, LinkedHashMap::new));
+                .collect(Collectors.toMap(AgentDefinitionEntity::getAgentUid, agent -> agent, (left, right) -> left, LinkedHashMap::new));
         agentsByUid.values().forEach(this::ensureWorkspaceDocsForExistingAgent);
 
         return groups.stream()
@@ -253,7 +266,7 @@ public class AgentApplicationService {
                         group.getCollaborationMode(),
                         membersByGroup.getOrDefault(group.getAgentGroupUid(), List.of()).stream()
                                 .map(member -> toAgentCatalogItem(member, agentsByUid.get(member.getAgentUid())))
-                                .filter(java.util.Objects::nonNull)
+                                .filter(Objects::nonNull)
                                 .toList()
                 ))
                 .toList();
@@ -290,7 +303,7 @@ public class AgentApplicationService {
         List<SkillDefinitionEntity> skillDefinitions = skillDefinitionRepository.listAllActive();
         Map<String, AgentSkillRelationEntity> relationsBySkillKey = agentSkillRelationRepository.listByAgentUid(normalizedAgentUid)
                 .stream()
-                .collect(java.util.stream.Collectors.toMap(
+                .collect(Collectors.toMap(
                         AgentSkillRelationEntity::getSkillKey,
                         relation -> relation,
                         (left, right) -> left,
@@ -474,7 +487,7 @@ public class AgentApplicationService {
         List<ToolDefinitionEntity> toolDefinitions = toolDefinitionRepository.listAllActive();
         Map<String, AgentToolRelationEntity> relationsByToolKey = agentToolRelationRepository.listByAgentUid(normalizedAgentUid)
                 .stream()
-                .collect(java.util.stream.Collectors.toMap(
+                .collect(Collectors.toMap(
                         AgentToolRelationEntity::getToolKey,
                         relation -> relation,
                         (left, right) -> left,
@@ -536,6 +549,35 @@ public class AgentApplicationService {
         );
     }
 
+    public List<AgentDocDto> listAgentDocs(String agentUid) {
+        AgentDefinitionEntity agent = requireAgentByUid(agentUid);
+        ensureWorkspaceDocsForExistingAgent(agent);
+        Path workspace = NomoClawPaths.ensureAgentWorkspace(agent.getAgentName());
+        List<AgentDocDto> docs = new ArrayList<>();
+        for (Map.Entry<String, String> entry : AGENT_DOC_FILES.entrySet()) {
+            docs.add(readAgentDoc(workspace, entry.getKey(), entry.getValue()));
+        }
+        return docs;
+    }
+
+    public AgentDocDto updateAgentDoc(String agentUid, String docKey, String content) {
+        AgentDefinitionEntity agent = requireAgentByUid(agentUid);
+        ensureWorkspaceDocsForExistingAgent(agent);
+        String normalizedDocKey = docKey == null ? "" : docKey.trim().toLowerCase();
+        String fileName = AGENT_DOC_FILES.get(normalizedDocKey);
+        if (fileName == null) {
+            throw new IllegalArgumentException("unsupported doc key: " + normalizedDocKey);
+        }
+        Path workspace = NomoClawPaths.ensureAgentWorkspace(agent.getAgentName());
+        Path file = workspace.resolve(fileName).toAbsolutePath().normalize();
+        try {
+            Files.writeString(file, content == null ? "" : content, StandardCharsets.UTF_8);
+        } catch (IOException ex) {
+            throw new IllegalStateException("failed to save doc file: " + file, ex);
+        }
+        return readAgentDoc(workspace, normalizedDocKey, fileName);
+    }
+
     public List<AgentTipDto> listAgentTips(String agentUid) {
         return agentTipApplicationService.listAgentTips(agentUid);
     }
@@ -554,7 +596,7 @@ public class AgentApplicationService {
         return store.listMessagesByConversation(conversationUid).stream()
                 .filter(message -> "user".equals(message.role()))
                 .map(this::toMessageRunResponse)
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .toList();
     }
 
@@ -2179,7 +2221,7 @@ public class AgentApplicationService {
     private int nextAgentSortIndex() {
         return agentDefinitionRepository.listAllActive().stream()
                 .map(AgentDefinitionEntity::getSortIndex)
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .max(Integer::compareTo)
                 .orElse(0) + 10;
     }
@@ -2241,6 +2283,30 @@ public class AgentApplicationService {
         } catch (IOException ex) {
             throw new IllegalStateException("failed to cleanup legacy agent doc: " + legacyAgentsDoc, ex);
         }
+    }
+
+    private AgentDefinitionEntity requireAgentByUid(String agentUid) {
+        String normalizedAgentUid = normalizeAgentUid(agentUid);
+        AgentDefinitionEntity agent = agentDefinitionRepository.findByUid(normalizedAgentUid);
+        if (agent == null) {
+            throw new IllegalArgumentException("agent not found: " + normalizedAgentUid);
+        }
+        return agent;
+    }
+
+    private AgentDocDto readAgentDoc(Path workspace, String key, String fileName) {
+        Path file = workspace.resolve(fileName).toAbsolutePath().normalize();
+        String content;
+        LocalDateTime updatedTime;
+        try {
+            content = Files.exists(file) ? Files.readString(file, StandardCharsets.UTF_8) : "";
+            updatedTime = Files.exists(file)
+                    ? LocalDateTime.ofInstant(Files.getLastModifiedTime(file).toInstant(), ZoneId.systemDefault())
+                    : LocalDateTime.now();
+        } catch (IOException ex) {
+            throw new IllegalStateException("failed to read doc file: " + file, ex);
+        }
+        return new AgentDocDto(key, fileName, content, updatedTime);
     }
 
     private void ensureWorkspaceDocsForExistingAgent(AgentDefinitionEntity agent) {

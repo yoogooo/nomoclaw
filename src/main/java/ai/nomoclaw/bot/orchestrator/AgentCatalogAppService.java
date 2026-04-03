@@ -8,6 +8,7 @@ import ai.nomoclaw.bot.application.command.UpdateAgentBasicInfoCommand;
 import ai.nomoclaw.bot.application.command.UpdateAgentTipCommand;
 import ai.nomoclaw.bot.application.dto.AgentCatalogAgentDto;
 import ai.nomoclaw.bot.application.dto.AgentCatalogGroupDto;
+import ai.nomoclaw.bot.application.dto.AgentDocDto;
 import ai.nomoclaw.bot.application.dto.AgentSkillDto;
 import ai.nomoclaw.bot.application.dto.AgentTipDto;
 import ai.nomoclaw.bot.application.dto.AgentToolDto;
@@ -73,6 +74,14 @@ public class AgentCatalogAppService {
 
     public AgentToolDto updateAgentToolStatus(String agentUid, String toolKey, boolean enabled) {
         return facade.updateAgentToolStatus(agentUid, toolKey, enabled);
+    }
+
+    public List<AgentDocDto> listAgentDocs(String agentUid) {
+        return facade.listAgentDocs(agentUid);
+    }
+
+    public AgentDocDto updateAgentDoc(String agentUid, String docKey, String content) {
+        return facade.updateAgentDoc(agentUid, docKey, content);
     }
 
     public List<AgentTipDto> listAgentTips(String agentUid) {

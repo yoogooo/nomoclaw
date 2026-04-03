@@ -20,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Component
 @Slf4j
@@ -104,7 +105,7 @@ public class SkillPromptLoader {
         Map<String, SkillDefinitionEntity> definitionsByKey = skillDefinitionRepository.listActiveByKeys(
                         relations.stream().map(AgentSkillRelationEntity::getSkillKey).toList())
                 .stream()
-                .collect(java.util.stream.Collectors.toMap(
+                .collect(Collectors.toMap(
                         SkillDefinitionEntity::getSkillKey,
                         definition -> definition,
                         (left, right) -> left,

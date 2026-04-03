@@ -60,6 +60,13 @@ export interface AgentTip {
   updatedTime: string;
 }
 
+export interface AgentDocFile {
+  key: string;
+  fileName: string;
+  content: string;
+  updatedTime: string;
+}
+
 export interface SystemConfig {
   nomoclawRootDir: string;
   agentsRootDir: string;

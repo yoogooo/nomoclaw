@@ -1,5 +1,6 @@
 import type {
   AgentCatalogAgent,
+  AgentDocFile,
   AgentCatalogGroup,
   AgentSkill,
   AgentTip,
@@ -85,6 +86,16 @@ export const conversationApi = {
   },
   listAgentTools(agentUid: string) {
     return requestJson<AgentTool[]>(`/api/agents/${agentUid}/tools`);
+  },
+  listAgentDocs(agentUid: string) {
+    return requestJson<AgentDocFile[]>(`/api/agents/${agentUid}/docs`);
+  },
+  updateAgentDoc(agentUid: string, docKey: string, payload: { content: string }) {
+    return requestJson<AgentDocFile>(`/api/agents/${agentUid}/docs/${docKey}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
   },
   listAgentTips(agentUid: string) {
     return requestJson<AgentTip[]>(`/api/agents/${agentUid}/tips`);

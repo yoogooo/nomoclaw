@@ -10,7 +10,7 @@ import type {
   DocKey,
   ManagedAgent
 } from "@/components/agents/agentManagementTypes";
-import type { ImportedSkillResponse, ModelConfig } from "@/types/api";
+import type { AgentDocFile, ImportedSkillResponse, ModelConfig } from "@/types/api";
 import {
   defaultDocs,
   mapApiSkill,
@@ -168,17 +168,23 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
     const isPersisted = agentCatalogStore.allAgents.some((item) => item.agentUid === agentUid);
     if (!isPersisted) return;
     const requestSeq = ++workspaceLoadSeq;
-    const [skills, tools, tips] = await Promise.all([
+    const [skills, tools, tips, docs] = await Promise.all([
       conversationApi.listAgentSkills(agentUid),
       conversationApi.listAgentTools(agentUid),
-      conversationApi.listAgentTips(agentUid)
+      conversationApi.listAgentTips(agentUid),
+      conversationApi.listAgentDocs(agentUid)
     ]);
     if (requestSeq !== workspaceLoadSeq) return;
     updateAgent(agentUid, (agent) => ({
       ...agent,
       managedSkills: skills.map((item) => mapApiSkill(item, domainOptions.value)),
       managedTools: tools.map(mapApiTool),
-      tips: tips.map(mapApiTip)
+      tips: tips.map(mapApiTip),
+      docs: {
+        ...agent.docs,
+        ...mapDocsPayload(docs)
+      },
+      docStates: mergeDocUpdatedTime(agent.docStates, docs)
     }));
   }
 
@@ -374,18 +380,17 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
     }));
   }
 
-  function saveDocs(selectedAgent: ManagedAgent | null, selectedDocKey: DocKey) {
+  async function saveDocs(selectedAgent: ManagedAgent | null, selectedDocKey: DocKey) {
     if (!selectedAgent) return;
-    const now = new Date().toISOString();
+    const updated = await conversationApi.updateAgentDoc(selectedAgent.agentUid, selectedDocKey, {
+      content: docsForm[selectedDocKey] || ""
+    });
+    const now = updated.updatedTime || new Date().toISOString();
     updateAgent(selectedAgent.agentUid, (agent) => ({
       ...agent,
       docs: {
-        soul: docsForm.soul,
-        agent: docsForm.agent,
-        memory: docsForm.memory,
-        tools: docsForm.tools,
-        identity: docsForm.identity,
-        user: docsForm.user
+        ...agent.docs,
+        [selectedDocKey]: updated.content || ""
       },
       docStates: {
         ...agent.docStates,
@@ -395,7 +400,33 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
         }
       }
     }));
+    docsForm[selectedDocKey] = updated.content || "";
     message.success("文档配置已保存");
+  }
+
+  function mapDocsPayload(items: AgentDocFile[]) {
+    const next: Partial<AgentDocConfig> = {};
+    for (const item of items || []) {
+      const key = (item.key || "").trim().toLowerCase() as DocKey;
+      if (key === "soul" || key === "agent" || key === "memory" || key === "tools" || key === "identity" || key === "user") {
+        next[key] = item.content || "";
+      }
+    }
+    return next;
+  }
+
+  function mergeDocUpdatedTime(current: ManagedAgent["docStates"], items: AgentDocFile[]) {
+    const next = { ...current };
+    for (const item of items || []) {
+      const key = (item.key || "").trim().toLowerCase() as DocKey;
+      if (key === "soul" || key === "agent" || key === "memory" || key === "tools" || key === "identity" || key === "user") {
+        next[key] = {
+          enabled: current[key]?.enabled ?? true,
+          updatedAt: item.updatedTime || current[key]?.updatedAt || new Date().toISOString()
+        };
+      }
+    }
+    return next;
   }
 
   async function saveBasicInfo(selectedAgent: ManagedAgent | null) {

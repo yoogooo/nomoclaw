@@ -113,6 +113,19 @@ public final class ApiDtoMapper {
         return dtos.stream().map(ApiDtoMapper::toAgentTip).toList();
     }
 
+    public static List<AgentDocResponse> toAgentDocs(List<AgentDocDto> dtos) {
+        return dtos.stream().map(ApiDtoMapper::toAgentDoc).toList();
+    }
+
+    public static AgentDocResponse toAgentDoc(AgentDocDto dto) {
+        return new AgentDocResponse(
+                dto.key(),
+                dto.fileName(),
+                dto.content(),
+                dto.updatedTime()
+        );
+    }
+
     public static AgentTipResponse toAgentTip(AgentTipDto dto) {
         return new AgentTipResponse(
                 dto.tipUid(),
