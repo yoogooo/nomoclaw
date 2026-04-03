@@ -97,7 +97,8 @@ public class SkillPromptLoader {
 
         List<AgentSkillRelationEntity> relations = agentSkillRelationRepository.listActiveByAgentUid(agent.getAgentUid());
         if (relations.isEmpty()) {
-            return listAvailableSkills(skillsRoot);
+            // No active relation means no skills enabled for this agent.
+            return List.of();
         }
 
         Map<String, SkillDefinitionEntity> definitionsByKey = skillDefinitionRepository.listActiveByKeys(
