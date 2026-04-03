@@ -113,6 +113,13 @@ public class AgentController {
         return ApiDtoMapper.toAgentCatalogAgent(agentCatalogAppService.createAgent(ApiDtoMapper.toCommand(request)));
     }
 
+    @DeleteMapping("/agents/{agentUid}")
+    public SimpleResponse deleteAgent(@PathVariable String agentUid) {
+        log.info("[AgentAPI] deleteAgent agentUid={}", agentUid);
+        agentCatalogAppService.deleteAgent(agentUid);
+        return new SimpleResponse("deleted");
+    }
+
     @PatchMapping("/agents/{agentUid}/basic")
     public AgentCatalogAgentResponse updateAgentBasicInfo(@PathVariable String agentUid,
                                                           @Valid @RequestBody UpdateAgentBasicInfoRequest request) {

@@ -43,6 +43,10 @@ public class AgentCatalogAppService {
         return facade.createAgent(command);
     }
 
+    public void deleteAgent(String agentUid) {
+        facade.deleteAgent(agentUid);
+    }
+
     public AgentCatalogAgentDto updateAgentBasicInfo(String agentUid, UpdateAgentBasicInfoCommand command) {
         return facade.updateAgentBasicInfo(agentUid, command);
     }

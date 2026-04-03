@@ -216,7 +216,8 @@ public class ToolSpecificationRegistry {
 
         List<AgentToolRelationEntity> relations = agentToolRelationRepository.listActiveByAgentUid(agent.getAgentUid());
         if (relations.isEmpty()) {
-            return null;
+            // No active relation means "no tools enabled" for this agent.
+            return List.of();
         }
 
         Set<String> builtinKeys = toolSpecificationsByName.keySet();

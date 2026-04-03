@@ -20,7 +20,10 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.FileVisitResult;
+import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -161,6 +164,35 @@ public class ConversationAttachmentAppService {
             throw new IllegalArgumentException("attachment not found: " + uploadUid);
         }
         return entity;
+    }
+
+    public void purgeConversationAttachments(String conversationUid) {
+        String normalizedConversationUid = trim(conversationUid);
+        if (normalizedConversationUid.isBlank()) {
+            return;
+        }
+        attachmentRepository.deleteByConversationUid(normalizedConversationUid);
+        Path uploadDir = NomoClawPaths.root().resolve("uploads").resolve(normalizedConversationUid).toAbsolutePath().normalize();
+        if (!Files.exists(uploadDir)) {
+            return;
+        }
+        try {
+            Files.walkFileTree(uploadDir, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                    Files.deleteIfExists(file);
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                    Files.deleteIfExists(dir);
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        } catch (IOException ex) {
+            throw new IllegalStateException("failed to cleanup upload dir: " + uploadDir, ex);
+        }
     }
 
     public List<Content> buildContentsForMessage(String messageText, String messageUid) {

@@ -73,9 +73,13 @@ import tools.jackson.databind.node.ObjectNode;
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
+import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
@@ -560,9 +564,63 @@ public class AgentApplicationService {
             executionStates.remove(message.messageUid());
             runningMessages.remove(message.messageUid());
         });
+        conversationAttachmentAppService.purgeConversationAttachments(conversationUid);
         store.deleteConversation(conversationUid);
         log.info("[Agent] conversation deleted conversationUid={} agentGroupUid={} agentUid={}",
                 conversationUid, conversation.agentGroupUid(), conversation.agentUid());
+    }
+
+    public void deleteAgent(String agentUid) {
+        String normalizedAgentUid = normalizeAgentUid(agentUid);
+        if (DEFAULT_AGENT_UID.equals(normalizedAgentUid)) {
+            throw new IllegalArgumentException("default agent cannot be deleted");
+        }
+        AgentDefinitionEntity agent = agentDefinitionRepository.findByUid(normalizedAgentUid);
+        if (agent == null) {
+            throw new IllegalArgumentException("agent not found: " + normalizedAgentUid);
+        }
+
+        List<String> conversationUids = store.listConversations().stream()
+                .filter(conversation -> normalizedAgentUid.equals(conversation.agentUid()))
+                .map(AgentConversation::conversationUid)
+                .toList();
+        for (String conversationUid : conversationUids) {
+            deleteConversation(conversationUid);
+        }
+
+        agentTipApplicationService.purgeAgentTips(normalizedAgentUid);
+        agentSkillRelationRepository.deleteByAgentUid(normalizedAgentUid);
+        agentToolRelationRepository.deleteByAgentUid(normalizedAgentUid);
+        agentGroupMemberRepository.deleteByAgentUid(normalizedAgentUid);
+        agentDefinitionRepository.deleteByAgentUid(normalizedAgentUid);
+        deleteDirectoryRecursively(NomoClawPaths.agentWorkspace(agent.getAgentName()));
+        log.info("[Agent] deleted agentUid={} agentName={} conversations={}",
+                normalizedAgentUid,
+                agent.getAgentName(),
+                conversationUids.size());
+    }
+
+    private void deleteDirectoryRecursively(Path rootPath) {
+        if (rootPath == null || !Files.exists(rootPath)) {
+            return;
+        }
+        try {
+            Files.walkFileTree(rootPath, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                    Files.deleteIfExists(file);
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                    Files.deleteIfExists(dir);
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        } catch (IOException ex) {
+            throw new IllegalStateException("failed to delete agent workspace: " + rootPath, ex);
+        }
     }
 
     public void updateConversationTitle(String conversationUid, String title) {

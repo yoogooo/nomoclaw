@@ -74,4 +74,13 @@ public class AgentGroupMemberRepository extends CrudRepository<AgentGroupMemberM
                 .eq(AgentGroupMemberEntity::getAgentGroupUid, groupUid)
                 .count();
     }
+
+    public void deleteByAgentUid(String agentUid) {
+        if (agentUid == null || agentUid.isBlank()) {
+            return;
+        }
+        lambdaUpdate()
+                .eq(AgentGroupMemberEntity::getAgentUid, agentUid)
+                .remove();
+    }
 }

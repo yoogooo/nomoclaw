@@ -40,4 +40,13 @@ public class AgentToolRelationRepository extends CrudRepository<AgentToolRelatio
                 .eq(AgentToolRelationEntity::getToolKey, toolKey)
                 .one();
     }
+
+    public void deleteByAgentUid(String agentUid) {
+        if (agentUid == null || agentUid.isBlank()) {
+            return;
+        }
+        lambdaUpdate()
+                .eq(AgentToolRelationEntity::getAgentUid, agentUid)
+                .remove();
+    }
 }

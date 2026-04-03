@@ -146,6 +146,11 @@ public class AgentTipApplicationService {
         agentTipRepository.updateById(tip);
     }
 
+    public void purgeAgentTips(String agentUid) {
+        String normalizedAgentUid = normalizeAgentUid(agentUid);
+        agentTipRepository.deleteByAgentUid(normalizedAgentUid);
+    }
+
     public AgentTipDto updateAgentTip(String agentUid, String tipUid, UpdateAgentTipCommand request) {
         String normalizedAgentUid = normalizeAgentUid(agentUid);
         String normalizedTipUid = tipUid == null ? "" : tipUid.trim();

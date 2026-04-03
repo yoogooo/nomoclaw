@@ -28,4 +28,14 @@ public class AgentConversationRepository extends CrudRepository<AgentConversatio
                 .eq(AgentConversationEntity::getConversationUid, conversationUid)
                 .remove();
     }
+
+    public List<AgentConversationEntity> listByAgentUid(String agentUid) {
+        if (agentUid == null || agentUid.isBlank()) {
+            return List.of();
+        }
+        return lambdaQuery()
+                .eq(AgentConversationEntity::getAgentUid, agentUid)
+                .orderByDesc(AgentConversationEntity::getUpdatedTime, AgentConversationEntity::getCreatedTime)
+                .list();
+    }
 }

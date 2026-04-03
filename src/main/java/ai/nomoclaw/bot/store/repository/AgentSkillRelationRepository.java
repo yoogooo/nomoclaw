@@ -40,4 +40,13 @@ public class AgentSkillRelationRepository extends CrudRepository<AgentSkillRelat
                 .eq(AgentSkillRelationEntity::getSkillKey, skillKey)
                 .one();
     }
+
+    public void deleteByAgentUid(String agentUid) {
+        if (agentUid == null || agentUid.isBlank()) {
+            return;
+        }
+        lambdaUpdate()
+                .eq(AgentSkillRelationEntity::getAgentUid, agentUid)
+                .remove();
+    }
 }

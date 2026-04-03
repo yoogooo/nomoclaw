@@ -75,6 +75,11 @@ export const conversationApi = {
       body: JSON.stringify(payload)
     });
   },
+  deleteAgent(agentUid: string) {
+    return requestJson<SimpleResponse>(`/api/agents/${agentUid}`, {
+      method: "DELETE"
+    });
+  },
   listAgentSkills(agentUid: string) {
     return requestJson<AgentSkill[]>(`/api/agents/${agentUid}/skills`);
   },

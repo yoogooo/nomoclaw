@@ -219,15 +219,29 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
   }
 
   function removeAgent(agent: ManagedAgent, onDeleted?: () => void) {
+    if (agent.agentUid === "agent_general_assistant") {
+      message.warning("默认 Agent 不支持删除");
+      return;
+    }
     dialog.warning({
       title: "删除 Agent",
-      content: `确认删除 “${agent.displayName || agent.agentName}” 吗？`,
-      positiveText: "删除",
+      content: `你即将删除“${agent.displayName || agent.agentName}”，确认继续操作么？`,
+      positiveText: "继续",
       negativeText: "取消",
       onPositiveClick: () => {
-        agents.value = agents.value.filter((item) => item.agentUid !== agent.agentUid);
-        onDeleted?.();
-        message.success("Agent 已删除");
+        dialog.error({
+          title: "删除后数据不可恢复",
+          content: `删除后将同时清理该 Agent 的数据与工作目录文件（含会话、步骤、锦囊、附件、工作区文件）。此操作不可恢复，确认继续吗？`,
+          positiveText: "确认彻底删除",
+          negativeText: "取消",
+          onPositiveClick: async () => {
+            await conversationApi.deleteAgent(agent.agentUid);
+            agents.value = agents.value.filter((item) => item.agentUid !== agent.agentUid);
+            await agentCatalogStore.loadCatalog();
+            onDeleted?.();
+            message.success("Agent 已删除，相关数据与工作目录已清理");
+          }
+        });
       }
     });
   }
