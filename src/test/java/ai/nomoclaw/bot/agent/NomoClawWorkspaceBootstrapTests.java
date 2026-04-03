@@ -20,7 +20,7 @@ class NomoClawWorkspaceBootstrapTests {
 
         Path defaultAgent = tempDir.resolve("agents").resolve("default");
         assertTrue(Files.isDirectory(defaultAgent));
-        assertTrue(Files.isRegularFile(defaultAgent.resolve("AGENTS.md")));
+        assertTrue(Files.isRegularFile(defaultAgent.resolve("AGENT.md")));
         assertTrue(Files.isRegularFile(defaultAgent.resolve("SOUL.md")));
         assertTrue(Files.isRegularFile(defaultAgent.resolve("IDENTITY.md")));
         assertTrue(Files.isRegularFile(defaultAgent.resolve("USER.md")));
