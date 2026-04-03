@@ -213,6 +213,7 @@ watch([selectedDocKey, detailTab, selectedAgentUid], () => {
 watch(selectedAgentUid, async (agentUid) => {
   if (!agentUid) return;
   await management.loadAgentWorkspace(agentUid);
+  management.syncDocsFormFromSelection(selectedAgent.value);
 });
 </script>
 

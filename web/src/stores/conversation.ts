@@ -189,6 +189,17 @@ export const useConversationStore = defineStore("conversation", () => {
     return "";
   });
 
+  function hasConfiguredModel(modelProvider: string, modelName: string) {
+    if (!modelProvider || !modelName) {
+      return false;
+    }
+    const provider = configuredProviders.value.find((item) => item.id === modelProvider);
+    if (!provider) {
+      return false;
+    }
+    return provider.models.some((model) => model.id === modelName);
+  }
+
   function clearApproval() {
     approval.value = {
       stepUid: null,
@@ -513,13 +524,21 @@ export const useConversationStore = defineStore("conversation", () => {
       message.error(error instanceof Error ? error.message : "文件不符合当前模型上传规则");
       return;
     }
+    const lockedProvider = selectedModelProvider.value;
+    const lockedModelName = selectedModelName.value;
     const conversationUid = await ensureConversationForInteraction();
+    const effectiveProvider = hasConfiguredModel(lockedProvider, lockedModelName) ? lockedProvider : selectedModelProvider.value;
+    const effectiveModelName = hasConfiguredModel(lockedProvider, lockedModelName) ? lockedModelName : selectedModelName.value;
+    if (effectiveProvider && effectiveModelName) {
+      selectedModelProvider.value = effectiveProvider;
+      selectedModelName.value = effectiveModelName;
+    }
     uploadingFiles.value = true;
     try {
       const uploaded = await conversationApi.uploadConversationFiles(conversationUid, {
         files,
-        modelProvider: selectedModelProvider.value,
-        modelName: selectedModelName.value
+        modelProvider: effectiveProvider,
+        modelName: effectiveModelName
       });
       draftAttachments.value = [...draftAttachments.value, ...uploaded.items];
     } finally {
@@ -546,14 +565,24 @@ export const useConversationStore = defineStore("conversation", () => {
       return;
     }
 
+    const lockedProvider = selectedModelProvider.value;
+    const lockedModelName = selectedModelName.value;
     const conversationUid = await ensureConversationForInteraction();
+    const effectiveProvider = hasConfiguredModel(lockedProvider, lockedModelName) ? lockedProvider : selectedModelProvider.value;
+    const effectiveModelName = hasConfiguredModel(lockedProvider, lockedModelName) ? lockedModelName : selectedModelName.value;
+    if (!effectiveProvider || !effectiveModelName) {
+      message.error("请先选择模型");
+      return;
+    }
+    selectedModelProvider.value = effectiveProvider;
+    selectedModelName.value = effectiveModelName;
     const attachments = [...draftAttachments.value];
     const tempMessage: ConversationMessage = {
       role: "user",
       content,
       status: "CREATED",
-      provider: selectedModelProvider.value,
-      modelName: selectedModelName.value,
+      provider: effectiveProvider,
+      modelName: effectiveModelName,
       createdTime: new Date().toISOString(),
       attachments
     };
@@ -566,8 +595,8 @@ export const useConversationStore = defineStore("conversation", () => {
       const accepted = await conversationApi.sendMessage(conversationUid, {
         message: content,
         fileUrls: attachments.map((item) => item.fileUrl),
-        modelProvider: selectedModelProvider.value,
-        modelName: selectedModelName.value
+        modelProvider: effectiveProvider,
+        modelName: effectiveModelName
       });
       tempMessage.messageUid = accepted.messageUid;
       runningConversationUid.value = conversationUid;

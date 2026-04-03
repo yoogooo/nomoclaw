@@ -198,9 +198,6 @@ public class InMemoryAgentStore implements AgentStore {
         final int input = normalizedInput;
         final int output = normalizedOutput;
         final int total = normalizedTotal;
-        final String normalizedProvider = isBlank(provider) ? null : provider.trim();
-        final String normalizedModelName = isBlank(modelName) ? null : modelName.trim();
-
         messages.computeIfPresent(messageUid, (id, oldMessage) -> new AgentMessage(
                 oldMessage.messageUid(),
                 oldMessage.conversationUid(),
@@ -208,8 +205,8 @@ public class InMemoryAgentStore implements AgentStore {
                 oldMessage.role(),
                 oldMessage.content(),
                 oldMessage.status(),
-                normalizedProvider == null ? oldMessage.provider() : normalizedProvider,
-                normalizedModelName == null ? oldMessage.modelName() : normalizedModelName,
+                oldMessage.provider(),
+                oldMessage.modelName(),
                 oldMessage.inputTokens() + input,
                 oldMessage.outputTokens() + output,
                 oldMessage.totalTokens() + total,

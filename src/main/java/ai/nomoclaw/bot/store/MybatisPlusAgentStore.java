@@ -198,23 +198,13 @@ public class MybatisPlusAgentStore implements AgentStore {
             total = input + output;
         }
 
-        String normalizedProvider = provider == null ? "" : provider.trim();
-        String normalizedModelName = modelName == null ? "" : modelName.trim();
-        boolean hasUsage = input > 0 || output > 0 || total > 0;
-        boolean hasMeta = !normalizedProvider.isBlank() || !normalizedModelName.isBlank();
-        if (!hasUsage && !hasMeta) {
+        if (input <= 0 && output <= 0 && total <= 0) {
             return;
         }
 
         LambdaUpdateWrapper<AgentMessageEntity> update = new LambdaUpdateWrapper<AgentMessageEntity>()
                 .eq(AgentMessageEntity::getMessageUid, messageUid)
                 .set(AgentMessageEntity::getUpdatedTime, LocalDateTime.now());
-        if (!normalizedProvider.isBlank()) {
-            update.set(AgentMessageEntity::getProvider, normalizedProvider);
-        }
-        if (!normalizedModelName.isBlank()) {
-            update.set(AgentMessageEntity::getModelName, normalizedModelName);
-        }
         if (input > 0) {
             update.setSql("input_tokens = input_tokens + " + input);
         }
