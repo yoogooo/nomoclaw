@@ -80,6 +80,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
@@ -239,6 +240,7 @@ public class AgentApplicationService {
                 .toList();
         Map<String, AgentDefinitionEntity> agentsByUid = agentDefinitionRepository.listActiveByUids(agentUids).stream()
                 .collect(java.util.stream.Collectors.toMap(AgentDefinitionEntity::getAgentUid, agent -> agent, (left, right) -> left, LinkedHashMap::new));
+        agentsByUid.values().forEach(this::ensureWorkspaceDocsForExistingAgent);
 
         return groups.stream()
                 .map(group -> new AgentCatalogGroupDto(
@@ -374,6 +376,7 @@ public class AgentApplicationService {
         member.setCreatedTime(now);
         member.setUpdatedTime(now);
         agentGroupMemberRepository.save(member);
+        initializeAgentWorkspaceDocs(agentName, displayName);
         return toAgentCatalogItem(member, agent);
     }
 
@@ -2208,6 +2211,43 @@ public class AgentApplicationService {
         group.setUpdatedTime(now);
         agentGroupDefinitionRepository.save(group);
         return group;
+    }
+
+    private void initializeAgentWorkspaceDocs(String agentName, String displayName) {
+        Path workspace = NomoClawPaths.ensureAgentWorkspace(agentName);
+        Map<String, String> defaults = new LinkedHashMap<>();
+        String name = (displayName == null || displayName.isBlank()) ? agentName : displayName.trim();
+        defaults.put("SOUL.md", "# SOUL\n\n你是 " + name + " 的内核人格，保持清晰、稳健、可执行。\n");
+        defaults.put("AGENT.md", "# AGENT\n\n## 目标\n- 在当前职责范围内完成任务\n\n## 输出约束\n- 先结论，后细节\n");
+        defaults.put("MEMORY.md", "# MEMORY\n\n- 记录长期偏好\n- 记录高价值上下文\n");
+        defaults.put("TOOLS.md", "# TOOLS\n\n- 列出允许调用的工具\n- 列出工具风险边界\n");
+        defaults.put("IDENTITY.md", "# IDENTITY\n\nname: " + name + "\nrole: 成员\n");
+        defaults.put("USER.md", "# USER\n\n- 记录该 Agent 服务对象的偏好、约束与上下文。\n");
+
+        for (Map.Entry<String, String> entry : defaults.entrySet()) {
+            Path file = workspace.resolve(entry.getKey());
+            if (Files.exists(file)) {
+                continue;
+            }
+            try {
+                Files.writeString(file, entry.getValue(), StandardCharsets.UTF_8);
+            } catch (IOException ex) {
+                throw new IllegalStateException("failed to initialize agent doc: " + file, ex);
+            }
+        }
+        Path legacyAgentsDoc = workspace.resolve("AGENTS.md");
+        try {
+            Files.deleteIfExists(legacyAgentsDoc);
+        } catch (IOException ex) {
+            throw new IllegalStateException("failed to cleanup legacy agent doc: " + legacyAgentsDoc, ex);
+        }
+    }
+
+    private void ensureWorkspaceDocsForExistingAgent(AgentDefinitionEntity agent) {
+        if (agent == null) {
+            return;
+        }
+        initializeAgentWorkspaceDocs(agent.getAgentName(), agent.getDisplayName());
     }
 
     private List<String> readStringArray(String rawJson) {

@@ -56,7 +56,8 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
     agent: "",
     memory: "",
     tools: "",
-    identity: ""
+    identity: "",
+    user: ""
   });
 
   const basicForm = reactive<BasicFormModel>({
@@ -105,6 +106,7 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
       docsForm.memory = "";
       docsForm.tools = "";
       docsForm.identity = "";
+      docsForm.user = "";
       return;
     }
     docsForm.soul = selectedAgent.docs.soul;
@@ -112,6 +114,7 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
     docsForm.memory = selectedAgent.docs.memory;
     docsForm.tools = selectedAgent.docs.tools;
     docsForm.identity = selectedAgent.docs.identity;
+    docsForm.user = selectedAgent.docs.user;
   }
 
   function syncBasicFormFromSelection(selectedAgent: ManagedAgent | null) {
@@ -381,7 +384,8 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
         agent: docsForm.agent,
         memory: docsForm.memory,
         tools: docsForm.tools,
-        identity: docsForm.identity
+        identity: docsForm.identity,
+        user: docsForm.user
       },
       docStates: {
         ...agent.docStates,

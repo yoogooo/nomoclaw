@@ -100,7 +100,8 @@ const docItems = computed(() => [
   { key: "agent" as DocKey, label: "AGENT.md" },
   { key: "memory" as DocKey, label: "MEMORY.md" },
   { key: "tools" as DocKey, label: "TOOLS.md" },
-  { key: "identity" as DocKey, label: "IDENTITY.md" }
+  { key: "identity" as DocKey, label: "IDENTITY.md" },
+  { key: "user" as DocKey, label: "USER.md" }
 ]);
 
 const selectedDocLabel = computed(() =>

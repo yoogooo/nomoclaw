@@ -48,7 +48,8 @@ export function defaultDocs(displayName: string): AgentDocConfig {
     agent: "# AGENT\n\n## 目标\n- 在当前职责范围内完成任务\n\n## 输出约束\n- 先结论，后细节",
     memory: "# MEMORY\n\n- 记录长期偏好\n- 记录高价值上下文",
     tools: "# TOOLS\n\n- 列出允许调用的工具\n- 列出工具风险边界",
-    identity: `# IDENTITY\n\nname: ${displayName || "agent"}\nrole: 成员`
+    identity: `# IDENTITY\n\nname: ${displayName || "agent"}\nrole: 成员`,
+    user: "# USER\n\n- 记录该 Agent 服务对象的偏好、约束与上下文。"
   };
 }
 
@@ -59,7 +60,8 @@ export function defaultDocStates() {
     agent: { enabled: true, updatedAt: now },
     memory: { enabled: true, updatedAt: now },
     tools: { enabled: true, updatedAt: now },
-    identity: { enabled: true, updatedAt: now }
+    identity: { enabled: true, updatedAt: now },
+    user: { enabled: true, updatedAt: now }
   } satisfies Record<DocKey, DocState>;
 }
 

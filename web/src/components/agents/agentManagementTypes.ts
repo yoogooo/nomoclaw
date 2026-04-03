@@ -7,6 +7,7 @@ export interface AgentDocConfig {
   memory: string;
   tools: string;
   identity: string;
+  user: string;
 }
 
 export type DocKey = keyof AgentDocConfig;

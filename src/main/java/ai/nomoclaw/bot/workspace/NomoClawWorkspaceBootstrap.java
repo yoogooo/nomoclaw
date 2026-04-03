@@ -28,6 +28,7 @@ public final class NomoClawWorkspaceBootstrap {
                     Files.writeString(file, entry.getValue(), StandardCharsets.UTF_8);
                 }
             }
+            Files.deleteIfExists(defaultAgentRoot.resolve("AGENTS.md"));
         } catch (Exception ex) {
             throw new IllegalStateException("failed to initialize nomoclaw workspace: " + normalizedRoot, ex);
         }
@@ -36,11 +37,12 @@ public final class NomoClawWorkspaceBootstrap {
 
     private static Map<String, String> buildDefaultAgentFiles() {
         Map<String, String> files = new LinkedHashMap<>();
-        files.put("AGENTS.md", """
-                # Default Agent Rules
-                - 这是系统首次启动自动创建的默认 agent。
+        files.put("AGENT.md", """
+                # AGENT
+                ## 目标
                 - 负责通用任务处理、基础工具协调和最终答复。
-                - 优先用简洁、直接、可执行的方式回应用户。
+                ## 输出约束
+                - 优先给结果，再补必要说明。
                 """);
         files.put("SOUL.md", """
                 # Values

@@ -21,7 +21,7 @@ public final class PromptLoader {
     public static final String SYSTEM_PROMPT_CLASSPATH = "prompts/AGENTS.md";
 
     private static final String[] PROMPT_FILES = {
-            "AGENTS.md",
+            "AGENT.md",
             "SOUL.md",
             "IDENTITY.md",
             "USER.md",
