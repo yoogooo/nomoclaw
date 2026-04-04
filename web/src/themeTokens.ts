@@ -36,21 +36,21 @@ export const themeTokens = {
       error: "#B64B36"
     },
     dark: {
-      bgCanvas: "#000000",
-      bgPage: "#000000",
-      bgSurface: "#0E141A",
-      bgSurfaceSoft: "#151D26",
-      border: "rgba(255, 255, 255, 0.18)",
-      textPrimary: "#F5F8FC",
-      textSecondary: "#C4CFDB",
-      textTertiary: "#99A9BB",
+      bgCanvas: "#111214",
+      bgPage: "#131416",
+      bgSurface: "#1C1D20",
+      bgSurfaceSoft: "#242528",
+      border: "rgba(255, 255, 255, 0.1)",
+      textPrimary: "#F2F3F5",
+      textSecondary: "#C2C5CA",
+      textTertiary: "#979CA5",
       primary: "#36CBB5",
       primaryHover: "#4FDBC7",
       primaryPressed: "#2AAE9A",
-      info: "#60A5FA",
-      success: "#36CBB5",
-      warning: "#F0A35B",
-      error: "#FB7185"
+      info: "#69B6FF",
+      success: "#40D27F",
+      warning: "#F0B35A",
+      error: "#FF6B6B"
     }
   },
   component: {
@@ -79,10 +79,10 @@ export const themeTokens = {
         defaultBorderColor: "#36CBB5",
         defaultBorderColorHover: "#4FDBC7",
         defaultBorderColorPressed: "#2AAE9A",
-        defaultColorDisabled: "#1C242E",
-        defaultTextColorDisabled: "#6D7D90",
-        defaultBorderColorDisabled: "#2C3744",
-        focusRing: "#36CBB53A"
+        defaultColorDisabled: "#2A2B2E",
+        defaultTextColorDisabled: "#80848B",
+        defaultBorderColorDisabled: "#35373C",
+        focusRing: "rgba(54, 203, 181, 0.35)"
       }
     },
     input: {
@@ -98,15 +98,15 @@ export const themeTokens = {
         borderFocusError: "1px solid #B64B36"
       },
       dark: {
-        color: "#111418",
-        colorFocus: "#161B20",
-        colorFocusError: "#2A1D2B",
-        textColor: "#EDF2F7",
-        border: "1px solid rgba(255,255,255,0.16)",
-        borderHover: "1px solid rgba(255,255,255,0.28)",
+        color: "#26272B",
+        colorFocus: "#2D2E33",
+        colorFocusError: "#322427",
+        textColor: "#ECEEF2",
+        border: "1px solid rgba(255,255,255,0.12)",
+        borderHover: "1px solid rgba(255,255,255,0.2)",
         borderFocus: "1px solid #36CBB5",
-        borderError: "1px solid #FB7185",
-        borderFocusError: "1px solid #FB7185"
+        borderError: "1px solid #FF6B6B",
+        borderFocusError: "1px solid #FF6B6B"
       }
     }
   },

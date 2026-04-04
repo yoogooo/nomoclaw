@@ -48,14 +48,12 @@ export const router = createRouter({
     {
       path: "/design-system/light",
       name: "design-system-light",
-      component: DesignSystemPage,
-      props: { mode: "light" }
+      component: DesignSystemPage
     },
     {
       path: "/design-system/dark",
       name: "design-system-dark",
-      component: DesignSystemPage,
-      props: { mode: "dark" }
+      component: DesignSystemPage
     },
     {
       path: "/forbidden",

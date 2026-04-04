@@ -427,7 +427,7 @@ function isTipSaved(messageItem: ConversationMessage) {
   max-width: 92%;
   padding: var(--space-4_5) var(--space-5);
   border-radius: var(--radius-xl) var(--radius-xl) var(--radius-xl) var(--radius-s-md);
-  background: var(--color-bg-canvas);
+  background: var(--color-chat-bubble-assistant-bg);
   line-height: 1.75;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -435,7 +435,7 @@ function isTipSaved(messageItem: ConversationMessage) {
 
 .message-bubble.user {
   border-radius: var(--radius-xl) var(--radius-xl) var(--radius-s-md) var(--radius-xl);
-  background: var(--color-accent-brand);
+  background: var(--color-chat-bubble-user-bg);
   color: var(--color-text-inverse);
 }
 
@@ -722,7 +722,7 @@ function isTipSaved(messageItem: ConversationMessage) {
   gap: var(--space-2);
   padding: var(--space-4_5) var(--space-5);
   border-radius: var(--radius-xl) var(--radius-xl) var(--radius-xl) var(--radius-s-md);
-  background: var(--color-bg-canvas);
+  background: var(--color-chat-bubble-assistant-bg);
 }
 
 .typing-indicator span {

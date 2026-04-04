@@ -25,6 +25,12 @@ body,
   color: var(--text-main);
 }
 
+:root[data-theme="dark"] html,
+:root[data-theme="dark"] body,
+:root[data-theme="dark"] #app {
+  background: linear-gradient(180deg, #141518 0%, #121315 100%);
+}
+
 body {
   min-height: 100vh;
   overflow: hidden;

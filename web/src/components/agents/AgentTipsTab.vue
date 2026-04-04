@@ -116,6 +116,19 @@ function saveEdit() {
   padding-top: var(--space-1_5);
 }
 
+.ui-note-item {
+  background: var(--color-bg-surface-soft);
+  border-color: var(--color-border-soft);
+}
+
+.tip-title {
+  color: var(--color-text-primary);
+}
+
+.tip-content {
+  color: var(--color-text-secondary);
+}
+
 .tip-actions {
   display: inline-flex;
   align-items: center;
@@ -144,5 +157,18 @@ function saveEdit() {
   display: flex;
   justify-content: flex-end;
   gap: var(--space-2);
+}
+
+:global(:root[data-theme="dark"]) .tab-body .ui-note-item {
+  background: #232427;
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+:global(:root[data-theme="dark"]) .tab-body .tip-title {
+  color: #F2F3F5;
+}
+
+:global(:root[data-theme="dark"]) .tab-body .tip-content {
+  color: #E7EAEE;
 }
 </style>

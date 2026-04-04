@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useRouter } from "vue-router";
 import {
   NAlert,
   NBadge,
@@ -33,6 +32,7 @@ import {
 } from "naive-ui";
 import { themeOverrides } from "@/theme";
 import { themeTokens } from "@/themeTokens";
+import { useUiPreferencesStore } from "@/stores/uiPreferences";
 
 interface ColorComparisonRow {
   name: string;
@@ -45,17 +45,8 @@ interface ColorComparisonGroup {
   rows: ColorComparisonRow[];
 }
 
-const props = withDefaults(
-  defineProps<{
-    mode?: "light" | "dark";
-  }>(),
-  {
-    mode: "light"
-  }
-);
-
-const router = useRouter();
-const isDarkMode = computed(() => props.mode === "dark");
+const uiPreferencesStore = useUiPreferencesStore();
+const isDarkMode = computed(() => uiPreferencesStore.themeMode === "dark");
 const modeVars = computed(() =>
   isDarkMode.value
     ? {
@@ -263,6 +254,10 @@ function openNotificationDemo() {
     duration: 3000
   });
 }
+
+function switchTheme(mode: "light" | "dark") {
+  uiPreferencesStore.setThemeMode(mode);
+}
 </script>
 
 <template>
@@ -273,8 +268,8 @@ function openNotificationDemo() {
         <div class="page-subtitle">{{ pageSubtitle }}</div>
 
         <n-space class="mode-switch" :size="8">
-          <n-button :type="isDarkMode ? 'default' : 'primary'" @click="router.push('/design-system/light')">Light 页面</n-button>
-          <n-button :type="isDarkMode ? 'primary' : 'default'" @click="router.push('/design-system/dark')">Dark 页面</n-button>
+          <n-button :type="isDarkMode ? 'default' : 'primary'" @click="switchTheme('light')">Light 页面</n-button>
+          <n-button :type="isDarkMode ? 'primary' : 'default'" @click="switchTheme('dark')">Dark 页面</n-button>
         </n-space>
 
         <section class="spec-section">
