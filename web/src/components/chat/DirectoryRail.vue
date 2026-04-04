@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { Bot, Brain, CalendarClock, MessageCircleMore, Palette, Settings, PlugZap } from "lucide-vue-next";
+import { Bot, Brain, CalendarClock, MessageCircleMore, Settings, PlugZap } from "lucide-vue-next";
 import { useRoute, useRouter } from "vue-router";
 
 const route = useRoute();
@@ -12,8 +12,7 @@ const navItems = computed(() => [
   { key: "agents", label: "Agent 管理", icon: Bot, to: "/agents" },
   { key: "channels", label: "Channel 管理", icon: PlugZap, to: "/channels" },
   { key: "models", label: "模型管理", icon: Brain, to: "/models" },
-  { key: "settings", label: "个人配置", icon: Settings, to: "/settings" },
-  { key: "design-system-light", label: "UI 设计规范参考", icon: Palette, to: "/design-system/light", newPage: true }
+  { key: "settings", label: "个人配置", icon: Settings, to: "/settings" }
 ]);
 
 function isActive(path: string) {
