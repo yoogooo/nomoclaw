@@ -153,8 +153,8 @@ const emit = defineEmits<{
   padding: var(--space-3) var(--space-5_5);
   border: 0;
   border-radius: var(--radius-pill);
-  background: var(--color-accent-brand);
-  color: var(--color-text-inverse);
+  background: var(--color-button-primary-bg);
+  color: var(--color-button-primary-text);
   font-size: var(--font-size-lg);
   font-weight: 700;
   cursor: pointer;
@@ -162,7 +162,7 @@ const emit = defineEmits<{
 }
 
 .composer-submit:hover {
-  background: var(--color-accent-brand-hover);
+  background: var(--color-button-primary-bg-hover);
   box-shadow: var(--shadow-button-brand);
 }
 
@@ -171,11 +171,12 @@ const emit = defineEmits<{
 }
 
 .composer-submit-cancel {
-  background: var(--color-accent-danger);
+  background: var(--color-button-danger-bg);
+  color: var(--color-button-danger-text);
 }
 
 .composer-submit-cancel:hover {
-  background: var(--color-accent-danger-hover);
+  background: var(--color-button-danger-bg-hover);
   box-shadow: var(--shadow-button-danger);
 }
 

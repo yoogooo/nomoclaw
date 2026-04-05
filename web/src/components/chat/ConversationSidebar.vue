@@ -61,7 +61,7 @@ function createConversationAndFocusInput() {
       <div class="panel-subtitle">{{ description }}</div>
     </div>
     <div class="panel-body conversation-panel">
-      <button class="create-conversation-button ui-pill-btn" @click="createConversationAndFocusInput()">
+      <button class="create-conversation-button ui-pill-btn ui-button-brand" @click="createConversationAndFocusInput()">
         创建新对话
       </button>
 
@@ -105,21 +105,9 @@ function createConversationAndFocusInput() {
 .create-conversation-button {
   width: 100%;
   padding: var(--space-3) var(--space-4_5);
-  border-color: var(--color-accent-brand);
-  background: var(--color-accent-brand);
-  color: var(--color-bg-runtime);
   font-size: var(--font-size-sm);
   font-weight: 400;
   cursor: pointer;
-  box-shadow: var(--shadow-button-brand);
-  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
-}
-
-.create-conversation-button:hover {
-  background: var(--color-accent-brand-hover);
-  border-color: var(--color-accent-brand-hover);
-  color: var(--color-bg-runtime);
-  box-shadow: var(--shadow-card-hover);
 }
 
 .conversation-list {

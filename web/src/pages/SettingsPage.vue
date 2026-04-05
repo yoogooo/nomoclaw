@@ -106,7 +106,7 @@ function onThemeModeChange(value: "light" | "dark") {
   background: transparent;
   color: var(--color-text-muted);
   font-size: var(--font-size-lg);
-  font-weight: 600;
+  font-weight: 400;
   line-height: 1;
   cursor: pointer;
   transition: background-color 0.18s ease, color 0.18s ease;
@@ -118,7 +118,7 @@ function onThemeModeChange(value: "light" | "dark") {
 
 .theme-option.active {
   background: var(--color-accent-brand);
-  color: var(--color-text-inverse);
+  color: var(--color-button-primary-text);
 }
 
 @media (max-width: var(--size-breakpoint-lg)) {

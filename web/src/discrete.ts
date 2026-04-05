@@ -40,6 +40,14 @@ function resolveApis(): DiscreteApis {
   return apis;
 }
 
+function readToken(name: string, fallback: string): string {
+  if (typeof document === "undefined") {
+    return fallback;
+  }
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return value || fallback;
+}
+
 function createProxy<T extends object>(key: keyof DiscreteApis): T {
   return new Proxy({} as T, {
     get(_target, prop, receiver) {
@@ -61,9 +69,14 @@ export function warningDialogPreset(): Pick<DialogOptions, "showIcon" | "positiv
         type: "error"
       },
       negativeButtonProps: {
+        secondary: false,
         type: "default",
-        color: "#3A3D44",
-        textColor: "#E7EAEE"
+        color: readToken("--color-button-neutral-bg-dark", "#3A3D44"),
+        textColor: readToken("--color-button-neutral-text-dark", "#E7EAEE"),
+        themeOverrides: {
+          colorHover: readToken("--color-button-neutral-bg-hover-dark", "#454953"),
+          colorPressed: readToken("--color-button-neutral-bg-pressed-dark", "#505562")
+        }
       }
     };
   }
@@ -71,6 +84,16 @@ export function warningDialogPreset(): Pick<DialogOptions, "showIcon" | "positiv
     showIcon: false,
     positiveButtonProps: {
       type: "error"
+    },
+    negativeButtonProps: {
+      secondary: false,
+      type: "default",
+      color: readToken("--color-button-neutral-bg-light", "#EEF1F5"),
+      textColor: readToken("--color-button-neutral-text-light", "#4B5563"),
+      themeOverrides: {
+        colorHover: readToken("--color-button-neutral-bg-hover-light", "#E2E7EE"),
+        colorPressed: readToken("--color-button-neutral-bg-pressed-light", "#D6DEE8")
+      }
     }
   };
 }

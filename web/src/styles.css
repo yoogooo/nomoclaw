@@ -245,6 +245,21 @@ a {
   font-weight: 600;
 }
 
+.ui-button-brand {
+  border-color: var(--color-button-primary-bg);
+  background: var(--color-button-primary-bg);
+  color: var(--color-button-primary-text);
+  box-shadow: var(--shadow-button-brand);
+  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
+}
+
+.ui-button-brand:hover {
+  border-color: var(--color-button-primary-bg-hover);
+  background: var(--color-button-primary-bg-hover);
+  color: var(--color-button-primary-text);
+  box-shadow: var(--shadow-card-hover);
+}
+
 .ui-title-strong {
   font-weight: 700;
   color: var(--color-text-body-alt);
