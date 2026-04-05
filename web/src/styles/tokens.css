@@ -51,6 +51,8 @@
   --color-bg-rail-active: #060D28;
   --color-bg-rail-brand: #FFFFFF;
   --color-bg-rail-avatar: linear-gradient(135deg, #DCE5F1 0%, #B8C6D8 100%);
+  --color-border-rail-avatar: rgba(15, 35, 56, 0.12);
+  --color-text-rail-avatar: #2B4058;
   --color-bg-runtime: #000000;
   --color-bg-runtime-btn: rgba(255, 255, 255, 0.08);
   --color-bg-runtime-btn-hover: rgba(255, 255, 255, 0.14);
@@ -352,6 +354,9 @@
   --color-bg-rail: #434548;
   --color-bg-rail-brand: #46494D;
   --color-bg-rail-active: rgba(255, 255, 255, 0.14);
+  --color-bg-rail-avatar: linear-gradient(135deg, #343840 0%, #252930 100%);
+  --color-border-rail-avatar: rgba(148, 163, 184, 0.38);
+  --color-text-rail-avatar: #D9E2EE;
   --color-bg-runtime: #0F1012;
   --color-chat-bubble-assistant-bg: #222327;
   --color-chat-bubble-user-bg: #1D6B58;

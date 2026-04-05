@@ -130,9 +130,11 @@ function openNavItem(item: { to: string; newPage?: boolean }) {
   justify-content: center;
   border-radius: var(--radius-pill);
   background: var(--color-bg-rail-avatar);
-  color: var(--color-text-primary);
+  border: var(--size-1) solid var(--color-border-rail-avatar);
+  color: var(--color-text-rail-avatar);
   font-size: var(--font-size-md);
   font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 @media (max-width: var(--size-breakpoint-lg)) {
