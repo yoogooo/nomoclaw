@@ -1,5 +1,6 @@
 import { createDiscreteApi, darkTheme } from "naive-ui";
 import type { DialogApi, MessageApi } from "naive-ui";
+import type { DialogOptions } from "naive-ui";
 import { resolveThemeOverrides } from "@/theme";
 import type { UiThemeMode } from "@/stores/uiPreferences";
 
@@ -51,3 +52,25 @@ function createProxy<T extends object>(key: keyof DiscreteApis): T {
 
 export const message = createProxy<MessageApi>("message");
 export const dialog = createProxy<DialogApi>("dialog");
+
+export function warningDialogPreset(): Pick<DialogOptions, "showIcon" | "positiveButtonProps" | "negativeButtonProps"> {
+  if (resolveThemeMode() === "dark") {
+    return {
+      showIcon: false,
+      positiveButtonProps: {
+        type: "error"
+      },
+      negativeButtonProps: {
+        type: "default",
+        color: "#3A3D44",
+        textColor: "#E7EAEE"
+      }
+    };
+  }
+  return {
+    showIcon: false,
+    positiveButtonProps: {
+      type: "error"
+    }
+  };
+}

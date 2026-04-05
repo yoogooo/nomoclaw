@@ -2,7 +2,7 @@ import { computed, ref } from "vue";
 import { defineStore } from "pinia";
 import { cronApi, type CreateCronJobPayload } from "@/api/cronApi";
 import { fileApi } from "@/api/fileApi";
-import { dialog, message } from "@/discrete";
+import { dialog, message, warningDialogPreset } from "@/discrete";
 import type { AgentCatalogGroup, CronJob, CronJobExecutionResult, CronSubscription } from "@/types/api";
 
 export const useCronJobsStore = defineStore("cronJobs", () => {
@@ -137,6 +137,7 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
     dialog.warning({
       title: "删除定时任务",
       content: `确认删除“${job.title || job.taskContent || "未命名任务"}”？`,
+      ...warningDialogPreset(),
       positiveText: "删除",
       negativeText: "取消",
       onPositiveClick: async () => {
@@ -157,6 +158,7 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
     dialog.warning({
       title: "批量删除任务",
       content: `确认删除选中的 ${selectedJobs.length} 个定时任务？\n\n${preview}${suffix}`,
+      ...warningDialogPreset(),
       positiveText: "删除",
       negativeText: "取消",
       onPositiveClick: async () => {

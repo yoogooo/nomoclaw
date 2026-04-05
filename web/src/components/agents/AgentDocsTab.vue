@@ -67,7 +67,6 @@ const emit = defineEmits<{
             <n-button
               size="small"
               tertiary
-              class="docs-action-btn"
               :disabled="!selectedDocEnabled"
               @click="emit('toggle-edit')"
             >
@@ -76,7 +75,6 @@ const emit = defineEmits<{
             <n-button
               size="small"
               type="primary"
-              class="docs-action-btn"
               :disabled="!docEditable || !selectedDocEnabled"
               @click="emit('save')"
             >
@@ -170,10 +168,6 @@ const emit = defineEmits<{
 .docs-actions {
   display: flex;
   gap: var(--space-2);
-}
-
-.docs-action-btn {
-  min-width: var(--size-92);
 }
 
 .docs-editor-title {

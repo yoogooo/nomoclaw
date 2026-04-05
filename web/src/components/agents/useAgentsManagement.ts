@@ -1,7 +1,7 @@
 import { computed, reactive, ref } from "vue";
 import { conversationApi } from "@/api/conversationApi";
 import { modelApi } from "@/api/modelApi";
-import { dialog, message } from "@/discrete";
+import { dialog, message, warningDialogPreset } from "@/discrete";
 import { useAgentCatalogStore } from "@/stores/agentCatalog";
 import type {
   AgentDocConfig,
@@ -235,6 +235,7 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
     dialog.warning({
       title: "删除 Agent",
       content: `你即将删除“${agent.displayName || agent.agentName}”，确认继续操作么？`,
+      ...warningDialogPreset(),
       positiveText: "继续",
       negativeText: "取消",
       onPositiveClick: () => {

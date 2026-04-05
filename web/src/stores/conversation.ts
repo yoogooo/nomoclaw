@@ -4,7 +4,7 @@ import { conversationApi } from "@/api/conversationApi";
 import { fileApi } from "@/api/fileApi";
 import { subscribeConversationEvents } from "@/api/eventStreamApi";
 import { modelApi } from "@/api/modelApi";
-import { dialog, message } from "@/discrete";
+import { dialog, message, warningDialogPreset } from "@/discrete";
 import { useAgentCatalogStore } from "@/stores/agentCatalog";
 import { useConversationRunsStore } from "@/stores/conversationRuns";
 import { useRuntimeLogStore } from "@/stores/runtimeLog";
@@ -827,6 +827,7 @@ export const useConversationStore = defineStore("conversation", () => {
     dialog.warning({
       title: "删除对话",
       content: `确认删除“${title || "未命名对话"}”？删除后不可恢复。`,
+      ...warningDialogPreset(),
       positiveText: "删除",
       negativeText: "取消",
       onPositiveClick: async () => {
