@@ -75,6 +75,9 @@ function closePreview() {
 .jinnang-picker {
   position: relative;
   padding: var(--space-3);
+  border: var(--size-1) solid var(--color-border-strong);
+  border-radius: var(--radius-xl);
+  background: var(--color-bg-surface-soft);
 }
 
 .jinnang-picker-close {
@@ -118,7 +121,7 @@ function closePreview() {
   width: 100%;
   padding: var(--space-2_5) var(--space-3);
   border: var(--size-1) solid transparent;
-  border-radius: 0;
+  border-radius: var(--radius-xl);
   background: transparent;
   box-shadow: none !important;
   transition: border-color 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease;
@@ -150,15 +153,13 @@ function closePreview() {
 .jinnang-option:hover,
 .jinnang-option:focus-within {
   border-color: var(--color-border-brand-hover);
-  border-radius: var(--radius-xl);
-  background: color-mix(in srgb, var(--color-bg-brand-soft) 68%, white);
+  background: color-mix(in srgb, var(--color-bg-brand-soft) 72%, var(--color-bg-surface-soft));
   box-shadow: 0 1px 2px rgb(15 23 42 / 0.05) !important;
 }
 
 .jinnang-option.active {
   border-color: var(--color-overlay-brand-38);
-  border-radius: var(--radius-xl);
-  background: var(--color-bg-brand-soft);
+  background: color-mix(in srgb, var(--color-bg-brand-soft) 88%, var(--color-bg-surface-soft));
 }
 
 .jinnang-radio-ui {
@@ -166,9 +167,9 @@ function closePreview() {
   flex: none;
   width: var(--size-16);
   height: var(--size-16);
-  border: var(--size-1_5) solid var(--color-text-runtime-subtle);
+  border: var(--size-1_5) solid var(--color-border-strong);
   border-radius: var(--radius-pill);
-  background: var(--color-bg-surface);
+  background: var(--color-bg-surface-mute);
   position: relative;
 }
 
@@ -213,17 +214,13 @@ function closePreview() {
   top: var(--space-2);
   display: inline-flex;
   align-items: center;
-  border: var(--size-1) solid color-mix(in srgb, var(--color-border-brand-strong) 70%, transparent);
+  border: var(--size-1) solid var(--color-border-brand-soft-hover);
   border-radius: var(--radius-pill);
   padding: var(--size-3) var(--space-1_5);
-  background: linear-gradient(
-    140deg,
-    color-mix(in srgb, var(--color-bg-brand-soft) 85%, white),
-    color-mix(in srgb, var(--color-bg-brand-soft) 60%, var(--color-bg-surface))
-  );
+  background: var(--color-bg-brand-soft);
   color: var(--color-text-brand-strong);
   font-size: var(--font-size-2xs);
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.01em;
   box-shadow: var(--shadow-soft-sm);
   opacity: 0;
@@ -233,11 +230,7 @@ function closePreview() {
 
 .jinnang-view-btn:hover {
   border-color: var(--color-border-brand-strong);
-  background: linear-gradient(
-    140deg,
-    color-mix(in srgb, var(--color-bg-brand-soft) 96%, white),
-    color-mix(in srgb, var(--color-bg-brand-soft) 78%, var(--color-bg-surface))
-  );
+  background: var(--color-bg-brand-soft-hover);
   transform: translateY(calc(var(--size-1) * -1));
 }
 
@@ -260,7 +253,7 @@ function closePreview() {
   border-radius: var(--radius-xl);
   border: var(--size-1) solid color-mix(in srgb, var(--color-border-soft) 78%, transparent);
   background: var(--color-bg-surface);
-  box-shadow: var(--shadow-soft-lg);
+  box-shadow: var(--shadow-soft-md);
   padding: var(--space-4) var(--space-4_5);
   display: flex;
   flex-direction: column;
@@ -279,7 +272,7 @@ function closePreview() {
 .jinnang-preview-title {
   font-size: var(--font-size-md);
   font-weight: 700;
-  color: var(--color-text-title);
+  color: var(--color-text-heading);
   line-height: 1.45;
 }
 
@@ -309,11 +302,65 @@ function closePreview() {
 .jinnang-preview-content {
   white-space: pre-wrap;
   line-height: 1.7;
-  color: var(--color-text-body);
+  color: var(--color-text-body-alt);
   flex: 1;
   min-height: 0;
   overflow: auto;
   padding-right: var(--space-1_5);
+}
+
+:global(:root[data-theme="dark"]) .jinnang-picker {
+  background: var(--color-bg-surface);
+  border-color: var(--color-border-panel);
+}
+
+:global(:root[data-theme="dark"]) .jinnang-option + .jinnang-option::before {
+  background: color-mix(in srgb, var(--color-border-soft) 55%, transparent);
+}
+
+:global(:root[data-theme="dark"]) .jinnang-option {
+  border-color: transparent;
+}
+
+:global(:root[data-theme="dark"]) .jinnang-option:hover,
+:global(:root[data-theme="dark"]) .jinnang-option:focus-within {
+  border-color: var(--color-border-brand-soft-hover);
+  background: color-mix(in srgb, var(--color-bg-brand-soft) 52%, var(--color-bg-surface-soft));
+  box-shadow: none !important;
+}
+
+:global(:root[data-theme="dark"]) .jinnang-option.active {
+  border-color: var(--color-border-brand-light);
+  background: color-mix(in srgb, var(--color-bg-brand-soft) 64%, var(--color-bg-surface-soft));
+}
+
+:global(:root[data-theme="dark"]) .jinnang-option-title {
+  color: var(--color-text-primary);
+}
+
+:global(:root[data-theme="dark"]) .jinnang-option-summary {
+  color: var(--color-text-secondary);
+}
+
+:global(:root[data-theme="dark"]) .jinnang-radio-ui {
+  border-color: var(--color-border-default);
+  background: var(--color-bg-surface-mute);
+}
+
+:global(:root[data-theme="dark"]) .jinnang-view-btn {
+  border-color: var(--color-border-brand-soft);
+  background: color-mix(in srgb, var(--color-bg-brand-soft) 86%, var(--color-bg-surface));
+  color: var(--color-text-brand);
+}
+
+:global(:root[data-theme="dark"]) .jinnang-view-btn:hover {
+  border-color: var(--color-border-brand-hover);
+  background: color-mix(in srgb, var(--color-bg-brand-soft-hover) 90%, var(--color-bg-surface));
+}
+
+:global(:root[data-theme="dark"]) .jinnang-preview-panel {
+  border-color: var(--color-border-panel);
+  background: var(--color-bg-surface);
 }
 
 @media (hover: none) {
