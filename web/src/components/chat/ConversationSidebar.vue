@@ -105,17 +105,21 @@ function createConversationAndFocusInput() {
 .create-conversation-button {
   width: 100%;
   padding: var(--space-3) var(--space-4_5);
-  background: var(--color-bg-brand-soft);
-  color: var(--color-accent-brand);
-  font-size: var(--size-15);
+  border-color: var(--color-accent-brand);
+  background: var(--color-accent-brand);
+  color: var(--color-bg-runtime);
+  font-size: var(--font-size-sm);
+  font-weight: 400;
   cursor: pointer;
-  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  box-shadow: var(--shadow-button-brand);
+  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
 }
 
 .create-conversation-button:hover {
-  background: var(--color-bg-brand-soft-hover);
-  border-color: var(--color-border-brand-hover);
-  box-shadow: var(--shadow-soft-sm);
+  background: var(--color-accent-brand-hover);
+  border-color: var(--color-accent-brand-hover);
+  color: var(--color-bg-runtime);
+  box-shadow: var(--shadow-card-hover);
 }
 
 .conversation-list {
@@ -170,7 +174,7 @@ function createConversationAndFocusInput() {
   white-space: nowrap;
   font-size: var(--font-size-md);
   line-height: 1.4;
-  font-weight: 700;
+  font-weight: 500;
   color: var(--color-text-primary);
 }
 

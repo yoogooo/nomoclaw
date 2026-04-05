@@ -49,7 +49,7 @@ a {
 .ui-focus-highlight:focus,
 .ui-focus-highlight:focus-visible {
   border-color: var(--color-accent-brand);
-  background: var(--color-text-inverse);
+  background: var(--color-bg-surface);
   box-shadow: 0 0 0 var(--size-4) var(--color-bg-brand-tint-14);
 }
 
@@ -484,15 +484,41 @@ a {
   height: var(--size-36);
   border: var(--size-1) solid var(--color-border-strong);
   border-radius: var(--radius-s-md);
-  background: var(--color-text-inverse);
+  background: var(--color-bg-surface-soft);
   color: var(--color-text-label);
   cursor: pointer;
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.ui-avatar-icon-btn:hover {
+  border-color: var(--color-border-active);
+  background: var(--color-bg-brand-soft);
+  color: var(--color-text-brand);
 }
 
 .ui-avatar-icon-btn.active {
   border-color: var(--color-border-brand);
   box-shadow: 0 0 0 var(--size-2) var(--color-border-ring);
   color: var(--color-text-link);
+  background: var(--color-bg-brand-soft);
+}
+
+:root[data-theme="dark"] .ui-avatar-icon-btn {
+  background: var(--color-bg-surface-mute);
+  border-color: var(--color-border-soft);
+  color: var(--color-text-secondary);
+}
+
+:root[data-theme="dark"] .ui-avatar-icon-btn:hover {
+  border-color: var(--color-border-brand-hover);
+  background: var(--color-bg-brand-soft);
+  color: var(--color-text-brand);
+}
+
+:root[data-theme="dark"] .ui-avatar-icon-btn.active {
+  border-color: var(--color-border-brand);
+  background: var(--color-bg-brand-soft);
+  color: var(--color-text-brand-strong);
 }
 
 .ui-avatar-color-grid {

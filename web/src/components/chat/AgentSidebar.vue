@@ -248,7 +248,7 @@ function avatarBgColor(raw?: string | null, explicitColor?: string | null) {
   z-index: 1;
   margin: 0;
   padding: var(--space-1_5) 0 var(--space-2);
-  background: var(--color-gradient-agent-sticky);
+  background: transparent;
 }
 
 @media (max-width: var(--size-breakpoint-lg)) {

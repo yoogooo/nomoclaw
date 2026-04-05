@@ -1,13 +1,53 @@
-import { createDiscreteApi } from "naive-ui";
-import { themeOverrides } from "@/theme";
+import { createDiscreteApi, darkTheme } from "naive-ui";
+import type { DialogApi, MessageApi } from "naive-ui";
+import { resolveThemeOverrides } from "@/theme";
+import type { UiThemeMode } from "@/stores/uiPreferences";
 
-export const { message, dialog } = createDiscreteApi(["message", "dialog"], {
-  messageProviderProps: {
-    placement: "top",
-    duration: 2200,
-    max: 3
-  },
-  configProviderProps: {
-    themeOverrides
+interface DiscreteApis {
+  message: MessageApi;
+  dialog: DialogApi;
+}
+
+let cachedMode: UiThemeMode | null = null;
+let cachedApis: DiscreteApis | null = null;
+
+function resolveThemeMode(): UiThemeMode {
+  if (typeof document === "undefined") {
+    return "light";
   }
-});
+  return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+}
+
+function resolveApis(): DiscreteApis {
+  const mode = resolveThemeMode();
+  if (cachedApis && cachedMode === mode) {
+    return cachedApis;
+  }
+  const apis = createDiscreteApi(["message", "dialog"], {
+    messageProviderProps: {
+      placement: "top",
+      duration: 2200,
+      max: 3
+    },
+    configProviderProps: {
+      theme: mode === "dark" ? darkTheme : undefined,
+      themeOverrides: resolveThemeOverrides(mode)
+    }
+  });
+  cachedMode = mode;
+  cachedApis = apis;
+  return apis;
+}
+
+function createProxy<T extends object>(key: keyof DiscreteApis): T {
+  return new Proxy({} as T, {
+    get(_target, prop, receiver) {
+      const api = resolveApis()[key] as unknown as Record<PropertyKey, unknown>;
+      const value = Reflect.get(api, prop, receiver);
+      return typeof value === "function" ? value.bind(api) : value;
+    }
+  });
+}
+
+export const message = createProxy<MessageApi>("message");
+export const dialog = createProxy<DialogApi>("dialog");
