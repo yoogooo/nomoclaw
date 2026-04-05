@@ -78,6 +78,7 @@ const buttonStateVars = computed(() => ({ "--btn-focus-ring": currentButtonToken
 const buttonToneRows = [
   { label: "Primary", type: "primary" as const },
   { label: "Secondary", type: "primary" as const, secondary: true },
+  { label: "Tertiary", type: "primary" as const, tertiary: true },
   { label: "Info", type: "info" as const },
   { label: "Success", type: "success" as const },
   { label: "Warning", type: "warning" as const },
@@ -400,10 +401,10 @@ function switchTheme(mode: "light" | "dark") {
                       <div class="ui-button-state-head">聚焦</div>
                       <template v-for="row in buttonToneRows" :key="`btn-row-${row.label}`">
                         <div class="ui-button-state-label">{{ row.label }}</div>
-                        <n-button size="small" :type="row.type" :secondary="Boolean(row.secondary)" class="ui-state-static-btn">Button</n-button>
-                        <n-button size="small" :type="row.type" :secondary="Boolean(row.secondary)" class="ui-state-static-btn ui-btn-force-hover">Button</n-button>
-                        <n-button size="small" :type="row.type" :secondary="Boolean(row.secondary)" disabled class="ui-state-static-btn">Button</n-button>
-                        <n-button size="small" :type="row.type" :secondary="Boolean(row.secondary)" class="ui-state-static-btn ui-btn-force-focus">Button</n-button>
+                        <n-button size="small" :type="row.type" :secondary="Boolean(row.secondary)" :tertiary="Boolean(row.tertiary)" class="ui-state-static-btn">Button</n-button>
+                        <n-button size="small" :type="row.type" :secondary="Boolean(row.secondary)" :tertiary="Boolean(row.tertiary)" class="ui-state-static-btn ui-btn-force-hover">Button</n-button>
+                        <n-button size="small" :type="row.type" :secondary="Boolean(row.secondary)" :tertiary="Boolean(row.tertiary)" disabled class="ui-state-static-btn">Button</n-button>
+                        <n-button size="small" :type="row.type" :secondary="Boolean(row.secondary)" :tertiary="Boolean(row.tertiary)" class="ui-state-static-btn ui-btn-force-focus">Button</n-button>
                       </template>
                     </div>
                   </div>
