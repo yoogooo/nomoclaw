@@ -3,6 +3,7 @@ import { computed, reactive, ref, watch } from "vue";
 import { BellRing, Clock3 } from "lucide-vue-next";
 import { NButton, NForm, NFormItem, NInput, NInputNumber, NModal } from "naive-ui";
 import type { CronJob } from "@/types/api";
+import { getSortLocale } from "@/i18n";
 import { humanizeCronExpression } from "@/utils/format";
 
 type ExecutionType = "once" | "recurring";
@@ -435,7 +436,7 @@ function computeNextMonthRun(from: Date, monthlyDay: number, time: string) {
 }
 
 function formatPreviewTime(value: Date) {
-  return value.toLocaleString("zh-CN", {
+  return value.toLocaleString(getSortLocale(), {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",

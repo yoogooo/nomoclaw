@@ -3,6 +3,7 @@ import { computed } from "vue";
 import { NButton, NCheckbox, NFlex, NTag } from "naive-ui";
 import { useCronJobsStore } from "@/stores/cronJobs";
 import type { CronJob } from "@/types/api";
+import { getSortLocale } from "@/i18n";
 import { cronStatusLabel, displayCronJobTitle, fallbackAgentLabel, formatDateTime } from "@/utils/format";
 
 const emit = defineEmits<{
@@ -40,7 +41,7 @@ const groupedJobs = computed(() => {
     if (left.sortIndex !== right.sortIndex) {
       return left.sortIndex - right.sortIndex;
     }
-    return left.label.localeCompare(right.label, "zh-CN");
+    return left.label.localeCompare(right.label, getSortLocale());
   });
 });
 

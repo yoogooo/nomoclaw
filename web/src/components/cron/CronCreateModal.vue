@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { BellRing, Clock3 } from "lucide-vue-next";
 import { NButton, NEmpty, NForm, NFormItem, NInput, NInputNumber, NModal, NSelect } from "naive-ui";
 import { useCronJobsStore } from "@/stores/cronJobs";
-import { cronTaskTemplates, type ExecutionType, type RecurringMode } from "./cronTaskTemplates";
+import { buildCronTaskTemplates, type ExecutionType, type RecurringMode } from "./cronTaskTemplates";
 import { humanizeCronExpression, humanizeTimezone } from "@/utils/format";
 
 const props = defineProps<{
@@ -16,6 +17,8 @@ const emit = defineEmits<{
 }>();
 
 const cronJobsStore = useCronJobsStore();
+const { t, locale } = useI18n();
+const cronTaskTemplates = computed(() => buildCronTaskTemplates((key) => t(key)));
 const fallbackTimezone = typeof Intl !== "undefined"
   ? Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Shanghai"
   : "Asia/Shanghai";
@@ -120,7 +123,7 @@ function resetCreateForm() {
   form.timezone = fallbackTimezone;
 
   if (props.initialTemplateId) {
-    const template = cronTaskTemplates.find((item) => item.id === props.initialTemplateId);
+    const template = cronTaskTemplates.value.find((item) => item.id === props.initialTemplateId);
     if (template) {
       form.title = template.title;
       form.taskContent = template.taskContent;
@@ -457,7 +460,7 @@ function computeNextRunAfter(from: Date) {
 }
 
 function formatPreviewTime(value: Date) {
-  return value.toLocaleString("zh-CN", {
+  return value.toLocaleString(locale.value === "zh-CN" ? "zh-CN" : "en-US", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",

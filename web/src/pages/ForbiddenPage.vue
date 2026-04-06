@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 
 const route = useRoute();
 const router = useRouter();
+const { t } = useI18n();
 
 const detailMessage = computed(() => {
   const message = route.query.message;
   return typeof message === "string" && message.trim()
     ? message
-    : "当前来源地址不在允许范围内，系统已拒绝本次访问。";
+    : t("pages.forbidden.defaultReason");
 });
 </script>
 
@@ -17,19 +19,19 @@ const detailMessage = computed(() => {
   <div class="forbidden-page">
     <div class="forbidden-shell">
       <div class="ui-status-chip-danger">403 · ACCESS DENIED</div>
-      <h1 class="forbidden-title">无权访问</h1>
+      <h1 class="forbidden-title">{{ t("pages.forbidden.title") }}</h1>
       <p class="forbidden-subtitle">
-        这个项目当前只允许来自本机的访问请求。若你是通过非授权地址、代理或远程网络进入，页面和 API 都会被拒绝。
+        {{ t("pages.forbidden.description") }}
       </p>
 
       <div class="forbidden-panel">
-        <div class="ui-label-caps-danger">拒绝原因</div>
+        <div class="ui-label-caps-danger">{{ t("pages.forbidden.reason") }}</div>
         <div class="panel-message">{{ detailMessage }}</div>
       </div>
 
       <div class="forbidden-actions">
         <button class="primary-action" type="button" @click="router.replace({ name: 'chat' })">
-          返回首页
+          {{ t("pages.forbidden.backHome") }}
         </button>
       </div>
     </div>

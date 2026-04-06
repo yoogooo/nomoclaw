@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick } from "vue";
+import { useI18n } from "vue-i18n";
 import { NDropdown } from "naive-ui";
 import type { DropdownOption } from "naive-ui";
 import { useAgentCatalogStore } from "@/stores/agentCatalog";
@@ -8,6 +9,7 @@ import { conversationSelectionLabel, formatFriendlyDateTime } from "@/utils/form
 
 const conversationStore = useConversationStore();
 const agentCatalogStore = useAgentCatalogStore();
+const { t } = useI18n();
 
 const description = computed(() => {
   const label = conversationSelectionLabel(
@@ -17,18 +19,18 @@ const description = computed(() => {
     agentCatalogStore.selectedAgentUid
   );
   return agentCatalogStore.selectedEntryType === "group"
-    ? `正在查看 ${label} 下的全部对话。`
-    : `正在查看 ${label} 下的对话记录。`;
+    ? t("chat.sidebar.viewingGroup", { label })
+    : t("chat.sidebar.viewingAgent", { label });
 });
 
 function menuOptions(conversationUid: string, title: string): DropdownOption[] {
   return [
     {
       key: "rename",
-      label: "修改名称",
+      label: t("chat.sidebar.rename"),
       props: {
         onClick: () => {
-          const nextTitle = window.prompt("请输入新的对话名称", title || "");
+          const nextTitle = window.prompt(t("chat.sidebar.renamePrompt"), title || "");
           if (nextTitle && nextTitle.trim()) {
             void conversationStore.renameConversation(conversationUid, nextTitle.trim());
           }
@@ -37,7 +39,7 @@ function menuOptions(conversationUid: string, title: string): DropdownOption[] {
     },
     {
       key: "delete",
-      label: "删除",
+      label: t("chat.sidebar.delete"),
       props: {
         onClick: () => void conversationStore.confirmDeleteConversation(conversationUid, title)
       }
@@ -57,12 +59,12 @@ function createConversationAndFocusInput() {
 <template>
   <aside class="panel conversation-shell">
     <div class="panel-header">
-      <div class="panel-title">历史对话</div>
+      <div class="panel-title">{{ t("chat.sidebar.history") }}</div>
       <div class="panel-subtitle">{{ description }}</div>
     </div>
     <div class="panel-body conversation-panel">
       <button class="create-conversation-button ui-pill-btn ui-button-brand" @click="createConversationAndFocusInput()">
-        创建新对话
+        {{ t("chat.sidebar.createConversation") }}
       </button>
 
       <div class="scroll-area conversation-list">
@@ -74,8 +76,8 @@ function createConversationAndFocusInput() {
             :class="{ active: conversationStore.currentConversationUid === item.conversationUid }"
           >
             <button class="conversation-main" @click="conversationStore.selectConversation(item.conversationUid)">
-              <div class="conversation-title">{{ item.title || "未命名对话" }}</div>
-              <div class="conversation-time">更新于 {{ formatFriendlyDateTime(item.updatedTime) }}</div>
+              <div class="conversation-title">{{ item.title || t("chat.sidebar.unnamed") }}</div>
+              <div class="conversation-time">{{ t("chat.sidebar.updatedAt", { time: formatFriendlyDateTime(item.updatedTime) }) }}</div>
             </button>
             <div class="conversation-menu-wrap">
               <n-dropdown trigger="click" :options="menuOptions(item.conversationUid, item.title || '')">
@@ -84,7 +86,7 @@ function createConversationAndFocusInput() {
             </div>
           </div>
         </div>
-        <div v-else class="conversation-list-empty">暂无历史对话</div>
+        <div v-else class="conversation-list-empty">{{ t("chat.sidebar.noConversations") }}</div>
       </div>
     </div>
   </aside>

@@ -1,9 +1,12 @@
 import { computed, ref } from "vue";
 import { defineStore } from "pinia";
+import { setI18nLocale } from "@/i18n";
+import type { AppLocale } from "@/i18n";
 
 export type UiThemeMode = "light" | "dark";
 
 const THEME_STORAGE_KEY = "ui:theme-mode";
+const LOCALE_STORAGE_KEY = "ui:locale";
 
 function normalizeThemeMode(value: string | null | undefined): UiThemeMode {
   return value === "dark" ? "dark" : "light";
@@ -20,8 +23,16 @@ function applyThemeAttribute(mode: UiThemeMode) {
   document.documentElement.removeAttribute("data-theme");
 }
 
+function normalizeLocale(value: string | null | undefined): AppLocale {
+  if (!value) return "zh-CN";
+  const normalized = value.toLowerCase();
+  if (normalized.startsWith("en")) return "en-US";
+  return "zh-CN";
+}
+
 export const useUiPreferencesStore = defineStore("ui-preferences", () => {
   const themeMode = ref<UiThemeMode>("light");
+  const locale = ref<AppLocale>("zh-CN");
   const ready = ref(false);
   const isDarkTheme = computed(() => themeMode.value === "dark");
 
@@ -32,8 +43,11 @@ export const useUiPreferencesStore = defineStore("ui-preferences", () => {
     if (typeof window !== "undefined") {
       const cached = window.localStorage.getItem(THEME_STORAGE_KEY);
       themeMode.value = normalizeThemeMode(cached);
+      const cachedLocale = window.localStorage.getItem(LOCALE_STORAGE_KEY);
+      locale.value = cachedLocale ? normalizeLocale(cachedLocale) : normalizeLocale(window.navigator.language);
     }
     applyThemeAttribute(themeMode.value);
+    setI18nLocale(locale.value);
     ready.value = true;
   }
 
@@ -49,11 +63,21 @@ export const useUiPreferencesStore = defineStore("ui-preferences", () => {
     setThemeMode(themeMode.value === "dark" ? "light" : "dark");
   }
 
+  function setLocale(nextLocale: AppLocale) {
+    locale.value = nextLocale;
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(LOCALE_STORAGE_KEY, nextLocale);
+    }
+    setI18nLocale(nextLocale);
+  }
+
   return {
     themeMode,
+    locale,
     isDarkTheme,
     init,
     setThemeMode,
-    toggleThemeMode
+    toggleThemeMode,
+    setLocale
   };
 });

@@ -2,17 +2,19 @@
 import { computed } from "vue";
 import { Bot, Brain, CalendarClock, MessageCircleMore, Settings, PlugZap } from "lucide-vue-next";
 import { useRoute, useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
 
 const route = useRoute();
 const router = useRouter();
+const { t } = useI18n();
 
 const navItems = computed(() => [
-  { key: "chat", label: "对话控制台", icon: MessageCircleMore, to: "/" },
-  { key: "cron", label: "定时任务管理", icon: CalendarClock, to: "/cron" },
-  { key: "agents", label: "Agent 管理", icon: Bot, to: "/agents" },
-  { key: "channels", label: "Channel 管理", icon: PlugZap, to: "/channels" },
-  { key: "models", label: "模型管理", icon: Brain, to: "/models" },
-  { key: "settings", label: "个人配置", icon: Settings, to: "/settings" }
+  { key: "chat", label: t("nav.chat"), icon: MessageCircleMore, to: "/" },
+  { key: "cron", label: t("nav.cron"), icon: CalendarClock, to: "/cron" },
+  { key: "agents", label: t("nav.agents"), icon: Bot, to: "/agents" },
+  { key: "channels", label: t("nav.channels"), icon: PlugZap, to: "/channels" },
+  { key: "models", label: t("nav.models"), icon: Brain, to: "/models" },
+  { key: "settings", label: t("nav.settings"), icon: Settings, to: "/settings" }
 ]);
 
 function isActive(path: string) {

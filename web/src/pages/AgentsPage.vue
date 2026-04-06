@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import {
   Bot,
   Briefcase,
@@ -42,6 +43,7 @@ import { themeTokens } from "@/themeTokens";
 import type { ImportedSkillResponse } from "@/types/api";
 import { approxBytes, formatRelativeTime, joinPath } from "@/components/agents/domain/agentManagementDomain";
 import { useAgentsManagement } from "@/components/agents/useAgentsManagement";
+import { getSortLocale } from "@/i18n";
 
 const detailTab = ref("basic");
 const selectedAgentUid = ref("");
@@ -51,6 +53,7 @@ const docEditable = ref(false);
 const skillDrawerVisible = ref(false);
 const selectedSkillId = ref("");
 const importSkillVisible = ref(false);
+const { t } = useI18n();
 
 const avatarIconOptions: AvatarIconOption[] = [
   { key: "bot", label: "Bot", icon: Bot },
@@ -87,7 +90,7 @@ const management = useAgentsManagement({
 const sortedAgents = computed(() =>
   [...management.agents.value].sort((a, b) => {
     if (a.sortIndex !== b.sortIndex) return a.sortIndex - b.sortIndex;
-    return (a.displayName || a.agentName).localeCompare(b.displayName || b.agentName, "zh-CN");
+    return (a.displayName || a.agentName).localeCompare(b.displayName || b.agentName, getSortLocale());
   })
 );
 
@@ -224,8 +227,8 @@ watch(selectedAgentUid, async (agentUid) => {
       <main class="app-main-content">
         <div class="app-page-content agents-page">
           <AppPageHeader
-            title="Agent 管理"
-            subtitle="统一管理 Agent 的基本信息、技能、工具、锦囊和配置文件。"
+            :title="t('pages.agents.title')"
+            :subtitle="t('pages.agents.subtitle')"
           />
 
           <div class="agent-main-grid">
@@ -240,7 +243,7 @@ watch(selectedAgentUid, async (agentUid) => {
 
             <AgentDetailPanel :selected-agent="selectedAgent">
               <n-tabs v-if="selectedAgent" v-model:value="detailTab" type="line" animated>
-                <n-tab-pane name="basic" tab="基本信息">
+                <n-tab-pane name="basic" :tab="t('pages.agents.tabBasic')">
                   <AgentBasicTab
                     :selected-agent="selectedAgent"
                     :basic-form="management.basicForm"
@@ -255,7 +258,7 @@ watch(selectedAgentUid, async (agentUid) => {
                   />
                 </n-tab-pane>
 
-                <n-tab-pane name="skills" tab="技能">
+                <n-tab-pane name="skills" :tab="t('pages.agents.tabSkills')">
                   <AgentSkillsTab
                     :skills="selectedAgent.managedSkills"
                     @import="importSkillVisible = true"
@@ -264,14 +267,14 @@ watch(selectedAgentUid, async (agentUid) => {
                   />
                 </n-tab-pane>
 
-                <n-tab-pane name="tools" tab="工具">
+                <n-tab-pane name="tools" :tab="t('pages.agents.tabTools')">
                   <AgentToolsTab
                     :tools="selectedAgent.managedTools"
                     @toggle="onToggleTool"
                   />
                 </n-tab-pane>
 
-                <n-tab-pane name="tips" tab="锦囊">
+                <n-tab-pane name="tips" :tab="t('pages.agents.tabTips')">
                   <AgentTipsTab
                     :tips="selectedAgent.tips"
                     :tip-title="management.tipForm.title"
@@ -284,7 +287,7 @@ watch(selectedAgentUid, async (agentUid) => {
                   />
                 </n-tab-pane>
 
-                <n-tab-pane name="docs" tab="配置文件">
+                <n-tab-pane name="docs" :tab="t('pages.agents.tabDocs')">
                   <AgentDocsTab
                     :doc-items="docListItems"
                     :selected-doc-key="selectedDocKey"

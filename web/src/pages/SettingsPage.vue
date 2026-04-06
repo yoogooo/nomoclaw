@@ -1,14 +1,21 @@
 <script setup lang="ts">
 import { Moon, Sun } from "lucide-vue-next";
+import { useI18n } from "vue-i18n";
 import DirectoryRail from "@/components/chat/DirectoryRail.vue";
 import AppPageHeader from "@/components/layout/AppPageHeader.vue";
 import { useUiPreferencesStore } from "@/stores/uiPreferences";
+import type { AppLocale } from "@/i18n";
 
 const uiPreferencesStore = useUiPreferencesStore();
 uiPreferencesStore.init();
+const { t } = useI18n();
 
 function onThemeModeChange(value: "light" | "dark") {
   uiPreferencesStore.setThemeMode(value);
+}
+
+function onLocaleChange(value: AppLocale) {
+  uiPreferencesStore.setLocale(value);
 }
 </script>
 
@@ -19,33 +26,33 @@ function onThemeModeChange(value: "light" | "dark") {
       <main class="app-main-content">
         <div class="app-page-content">
           <AppPageHeader
-            title="设置"
-            subtitle="管理当前工作区的账户信息和界面偏好。"
+            :title="t('settings.title')"
+            :subtitle="t('settings.subtitle')"
           />
           <div class="page-section-grid settings-grid">
           <section class="surface-card">
-            <div class="surface-card-title">账户信息</div>
+            <div class="surface-card-title">{{ t("settings.account") }}</div>
             <div class="ui-detail-list">
               <div>
-                <div class="meta-label">当前身份</div>
+                <div class="meta-label">{{ t("settings.currentIdentity") }}</div>
                 <div class="ui-value-strong">NomoClaw Operator</div>
               </div>
               <div>
-                <div class="meta-label">默认时区</div>
+                <div class="meta-label">{{ t("settings.defaultTimezone") }}</div>
                 <div class="ui-value-strong">Asia/Shanghai</div>
               </div>
             </div>
           </section>
 
           <section class="surface-card">
-            <div class="surface-card-title">界面偏好</div>
+            <div class="surface-card-title">{{ t("settings.preferences") }}</div>
             <div class="ui-detail-list">
               <div>
-                <div class="meta-label">布局模式</div>
-                <div class="ui-value-strong">聊天工作台</div>
+                <div class="meta-label">{{ t("settings.layoutMode") }}</div>
+                <div class="ui-value-strong">{{ t("settings.workspaceMode") }}</div>
               </div>
               <div>
-                <div class="meta-label">主题风格</div>
+                <div class="meta-label">{{ t("settings.theme") }}</div>
                 <div class="ui-value-strong settings-theme-toggle">
                   <button
                     class="theme-option"
@@ -54,7 +61,7 @@ function onThemeModeChange(value: "light" | "dark") {
                     @click="onThemeModeChange('light')"
                   >
                     <Sun :size="16" />
-                    <span>Light</span>
+                    <span>{{ t("settings.themeLight") }}</span>
                   </button>
                   <button
                     class="theme-option"
@@ -63,7 +70,28 @@ function onThemeModeChange(value: "light" | "dark") {
                     @click="onThemeModeChange('dark')"
                   >
                     <Moon :size="16" />
-                    <span>Dark</span>
+                    <span>{{ t("settings.themeDark") }}</span>
+                  </button>
+                </div>
+              </div>
+              <div>
+                <div class="meta-label">{{ t("settings.language") }}</div>
+                <div class="ui-value-strong settings-lang-toggle">
+                  <button
+                    class="theme-option"
+                    :class="{ active: uiPreferencesStore.locale === 'zh-CN' }"
+                    type="button"
+                    @click="onLocaleChange('zh-CN')"
+                  >
+                    <span>{{ t("settings.languageZhCN") }}</span>
+                  </button>
+                  <button
+                    class="theme-option"
+                    :class="{ active: uiPreferencesStore.locale === 'en-US' }"
+                    type="button"
+                    @click="onLocaleChange('en-US')"
+                  >
+                    <span>{{ t("settings.languageEnUS") }}</span>
                   </button>
                 </div>
               </div>
@@ -83,6 +111,18 @@ function onThemeModeChange(value: "light" | "dark") {
 }
 
 .settings-theme-toggle {
+  margin-top: var(--space-1_5);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: fit-content;
+  padding: var(--space-1);
+  border: var(--size-1) solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-surface-soft);
+}
+
+.settings-lang-toggle {
   margin-top: var(--space-1_5);
   display: inline-flex;
   align-items: center;

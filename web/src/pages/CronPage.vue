@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { NButton } from "naive-ui";
 import DirectoryRail from "@/components/chat/DirectoryRail.vue";
 import AppPageHeader from "@/components/layout/AppPageHeader.vue";
 import CronCreateModal from "@/components/cron/CronCreateModal.vue";
 import CronDetailPanel from "@/components/cron/CronDetailPanel.vue";
 import CronListPanel from "@/components/cron/CronListPanel.vue";
-import { cronTaskTemplates } from "@/components/cron/cronTaskTemplates";
+import { buildCronTaskTemplates } from "@/components/cron/cronTaskTemplates";
 import { message } from "@/discrete";
 import { useCronJobsStore } from "@/stores/cronJobs";
 
@@ -14,6 +15,8 @@ const cronJobsStore = useCronJobsStore();
 const showCreateModal = ref(false);
 const createTemplateId = ref<string | null>(null);
 const hasJobs = computed(() => cronJobsStore.jobs.length > 0);
+const { t } = useI18n();
+const cronTaskTemplates = computed(() => buildCronTaskTemplates(t));
 
 function openCreateModal(templateId?: string) {
   createTemplateId.value = templateId ?? null;
@@ -23,9 +26,9 @@ function openCreateModal(templateId?: string) {
 async function refreshJobs() {
   try {
     await cronJobsStore.refresh();
-    message.success("任务配置已刷新");
+    message.success(t("toast.configRefreshed"));
   } catch (error) {
-    const text = error instanceof Error ? error.message : "刷新失败";
+    const text = error instanceof Error ? error.message : t("toast.refreshFailed");
     message.error(text);
   }
 }
@@ -43,11 +46,11 @@ onMounted(() => {
       <DirectoryRail />
       <div class="cron-page-content">
         <AppPageHeader
-          title="定时任务"
-          subtitle="按 Agent 分组查看和管理调度任务。"
+          :title="t('pages.cron.title')"
+          :subtitle="t('pages.cron.subtitle')"
         >
           <template #actions>
-            <n-button :loading="cronJobsStore.loading" @click="refreshJobs">刷新配置</n-button>
+            <n-button :loading="cronJobsStore.loading" @click="refreshJobs">{{ t("common.refresh") }}</n-button>
           </template>
         </AppPageHeader>
 
@@ -58,8 +61,8 @@ onMounted(() => {
 
         <div v-else class="panel cron-empty-layout">
           <div class="cron-empty-head">
-            <div class="panel-title ui-title-xl">还没有定时任务</div>
-            <div class="panel-subtitle ui-subtitle">选择一个常用模板，快速创建你的第一个自动执行任务。</div>
+            <div class="panel-title ui-title-xl">{{ t("cron.empty.title") }}</div>
+            <div class="panel-subtitle ui-subtitle">{{ t("cron.empty.subtitle") }}</div>
           </div>
           <div class="cron-empty-template-grid">
             <button
@@ -79,7 +82,7 @@ onMounted(() => {
             </button>
           </div>
           <div class="cron-empty-actions">
-            <n-button type="primary" @click="openCreateModal()">创建空白任务</n-button>
+            <n-button type="primary" @click="openCreateModal()">{{ t("cron.empty.createBlank") }}</n-button>
           </div>
         </div>
       </div>

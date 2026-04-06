@@ -1,12 +1,13 @@
 import { router } from "@/router";
 import { message } from "@/discrete";
+import { tr } from "@/i18n";
 
 export async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
     response = await fetch(input, init);
   } catch (error) {
-    const errorMessage = "请求未发送成功：网络连接异常或服务不可达，请检查网络/服务后重试。";
+    const errorMessage = tr("http.networkError");
     message.error(errorMessage);
     throw new Error(errorMessage, { cause: error });
   }
@@ -49,30 +50,30 @@ function normalizeErrorMessage(text: string): string {
 
 function buildUserFriendlyMessage(status: number, reason: string): string {
   const normalizedReason = reason?.trim() || "";
-  const withReason = (base: string) => (normalizedReason ? `${base} 原因：${normalizedReason}` : base);
+  const withReason = (base: string) => (normalizedReason ? tr("http.withReason", { base, reason: normalizedReason }) : base);
   if (status === 400) {
-    return withReason("请求参数有误，请检查输入后重试。");
+    return withReason(tr("http.400"));
   }
   if (status === 401) {
-    return withReason("登录状态已失效，请重新登录后重试。");
+    return withReason(tr("http.401"));
   }
   if (status === 403) {
-    return withReason("当前没有该操作权限。");
+    return withReason(tr("http.403"));
   }
   if (status === 404) {
-    return withReason("请求的资源不存在或已被删除。");
+    return withReason(tr("http.404"));
   }
   if (status === 409) {
-    return withReason("资源状态冲突，暂时无法完成操作。");
+    return withReason(tr("http.409"));
   }
   if (status === 422) {
-    return withReason("提交内容未通过校验，请修改后重试。");
+    return withReason(tr("http.422"));
   }
   if (status === 429) {
-    return withReason("请求过于频繁，请稍后再试。");
+    return withReason(tr("http.429"));
   }
   if (status >= 500) {
-    return withReason("服务暂时不可用，请稍后重试。");
+    return withReason(tr("http.500"));
   }
-  return withReason(`请求失败（HTTP ${status}）。`);
+  return withReason(tr("http.default", { status }));
 }
