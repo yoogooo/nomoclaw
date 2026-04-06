@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { BellRing, Clock3 } from "lucide-vue-next";
 import { NButton, NForm, NFormItem, NInput, NInputNumber, NModal } from "naive-ui";
 import type { CronJob } from "@/types/api";
@@ -25,27 +26,28 @@ const emit = defineEmits<{
     status: string;
   }): void;
 }>();
+const { t } = useI18n();
 
-const weekdayOptions = [
-  { label: "周一", short: "一", value: "2" },
-  { label: "周二", short: "二", value: "3" },
-  { label: "周三", short: "三", value: "4" },
-  { label: "周四", short: "四", value: "5" },
-  { label: "周五", short: "五", value: "6" },
-  { label: "周六", short: "六", value: "7" },
-  { label: "周日", short: "日", value: "1" }
-] as const;
-const executionTypeOptions: Array<{ value: ExecutionType; label: string }> = [
-  { value: "once", label: "只执行一次" },
-  { value: "recurring", label: "周期性执行" }
-];
-const recurringModeOptions: Array<{ value: RecurringMode; label: string }> = [
-  { value: "minute", label: "按分钟" },
-  { value: "hour", label: "按小时" },
-  { value: "day", label: "按天" },
-  { value: "week", label: "按周" },
-  { value: "month", label: "按月" }
-];
+const weekdayOptions = computed(() => [
+  { label: t("cron.weekday.monday"), short: t("cron.weekdayShort.monday"), value: "2" },
+  { label: t("cron.weekday.tuesday"), short: t("cron.weekdayShort.tuesday"), value: "3" },
+  { label: t("cron.weekday.wednesday"), short: t("cron.weekdayShort.wednesday"), value: "4" },
+  { label: t("cron.weekday.thursday"), short: t("cron.weekdayShort.thursday"), value: "5" },
+  { label: t("cron.weekday.friday"), short: t("cron.weekdayShort.friday"), value: "6" },
+  { label: t("cron.weekday.saturday"), short: t("cron.weekdayShort.saturday"), value: "7" },
+  { label: t("cron.weekday.sunday"), short: t("cron.weekdayShort.sunday"), value: "1" }
+]);
+const executionTypeOptions = computed<Array<{ value: ExecutionType; label: string }>>(() => [
+  { value: "once", label: t("cron.executionType.once") },
+  { value: "recurring", label: t("cron.executionType.recurring") }
+]);
+const recurringModeOptions = computed<Array<{ value: RecurringMode; label: string }>>(() => [
+  { value: "minute", label: t("cron.recurringMode.minute") },
+  { value: "hour", label: t("cron.recurringMode.hour") },
+  { value: "day", label: t("cron.recurringMode.day") },
+  { value: "week", label: t("cron.recurringMode.week") },
+  { value: "month", label: t("cron.recurringMode.month") }
+]);
 
 const form = reactive({
   title: "",
@@ -142,23 +144,23 @@ const scheduleError = computed(() => {
   if (form.executionType === "once") {
     const onceAt = parseDateTime(form.onceDate, form.onceTime);
     if (!onceAt) {
-      return "请选择执行日期和时间";
+      return t("cron.validation.pickDateTime");
     }
     if (onceAt.getTime() <= Date.now()) {
-      return "只执行一次的时间必须晚于当前时间";
+      return t("cron.validation.onceAfterNow");
     }
   }
   if (form.recurringMode === "week" && !form.weekdays.length) {
-    return "按周执行至少选择一天";
+    return t("cron.validation.pickOneWeekday");
   }
   if (form.endAtLocal) {
     const endAt = new Date(form.endAtLocal);
     if (Number.isNaN(endAt.getTime())) {
-      return "截止日期格式不正确";
+      return t("cron.validation.invalidEndAt");
     }
     const first = firstRunAt.value;
     if (first && endAt.getTime() <= first.getTime()) {
-      return "截止日期必须晚于首次触发时间";
+      return t("cron.validation.endAtAfterFirstRun");
     }
   }
   return "";
@@ -451,7 +453,7 @@ function formatPreviewTime(value: Date) {
   <n-modal
     :show="show"
     preset="card"
-    title="修改任务"
+    :title="t('cron.edit.title')"
     class="cron-create-modal ui-scrollable-card-modal"
     :style="modalStyle"
     :content-style="modalContentStyle"
@@ -462,22 +464,22 @@ function formatPreviewTime(value: Date) {
         <div class="cron-form-main">
           <div class="basic-card">
             <div class="section-title">
-              <span>任务信息</span>
+              <span>{{ t("cron.form.taskInfo") }}</span>
             </div>
             <div class="basic-meta-grid">
-              <n-form-item label="任务标题">
+              <n-form-item :label="t('cron.form.taskTitle')">
                 <n-input
                   v-model:value="form.title"
-                  placeholder="例如：工作日报、每日市场简报、服务器巡检"
+                  :placeholder="t('cron.form.taskTitlePlaceholder')"
                 />
               </n-form-item>
             </div>
 
-            <n-form-item label="任务内容" class="task-content-item" :show-feedback="false">
+            <n-form-item :label="t('cron.form.taskContent')" class="task-content-item" :show-feedback="false">
               <n-input
                 v-model:value="form.taskContent"
                 type="textarea"
-                placeholder="直接写你希望它定时帮你做什么。越具体，执行结果越稳定。"
+                :placeholder="t('cron.form.taskContentPlaceholder')"
                 :autosize="{ minRows: 5, maxRows: 8 }"
               />
             </n-form-item>
@@ -488,11 +490,11 @@ function formatPreviewTime(value: Date) {
           <div class="schedule-card">
             <div class="section-title">
               <BellRing :size="16" />
-              <span>执行计划</span>
+              <span>{{ t("cron.form.plan") }}</span>
             </div>
 
             <div class="schedule-field">
-              <div class="field-label">执行类型</div>
+              <div class="field-label">{{ t("cron.form.executionType") }}</div>
               <div class="segmented-group">
                 <button
                   v-for="option in executionTypeOptions"
@@ -510,7 +512,7 @@ function formatPreviewTime(value: Date) {
             <div class="schedule-dynamic-block">
               <template v-if="form.executionType === 'once'">
                 <div class="schedule-field">
-                  <label class="field-label">执行日期与时间</label>
+                  <label class="field-label">{{ t("cron.form.executeDateTime") }}</label>
                   <div class="inline-fields">
                     <input v-model="form.onceDate" class="native-date-input" type="date" />
                     <input v-model="form.onceTime" class="native-time-input" type="time" step="60" />
@@ -521,7 +523,7 @@ function formatPreviewTime(value: Date) {
 
               <template v-else>
                 <div class="schedule-field">
-                  <div class="field-label">重复频率</div>
+                  <div class="field-label">{{ t("cron.form.recurringFrequency") }}</div>
                   <div class="segmented-group segmented-group-multi">
                     <button
                       v-for="option in recurringModeOptions"
@@ -537,25 +539,25 @@ function formatPreviewTime(value: Date) {
                 </div>
 
                 <div v-if="form.recurringMode === 'minute'" class="schedule-field">
-                  <label class="field-label">每隔几分钟执行一次</label>
+                  <label class="field-label">{{ t("cron.form.everyMinutes") }}</label>
                   <n-input-number v-model:value="form.minuteInterval" :min="1" :max="59" :precision="0" class="minute-input" />
                 </div>
 
                 <div v-if="form.recurringMode === 'hour'" class="schedule-field">
-                  <label class="field-label">每隔几小时执行一次</label>
+                  <label class="field-label">{{ t("cron.form.everyHours") }}</label>
                   <n-input-number v-model:value="form.hourInterval" :min="1" :max="23" :precision="0" class="minute-input" />
-                  <label class="field-label hour-sub-label">每小时的第几分钟执行</label>
+                  <label class="field-label hour-sub-label">{{ t("cron.form.minuteOfHour") }}</label>
                   <n-input-number v-model:value="form.hourlyMinute" :min="0" :max="59" :precision="0" class="minute-input" />
-                  <div class="field-hint">例如填 22，表示在每小时的 22 分执行。</div>
+                  <div class="field-hint">{{ t("cron.form.minuteOfHourHint") }}</div>
                 </div>
 
                 <div v-if="form.recurringMode === 'day' || form.recurringMode === 'week' || form.recurringMode === 'month'" class="schedule-field">
-                  <label class="field-label">执行时间</label>
+                  <label class="field-label">{{ t("cron.form.executeTime") }}</label>
                   <input v-model="form.time" class="native-time-input" type="time" step="60" />
                 </div>
 
                 <div v-if="form.recurringMode === 'week'" class="schedule-field">
-                  <div class="field-label">每周哪一天</div>
+                  <div class="field-label">{{ t("cron.form.weekday") }}</div>
                   <div class="weekday-grid">
                     <button
                       v-for="weekday in weekdayOptions"
@@ -571,19 +573,19 @@ function formatPreviewTime(value: Date) {
                 </div>
 
                 <div v-if="form.recurringMode === 'month'" class="schedule-field">
-                  <label class="field-label">每月几号执行</label>
+                  <label class="field-label">{{ t("cron.form.dayOfMonth") }}</label>
                   <n-input-number v-model:value="form.monthlyDay" :min="1" :max="31" :precision="0" class="minute-input" />
                 </div>
 
                 <div class="schedule-field">
-                  <label class="field-label">截止日期（可选）</label>
+                  <label class="field-label">{{ t("cron.form.endAtOptional") }}</label>
                   <input v-model="form.endAtLocal" class="native-date-input" type="datetime-local" step="60" />
                 </div>
               </template>
             </div>
 
             <div class="schedule-field">
-              <label class="field-label">时区</label>
+              <label class="field-label">{{ t("cron.form.timezone") }}</label>
               <n-input :value="form.timezone" readonly />
             </div>
 
@@ -595,25 +597,25 @@ function formatPreviewTime(value: Date) {
               <div>
                 <div class="section-title">
                   <Clock3 :size="16" />
-                  <span>计划预览</span>
+                  <span>{{ t("cron.form.planPreview") }}</span>
                 </div>
                 <div class="preview-summary">{{ scheduleSummary }}</div>
               </div>
             </div>
             <div class="preview-expression">{{ scheduleExpression || "-" }}</div>
             <div v-if="form.executionType === 'recurring'" class="preview-next">
-              <div class="preview-next-title">最近 5 次执行计划</div>
+              <div class="preview-next-title">{{ t("cron.form.nextRuns") }}</div>
               <div v-if="schedulePreviewRuns.length" class="preview-timeline">
                 <div v-for="(item, index) in schedulePreviewRuns" :key="`${item}-${index}`" class="preview-timeline-item">
                   <Clock3 :size="12" class="preview-timeline-icon" />
                   <span class="preview-timeline-text">{{ item }}</span>
                 </div>
               </div>
-              <div v-else class="preview-next-empty">暂无可执行时间</div>
+              <div v-else class="preview-next-empty">{{ t("cron.form.noRunnableTime") }}</div>
             </div>
             <div v-else class="preview-next">
-              <div class="preview-next-title">执行时间</div>
-              <div class="preview-once-time">{{ schedulePreviewRuns[0] || "暂无可执行时间" }}</div>
+              <div class="preview-next-title">{{ t("cron.form.executeTime") }}</div>
+              <div class="preview-once-time">{{ schedulePreviewRuns[0] || t("cron.form.noRunnableTime") }}</div>
             </div>
           </div>
         </div>
@@ -622,8 +624,8 @@ function formatPreviewTime(value: Date) {
 
     <template #action>
       <div class="cron-edit-actions">
-        <n-button @click="emit('update:show', false)">取消</n-button>
-        <n-button type="primary" :disabled="!canSubmit" @click="submit">保存</n-button>
+        <n-button @click="emit('update:show', false)">{{ t("common.cancel") }}</n-button>
+        <n-button type="primary" :disabled="!canSubmit" @click="submit">{{ t("common.save") }}</n-button>
       </div>
     </template>
   </n-modal>
