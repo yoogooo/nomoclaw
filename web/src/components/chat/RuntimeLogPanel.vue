@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { ChevronLeft, ChevronRight } from "lucide-vue-next";
 import { useRuntimeLogStore } from "@/stores/runtimeLog";
 
@@ -15,17 +16,18 @@ const emit = defineEmits<{
 
 const runtimeLogStore = useRuntimeLogStore();
 const runtimeLines = computed(() => runtimeLogStore.lines);
+const { t } = useI18n();
 </script>
 
 <template>
   <aside class="panel panel-soft runtime-panel" :class="{ collapsed: props.collapsed }">
     <div class="runtime-header">
       <div>
-        <h2 v-if="!props.collapsed" class="runtime-title">执行日志</h2>
-        <p v-if="!props.collapsed" class="runtime-subtitle">统一展示计划生成、审批入口、步骤执行、失败原因和循环终止。</p>
+        <h2 v-if="!props.collapsed" class="runtime-title">{{ t("chat.runtime.title") }}</h2>
+        <p v-if="!props.collapsed" class="runtime-subtitle">{{ t("chat.runtime.subtitle") }}</p>
       </div>
       <div class="runtime-tools">
-        <button class="runtime-toggle" :title="props.collapsed ? '展开日志' : '收起日志'" @click="emit('toggle')">
+        <button class="runtime-toggle" :title="props.collapsed ? t('chat.runtime.expand') : t('chat.runtime.collapse')" @click="emit('toggle')">
           <component :is="props.collapsed ? ChevronLeft : ChevronRight" :size="16" />
         </button>
       </div>

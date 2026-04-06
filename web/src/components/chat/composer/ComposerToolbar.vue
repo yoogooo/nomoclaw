@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import { Lightbulb, Paperclip } from "lucide-vue-next";
 import { NSelect } from "naive-ui";
 
@@ -21,6 +22,8 @@ const emit = defineEmits<{
   (e: "toggle-jinnang"): void;
   (e: "submit"): void;
 }>();
+
+const { t } = useI18n();
 </script>
 
 <template>
@@ -29,7 +32,7 @@ const emit = defineEmits<{
       <n-select
         :value="selectedModelKey"
         :options="modelOptions"
-        placeholder="选择已配置模型"
+        :placeholder="t('chat.composer.modelPlaceholder')"
         :disabled="switchingContext"
         :render-label="renderLabel"
         :render-option="renderOption"
@@ -42,8 +45,8 @@ const emit = defineEmits<{
         <button
           class="composer-tool-btn icon-only"
           type="button"
-          title="上传文件"
-          aria-label="上传文件"
+          :title="t('chat.composer.upload')"
+          :aria-label="t('chat.composer.upload')"
           :disabled="uploadDisabled || uploadingFiles || switchingContext"
           @click="emit('trigger-upload')"
         >
@@ -53,8 +56,8 @@ const emit = defineEmits<{
           class="composer-tool-btn icon-only"
           :class="{ active: showJinnangPicker }"
           type="button"
-          title="锦囊"
-          aria-label="锦囊"
+          :title="t('chat.composer.jinnang')"
+          :aria-label="t('chat.composer.jinnang')"
           @click="emit('toggle-jinnang')"
         >
           <Lightbulb :size="16" />
@@ -69,7 +72,7 @@ const emit = defineEmits<{
         :disabled="isSubmitDisabled"
         @click="emit('submit')"
       >
-        {{ isRunningCurrentConversation ? "取消" : "发送" }}
+        {{ isRunningCurrentConversation ? t("chat.composer.stop") : t("chat.composer.send") }}
       </button>
     </div>
   </div>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import { X } from "lucide-vue-next";
 
 defineProps<{
@@ -8,15 +9,17 @@ defineProps<{
 const emit = defineEmits<{
   (e: "close"): void;
 }>();
+
+const { t } = useI18n();
 </script>
 
 <template>
   <div class="composer-preview-backdrop" @click="emit('close')">
     <div class="composer-preview-dialog" @click.stop>
-      <button class="composer-preview-close" type="button" aria-label="关闭预览" @click="emit('close')">
+      <button class="composer-preview-close" type="button" :aria-label="t('chat.composer.closePreview')" @click="emit('close')">
         <X :size="16" />
       </button>
-      <img :src="imageUrl" alt="附件预览" class="composer-preview-image" />
+      <img :src="imageUrl" :alt="t('chat.composer.attachmentPreview')" class="composer-preview-image" />
     </div>
   </div>
 </template>

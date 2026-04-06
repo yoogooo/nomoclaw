@@ -9,15 +9,31 @@ import { conversationSelectionLabel, formatFriendlyDateTime } from "@/utils/form
 
 const conversationStore = useConversationStore();
 const agentCatalogStore = useAgentCatalogStore();
-const { t } = useI18n();
+const { t, locale } = useI18n();
+
+function hasHanText(value: string) {
+  return /[\u4e00-\u9fff]/.test(value);
+}
+
+function normalizeLabelForLocale(label: string) {
+  if (locale.value !== "en-US" || !hasHanText(label)) {
+    return label;
+  }
+  if (agentCatalogStore.selectedEntryType === "group") {
+    return agentCatalogStore.selectedAgentGroupUid || label;
+  }
+  const selectedAgent = agentCatalogStore.allAgents.find((item) => item.agentUid === agentCatalogStore.selectedAgentUid);
+  return selectedAgent?.agentName || label;
+}
 
 const description = computed(() => {
-  const label = conversationSelectionLabel(
+  const rawLabel = conversationSelectionLabel(
     agentCatalogStore.groups,
     agentCatalogStore.selectedEntryType,
     agentCatalogStore.selectedAgentGroupUid,
     agentCatalogStore.selectedAgentUid
   );
+  const label = normalizeLabelForLocale(rawLabel);
   return agentCatalogStore.selectedEntryType === "group"
     ? t("chat.sidebar.viewingGroup", { label })
     : t("chat.sidebar.viewingAgent", { label });

@@ -1,5 +1,6 @@
 const enUS = {
   common: {
+    confirm: "Confirm",
     cancel: "Cancel",
     save: "Save",
     delete: "Delete",
@@ -49,6 +50,7 @@ const enUS = {
       delete: "Delete"
     },
     messages: {
+      panelTitle: "Conversation",
       noMessages: "No messages in this conversation yet.",
       copyFailed: "Copy failed, please try again.",
       saveTipNoAgent: "No target Agent selected, unable to save as tip.",
@@ -58,7 +60,9 @@ const enUS = {
       saveTipConfirm: "Save as tip?",
       savedAsTip: "Saved as tip",
       openFile: "Open {name}",
-      processing: "Processing..."
+      processing: "Processing...",
+      runTitle: "Execution",
+      noExtraDetails: "No extra details"
     },
     composer: {
       placeholder: "For example: summarize the uploaded file into directly actionable conclusions and recommendations.",
@@ -75,7 +79,16 @@ const enUS = {
       mixedTypeNotAllowed: "Images and other files cannot be mixed",
       maxImages: "At most {count} images can be uploaded",
       maxFiles: "At most {count} non-image files can be uploaded",
-      clearedByModelSwitch: "Draft attachments were cleared because the new model does not support them"
+      clearedByModelSwitch: "Draft attachments were cleared because the new model does not support them",
+      sameTypeOnlyHint: "Only one file type can be uploaded per message.",
+      mixedTypeHint: "Multiple file types are supported in one message.",
+      uploadLimitHint: "Up to {maxImages} images and {maxFiles} non-image files per message. {sameTypeHint}",
+      switchingConversation: "Switching conversation, please try upload in a moment",
+      dropToUpload: "Release to upload files",
+      closePreview: "Close preview",
+      attachmentPreview: "Attachment preview",
+      previewImageAttachment: "Preview image {name}",
+      removeAttachment: "Remove attachment {name}"
     },
     runtime: {
       title: "Runtime Log",
@@ -104,7 +117,11 @@ const enUS = {
       messageCanceled: "Message processing canceled"
     },
     approval: {
-      waiting: "High-risk action pending confirmation"
+      waiting: "High-risk action pending confirmation",
+      approve: "Continue",
+      approving: "Continuing",
+      reject: "Reject this action",
+      rejecting: "Rejecting"
     },
     jinnang: {
       count: "{count} tips",

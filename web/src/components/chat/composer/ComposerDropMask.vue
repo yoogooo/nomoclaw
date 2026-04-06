@@ -1,6 +1,12 @@
+<script setup lang="ts">
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
+</script>
+
 <template>
   <div class="composer-drop-mask">
-    <div class="composer-drop-title">松开即可上传文件</div>
+    <div class="composer-drop-title">{{ t("chat.composer.dropToUpload") }}</div>
     <div class="composer-drop-subtitle"><slot /></div>
   </div>
 </template>

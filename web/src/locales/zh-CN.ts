@@ -1,5 +1,6 @@
 const zhCN = {
   common: {
+    confirm: "确定",
     cancel: "取消",
     save: "保存",
     delete: "删除",
@@ -49,6 +50,7 @@ const zhCN = {
       delete: "删除"
     },
     messages: {
+      panelTitle: "对话区",
       noMessages: "当前对话暂无消息。",
       copyFailed: "复制失败，请重试",
       saveTipNoAgent: "当前未选择可归属的 Agent，无法保存锦囊。",
@@ -58,7 +60,9 @@ const zhCN = {
       saveTipConfirm: "保存为锦囊？",
       savedAsTip: "已保存为锦囊",
       openFile: "打开 {name}",
-      processing: "处理进行中…"
+      processing: "处理进行中…",
+      runTitle: "执行过程",
+      noExtraDetails: "无附加详情"
     },
     composer: {
       placeholder: "例如：请结合我上传的文件，整理出一版可直接使用的结论和建议。",
@@ -75,7 +79,16 @@ const zhCN = {
       mixedTypeNotAllowed: "图片和其他文件不能混合上传",
       maxImages: "当前模型最多上传 {count} 张图片",
       maxFiles: "当前模型最多上传 {count} 个非图片文件",
-      clearedByModelSwitch: "已清空当前草稿附件，新模型不支持这些文件"
+      clearedByModelSwitch: "已清空当前草稿附件，新模型不支持这些文件",
+      sameTypeOnlyHint: "同一条消息只能上传同一类型文件。",
+      mixedTypeHint: "支持同一条消息上传多种类型文件。",
+      uploadLimitHint: "图片最多 {maxImages} 张，非图片文件最多 {maxFiles} 个。{sameTypeHint}",
+      switchingConversation: "正在切换会话，请稍候再上传",
+      dropToUpload: "松开即可上传文件",
+      closePreview: "关闭预览",
+      attachmentPreview: "附件预览",
+      previewImageAttachment: "预览图片 {name}",
+      removeAttachment: "移除附件 {name}"
     },
     runtime: {
       title: "运行时日志",
@@ -104,7 +117,11 @@ const zhCN = {
       messageCanceled: "消息处理已取消"
     },
     approval: {
-      waiting: "高风险操作待确认"
+      waiting: "高风险操作待确认",
+      approve: "继续执行",
+      approving: "继续执行中",
+      reject: "拒绝本次操作",
+      rejecting: "拒绝中"
     },
     jinnang: {
       count: "共 {count} 个锦囊",

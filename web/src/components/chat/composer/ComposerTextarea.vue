@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
+
 defineProps<{
   modelValue: string;
 }>();
@@ -7,6 +9,8 @@ const emit = defineEmits<{
   (e: "update:modelValue", value: string): void;
   (e: "keydown", event: KeyboardEvent): void;
 }>();
+
+const { t } = useI18n();
 </script>
 
 <template>
@@ -14,7 +18,7 @@ const emit = defineEmits<{
     id="messageInput"
     :value="modelValue"
     class="composer-textarea ui-focus-highlight"
-    placeholder="例如：请结合我上传的文件，整理出一版可直接使用的结论和建议。"
+    :placeholder="t('chat.composer.placeholder')"
     @input="emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"
     @keydown="emit('keydown', $event)"
   />

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { ArrowDown, ArrowUp, Check, Copy, Sparkles } from "lucide-vue-next";
 import { NButton, NCard, NCollapse, NCollapseItem, NFlex, NPopconfirm, NTag } from "naive-ui";
 import ApprovalBanner from "./ApprovalBanner.vue";
@@ -17,6 +18,7 @@ const conversationStore = useConversationStore();
 const conversationRunsStore = useConversationRunsStore();
 const agentCatalogStore = useAgentCatalogStore();
 const jinnangStore = useJinnangStore();
+const { t } = useI18n();
 const copiedMessageMap = ref<Record<string, boolean>>({});
 const savingTipMap = ref<Record<string, boolean>>({});
 const savedTipMap = ref<Record<string, boolean>>({});
@@ -87,7 +89,7 @@ async function copyAssistantMessage(messageItem: ConversationMessage) {
       };
     }, 1200);
   } catch {
-    discreteMessage.error("复制失败，请重试");
+    discreteMessage.error(t("chat.messages.copyFailed"));
   }
 }
 
@@ -97,7 +99,7 @@ async function saveJinnang(messageItem: ConversationMessage) {
   const conversationAgentUid = conversationStore.conversations.find((item) => item.conversationUid === conversationStore.currentConversationUid)?.agentUid || "";
   const targetAgentUid = (conversationAgentUid || agentCatalogStore.selectedAgentUid || "").trim();
   if (!targetAgentUid) {
-    discreteMessage.warning("当前未选择可归属的 Agent，无法保存锦囊。");
+    discreteMessage.warning(t("chat.messages.saveTipNoAgent"));
     return;
   }
   savingTipMap.value = {
@@ -192,7 +194,7 @@ function isTipSaved(messageItem: ConversationMessage) {
 <template>
   <section class="panel message-panel">
     <div class="panel-header message-panel-header">
-      <div class="panel-title">对话区</div>
+      <div class="panel-title">{{ t("chat.messages.panelTitle") }}</div>
       <button class="conversation-badge" :disabled="!conversationStore.currentConversationUid" @click="copyConversationUid">
         {{ conversationStore.currentConversationUid || "Conversation" }}
       </button>
@@ -203,7 +205,7 @@ function isTipSaved(messageItem: ConversationMessage) {
         v-if="!conversationStore.messages.length && conversationStore.runningConversationUid !== conversationStore.currentConversationUid"
         class="empty-state conversation-empty"
       >
-        当前对话暂无消息。
+        {{ t("chat.messages.noMessages") }}
       </div>
       <template v-else>
         <div
@@ -246,7 +248,7 @@ function isTipSaved(messageItem: ConversationMessage) {
                 secondary
                 @click="conversationStore.openFile(fileLink.path)"
               >
-                打开 {{ fileLink.name }}
+                {{ t("chat.messages.openFile", { name: fileLink.name }) }}
               </n-button>
             </n-flex>
           </div>
@@ -268,8 +270,8 @@ function isTipSaved(messageItem: ConversationMessage) {
                 class="message-action-btn icon-only"
                 :class="{ copied: copiedMessageMap[messageActionKey(message)] }"
                 type="button"
-                title="复制"
-                aria-label="复制"
+                :title="t('chat.messages.copy')"
+                :aria-label="t('chat.messages.copy')"
                 @click="copyAssistantMessage(message)"
               >
                 <Check v-if="copiedMessageMap[messageActionKey(message)]" :size="14" />
@@ -279,8 +281,8 @@ function isTipSaved(messageItem: ConversationMessage) {
                 <n-popconfirm
                   :show-icon="false"
                   :disabled="savingTipMap[messageActionKey(message)] || isTipSaved(message)"
-                  positive-text="确定"
-                  negative-text="取消"
+                  :positive-text="t('common.confirm')"
+                  :negative-text="t('common.cancel')"
                   @positive-click="saveJinnang(message)"
                 >
                   <template #trigger>
@@ -292,16 +294,16 @@ function isTipSaved(messageItem: ConversationMessage) {
                       }"
                       :disabled="savingTipMap[messageActionKey(message)] || isTipSaved(message)"
                       type="button"
-                      :title="isTipSaved(message) ? '锦囊已保存' : '保存为锦囊'"
-                      :aria-label="isTipSaved(message) ? '锦囊已保存' : '保存为锦囊'"
+                      :title="isTipSaved(message) ? t('chat.messages.tipSaved') : t('chat.messages.saveTip')"
+                      :aria-label="isTipSaved(message) ? t('chat.messages.tipSaved') : t('chat.messages.saveTip')"
                     >
                       <Check v-if="isTipSaved(message) && !savingTipMap[messageActionKey(message)]" :size="14" />
                       <Sparkles v-else-if="!savingTipMap[messageActionKey(message)]" :size="14" />
                     </button>
                   </template>
-                  保存为锦囊？
+                  {{ t("chat.messages.saveTipConfirm") }}
                 </n-popconfirm>
-                <span v-if="isTipSaved(message)" class="message-action-hint">已保存为锦囊</span>
+                <span v-if="isTipSaved(message)" class="message-action-hint">{{ t("chat.messages.savedAsTip") }}</span>
               </div>
             </div>
           </div>
@@ -316,7 +318,7 @@ function isTipSaved(messageItem: ConversationMessage) {
             <n-collapse>
               <n-collapse-item :name="`run-${message.messageUid}`">
                 <template #header>
-                  <div class="run-title">执行过程</div>
+                  <div class="run-title">{{ t("chat.messages.runTitle") }}</div>
                 </template>
                 <template #header-extra>
                   <n-tag size="small" :type="runTone(conversationRunsStore.runsByMessageUid[message.messageUid].status)">
@@ -334,7 +336,7 @@ function isTipSaved(messageItem: ConversationMessage) {
                     <template #header-extra>
                       <n-tag size="small" :type="runTone(step.status)">{{ step.status }}</n-tag>
                     </template>
-                    <div class="run-details">{{ step.displayDetails || step.displaySummary || "无附加详情" }}</div>
+                    <div class="run-details">{{ step.displayDetails || step.displaySummary || t("chat.messages.noExtraDetails") }}</div>
                   </n-collapse-item>
                 </n-collapse>
               </n-collapse-item>

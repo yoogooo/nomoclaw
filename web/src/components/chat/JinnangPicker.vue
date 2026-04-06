@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { X } from "lucide-vue-next";
 import { NModal } from "naive-ui";
 import type { JinnangTip } from "@/stores/jinnang";
@@ -13,6 +14,7 @@ const emit = defineEmits<{
   (event: "pick", value: string): void;
   (event: "close"): void;
 }>();
+const { t } = useI18n();
 
 function selectTip(id: string) {
   emit("pick", id);
@@ -31,10 +33,10 @@ function closePreview() {
 
 <template>
   <div class="jinnang-picker ui-card-soft">
-    <button class="jinnang-picker-close" type="button" aria-label="关闭锦囊面板" @click="emit('close')">
+    <button class="jinnang-picker-close" type="button" :aria-label="t('chat.jinnang.closePanel')" @click="emit('close')">
       <X :size="14" />
     </button>
-    <div class="jinnang-picker-title ui-title-strong">共 {{ props.tips.length }} 个锦囊</div>
+    <div class="jinnang-picker-title ui-title-strong">{{ t("chat.jinnang.count", { count: props.tips.length }) }}</div>
     <div v-if="props.tips.length" class="jinnang-picker-list">
       <div
         v-for="tip in props.tips"
@@ -50,17 +52,17 @@ function closePreview() {
           </span>
         </button>
         <button class="jinnang-view-btn" type="button" @click.stop="openPreview(tip)">
-          查看
+          {{ t("chat.jinnang.view") }}
         </button>
       </div>
     </div>
-    <div v-else class="jinnang-picker-empty">暂无可选锦囊</div>
+    <div v-else class="jinnang-picker-empty">{{ t("chat.jinnang.empty") }}</div>
 
     <n-modal :show="Boolean(previewTip)" class="jinnang-preview-modal" @mask-click="closePreview">
       <div v-if="previewTip" class="jinnang-preview-panel">
         <div class="jinnang-preview-header">
           <div class="jinnang-preview-title">{{ previewTip.title }}</div>
-          <button class="jinnang-preview-close" type="button" aria-label="关闭查看弹窗" @click="closePreview">
+          <button class="jinnang-preview-close" type="button" :aria-label="t('chat.jinnang.closePreview')" @click="closePreview">
             <X :size="14" />
           </button>
         </div>

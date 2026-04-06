@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, h, onBeforeUnmount, onMounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { Sparkles, X } from "lucide-vue-next";
 import { message as discreteMessage } from "@/discrete";
 import { useConversationStore } from "@/stores/conversation";
@@ -13,6 +14,7 @@ import ComposerToolbar from "./ComposerToolbar.vue";
 
 const conversationStore = useConversationStore();
 const jinnangStore = useJinnangStore();
+const { t } = useI18n();
 const showJinnangPicker = ref(false);
 const appliedJinnangId = ref("");
 const fileInputRef = ref<HTMLInputElement | null>(null);
@@ -29,10 +31,14 @@ const appliedJinnang = computed(() => jinnangStore.tips.find((item) => item.id =
 const uploadHint = computed(() => {
   const policy = conversationStore.currentUploadPolicy;
   if (!policy.enabled) {
-    return conversationStore.uploadDisabledReason || "当前模型不支持上传文件";
+    return conversationStore.uploadDisabledReason || t("chat.composer.uploadDisabled");
   }
-  const sameTypeHint = policy.singleMimeGroupOnly ? "同一条消息只能上传同一类型文件。" : "支持同一条消息上传多种类型文件。";
-  return `图片最多 ${policy.maxImagesPerMessage} 张，非图片文件最多 ${policy.maxFilesPerMessage} 个。${sameTypeHint}`;
+  const sameTypeHint = policy.singleMimeGroupOnly ? t("chat.composer.sameTypeOnlyHint") : t("chat.composer.mixedTypeHint");
+  return t("chat.composer.uploadLimitHint", {
+    maxImages: policy.maxImagesPerMessage,
+    maxFiles: policy.maxFilesPerMessage,
+    sameTypeHint
+  });
 });
 
 function onKeydown(event: KeyboardEvent) {
@@ -59,7 +65,7 @@ function removeAppliedJinnang() {
 
 function triggerFilePicker() {
   if (conversationStore.loading) {
-    discreteMessage.info("正在切换会话，请稍候再上传");
+    discreteMessage.info(t("chat.composer.switchingConversation"));
     return;
   }
   if (conversationStore.uploadDisabledReason) {
@@ -105,7 +111,7 @@ async function onDrop(event: DragEvent) {
   event.preventDefault();
   isDragActive.value = false;
   if (conversationStore.loading) {
-    discreteMessage.info("正在切换会话，请稍候再上传");
+    discreteMessage.info(t("chat.composer.switchingConversation"));
     return;
   }
   if (conversationStore.uploadDisabledReason) {
@@ -210,7 +216,7 @@ onBeforeUnmount(() => {
     <div v-if="appliedJinnang" class="applied-jinnang">
       <Sparkles :size="14" class="applied-jinnang-icon" />
       <span class="applied-jinnang-title">{{ appliedJinnang.title }}</span>
-      <button class="applied-jinnang-remove" type="button" @click="removeAppliedJinnang()" aria-label="删除锦囊">
+      <button class="applied-jinnang-remove" type="button" @click="removeAppliedJinnang()" :aria-label="t('chat.composer.removeTip')">
         <X :size="12" />
       </button>
     </div>
@@ -233,7 +239,7 @@ onBeforeUnmount(() => {
     />
 
     <div class="composer-upload-status">
-      <div class="composer-upload-hint">{{ conversationStore.uploadingFiles ? "文件上传中..." : uploadHint }}</div>
+      <div class="composer-upload-hint">{{ conversationStore.uploadingFiles ? t("chat.composer.uploadHintUploading") : uploadHint }}</div>
       <input ref="fileInputRef" class="composer-file-input" type="file" multiple @change="onFileChange" />
     </div>
   </div>
