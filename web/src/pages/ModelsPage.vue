@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import {
   NButton,
   NCard,
@@ -21,6 +22,7 @@ import { message } from "@/discrete";
 import type { ModelConfig, ModelProvider, ModelProviderOption } from "@/types/api";
 
 type ProviderStatusType = "success" | "warning";
+const { t } = useI18n();
 
 const CAPABILITY_OPTIONS = [
   { label: "Text", value: "text" },
@@ -54,7 +56,11 @@ const providerCards = computed(() =>
       : Boolean(provider.apiKey.trim());
     return {
       ...provider,
-      statusText: configured ? "已配置" : provider.local ? "待填写本地地址" : "待填写密钥",
+      statusText: configured
+        ? t("models.status.configured")
+        : provider.local
+          ? t("models.status.pendingLocalUrl")
+          : t("models.status.pendingApiKey"),
       statusType: (configured ? "success" : "warning") as ProviderStatusType
     };
   })
@@ -120,9 +126,9 @@ async function loadConfig() {
 async function refreshConfig() {
   try {
     await loadConfig();
-    message.success("配置已刷新");
+    message.success(t("toast.configRefreshed"));
   } catch (error) {
-    const text = error instanceof Error ? error.message : "刷新失败";
+    const text = error instanceof Error ? error.message : t("toast.refreshFailed");
     message.error(text);
   }
 }
@@ -171,16 +177,16 @@ function removeModel(index: number) {
 
 function validateProvider(provider: ModelProvider) {
   if (!provider.baseUrl.trim()) {
-    throw new Error(`${provider.name} 需要填写 Base URL`);
+    throw new Error(t("models.errors.baseUrlRequired", { name: provider.name }));
   }
   if (!provider.local && provider.requireApiKey && !provider.apiKey.trim()) {
-    throw new Error(`${provider.name} 需要填写 API Key`);
+    throw new Error(t("models.errors.apiKeyRequired", { name: provider.name }));
   }
   if (provider.models.some((model) => !model.id.trim())) {
-    throw new Error(`${provider.name} 存在未填写模型 ID 的条目`);
+    throw new Error(t("models.errors.modelIdRequired", { name: provider.name }));
   }
   if (provider.defaultModel.trim() && !provider.models.some((model) => model.id === provider.defaultModel.trim())) {
-    throw new Error(`${provider.name} 的默认模型不在模型列表中`);
+    throw new Error(t("models.errors.defaultModelNotInList", { name: provider.name }));
   }
 }
 
@@ -213,9 +219,9 @@ async function saveEditor() {
     const saved = await modelApi.updateModelConfig(cloneConfig(draft));
     config.providers = saved.providers.map(normalizeProvider);
     showEditor.value = false;
-    message.success("模型配置已保存");
+    message.success(t("models.toast.saved"));
   } catch (error) {
-    message.error(error instanceof Error ? error.message : "保存失败");
+    message.error(error instanceof Error ? error.message : t("toast.saveFailed"));
   } finally {
     saving.value = false;
   }
@@ -232,9 +238,9 @@ async function loadOllamaLocalModels() {
     config.providers = data.providers.map(normalizeProvider);
     draft.providers = cloneConfig(config).providers.map(normalizeProvider);
     editingProviderId.value = provider.id;
-    message.success("已加载本地 Ollama 模型");
+    message.success(t("models.toast.localModelsLoaded"));
   } catch (error) {
-    message.error(error instanceof Error ? error.message : "加载本地模型失败");
+    message.error(error instanceof Error ? error.message : t("models.toast.localModelsLoadFailed"));
   } finally {
     loadingLocalModels.value = false;
   }
@@ -252,11 +258,11 @@ onMounted(() => {
       <main class="app-main-content">
         <div class="app-page-content models-page">
           <AppPageHeader
-            title="模型管理"
-            subtitle="模型配置已切到数据库持久化。页面编辑的 provider、默认模型和模型能力信息会直接写入 MySQL。"
+            :title="t('pages.models.title')"
+            :subtitle="t('pages.models.subtitle')"
           >
             <template #actions>
-              <n-button :loading="loading" @click="refreshConfig">刷新配置</n-button>
+              <n-button :loading="loading" @click="refreshConfig">{{ t("common.refresh") }}</n-button>
             </template>
           </AppPageHeader>
 
@@ -283,20 +289,20 @@ onMounted(() => {
                 <span>{{ provider.baseUrl }}</span>
               </div>
               <div class="provider-meta">
-                <span class="meta-label">默认模型</span>
-                <span>{{ provider.defaultModel || "未设置" }}</span>
+                <span class="meta-label">{{ t("models.labels.defaultModel") }}</span>
+                <span>{{ provider.defaultModel || t("models.labels.notSet") }}</span>
               </div>
               <div class="provider-meta">
-                <span class="meta-label">模型数量</span>
+                <span class="meta-label">{{ t("models.labels.modelCount") }}</span>
                 <span>{{ provider.models.length }}</span>
               </div>
               <div class="provider-meta">
-                <span class="meta-label">URL 策略</span>
-                <span>{{ provider.freezeUrl ? "固定官方端点" : "允许自定义" }}</span>
+                <span class="meta-label">{{ t("models.labels.urlPolicy") }}</span>
+                <span>{{ provider.freezeUrl ? t("models.labels.urlPolicyFixed") : t("models.labels.urlPolicyCustom") }}</span>
               </div>
 
               <div class="provider-card-footer">
-                <n-button size="small" tertiary type="primary">编辑配置</n-button>
+                <n-button size="small" tertiary type="primary">{{ t("models.actions.editConfig") }}</n-button>
               </div>
             </n-card>
           </section>
@@ -307,12 +313,12 @@ onMounted(() => {
   </div>
 
   <n-drawer v-model:show="showEditor" :width="720" placement="right">
-    <n-drawer-content :title="editingProvider?.name || '编辑模型 Provider'" closable>
+    <n-drawer-content :title="editingProvider?.name || t('models.editor.defaultTitle')" closable>
       <n-form v-if="editingProvider" label-placement="top" class="provider-form">
           <div class="editor-summary">
             <n-tag size="small" :bordered="false">{{ editingProvider.protocol }}</n-tag>
             <span class="editor-summary-text">
-              {{ editingProvider.freezeUrl ? "该 Provider 使用平台官方地址，当前页面不支持修改。" : "该 Provider 支持自定义 Base URL。" }}
+              {{ editingProvider.freezeUrl ? t("models.editor.freezeUrlHint") : t("models.editor.customUrlHint") }}
             </span>
           </div>
 
@@ -321,21 +327,21 @@ onMounted(() => {
         </n-form-item>
 
         <n-form-item v-if="!editingProvider.local" label="API Key">
-          <n-input v-model:value="editingProvider.apiKey" type="password" show-password-on="click" placeholder="输入 API Key" />
+          <n-input v-model:value="editingProvider.apiKey" type="password" show-password-on="click" :placeholder="t('models.editor.apiKeyPlaceholder')" />
         </n-form-item>
 
-        <n-form-item label="默认模型">
+        <n-form-item :label="t('models.labels.defaultModel')">
           <n-select
             v-model:value="editingProvider.defaultModel"
             :options="defaultModelOptions"
             clearable
             filterable
-            placeholder="选择默认模型"
+            :placeholder="t('models.editor.defaultModelPlaceholder')"
           />
         </n-form-item>
 
         <div class="models-toolbar">
-          <div class="ui-title-lg">模型列表</div>
+          <div class="ui-title-lg">{{ t("models.labels.modelList") }}</div>
           <div class="models-toolbar-actions">
             <n-button
               v-if="editingProvider.id === 'ollama'"
@@ -343,26 +349,26 @@ onMounted(() => {
               :loading="loadingLocalModels"
               @click="loadOllamaLocalModels"
             >
-              加载本地模型
+              {{ t("models.actions.loadLocalModels") }}
             </n-button>
-            <n-button size="small" type="primary" secondary @click="addModel">新增模型</n-button>
+            <n-button size="small" type="primary" secondary @click="addModel">{{ t("models.actions.addModel") }}</n-button>
           </div>
         </div>
 
         <div class="model-stack">
           <section v-for="(model, index) in editingProvider.models" :key="`${model.id || 'new'}-${index}`" class="model-card">
             <div class="ui-card-head-between model-card-head">
-              <div class="ui-title-strong">模型 {{ index + 1 }}</div>
-              <n-button size="tiny" tertiary type="error" @click="removeModel(index)">删除</n-button>
+              <div class="ui-title-strong">{{ t("models.labels.modelIndex", { index: index + 1 }) }}</div>
+              <n-button size="tiny" tertiary type="error" @click="removeModel(index)">{{ t("common.delete") }}</n-button>
             </div>
             <n-form-item label="Model ID">
               <n-input v-model:value="model.id" placeholder="gpt-5.4" />
             </n-form-item>
-            <n-form-item label="展示名称">
+            <n-form-item :label="t('models.labels.displayName')">
               <n-input v-model:value="model.name" placeholder="GPT-5.4" />
             </n-form-item>
             <n-form-item label="Capabilities">
-              <n-select v-model:value="model.capabilities" multiple filterable tag :options="CAPABILITY_OPTIONS" placeholder="选择能力" />
+              <n-select v-model:value="model.capabilities" multiple filterable tag :options="CAPABILITY_OPTIONS" :placeholder="t('models.editor.capabilitiesPlaceholder')" />
             </n-form-item>
             <div class="model-flags">
               <n-form-item label="Reasoning">
@@ -380,32 +386,32 @@ onMounted(() => {
                 <n-input-number v-model:value="model.maxOutputTokens" :min="0" />
               </n-form-item>
             </div>
-            <div class="ui-title-sm">文件上传策略</div>
+            <div class="ui-title-sm">{{ t("models.labels.uploadPolicyTitle") }}</div>
             <div class="model-flags">
-              <n-form-item label="允许上传">
+              <n-form-item :label="t('models.labels.uploadEnabled')">
                 <n-switch v-model:value="model.uploadPolicy!.enabled" />
               </n-form-item>
-              <n-form-item label="仅允许单一类型">
+              <n-form-item :label="t('models.labels.singleMimeGroupOnly')">
                 <n-switch v-model:value="model.uploadPolicy!.singleMimeGroupOnly" />
               </n-form-item>
-              <n-form-item label="允许图片与文件混传">
+              <n-form-item :label="t('models.labels.allowMixedImageAndFile')">
                 <n-switch v-model:value="model.uploadPolicy!.allowMixedImageAndFile" />
               </n-form-item>
             </div>
-            <n-form-item label="允许的文件类型">
+            <n-form-item :label="t('models.labels.allowedFileTypes')">
               <n-select
                 v-model:value="model.uploadPolicy!.allowedMimeGroups"
                 multiple
                 filterable
                 :options="UPLOAD_MIME_GROUP_OPTIONS"
-                placeholder="例如 image / pdf / text"
+                :placeholder="t('models.editor.allowedFileTypesPlaceholder')"
               />
             </n-form-item>
             <div class="model-metrics-row">
-              <n-form-item label="非图片文件上限">
+              <n-form-item :label="t('models.labels.maxFilesPerMessage')">
                 <n-input-number v-model:value="model.uploadPolicy!.maxFilesPerMessage" :min="0" />
               </n-form-item>
-              <n-form-item label="图片上限">
+              <n-form-item :label="t('models.labels.maxImagesPerMessage')">
                 <n-input-number v-model:value="model.uploadPolicy!.maxImagesPerMessage" :min="0" />
               </n-form-item>
             </div>
@@ -416,8 +422,8 @@ onMounted(() => {
 
       <template #footer>
         <div class="ui-actions-end">
-          <n-button @click="showEditor = false">取消</n-button>
-          <n-button type="primary" :loading="saving" @click="saveEditor">保存</n-button>
+          <n-button @click="showEditor = false">{{ t("common.cancel") }}</n-button>
+          <n-button type="primary" :loading="saving" @click="saveEditor">{{ t("common.save") }}</n-button>
         </div>
       </template>
     </n-drawer-content>

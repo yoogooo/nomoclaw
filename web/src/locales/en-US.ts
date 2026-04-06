@@ -507,6 +507,56 @@ const enUS = {
       saved: "Channel configuration saved"
     }
   },
+  models: {
+    status: {
+      configured: "Configured",
+      pendingLocalUrl: "Local URL required",
+      pendingApiKey: "API key required"
+    },
+    actions: {
+      editConfig: "Edit Config",
+      loadLocalModels: "Load Local Models",
+      addModel: "Add Model"
+    },
+    labels: {
+      defaultModel: "Default Model",
+      notSet: "Not set",
+      modelCount: "Model Count",
+      modelList: "Model List",
+      modelIndex: "Model {index}",
+      displayName: "Display Name",
+      urlPolicy: "URL Policy",
+      urlPolicyFixed: "Official endpoint only",
+      urlPolicyCustom: "Customizable",
+      uploadPolicyTitle: "File Upload Policy",
+      uploadEnabled: "Upload Enabled",
+      singleMimeGroupOnly: "Single type only",
+      allowMixedImageAndFile: "Allow mixed image and file",
+      allowedFileTypes: "Allowed file types",
+      maxFilesPerMessage: "Max non-image files",
+      maxImagesPerMessage: "Max images"
+    },
+    editor: {
+      defaultTitle: "Edit Model Provider",
+      freezeUrlHint: "This provider uses an official endpoint and cannot be modified on this page.",
+      customUrlHint: "This provider supports custom Base URL.",
+      apiKeyPlaceholder: "Enter API key",
+      defaultModelPlaceholder: "Select default model",
+      capabilitiesPlaceholder: "Select capabilities",
+      allowedFileTypesPlaceholder: "e.g. image / pdf / text"
+    },
+    errors: {
+      baseUrlRequired: "{name} requires Base URL",
+      apiKeyRequired: "{name} requires API key",
+      modelIdRequired: "{name} has entries with empty model ID",
+      defaultModelNotInList: "{name} default model is not in the model list"
+    },
+    toast: {
+      saved: "Model configuration saved",
+      localModelsLoaded: "Local Ollama models loaded",
+      localModelsLoadFailed: "Failed to load local models"
+    }
+  },
   pages: {
     chat: {
       runtimeExpand: "Expand log"
@@ -530,7 +580,7 @@ const enUS = {
     },
     models: {
       title: "Model Management",
-      subtitle: "Model configuration is persisted in DB. Provider settings, default model, and capabilities are written to MySQL."
+      subtitle: "Manage available models and default options here. Changes take effect immediately after saving."
     },
     forbidden: {
       title: "Access Denied",

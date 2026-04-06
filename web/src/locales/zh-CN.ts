@@ -507,6 +507,56 @@ const zhCN = {
       saved: "Channel 配置已保存"
     }
   },
+  models: {
+    status: {
+      configured: "已配置",
+      pendingLocalUrl: "待填写本地地址",
+      pendingApiKey: "待填写密钥"
+    },
+    actions: {
+      editConfig: "编辑配置",
+      loadLocalModels: "加载本地模型",
+      addModel: "新增模型"
+    },
+    labels: {
+      defaultModel: "默认模型",
+      notSet: "未设置",
+      modelCount: "模型数量",
+      modelList: "模型列表",
+      modelIndex: "模型 {index}",
+      displayName: "展示名称",
+      urlPolicy: "URL 策略",
+      urlPolicyFixed: "固定官方端点",
+      urlPolicyCustom: "允许自定义",
+      uploadPolicyTitle: "文件上传策略",
+      uploadEnabled: "允许上传",
+      singleMimeGroupOnly: "仅允许单一类型",
+      allowMixedImageAndFile: "允许图片与文件混传",
+      allowedFileTypes: "允许的文件类型",
+      maxFilesPerMessage: "非图片文件上限",
+      maxImagesPerMessage: "图片上限"
+    },
+    editor: {
+      defaultTitle: "编辑模型 Provider",
+      freezeUrlHint: "该 Provider 使用平台官方地址，当前页面不支持修改。",
+      customUrlHint: "该 Provider 支持自定义 Base URL。",
+      apiKeyPlaceholder: "输入 API Key",
+      defaultModelPlaceholder: "选择默认模型",
+      capabilitiesPlaceholder: "选择能力",
+      allowedFileTypesPlaceholder: "例如 image / pdf / text"
+    },
+    errors: {
+      baseUrlRequired: "{name} 需要填写 Base URL",
+      apiKeyRequired: "{name} 需要填写 API Key",
+      modelIdRequired: "{name} 存在未填写模型 ID 的条目",
+      defaultModelNotInList: "{name} 的默认模型不在模型列表中"
+    },
+    toast: {
+      saved: "模型配置已保存",
+      localModelsLoaded: "已加载本地 Ollama 模型",
+      localModelsLoadFailed: "加载本地模型失败"
+    }
+  },
   pages: {
     chat: {
       runtimeExpand: "展开日志"
@@ -530,7 +580,7 @@ const zhCN = {
     },
     models: {
       title: "模型管理",
-      subtitle: "模型配置已切到数据库持久化。页面编辑的 provider、默认模型和模型能力信息会直接写入 MySQL。"
+      subtitle: "在这里管理可用模型和默认选项，保存后会立即生效。"
     },
     forbidden: {
       title: "无权访问",
