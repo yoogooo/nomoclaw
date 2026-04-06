@@ -1016,6 +1016,34 @@ a {
   background: var(--color-overlay-slate-50);
 }
 
+:root[data-theme="dark"] .message-html table {
+  border-color: var(--color-border-soft);
+  background: color-mix(in srgb, var(--color-bg-surface) 88%, var(--color-bg-surface-soft) 12%);
+  box-shadow: none;
+}
+
+:root[data-theme="dark"] .message-html thead {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-bg-surface-soft) 86%, var(--color-bg-surface) 14%) 0%,
+    color-mix(in srgb, var(--color-bg-surface-soft) 70%, var(--color-bg-surface) 30%) 100%
+  );
+}
+
+:root[data-theme="dark"] .message-html th,
+:root[data-theme="dark"] .message-html td {
+  border-right-color: var(--color-border-soft);
+  border-bottom-color: var(--color-border-soft);
+}
+
+:root[data-theme="dark"] .message-html tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--color-bg-surface-soft) 74%, transparent);
+}
+
+:root[data-theme="dark"] .message-html tbody tr:hover td {
+  background: color-mix(in srgb, var(--color-bg-soft-hover) 88%, var(--color-bg-surface) 12%);
+}
+
 .message-html th:last-child,
 .message-html td:last-child {
   border-right: none;
