@@ -283,9 +283,11 @@ export interface UploadFilesResponse {
 }
 
 export interface AgentEvent {
+  id?: string;
   conversationUid?: string;
   messageUid?: string;
   stepUid?: string;
+  timestamp?: string;
   eventType: string;
   payload: Record<string, any>;
 }

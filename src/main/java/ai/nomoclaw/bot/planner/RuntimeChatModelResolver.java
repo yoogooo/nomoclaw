@@ -12,8 +12,11 @@ import ai.nomoclaw.bot.store.repository.AgentDefinitionRepository;
 import ai.nomoclaw.bot.store.repository.AgentMessageRepository;
 import ai.nomoclaw.bot.util.JsonUtil;
 import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.ollama.OllamaChatModel;
+import dev.langchain4j.model.ollama.OllamaStreamingChatModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
+import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
@@ -94,7 +97,12 @@ public class RuntimeChatModelResolver {
                     .timeout(llmProperties.getTimeout())
                     .maxRetries(llmProperties.getMaxRetries())
                     .build();
-            return new ResolvedModel(provider.id(), runtimeModelId, model);
+            StreamingChatModel streamingModel = OllamaStreamingChatModel.builder()
+                    .baseUrl(baseUrl)
+                    .modelName(runtimeModelId)
+                    .timeout(llmProperties.getTimeout())
+                    .build();
+            return new ResolvedModel(provider.id(), runtimeModelId, model, streamingModel);
         }
 
         String baseUrl = normalizeCompatibleBaseUrl(provider.id(), provider.baseUrl());
@@ -109,7 +117,13 @@ public class RuntimeChatModelResolver {
                 .timeout(llmProperties.getTimeout())
                 .maxRetries(llmProperties.getMaxRetries())
                 .build();
-        return new ResolvedModel(provider.id(), runtimeModelId, model);
+        StreamingChatModel streamingModel = OpenAiStreamingChatModel.builder()
+                .apiKey(Objects.requireNonNull(apiKey, "apiKey must not be null"))
+                .baseUrl(baseUrl)
+                .modelName(runtimeModelId)
+                .timeout(llmProperties.getTimeout())
+                .build();
+        return new ResolvedModel(provider.id(), runtimeModelId, model, streamingModel);
     }
 
     private String normalizeCompatibleBaseUrl(String providerId, String rawBaseUrl) {
@@ -165,6 +179,9 @@ public class RuntimeChatModelResolver {
         return modelIds.stream().findFirst().orElse("");
     }
 
-    public record ResolvedModel(String providerId, String modelId, ChatModel model) {
+    public record ResolvedModel(String providerId, String modelId, ChatModel model, StreamingChatModel streamingModel) {
+        public boolean supportsStreaming() {
+            return streamingModel != null;
+        }
     }
 }

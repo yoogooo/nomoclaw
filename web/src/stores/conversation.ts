@@ -127,6 +127,7 @@ export const useConversationStore = defineStore("conversation", () => {
   });
 
   let eventSource: EventSource | null = null;
+  const streamingAssistantByParentUid = ref<Record<string, number>>({});
 
   const filteredConversations = computed(() =>
     conversations.value.filter((item) => agentCatalogStore.matchesConversation(item))
@@ -260,10 +261,60 @@ export const useConversationStore = defineStore("conversation", () => {
     }
   }
 
+  function clearStreamingAssistantDraft(parentMessageUid?: string) {
+    if (!parentMessageUid) {
+      const indexes = Object.values(streamingAssistantByParentUid.value);
+      if (!indexes.length) return;
+      const indexSet = new Set(indexes);
+      messages.value = messages.value.filter((_, index) => !indexSet.has(index));
+      streamingAssistantByParentUid.value = {};
+      return;
+    }
+    const index = streamingAssistantByParentUid.value[parentMessageUid];
+    if (index === undefined) return;
+    messages.value = messages.value.filter((_, i) => i !== index);
+    const nextMap: Record<string, number> = {};
+    for (const [key, value] of Object.entries(streamingAssistantByParentUid.value)) {
+      if (key === parentMessageUid) continue;
+      nextMap[key] = value > index ? value - 1 : value;
+    }
+    streamingAssistantByParentUid.value = nextMap;
+  }
+
+  function upsertStreamingAssistantDelta(parentMessageUid: string, textDelta: string, createdTime?: string, accumulatedText?: string, done?: boolean) {
+    if (!parentMessageUid) return;
+    const existingIndex = streamingAssistantByParentUid.value[parentMessageUid];
+    if (existingIndex !== undefined && messages.value[existingIndex]) {
+      const existing = messages.value[existingIndex];
+      messages.value[existingIndex] = {
+        ...existing,
+        content: done && accumulatedText !== undefined ? accumulatedText : `${existing.content || ""}${textDelta}`,
+        status: done ? "COMPLETED" : "RUNNING"
+      };
+      return;
+    }
+    if (!textDelta && accumulatedText === undefined) return;
+    const assistantDraft: ConversationMessage = {
+      role: "assistant",
+      parentMessageUid,
+      content: accumulatedText ?? textDelta,
+      status: done ? "COMPLETED" : "RUNNING",
+      createdTime: createdTime || new Date().toISOString(),
+      fileLinks: [],
+      attachments: []
+    };
+    messages.value = [...messages.value, assistantDraft];
+    streamingAssistantByParentUid.value = {
+      ...streamingAssistantByParentUid.value,
+      [parentMessageUid]: messages.value.length - 1
+    };
+  }
+
   function resetRuntimePanels() {
     runtimeLogStore.clear();
     conversationRunsStore.clear();
     clearApproval();
+    clearStreamingAssistantDraft();
   }
 
   function findAgentDefaultModel() {
@@ -747,7 +798,19 @@ export const useConversationStore = defineStore("conversation", () => {
 
   async function handleEvent(event: AgentEvent) {
     const type = event.eventType;
+    if (type === "MESSAGE_DELTA") {
+      if (!event.messageUid) return;
+      const textDelta = String(event.payload.textDelta || "");
+      const done = Boolean(event.payload.done);
+      const accumulatedText = event.payload.accumulatedText === undefined ? undefined : String(event.payload.accumulatedText || "");
+      if (!textDelta && !done) return;
+      upsertStreamingAssistantDelta(event.messageUid, textDelta, event.timestamp, accumulatedText, done);
+      return;
+    }
     if (type === "PLAN_CREATED") {
+      if (event.messageUid) {
+        clearStreamingAssistantDraft(event.messageUid);
+      }
       runtimeLogStore.append(tr("chat.runtime.modelToolCall", { round: event.payload.roundIndex || 1 }));
       renderPlanSteps(event.payload.steps || []);
       handlePlanCreated(event);
@@ -794,6 +857,9 @@ export const useConversationStore = defineStore("conversation", () => {
     }
     if (type === "MESSAGE_COMPLETED") {
       clearApproval();
+      if (event.messageUid) {
+        clearStreamingAssistantDraft(event.messageUid);
+      }
       runtimeLogStore.append(tr("chat.runtime.messageCompleted", { status: event.payload.status, message: event.payload.message }));
       if (event.payload.stopReason) {
         runtimeLogStore.append(tr("chat.runtime.stopReason", {
@@ -818,6 +884,9 @@ export const useConversationStore = defineStore("conversation", () => {
     }
     if (type === "MESSAGE_CANCELED") {
       clearApproval();
+      if (event.messageUid) {
+        clearStreamingAssistantDraft(event.messageUid);
+      }
       runtimeLogStore.append(tr("chat.runtime.messageCanceled"));
       const latestUserMessage = [...messages.value].reverse().find((item) => item.role === "user" && item.messageUid);
       if (latestUserMessage?.messageUid) {

@@ -7,16 +7,26 @@ import dev.langchain4j.model.chat.request.ToolChoice;
 import dev.langchain4j.model.chat.response.ChatResponse;
 
 import java.util.List;
+import java.util.function.Consumer;
 
 public interface Planner {
 
     record SummaryResult(String answer, ChatResponse response) {
     }
 
+    record StreamReasonResult(ChatResponse response, String accumulatedText, boolean streamed) {
+    }
+
     ChatResponse reason(List<ChatMessage> memory,
                         List<ToolSpecification> toolSpecifications,
                         ToolChoice toolChoice,
                         PromptLoader.PromptContext promptContext);
+
+    StreamReasonResult reasonStream(List<ChatMessage> memory,
+                                    List<ToolSpecification> toolSpecifications,
+                                    ToolChoice toolChoice,
+                                    PromptLoader.PromptContext promptContext,
+                                    Consumer<String> onDelta);
 
     SummaryResult summarize(List<ChatMessage> memory,
                             String stopReason,

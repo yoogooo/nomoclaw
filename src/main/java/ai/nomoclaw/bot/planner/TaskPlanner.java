@@ -10,12 +10,15 @@ import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.request.ToolChoice;
 import dev.langchain4j.model.chat.response.ChatResponse;
+import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import dev.langchain4j.model.output.TokenUsage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
 @Component
 @Slf4j
@@ -38,18 +41,91 @@ public class TaskPlanner implements Planner {
                                List<ToolSpecification> toolSpecifications,
                                ToolChoice toolChoice,
                                PromptLoader.PromptContext promptContext) {
+        PreparedRequest preparedRequest = buildRequest(memory, toolSpecifications, toolChoice, promptContext);
+        ChatRequest request = preparedRequest.request();
+        RuntimeChatModelResolver.ResolvedModel resolvedModel = runtimeChatModelResolver.resolve(promptContext);
+        logReasonStart(resolvedModel, memory, toolSpecifications, toolChoice, preparedRequest.systemPrompt());
+        ChatResponse response = resolvedModel.model().chat(request);
+        logReasonFinish(response);
+        return response;
+    }
+
+    @Override
+    public StreamReasonResult reasonStream(List<ChatMessage> memory,
+                                           List<ToolSpecification> toolSpecifications,
+                                           ToolChoice toolChoice,
+                                           PromptLoader.PromptContext promptContext,
+                                           Consumer<String> onDelta) {
+        PreparedRequest preparedRequest = buildRequest(memory, toolSpecifications, toolChoice, promptContext);
+        ChatRequest request = preparedRequest.request();
+        RuntimeChatModelResolver.ResolvedModel resolvedModel = runtimeChatModelResolver.resolve(promptContext);
+        logReasonStart(resolvedModel, memory, toolSpecifications, toolChoice, preparedRequest.systemPrompt());
+        if (!resolvedModel.supportsStreaming()) {
+            log.info("[Reasoning] stream fallback disabled provider={} model={}", resolvedModel.providerId(), resolvedModel.modelId());
+            ChatResponse response = resolvedModel.model().chat(request);
+            String text = response.aiMessage() == null ? "" : response.aiMessage().text();
+            logReasonFinish(response);
+            return new StreamReasonResult(response, text == null ? "" : text, false);
+        }
+
+        StringBuilder buffer = new StringBuilder();
+        final int[] deltaCount = {0};
+        CompletableFuture<ChatResponse> completion = new CompletableFuture<>();
+        resolvedModel.streamingModel().chat(request, new StreamingChatResponseHandler() {
+            @Override
+            public void onPartialResponse(String partialResponse) {
+                if (partialResponse == null || partialResponse.isEmpty()) {
+                    return;
+                }
+                buffer.append(partialResponse);
+                deltaCount[0]++;
+                if (onDelta != null) {
+                    onDelta.accept(partialResponse);
+                }
+            }
+
+            @Override
+            public void onCompleteResponse(ChatResponse response) {
+                completion.complete(response);
+            }
+
+            @Override
+            public void onError(Throwable error) {
+                completion.completeExceptionally(error);
+            }
+        });
+
+        ChatResponse response = completion.join();
+        log.info("[Reasoning] stream completed provider={} model={} deltas={} chars={}",
+                resolvedModel.providerId(), resolvedModel.modelId(), deltaCount[0], buffer.length());
+        logReasonFinish(response);
+        return new StreamReasonResult(response, buffer.toString(), true);
+    }
+
+    private PreparedRequest buildRequest(List<ChatMessage> memory,
+                                         List<ToolSpecification> toolSpecifications,
+                                         ToolChoice toolChoice,
+                                         PromptLoader.PromptContext promptContext) {
         String systemPrompt = resolveSystemPrompt(promptContext, toolSpecifications);
         List<ChatMessage> requestMessages = new ArrayList<>(memory.size() + 1);
         requestMessages.add(SystemMessage.from(systemPrompt));
         requestMessages.addAll(memory);
-
         ChatRequest request = ChatRequest.builder()
                 .messages(requestMessages)
                 .toolSpecifications(toolSpecifications)
                 .toolChoice(toolChoice)
                 .build();
+        return new PreparedRequest(request, systemPrompt);
+    }
 
-        RuntimeChatModelResolver.ResolvedModel resolvedModel = runtimeChatModelResolver.resolve(promptContext);
+    private record PreparedRequest(ChatRequest request, String systemPrompt) {
+    }
+
+    private void logReasonStart(RuntimeChatModelResolver.ResolvedModel resolvedModel,
+                                List<ChatMessage> memory,
+                                List<ToolSpecification> toolSpecifications,
+                                ToolChoice toolChoice,
+                                String systemPrompt) {
         log.info("[Reasoning] start provider={} model={} messages={} tools={} toolChoice={} systemPrompt={}",
                 resolvedModel.providerId(),
                 resolvedModel.modelId(),
@@ -57,8 +133,9 @@ public class TaskPlanner implements Planner {
                 toolSpecifications == null ? 0 : toolSpecifications.size(),
                 toolChoice,
                 systemPrompt);
+    }
 
-        ChatResponse response = resolvedModel.model().chat(request);
+    private void logReasonFinish(ChatResponse response) {
         String text = response.aiMessage() == null ? "" : response.aiMessage().text();
         int toolCalls = response.aiMessage() == null || response.aiMessage().toolExecutionRequests() == null
                 ? 0
@@ -74,7 +151,6 @@ public class TaskPlanner implements Planner {
                 outputTokens,
                 totalTokens,
                 text);
-        return response;
     }
 
     @Override

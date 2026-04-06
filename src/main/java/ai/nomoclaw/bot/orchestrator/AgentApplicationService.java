@@ -157,6 +157,7 @@ public class AgentApplicationService {
     private final ApplicationEventPublisher applicationEventPublisher;
     private final ConcurrentMap<String, Boolean> runningMessages = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, ExecutionState> executionStates = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, StringBuilder> streamingAnswerBuffers = new ConcurrentHashMap<>();
 
     public AgentApplicationService(AgentStore store,
                                    Planner planner,
@@ -807,8 +808,12 @@ public class AgentApplicationService {
         cancellationRegistry.cancel(message.messageUid());
         executionStates.remove(message.messageUid());
         log.info("[Agent] message canceled conversationUid={} messageUid={}", conversationUid, message.messageUid());
-        publishEvent(AgentEventType.MESSAGE_CANCELED, conversationUid, message.messageUid(), null, basePayload("message canceled"));
+        ObjectNode payload = basePayload("message canceled");
+        String partialAnswer = streamingAnswerBuffers.getOrDefault(message.messageUid(), new StringBuilder()).toString().trim();
+        payload.put("answer", partialAnswer);
+        publishEvent(AgentEventType.MESSAGE_CANCELED, conversationUid, message.messageUid(), null, payload);
         publishChannelMessageCompletedEvent(message, MessageStatus.CANCELED, "任务已取消。");
+        streamingAnswerBuffers.remove(message.messageUid());
     }
 
     public SseEmitter subscribe(String conversationUid) {
@@ -862,6 +867,10 @@ public class AgentApplicationService {
                 if (roundSteps.isEmpty()) {
                     RoundPlanningResult planningResult = reasonNextAction(message, state);
                     if (planningResult.completed()) {
+                        if (cancellationRegistry.isCanceled(message.messageUid())) {
+                            cleanupRuntimeState(messageUid);
+                            return;
+                        }
                         completeMessage(message, planningResult.answer(), state.currentRound());
                         return;
                     }
@@ -922,12 +931,29 @@ public class AgentApplicationService {
         AgentDefinitionEntity executionAgent = resolveExecutionAgent(conversation);
         // For scheduled runs, hide cron_tool from the model to prevent recursive job creation.
         List<ToolSpecification> availableTools = availableToolsForConversation(conversation, executionAgent);
-        ChatResponse response = planner.reason(
+        streamingAnswerBuffers.remove(message.messageUid());
+        int roundIndex = state.currentRound();
+        StringBuilder streamedText = new StringBuilder();
+        Planner.StreamReasonResult streamedResult = planner.reasonStream(
                 state.memory(),
                 availableTools,
                 ToolChoice.AUTO,
-                buildPromptContext(conversation, executionAgent, message.conversationUid(), message.messageUid())
+                buildPromptContext(conversation, executionAgent, message.conversationUid(), message.messageUid()),
+                textDelta -> {
+                    if (textDelta == null || textDelta.isBlank()) {
+                        return;
+                    }
+                    streamedText.append(textDelta);
+                    if (cancellationRegistry.isCanceled(message.messageUid())) {
+                        return;
+                    }
+                    String accumulatedText = streamedText.toString();
+                    streamingAnswerBuffers.computeIfAbsent(message.messageUid(), ignored -> new StringBuilder())
+                            .append(textDelta);
+                    publishMessageDelta(message, roundIndex, textDelta, accumulatedText, false);
+                }
         );
+        ChatResponse response = streamedResult.response();
         recordRoundTokenUsage(message, response, state.currentRound());
         AiMessage aiMessage = response.aiMessage();
         if (aiMessage == null) {
@@ -939,7 +965,10 @@ public class AgentApplicationService {
         }
 
         if (!aiMessage.hasToolExecutionRequests()) {
-            String answer = nullToEmpty(aiMessage.text()).trim();
+            String answer = nullToEmpty(streamedResult.accumulatedText()).trim();
+            if (answer.isBlank()) {
+                answer = nullToEmpty(aiMessage.text()).trim();
+            }
             if (answer.isBlank()) {
                 Planner.SummaryResult summaryResult = planner.summarize(
                         state.memory(),
@@ -952,9 +981,13 @@ public class AgentApplicationService {
                 recordRoundTokenUsage(message, summaryResult.response(), state.currentRound());
                 answer = summaryResult.answer();
             }
+            if (streamedResult.streamed() && !answer.isBlank() && !cancellationRegistry.isCanceled(message.messageUid())) {
+                publishMessageDelta(message, roundIndex, "", answer, true);
+            }
             return RoundPlanningResult.completed(answer);
         }
 
+        streamingAnswerBuffers.remove(message.messageUid());
         List<PlanStep> steps = toPlanSteps(message.messageUid(), state.currentRound(), aiMessage.toolExecutionRequests());
         store.saveSteps(message.conversationUid(), message.messageUid(), steps);
         store.updateMessageStatus(message.messageUid(), MessageStatus.PLANNED);
@@ -1613,6 +1646,19 @@ public class AgentApplicationService {
         return payload;
     }
 
+    private void publishMessageDelta(AgentMessage message,
+                                     int roundIndex,
+                                     String textDelta,
+                                     String accumulatedText,
+                                     boolean done) {
+        ObjectNode payload = basePayload("message delta");
+        payload.put("textDelta", textDelta == null ? "" : textDelta);
+        payload.put("accumulatedText", accumulatedText == null ? "" : accumulatedText);
+        payload.put("roundIndex", roundIndex);
+        payload.put("done", done);
+        publishEvent(AgentEventType.MESSAGE_DELTA, message.conversationUid(), message.messageUid(), null, payload);
+    }
+
     private void publishEvent(AgentEventType type, String conversationUid, String messageUid, String stepUid, ObjectNode payload) {
         AgentEvent event = new AgentEvent(
                 UUID.randomUUID().toString(),
@@ -2056,6 +2102,7 @@ public class AgentApplicationService {
     private void cleanupRuntimeState(String messageUid) {
         executionStates.remove(messageUid);
         cancellationRegistry.clear(messageUid);
+        streamingAnswerBuffers.remove(messageUid);
     }
 
     private String emptyToNull(String value) {
