@@ -463,6 +463,50 @@ const zhCN = {
       yearsAgo: "{count}年前"
     }
   },
+  channels: {
+    cards: {
+      feishu: {
+        title: "飞书 Channel",
+        subtitle: "长连接接收消息，支持 Reaction ACK",
+        summaryConfigured: "App ID: {appId}",
+        summaryEmpty: "未配置 App ID"
+      },
+      dingtalk: {
+        title: "钉钉 Channel",
+        subtitle: "Stream SDK 接收消息，支持会话 webhook 回复",
+        summaryConfigured: "Robot Code: {robotCode}",
+        summaryEmpty: "未配置 Robot Code"
+      },
+      mentionPolicy: "@响应策略",
+      mentionOnly: "仅 @ 触发",
+      allMessages: "所有消息",
+      summary: "配置摘要"
+    },
+    editor: {
+      feishuTitle: "编辑飞书通道",
+      dingtalkTitle: "编辑钉钉通道",
+      enable: "启用",
+      enableDingtalk: "启用钉钉通道",
+      mentionOnly: "仅响应 @ 机器人",
+      feishuAppId: "App ID（启用时必填）",
+      feishuAppSecret: "App Secret（启用时必填）",
+      feishuAppIdPlaceholder: "cli_xxx",
+      allowList: "Allow List（可选，逗号分隔）",
+      allowListFeishuPlaceholder: "ou_xxx, ou_yyy",
+      dingtalkClientId: "Client ID（启用时必填）",
+      dingtalkClientSecret: "Client Secret（启用时必填）",
+      dingtalkRobotCode: "Robot Code（启用时必填）",
+      dingtalkRobotCodePlaceholder: "dingxxxx",
+      allowListDingtalkPlaceholder: "manager001, manager002"
+    },
+    errors: {
+      feishuRequired: "飞书启用时必须填写 appId 和 appSecret",
+      dingtalkRequired: "钉钉启用时必须填写 clientId、clientSecret、robotCode"
+    },
+    toast: {
+      saved: "Channel 配置已保存"
+    }
+  },
   pages: {
     chat: {
       runtimeExpand: "展开日志"

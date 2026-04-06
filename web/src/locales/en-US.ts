@@ -463,6 +463,50 @@ const enUS = {
       yearsAgo: "{count} year(s) ago"
     }
   },
+  channels: {
+    cards: {
+      feishu: {
+        title: "Feishu Channel",
+        subtitle: "Receives messages via long connection and supports reaction ACK",
+        summaryConfigured: "App ID: {appId}",
+        summaryEmpty: "App ID not configured"
+      },
+      dingtalk: {
+        title: "DingTalk Channel",
+        subtitle: "Receives messages via Stream SDK and supports webhook replies",
+        summaryConfigured: "Robot Code: {robotCode}",
+        summaryEmpty: "Robot Code not configured"
+      },
+      mentionPolicy: "@ mention policy",
+      mentionOnly: "Only when @ mentioned",
+      allMessages: "All messages",
+      summary: "Configuration summary"
+    },
+    editor: {
+      feishuTitle: "Edit Feishu Channel",
+      dingtalkTitle: "Edit DingTalk Channel",
+      enable: "Enable",
+      enableDingtalk: "Enable DingTalk channel",
+      mentionOnly: "Respond only when @ bot",
+      feishuAppId: "App ID (required when enabled)",
+      feishuAppSecret: "App Secret (required when enabled)",
+      feishuAppIdPlaceholder: "cli_xxx",
+      allowList: "Allow List (optional, comma-separated)",
+      allowListFeishuPlaceholder: "ou_xxx, ou_yyy",
+      dingtalkClientId: "Client ID (required when enabled)",
+      dingtalkClientSecret: "Client Secret (required when enabled)",
+      dingtalkRobotCode: "Robot Code (required when enabled)",
+      dingtalkRobotCodePlaceholder: "dingxxxx",
+      allowListDingtalkPlaceholder: "manager001, manager002"
+    },
+    errors: {
+      feishuRequired: "When Feishu is enabled, appId and appSecret are required",
+      dingtalkRequired: "When DingTalk is enabled, clientId, clientSecret, and robotCode are required"
+    },
+    toast: {
+      saved: "Channel configuration saved"
+    }
+  },
   pages: {
     chat: {
       runtimeExpand: "Expand log"

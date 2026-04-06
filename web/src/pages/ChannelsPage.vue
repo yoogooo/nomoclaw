@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { NButton, NCard, NDrawer, NDrawerContent, NForm, NFormItem, NInput, NSwitch, NTag } from "naive-ui";
 import DirectoryRail from "@/components/chat/DirectoryRail.vue";
 import AppPageHeader from "@/components/layout/AppPageHeader.vue";
@@ -8,6 +9,7 @@ import { message } from "@/discrete";
 import type { ChannelConfig } from "@/types/api";
 
 type ChannelKey = "feishu" | "dingtalk";
+const { t } = useI18n();
 
 const loading = ref(false);
 const saving = ref(false);
@@ -60,23 +62,29 @@ const allowListText = reactive({ feishu: "", dingtalk: "" });
 const channelCards = computed(() => [
   {
     key: "feishu" as ChannelKey,
-    title: "飞书 Channel",
-    subtitle: "长连接接收消息，支持 Reaction ACK",
+    title: t("channels.cards.feishu.title"),
+    subtitle: t("channels.cards.feishu.subtitle"),
     enabled: config.channels.feishu.enabled,
     mention: config.channels.feishu.requireMention,
-    summary: config.channels.feishu.appId ? `App ID: ${config.channels.feishu.appId}` : "未配置 App ID"
+    summary: config.channels.feishu.appId
+      ? t("channels.cards.feishu.summaryConfigured", { appId: config.channels.feishu.appId })
+      : t("channels.cards.feishu.summaryEmpty")
   },
   {
     key: "dingtalk" as ChannelKey,
-    title: "钉钉 Channel",
-    subtitle: "Stream SDK 接收消息，支持会话 webhook 回复",
+    title: t("channels.cards.dingtalk.title"),
+    subtitle: t("channels.cards.dingtalk.subtitle"),
     enabled: config.channels.dingtalk.enabled,
     mention: config.channels.dingtalk.requireMention,
-    summary: config.channels.dingtalk.robotCode ? `Robot Code: ${config.channels.dingtalk.robotCode}` : "未配置 Robot Code"
+    summary: config.channels.dingtalk.robotCode
+      ? t("channels.cards.dingtalk.summaryConfigured", { robotCode: config.channels.dingtalk.robotCode })
+      : t("channels.cards.dingtalk.summaryEmpty")
   }
 ]);
 
-const editorTitle = computed(() => (editingKey.value === "feishu" ? "编辑飞书通道" : "编辑钉钉通道"));
+const editorTitle = computed(() =>
+  editingKey.value === "feishu" ? t("channels.editor.feishuTitle") : t("channels.editor.dingtalkTitle")
+);
 
 function normalizeAllowList(raw: string): string[] {
   if (!raw.trim()) {
@@ -109,9 +117,9 @@ async function loadConfig() {
 async function refreshConfig() {
   try {
     await loadConfig();
-    message.success("配置已刷新");
+    message.success(t("toast.configRefreshed"));
   } catch (error) {
-    const text = error instanceof Error ? error.message : "刷新失败";
+    const text = error instanceof Error ? error.message : t("toast.refreshFailed");
     message.error(text);
   }
 }
@@ -134,13 +142,13 @@ function validateChannelDraft() {
   if (editingKey.value === "feishu") {
     const feishu = draft.channels.feishu;
     if (feishu.enabled && (!feishu.appId.trim() || !feishu.appSecret.trim())) {
-      throw new Error("飞书启用时必须填写 appId 和 appSecret");
+      throw new Error(t("channels.errors.feishuRequired"));
     }
     return;
   }
   const dingtalk = draft.channels.dingtalk;
   if (dingtalk.enabled && (!dingtalk.clientId.trim() || !dingtalk.clientSecret.trim() || !dingtalk.robotCode.trim())) {
-    throw new Error("钉钉启用时必须填写 clientId、clientSecret、robotCode");
+    throw new Error(t("channels.errors.dingtalkRequired"));
   }
 }
 
@@ -159,9 +167,9 @@ async function saveEditor() {
     config.channels.dingtalk = { ...saved.channels.dingtalk };
     syncAllowListText();
     showEditor.value = false;
-    message.success("Channel 配置已保存");
+    message.success(t("channels.toast.saved"));
   } catch (error) {
-    const text = error instanceof Error ? error.message : "保存失败";
+    const text = error instanceof Error ? error.message : t("toast.saveFailed");
     message.error(text);
   } finally {
     saving.value = false;
@@ -179,12 +187,12 @@ onMounted(() => {
       <DirectoryRail />
       <main class="app-main-content">
         <div class="app-page-content channels-page">
-          <AppPageHeader title="Channel 管理">
+          <AppPageHeader :title="t('pages.channels.title')">
             <template #subtitle>
-              点击卡片编辑通道信息，保存后写入 <code>~/.nomoclaw/nomoclaw.json</code>。
+              {{ t("pages.channels.subtitle") }}
             </template>
             <template #actions>
-              <n-button :loading="loading" @click="refreshConfig">刷新配置</n-button>
+              <n-button :loading="loading" @click="refreshConfig">{{ t("common.refresh") }}</n-button>
             </template>
           </AppPageHeader>
 
@@ -199,14 +207,14 @@ onMounted(() => {
               <template #header>
                 <div class="ui-card-head-between">
                   <span>{{ item.title }}</span>
-                  <n-tag :type="item.enabled ? 'success' : 'warning'" round>{{ item.enabled ? "已启用" : "已停用" }}</n-tag>
+                  <n-tag :type="item.enabled ? 'success' : 'warning'" round>{{ item.enabled ? t("common.enabled") : t("common.disabled") }}</n-tag>
                 </div>
               </template>
               <div class="card-subtitle">{{ item.subtitle }}</div>
-              <div class="card-row"><span class="meta-label">@响应策略</span><span>{{ item.mention ? "仅 @ 触发" : "所有消息" }}</span></div>
-              <div class="card-row"><span class="meta-label">配置摘要</span><span>{{ item.summary }}</span></div>
+              <div class="card-row"><span class="meta-label">{{ t("channels.cards.mentionPolicy") }}</span><span>{{ item.mention ? t("channels.cards.mentionOnly") : t("channels.cards.allMessages") }}</span></div>
+              <div class="card-row"><span class="meta-label">{{ t("channels.cards.summary") }}</span><span>{{ item.summary }}</span></div>
               <div class="card-foot">
-                <n-button size="small" tertiary type="primary">编辑</n-button>
+                <n-button size="small" tertiary type="primary">{{ t("common.edit") }}</n-button>
               </div>
             </n-card>
           </section>
@@ -220,47 +228,47 @@ onMounted(() => {
     <n-drawer-content :title="editorTitle" closable>
     <n-form v-if="editingKey === 'feishu'" label-placement="top" class="channel-edit-form">
       <div class="channel-switch-stack">
-        <span class="channel-enable-label">启用</span>
+        <span class="channel-enable-label">{{ t("channels.editor.enable") }}</span>
         <n-switch v-model:value="draft.channels.feishu.enabled" />
       </div>
-      <n-form-item label="App ID（启用时必填）">
-        <n-input v-model:value="draft.channels.feishu.appId" placeholder="cli_xxx" />
+      <n-form-item :label="t('channels.editor.feishuAppId')">
+        <n-input v-model:value="draft.channels.feishu.appId" :placeholder="t('channels.editor.feishuAppIdPlaceholder')" />
       </n-form-item>
-      <n-form-item label="App Secret（启用时必填）">
+      <n-form-item :label="t('channels.editor.feishuAppSecret')">
         <n-input v-model:value="draft.channels.feishu.appSecret" type="password" show-password-on="click" />
       </n-form-item>
-      <n-form-item label="Allow List（可选，逗号分隔）">
-        <n-input v-model:value="allowListText.feishu" placeholder="ou_xxx, ou_yyy" />
+      <n-form-item :label="t('channels.editor.allowList')">
+        <n-input v-model:value="allowListText.feishu" :placeholder="t('channels.editor.allowListFeishuPlaceholder')" />
       </n-form-item>
     </n-form>
 
     <n-form v-else label-placement="top" class="channel-edit-form">
       <div class="channel-switch-row">
-        <span class="meta-label">启用钉钉通道</span>
+        <span class="meta-label">{{ t("channels.editor.enableDingtalk") }}</span>
         <n-switch v-model:value="draft.channels.dingtalk.enabled" />
       </div>
       <div class="channel-switch-row">
-        <span class="meta-label">仅响应 @ 机器人</span>
+        <span class="meta-label">{{ t("channels.editor.mentionOnly") }}</span>
         <n-switch v-model:value="draft.channels.dingtalk.requireMention" />
       </div>
-      <n-form-item label="Client ID（启用时必填）">
+      <n-form-item :label="t('channels.editor.dingtalkClientId')">
         <n-input v-model:value="draft.channels.dingtalk.clientId" />
       </n-form-item>
-      <n-form-item label="Client Secret（启用时必填）">
+      <n-form-item :label="t('channels.editor.dingtalkClientSecret')">
         <n-input v-model:value="draft.channels.dingtalk.clientSecret" type="password" show-password-on="click" />
       </n-form-item>
-      <n-form-item label="Robot Code（启用时必填）">
-        <n-input v-model:value="draft.channels.dingtalk.robotCode" placeholder="dingxxxx" />
+      <n-form-item :label="t('channels.editor.dingtalkRobotCode')">
+        <n-input v-model:value="draft.channels.dingtalk.robotCode" :placeholder="t('channels.editor.dingtalkRobotCodePlaceholder')" />
       </n-form-item>
-      <n-form-item label="Allow List（可选，逗号分隔）">
-        <n-input v-model:value="allowListText.dingtalk" placeholder="manager001, manager002" />
+      <n-form-item :label="t('channels.editor.allowList')">
+        <n-input v-model:value="allowListText.dingtalk" :placeholder="t('channels.editor.allowListDingtalkPlaceholder')" />
       </n-form-item>
     </n-form>
 
     <template #footer>
       <div class="ui-actions-end">
-        <n-button @click="showEditor = false">取消</n-button>
-        <n-button type="primary" :loading="saving" @click="saveEditor">保存</n-button>
+        <n-button @click="showEditor = false">{{ t("common.cancel") }}</n-button>
+        <n-button type="primary" :loading="saving" @click="saveEditor">{{ t("common.save") }}</n-button>
       </div>
     </template>
     </n-drawer-content>
