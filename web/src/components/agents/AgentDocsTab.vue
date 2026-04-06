@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import { NButton, NInput, NSwitch } from "naive-ui";
 
 interface DocListItem {
@@ -26,13 +27,14 @@ const emit = defineEmits<{
   (e: "save"): void;
   (e: "update-content", value: string): void;
 }>();
+const { t } = useI18n();
 </script>
 
 <template>
   <div class="tab-body">
     <div class="docs-split">
       <aside class="docs-list ui-card-soft">
-        <div class="docs-list-title ui-title-strong">配置文件清单</div>
+        <div class="docs-list-title ui-title-strong">{{ t("agents.docs.listTitle") }}</div>
         <button
           v-for="item in docItems"
           :key="item.key"
@@ -70,7 +72,7 @@ const emit = defineEmits<{
               :disabled="!selectedDocEnabled"
               @click="emit('toggle-edit')"
             >
-              {{ docEditable ? "取消编辑" : "启用编辑" }}
+              {{ docEditable ? t("agents.docs.cancelEdit") : t("agents.docs.enableEdit") }}
             </n-button>
             <n-button
               size="small"
@@ -78,7 +80,7 @@ const emit = defineEmits<{
               :disabled="!docEditable || !selectedDocEnabled"
               @click="emit('save')"
             >
-              保存配置
+              {{ t("agents.docs.saveConfig") }}
             </n-button>
           </div>
         </div>

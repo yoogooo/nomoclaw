@@ -362,6 +362,107 @@ const enUS = {
     chooseModelFirst: "Please select a model first",
     uploadRuleNotMatch: "Files do not match current model upload policy"
   },
+  agents: {
+    common: {
+      noDescription: "No description"
+    },
+    detail: {
+      title: "Agent Details",
+      empty: "Select an Agent on the left, or create a new one first."
+    },
+    list: {
+      title: "Agent List",
+      newAgent: "New Agent",
+      empty: "No agents yet",
+      member: "Member"
+    },
+    basic: {
+      displayName: "Display Name",
+      agentName: "Agent Identifier",
+      agentNameHint: "Immutable after creation. Only letters, numbers, underscore, and hyphen are allowed.",
+      description: "Description",
+      iconSelect: "Icon",
+      preview: "Live Preview",
+      iconStyle: "Icon Style",
+      themeColor: "Theme Color"
+    },
+    create: {
+      title: "Create Agent",
+      displayNamePlaceholder: "e.g. General Assistant",
+      agentNamePlaceholder: "e.g. agent_general_assistant",
+      submit: "Create Agent"
+    },
+    skills: {
+      description: "Imported skills can be enabled in this Agent's system prompt as needed.",
+      import: "Import Skill",
+      empty: "No skills"
+    },
+    tools: {
+      empty: "No tools"
+    },
+    tips: {
+      titlePlaceholder: "Tip title",
+      contentPlaceholder: "Tip content",
+      add: "Add Tip",
+      deleteConfirm: "Delete \"{title}\"?",
+      empty: "No tips",
+      untitled: "Untitled Tip"
+    },
+    docs: {
+      listTitle: "Config Files",
+      cancelEdit: "Cancel Editing",
+      enableEdit: "Enable Editing",
+      saveConfig: "Save Config"
+    },
+    skillDrawer: {
+      status: "Status",
+      disabled: "Disabled",
+      description: "Description",
+      path: "Full Path"
+    },
+    import: {
+      title: "Import Skill",
+      subtitle: "Import skills from URL, archive, or quick-create.",
+      tabUrl: "Import by URL",
+      tabArchive: "Import Archive",
+      tabCreate: "Create Skill",
+      supportedSources: "Supported Sources",
+      urlExamples: "URL Examples",
+      urlPlaceholder: "Enter a Skill repository or resource URL",
+      archiveHint: "Upload a zip archive. The system will parse the Skill directory automatically.",
+      pickArchive: "Select archive",
+      skillKeyPlaceholder: "e.g. my-skill",
+      displayNamePlaceholder: "e.g. Order Query Assistant",
+      descriptionPlaceholder: "Add a brief description to identify this Skill",
+      purpose: "Purpose",
+      purposePlaceholder: "Describe what problem this Skill solves",
+      attachToAgent: "Enable for current Agent immediately",
+      createSkill: "Create Skill",
+      importSkill: "Import Skill"
+    },
+    docsTemplate: {
+      defaultAgentName: "this Agent",
+      defaultRole: "member",
+      soul: "You are the core persona of {name}. Stay clear, stable, and actionable.",
+      goalTitle: "Goal",
+      goalItem: "Complete tasks within the current responsibility scope",
+      outputRulesTitle: "Output Rules",
+      outputRulesItem: "Conclusion first, then details",
+      memoryItem1: "Record long-term preferences",
+      memoryItem2: "Record high-value context",
+      toolsItem1: "List tools allowed to call",
+      toolsItem2: "List risk boundaries for tools",
+      userItem1: "Record the preferences, constraints, and context of this Agent's target users."
+    },
+    time: {
+      justNow: "Just now",
+      minutesAgo: "{count} min ago",
+      hoursAgo: "{count} hr ago",
+      daysAgo: "{count} day(s) ago",
+      monthsAgo: "{count} month(s) ago",
+      yearsAgo: "{count} year(s) ago"
+    }
+  },
   pages: {
     chat: {
       runtimeExpand: "Expand log"

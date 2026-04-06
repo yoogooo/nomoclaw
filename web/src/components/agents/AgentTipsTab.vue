@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { NButton, NInput, NPopconfirm } from "naive-ui";
 import { Pencil, Trash2 } from "lucide-vue-next";
 import type { AgentTip } from "@/components/agents/agentManagementTypes";
@@ -17,6 +18,7 @@ const emit = defineEmits<{
   (e: "update:title", value: string): void;
   (e: "update:content", value: string): void;
 }>();
+const { t } = useI18n();
 
 const editingTipId = ref("");
 const editingTitle = ref("");
@@ -50,33 +52,33 @@ function saveEdit() {
 <template>
   <div class="tab-body">
     <div class="ui-note-editor">
-      <n-input :value="tipTitle" placeholder="锦囊标题" @update:value="emit('update:title', $event)" />
+      <n-input :value="tipTitle" :placeholder="t('agents.tips.titlePlaceholder')" @update:value="emit('update:title', $event)" />
       <n-input
         :value="tipContent"
         type="textarea"
         :autosize="{ minRows: 3, maxRows: 6 }"
-        placeholder="锦囊内容"
+        :placeholder="t('agents.tips.contentPlaceholder')"
         @update:value="emit('update:content', $event)"
       />
       <div class="ui-actions-right">
-        <n-button :disabled="isEditing" @click="emit('add')">新增锦囊</n-button>
+        <n-button :disabled="isEditing" @click="emit('add')">{{ t("agents.tips.add") }}</n-button>
       </div>
     </div>
     <div v-if="tips.length" class="ui-note-list">
       <div v-for="tip in tips" :key="tip.id" class="ui-note-item">
         <template v-if="editingTipId === tip.id">
           <div class="ui-note-editor tip-editor">
-            <n-input :value="editingTitle" placeholder="锦囊标题" @update:value="editingTitle = $event" />
+            <n-input :value="editingTitle" :placeholder="t('agents.tips.titlePlaceholder')" @update:value="editingTitle = $event" />
             <n-input
               :value="editingContent"
               type="textarea"
               :autosize="{ minRows: 3, maxRows: 8 }"
-              placeholder="锦囊内容"
+              :placeholder="t('agents.tips.contentPlaceholder')"
               @update:value="editingContent = $event"
             />
             <div class="ui-actions-right">
-              <n-button tertiary @click="cancelEdit">取消</n-button>
-              <n-button type="primary" @click="saveEdit">保存</n-button>
+              <n-button tertiary @click="cancelEdit">{{ t("common.cancel") }}</n-button>
+              <n-button type="primary" @click="saveEdit">{{ t("common.save") }}</n-button>
             </div>
           </div>
         </template>
@@ -84,22 +86,22 @@ function saveEdit() {
           <div class="ui-note-head">
             <div class="tip-title ui-item-title">{{ tip.title }}</div>
             <div class="tip-actions">
-              <n-button text title="编辑" aria-label="编辑" @click="startEdit(tip)">
+              <n-button text :title="t('common.edit')" :aria-label="t('common.edit')" @click="startEdit(tip)">
                 <Pencil :size="14" />
               </n-button>
               <n-popconfirm
                 :show-icon="false"
                 :positive-button-props="{ type: 'error' }"
-                positive-text="删除"
-                negative-text="取消"
+                :positive-text="t('common.delete')"
+                :negative-text="t('common.cancel')"
                 @positive-click="emit('remove', tip.id)"
               >
                 <template #trigger>
-                  <n-button text type="error" title="删除" aria-label="删除" :disabled="isEditing">
+                  <n-button text type="error" :title="t('common.delete')" :aria-label="t('common.delete')" :disabled="isEditing">
                     <Trash2 :size="14" />
                   </n-button>
                 </template>
-                确认删除“{{ tip.title }}”吗？
+                {{ t("agents.tips.deleteConfirm", { title: tip.title }) }}
               </n-popconfirm>
             </div>
           </div>
@@ -107,7 +109,7 @@ function saveEdit() {
         </template>
       </div>
     </div>
-    <div v-else class="ui-empty-muted">暂无锦囊</div>
+    <div v-else class="ui-empty-muted">{{ t("agents.tips.empty") }}</div>
   </div>
 </template>
 

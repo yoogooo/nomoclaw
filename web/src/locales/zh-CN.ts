@@ -362,6 +362,107 @@ const zhCN = {
     chooseModelFirst: "请先选择模型",
     uploadRuleNotMatch: "文件不符合当前模型上传规则"
   },
+  agents: {
+    common: {
+      noDescription: "暂无描述"
+    },
+    detail: {
+      title: "Agent 详细信息",
+      empty: "请先在左侧选择一个 Agent，或新建 Agent。"
+    },
+    list: {
+      title: "Agent 列表",
+      newAgent: "新建 Agent",
+      empty: "当前没有 Agent",
+      member: "成员"
+    },
+    basic: {
+      displayName: "显示名称",
+      agentName: "Agent 标识",
+      agentNameHint: "创建后不可修改，仅允许字母/数字/下划线/中划线。",
+      description: "描述",
+      iconSelect: "Icon 选择",
+      preview: "实时预览",
+      iconStyle: "图标样式",
+      themeColor: "主题色"
+    },
+    create: {
+      title: "新建 Agent",
+      displayNamePlaceholder: "例如：通用助手",
+      agentNamePlaceholder: "例如：agent_general_assistant",
+      submit: "创建 Agent"
+    },
+    skills: {
+      description: "导入后可在该 Agent 的系统提示词中按需启用 Skills。",
+      import: "导入 Skill",
+      empty: "暂无技能"
+    },
+    tools: {
+      empty: "暂无工具"
+    },
+    tips: {
+      titlePlaceholder: "锦囊标题",
+      contentPlaceholder: "锦囊内容",
+      add: "新增锦囊",
+      deleteConfirm: "确认删除「{title}」？",
+      empty: "暂无锦囊",
+      untitled: "未命名锦囊"
+    },
+    docs: {
+      listTitle: "配置文件清单",
+      cancelEdit: "取消编辑",
+      enableEdit: "启用编辑",
+      saveConfig: "保存配置"
+    },
+    skillDrawer: {
+      status: "状态",
+      disabled: "已关闭",
+      description: "描述",
+      path: "完整路径"
+    },
+    import: {
+      title: "导入 Skill",
+      subtitle: "支持从 URL、压缩包或快速创建导入 Skill。",
+      tabUrl: "网址导入",
+      tabArchive: "压缩包导入",
+      tabCreate: "自建 Skill",
+      supportedSources: "支持来源",
+      urlExamples: "URL 示例",
+      urlPlaceholder: "请输入 Skill 仓库或资源地址",
+      archiveHint: "请上传 zip 压缩包，系统会自动解析 Skill 目录结构。",
+      pickArchive: "选择压缩包",
+      skillKeyPlaceholder: "例如：my-skill",
+      displayNamePlaceholder: "例如：订单查询助手",
+      descriptionPlaceholder: "输入简要描述，帮助识别该 Skill 的用途",
+      purpose: "用途说明",
+      purposePlaceholder: "说明这个 Skill 用于解决什么问题",
+      attachToAgent: "立即启用到当前 Agent",
+      createSkill: "创建 Skill",
+      importSkill: "导入 Skill"
+    },
+    docsTemplate: {
+      defaultAgentName: "该 Agent",
+      defaultRole: "成员",
+      soul: "你是 {name} 的内核人格，保持清晰、稳健、可执行。",
+      goalTitle: "目标",
+      goalItem: "在当前职责范围内完成任务",
+      outputRulesTitle: "输出约束",
+      outputRulesItem: "先结论，后细节",
+      memoryItem1: "记录长期偏好",
+      memoryItem2: "记录高价值上下文",
+      toolsItem1: "列出允许调用的工具",
+      toolsItem2: "列出工具风险边界",
+      userItem1: "记录该 Agent 服务对象的偏好、约束与上下文。"
+    },
+    time: {
+      justNow: "刚刚",
+      minutesAgo: "{count}分钟前",
+      hoursAgo: "{count}小时前",
+      daysAgo: "{count}天前",
+      monthsAgo: "{count}个月前",
+      yearsAgo: "{count}年前"
+    }
+  },
   pages: {
     chat: {
       runtimeExpand: "展开日志"

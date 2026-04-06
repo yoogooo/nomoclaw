@@ -14,6 +14,7 @@ import type {
   ManagedSkill,
   ManagedTool
 } from "@/components/agents/agentManagementTypes";
+import { tr } from "@/i18n";
 
 export interface AgentDomainOptions {
   nomoclawRootDir: string;
@@ -43,13 +44,15 @@ export function normalizePath(path: string, nomoclawRootDir: string) {
 }
 
 export function defaultDocs(displayName: string): AgentDocConfig {
+  const resolvedName = displayName || tr("agents.docsTemplate.defaultAgentName");
+  const resolvedRole = tr("agents.docsTemplate.defaultRole");
   return {
-    soul: `# SOUL\n\n你是 ${displayName || "该 Agent"} 的内核人格，保持清晰、稳健、可执行。`,
-    agent: "# AGENT\n\n## 目标\n- 在当前职责范围内完成任务\n\n## 输出约束\n- 先结论，后细节",
-    memory: "# MEMORY\n\n- 记录长期偏好\n- 记录高价值上下文",
-    tools: "# TOOLS\n\n- 列出允许调用的工具\n- 列出工具风险边界",
-    identity: `# IDENTITY\n\nname: ${displayName || "agent"}\nrole: 成员`,
-    user: "# USER\n\n- 记录该 Agent 服务对象的偏好、约束与上下文。"
+    soul: `# SOUL\n\n${tr("agents.docsTemplate.soul", { name: resolvedName })}`,
+    agent: `# AGENT\n\n## ${tr("agents.docsTemplate.goalTitle")}\n- ${tr("agents.docsTemplate.goalItem")}\n\n## ${tr("agents.docsTemplate.outputRulesTitle")}\n- ${tr("agents.docsTemplate.outputRulesItem")}`,
+    memory: `# MEMORY\n\n- ${tr("agents.docsTemplate.memoryItem1")}\n- ${tr("agents.docsTemplate.memoryItem2")}`,
+    tools: `# TOOLS\n\n- ${tr("agents.docsTemplate.toolsItem1")}\n- ${tr("agents.docsTemplate.toolsItem2")}`,
+    identity: `# IDENTITY\n\nname: ${resolvedName}\nrole: ${resolvedRole}`,
+    user: `# USER\n\n- ${tr("agents.docsTemplate.userItem1")}`
   };
 }
 
@@ -70,21 +73,21 @@ export function approxBytes(content: string) {
 }
 
 export function formatRelativeTime(raw: string) {
-  if (!raw) return "刚刚";
+  if (!raw) return tr("agents.time.justNow");
   const ts = new Date(raw).getTime();
-  if (!Number.isFinite(ts)) return "刚刚";
+  if (!Number.isFinite(ts)) return tr("agents.time.justNow");
   const diff = Math.max(0, Date.now() - ts);
   const minute = 60 * 1000;
   const hour = 60 * minute;
   const day = 24 * hour;
   const month = 30 * day;
   const year = 365 * day;
-  if (diff < minute) return "刚刚";
-  if (diff < hour) return `${Math.floor(diff / minute)}分钟前`;
-  if (diff < day) return `${Math.floor(diff / hour)}小时前`;
-  if (diff < month) return `${Math.floor(diff / day)}天前`;
-  if (diff < year) return `${Math.floor(diff / month)}个月前`;
-  return `${Math.floor(diff / year)}年前`;
+  if (diff < minute) return tr("agents.time.justNow");
+  if (diff < hour) return tr("agents.time.minutesAgo", { count: Math.floor(diff / minute) });
+  if (diff < day) return tr("agents.time.hoursAgo", { count: Math.floor(diff / hour) });
+  if (diff < month) return tr("agents.time.daysAgo", { count: Math.floor(diff / day) });
+  if (diff < year) return tr("agents.time.monthsAgo", { count: Math.floor(diff / month) });
+  return tr("agents.time.yearsAgo", { count: Math.floor(diff / year) });
 }
 
 export function normalizeAvatarIcon(raw: unknown, options: AgentDomainOptions) {
@@ -114,7 +117,7 @@ export function toManagedAgent(agent: AgentCatalogAgent, agentGroupUid: string, 
       id: `skill_${skillKey}`,
       skillKey,
       name: skillKey,
-      description: "暂无描述",
+      description: tr("agents.common.noDescription"),
       path: joinPath(options.skillsRootDir, skillKey),
       enabled: true
     })),
@@ -131,7 +134,7 @@ export function mapApiSkill(skill: AgentSkill, options: AgentDomainOptions): Man
     id: `skill_${key}`,
     skillKey: key,
     name: skill.displayName || key,
-    description: skill.description || "暂无描述",
+    description: skill.description || tr("agents.common.noDescription"),
     path: skill.skillPath ? normalizePath(skill.skillPath, options.nomoclawRootDir) : joinPath(options.skillsRootDir, key),
     enabled: skill.enabled
   };
@@ -143,7 +146,7 @@ export function mapApiTool(tool: AgentTool): ManagedTool {
     id: `tool_${key}`,
     toolKey: key,
     name: tool.displayName || key,
-    description: tool.description || "暂无描述",
+    description: tool.description || tr("agents.common.noDescription"),
     enabled: tool.enabled
   };
 }
@@ -151,7 +154,7 @@ export function mapApiTool(tool: AgentTool): ManagedTool {
 export function mapApiTip(tip: ApiAgentTip): AgentTip {
   return {
     id: tip.tipUid,
-    title: tip.title || "未命名锦囊",
+    title: tip.title || tr("agents.tips.untitled"),
     content: tip.sourceContent || tip.summary || ""
   };
 }

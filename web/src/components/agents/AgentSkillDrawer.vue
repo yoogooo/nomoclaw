@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import { NDrawer, NDrawerContent } from "naive-ui";
 import type { ManagedSkill } from "@/components/agents/agentManagementTypes";
 
@@ -10,6 +11,7 @@ defineProps<{
 const emit = defineEmits<{
   (e: "update:show", value: boolean): void;
 }>();
+const { t } = useI18n();
 </script>
 
 <template>
@@ -17,15 +19,15 @@ const emit = defineEmits<{
     <n-drawer-content v-if="skill" :title="skill.name" closable>
       <div class="ui-stack-sm">
         <div class="ui-card-section">
-          <div class="skill-drawer-label ui-field-label">状态</div>
-          <div class="skill-drawer-value ui-field-value">{{ skill.enabled ? "已启用" : "已关闭" }}</div>
+          <div class="skill-drawer-label ui-field-label">{{ t("agents.skillDrawer.status") }}</div>
+          <div class="skill-drawer-value ui-field-value">{{ skill.enabled ? t("common.enabled") : t("agents.skillDrawer.disabled") }}</div>
         </div>
         <div class="ui-card-section">
-          <div class="skill-drawer-label ui-field-label">描述</div>
-          <div class="skill-drawer-value ui-field-value">{{ skill.description || "暂无描述" }}</div>
+          <div class="skill-drawer-label ui-field-label">{{ t("agents.skillDrawer.description") }}</div>
+          <div class="skill-drawer-value ui-field-value">{{ skill.description || t("agents.common.noDescription") }}</div>
         </div>
         <div class="ui-card-section">
-          <div class="skill-drawer-label ui-field-label">完整路径</div>
+          <div class="skill-drawer-label ui-field-label">{{ t("agents.skillDrawer.path") }}</div>
           <div class="skill-drawer-path ui-field-value">{{ skill.path }}</div>
         </div>
       </div>

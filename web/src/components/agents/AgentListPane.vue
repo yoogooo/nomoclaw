@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { Plus } from "lucide-vue-next";
 import { NButton } from "naive-ui";
 import type { AvatarIconOption, ManagedAgent } from "@/components/agents/agentManagementTypes";
@@ -15,6 +16,7 @@ const emit = defineEmits<{
   (e: "create"): void;
   (e: "select", agentUid: string): void;
 }>();
+const { t } = useI18n();
 
 const iconMap = computed(() =>
   props.avatarIconOptions.reduce<Record<string, AvatarIconOption["icon"]>>((acc, item) => {
@@ -38,12 +40,12 @@ function avatarFallbackText(agent: ManagedAgent) {
   <aside class="agent-list-column">
     <div class="surface-card agent-list-pane">
       <div class="ui-pane-head">
-        <div class="pane-title ui-pane-title">Agent 列表</div>
+        <div class="pane-title ui-pane-title">{{ t("agents.list.title") }}</div>
         <n-button size="small" type="primary" class="new-agent-btn" @click="emit('create')">
-          新建 Agent
+          {{ t("agents.list.newAgent") }}
         </n-button>
       </div>
-      <div v-if="!agents.length" class="ui-empty-muted">当前没有 Agent</div>
+      <div v-if="!agents.length" class="ui-empty-muted">{{ t("agents.list.empty") }}</div>
       <div v-else class="agent-list">
         <button
           v-for="agent in agents"
@@ -59,7 +61,7 @@ function avatarFallbackText(agent: ManagedAgent) {
           </div>
           <div class="agent-row-meta">
             <div class="agent-item-name">{{ agent.displayName || agent.agentName }}</div>
-            <div class="agent-item-meta">{{ agent.memberRole || "成员" }}</div>
+            <div class="agent-item-meta">{{ agent.memberRole || t("agents.list.member") }}</div>
           </div>
         </button>
       </div>
