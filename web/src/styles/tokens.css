@@ -351,8 +351,8 @@
   --color-bg-soft-alt: #191A1D;
   --color-bg-brand-soft: rgba(54, 203, 181, 0.14);
   --color-bg-brand-soft-hover: rgba(54, 203, 181, 0.22);
-  --color-bg-rail: #434548;
-  --color-bg-rail-brand: #46494D;
+  --color-bg-rail: #34363A;
+  --color-bg-rail-brand: #3A3D42;
   --color-bg-rail-active: rgba(255, 255, 255, 0.14);
   --color-bg-rail-avatar: linear-gradient(135deg, #343840 0%, #252930 100%);
   --color-border-rail-avatar: rgba(148, 163, 184, 0.38);

@@ -1,20 +1,27 @@
 <script setup lang="ts">
 import { Moon, Sun } from "lucide-vue-next";
+import { NSelect } from "naive-ui";
 import { useI18n } from "vue-i18n";
 import DirectoryRail from "@/components/chat/DirectoryRail.vue";
 import AppPageHeader from "@/components/layout/AppPageHeader.vue";
 import { useUiPreferencesStore } from "@/stores/uiPreferences";
 import type { AppLocale } from "@/i18n";
+import { computed } from "vue";
 
 const uiPreferencesStore = useUiPreferencesStore();
 uiPreferencesStore.init();
 const { t } = useI18n();
+const localeOptions = computed(() => [
+  { label: t("settings.languageZhCN"), value: "zh-CN" },
+  { label: t("settings.languageEnUS"), value: "en-US" }
+]);
 
 function onThemeModeChange(value: "light" | "dark") {
   uiPreferencesStore.setThemeMode(value);
 }
 
-function onLocaleChange(value: AppLocale) {
+function onLocaleChange(value: AppLocale | null) {
+  if (!value) return;
   uiPreferencesStore.setLocale(value);
 }
 </script>
@@ -76,23 +83,14 @@ function onLocaleChange(value: AppLocale) {
               </div>
               <div>
                 <div class="meta-label">{{ t("settings.language") }}</div>
-                <div class="ui-value-strong settings-lang-toggle">
-                  <button
-                    class="theme-option"
-                    :class="{ active: uiPreferencesStore.locale === 'zh-CN' }"
-                    type="button"
-                    @click="onLocaleChange('zh-CN')"
-                  >
-                    <span>{{ t("settings.languageZhCN") }}</span>
-                  </button>
-                  <button
-                    class="theme-option"
-                    :class="{ active: uiPreferencesStore.locale === 'en-US' }"
-                    type="button"
-                    @click="onLocaleChange('en-US')"
-                  >
-                    <span>{{ t("settings.languageEnUS") }}</span>
-                  </button>
+                <div class="ui-value-strong settings-language-select-wrap">
+                  <n-select
+                    class="settings-language-select"
+                    :value="uiPreferencesStore.locale"
+                    :options="localeOptions"
+                    :clearable="false"
+                    @update:value="onLocaleChange"
+                  />
                 </div>
               </div>
             </div>
@@ -122,16 +120,14 @@ function onLocaleChange(value: AppLocale) {
   background: var(--color-bg-surface-soft);
 }
 
-.settings-lang-toggle {
+.settings-language-select-wrap {
   margin-top: var(--space-1_5);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  width: fit-content;
-  padding: var(--space-1);
-  border: var(--size-1) solid var(--color-border-strong);
-  border-radius: var(--radius-pill);
-  background: var(--color-bg-surface-soft);
+  display: inline-block;
+}
+
+.settings-language-select {
+  width: var(--size-180);
+  min-width: var(--size-170);
 }
 
 .theme-option {
