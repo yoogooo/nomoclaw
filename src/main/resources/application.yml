@@ -2,7 +2,7 @@ spring:
   application:
     name: bot
   profiles:
-    default: local
+    default: h2
   datasource:
     url: "${MYSQL_URL:jdbc:mysql://localhost:3306/bot?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}"
     username: "${MYSQL_USER:}"

@@ -390,6 +390,7 @@ public class AgentApplicationService {
         member.setCreatedTime(now);
         member.setUpdatedTime(now);
         agentGroupMemberRepository.save(member);
+        initializeAgentToolRelations(agentUid, now);
         initializeAgentWorkspaceDocs(agentName, displayName);
         return toAgentCatalogItem(member, agent);
     }
@@ -2329,6 +2330,22 @@ public class AgentApplicationService {
             Files.deleteIfExists(legacyAgentsDoc);
         } catch (IOException ex) {
             throw new IllegalStateException("failed to cleanup legacy agent doc: " + legacyAgentsDoc, ex);
+        }
+    }
+
+    private void initializeAgentToolRelations(String agentUid, LocalDateTime now) {
+        List<ToolDefinitionEntity> tools = toolDefinitionRepository.listAllActive();
+        for (ToolDefinitionEntity tool : tools) {
+            AgentToolRelationEntity relation = new AgentToolRelationEntity();
+            relation.setRelationUid(UUID.randomUUID().toString());
+            relation.setAgentUid(agentUid);
+            relation.setToolKey(tool.getToolKey());
+            relation.setStatus("ACTIVE");
+            relation.setSortIndex(tool.getSortIndex() == null ? 0 : tool.getSortIndex());
+            relation.setConfigJson("{}");
+            relation.setCreatedTime(now);
+            relation.setUpdatedTime(now);
+            agentToolRelationRepository.save(relation);
         }
     }
 
