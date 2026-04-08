@@ -549,7 +549,7 @@ Agent loop 的详细控制流、round/retry 区分、审批暂停、失败重规
 
 ### 8.13 当前开发态限制
 
-当前 [schema.sql](../../src/main/resources/db/schema.sql) 在启动时会先执行：
+当前 [schema-mysql.sql](../../src/main/resources/db/schema-mysql.sql) 在启动时会先执行：
 
 - `DROP TABLE IF EXISTS agent_cron_job`
 - `DROP TABLE IF EXISTS agent_cron_subscription`

@@ -26,7 +26,7 @@ spring:
     #   sql:
     #     init:
     #       mode: always
-    #       schema-locations: classpath:db/schema.sql
+    #       schema-locations: classpath:db/schema-mysql.sql
 
 server:
   address: 127.0.0.1

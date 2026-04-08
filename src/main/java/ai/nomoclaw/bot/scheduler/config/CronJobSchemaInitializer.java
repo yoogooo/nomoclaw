@@ -28,11 +28,11 @@ public class CronJobSchemaInitializer {
                 try (Statement statement = connection.createStatement()) {
                     statement.execute("""
                             ALTER TABLE agent_cron_job
-                            ADD COLUMN title VARCHAR(255) NOT NULL DEFAULT '' COMMENT '任务标题' AFTER message_uid
+                            ADD COLUMN title VARCHAR(255) NOT NULL DEFAULT ''
                             """);
                     statement.execute("""
                             UPDATE agent_cron_job
-                            SET title = LEFT(task_content, 255)
+                            SET title = SUBSTRING(task_content, 1, 255)
                             WHERE title = ''
                             """);
                     log.info("[CronJob] schema updated with title column");

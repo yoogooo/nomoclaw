@@ -32,7 +32,7 @@ cp .env.example .env
 cp web/.env.example web/.env
 ```
 
-2. 初始化数据库：执行 `src/main/resources/db/schema.sql`
+2. 初始化数据库：执行 `src/main/resources/db/schema-mysql.sql`
 
 3. 启动后端
 
@@ -51,6 +51,15 @@ pnpm dev
 ```
 
 默认：`http://127.0.0.1:5173`
+
+### 使用 H2（file 模式，开发/测试）
+
+```bash
+SPRING_PROFILES_ACTIVE=h2 ./mvnw spring-boot:run
+```
+
+- H2 数据文件默认位于：`${NOMOCLAW_ROOT_DIR}/data/nomoclaw`
+- 本模式用于开发/测试兼容验证，不作为生产主库建议
 
 ## 1 分钟体验
 

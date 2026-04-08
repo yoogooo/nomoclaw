@@ -32,7 +32,7 @@ cp .env.example .env
 cp web/.env.example web/.env
 ```
 
-2. Initialize database: run `src/main/resources/db/schema.sql`
+2. Initialize database: run `src/main/resources/db/schema-mysql.sql`
 
 3. Start backend
 
@@ -51,6 +51,15 @@ pnpm dev
 ```
 
 Default: `http://127.0.0.1:5173`
+
+### Run with H2 (file mode, dev/test)
+
+```bash
+SPRING_PROFILES_ACTIVE=h2 ./mvnw spring-boot:run
+```
+
+- Default H2 file path: `${NOMOCLAW_ROOT_DIR}/data/nomoclaw`
+- This mode is intended for development/testing compatibility, not as the recommended production primary database
 
 ## 1-Minute Demo
 
