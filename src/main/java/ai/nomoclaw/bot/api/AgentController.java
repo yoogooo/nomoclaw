@@ -7,6 +7,7 @@ import ai.nomoclaw.bot.orchestrator.ConversationAppService;
 import ai.nomoclaw.bot.orchestrator.MessageRunAppService;
 import ai.nomoclaw.bot.orchestrator.ModelConfigAppService;
 import ai.nomoclaw.bot.orchestrator.SystemAppService;
+import ai.nomoclaw.bot.scheduler.CronChannelTargetDirectoryService;
 import ai.nomoclaw.bot.scheduler.CronJobApplicationService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
@@ -45,6 +46,7 @@ public class AgentController {
     private final ModelConfigAppService modelConfigAppService;
     private final SystemAppService systemAppService;
     private final CronJobApplicationService cronJobApplicationService;
+    private final CronChannelTargetDirectoryService cronChannelTargetDirectoryService;
 
     public AgentController(ConversationAppService conversationAppService,
                            ConversationAttachmentAppService conversationAttachmentAppService,
@@ -53,7 +55,8 @@ public class AgentController {
                            ApprovalAppService approvalAppService,
                            ModelConfigAppService modelConfigAppService,
                            SystemAppService systemAppService,
-                           CronJobApplicationService cronJobApplicationService) {
+                           CronJobApplicationService cronJobApplicationService,
+                           CronChannelTargetDirectoryService cronChannelTargetDirectoryService) {
         this.conversationAppService = conversationAppService;
         this.conversationAttachmentAppService = conversationAttachmentAppService;
         this.agentCatalogAppService = agentCatalogAppService;
@@ -62,6 +65,7 @@ public class AgentController {
         this.modelConfigAppService = modelConfigAppService;
         this.systemAppService = systemAppService;
         this.cronJobApplicationService = cronJobApplicationService;
+        this.cronChannelTargetDirectoryService = cronChannelTargetDirectoryService;
     }
 
     @PostMapping("/conversations")
@@ -176,6 +180,15 @@ public class AgentController {
     public ChannelConfigResponse getChannelConfig() {
         log.info("[AgentAPI] getChannelConfig");
         return ApiDtoMapper.toChannelConfig(systemAppService.getChannelConfig());
+    }
+
+    @GetMapping("/system/channels/targets/search")
+    public ChannelTargetSearchResponse searchChannelTargets(@RequestParam String channel,
+                                                            @RequestParam(required = false, defaultValue = "") String keyword,
+                                                            @RequestParam(required = false, defaultValue = "") String botId,
+                                                            @RequestParam(required = false, defaultValue = "20") int limit) {
+        log.info("[AgentAPI] searchChannelTargets channel={} keyword={} botId={} limit={}", channel, keyword, botId, limit);
+        return ApiDtoMapper.toChannelTargetSearch(cronChannelTargetDirectoryService.search(channel, keyword, botId, limit));
     }
 
     @GetMapping("/system/models")

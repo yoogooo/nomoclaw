@@ -9,6 +9,7 @@ import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.MapPropertySource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 import java.nio.charset.StandardCharsets;
@@ -29,7 +30,7 @@ public class ChannelConfigEnvironmentPostProcessor implements EnvironmentPostPro
         Path rootDir = resolveRootDir(environment);
         Path configFile = rootDir.resolve(CONFIG_FILE_NAME).toAbsolutePath().normalize();
         ObjectNode root = loadOrCreateConfig(configFile);
-        ObjectNode channels = ensureChannelsTemplate(root);
+        ObjectNode channels = normalizeChannels(root);
         writeConfig(configFile, root);
         Map<String, Object> mapped = toChannelProperties(channels);
         environment.getPropertySources().addFirst(new MapPropertySource(PROPERTY_SOURCE_NAME, mapped));
@@ -68,53 +69,67 @@ public class ChannelConfigEnvironmentPostProcessor implements EnvironmentPostPro
         return MAPPER.createObjectNode();
     }
 
-    private ObjectNode ensureChannelsTemplate(ObjectNode root) {
-        ObjectNode channels = root.path("channels") instanceof ObjectNode node
-                ? node
-                : MAPPER.createObjectNode();
+    private ObjectNode normalizeChannels(ObjectNode root) {
+        ObjectNode channels = root.path("channels") instanceof ObjectNode node ? node : MAPPER.createObjectNode();
         root.set("channels", channels);
-
-        ObjectNode feishu = channels.path("feishu") instanceof ObjectNode node
-                ? node
-                : MAPPER.createObjectNode();
-        channels.set("feishu", feishu);
-        setIfMissing(feishu, "enabled", false);
-        setIfMissing(feishu, "requireMention", true);
-        setIfMissing(feishu, "allowList", MAPPER.createArrayNode());
-        setIfMissing(feishu, "appId", "");
-        setIfMissing(feishu, "appSecret", "");
-        setIfMissing(feishu, "processingAckReactionEnabled", true);
-        setIfMissing(feishu, "processingAckReactionType", "OK");
-
-        ObjectNode dingtalk = channels.path("dingtalk") instanceof ObjectNode node
-                ? node
-                : MAPPER.createObjectNode();
-        channels.set("dingtalk", dingtalk);
-        setIfMissing(dingtalk, "enabled", false);
-        setIfMissing(dingtalk, "requireMention", true);
-        setIfMissing(dingtalk, "allowList", MAPPER.createArrayNode());
-        setIfMissing(dingtalk, "clientId", "");
-        setIfMissing(dingtalk, "clientSecret", "");
-        setIfMissing(dingtalk, "robotCode", "");
+        channels.set("feishu", normalizeFeishu(channels.path("feishu")));
+        channels.set("dingtalk", normalizeDingtalk(channels.path("dingtalk")));
         return channels;
     }
 
-    private void setIfMissing(ObjectNode node, String key, boolean value) {
-        if (!node.has(key)) {
-            node.put(key, value);
+    private ObjectNode normalizeFeishu(JsonNode node) {
+        ObjectNode feishu = node instanceof ObjectNode object ? object.deepCopy() : MAPPER.createObjectNode();
+        feishu.remove("added");
+        boolean enabled = feishu.path("enabled").asBoolean(false);
+        ArrayNode bots = MAPPER.createArrayNode();
+        JsonNode oldBots = feishu.path("bots");
+        if (oldBots.isArray() && !oldBots.isEmpty()) {
+            oldBots.forEach(bots::add);
+        } else {
+            ObjectNode defaultBot = MAPPER.createObjectNode();
+            defaultBot.put("botId", "default");
+            defaultBot.put("displayName", "Feishu Default");
+            defaultBot.put("enabled", enabled);
+            defaultBot.put("isDefault", true);
+            defaultBot.put("requireMention", feishu.path("requireMention").asBoolean(true));
+            defaultBot.set("allowList", feishu.path("allowList").isArray() ? feishu.path("allowList") : MAPPER.createArrayNode());
+            defaultBot.put("appId", trim(feishu.path("appId").asText("")));
+            defaultBot.put("appSecret", trim(feishu.path("appSecret").asText("")));
+            defaultBot.put("processingAckReactionEnabled", feishu.path("processingAckReactionEnabled").asBoolean(true));
+            defaultBot.put("processingAckReactionType", fallback(trim(feishu.path("processingAckReactionType").asText("")), "OK"));
+            bots.add(defaultBot);
         }
+        feishu.removeAll();
+        feishu.put("enabled", enabled);
+        feishu.set("bots", bots);
+        return feishu;
     }
 
-    private void setIfMissing(ObjectNode node, String key, String value) {
-        if (!node.has(key)) {
-            node.put(key, value);
+    private ObjectNode normalizeDingtalk(JsonNode node) {
+        ObjectNode dingtalk = node instanceof ObjectNode object ? object.deepCopy() : MAPPER.createObjectNode();
+        dingtalk.remove("added");
+        boolean enabled = dingtalk.path("enabled").asBoolean(false);
+        ArrayNode bots = MAPPER.createArrayNode();
+        JsonNode oldBots = dingtalk.path("bots");
+        if (oldBots.isArray() && !oldBots.isEmpty()) {
+            oldBots.forEach(bots::add);
+        } else {
+            ObjectNode defaultBot = MAPPER.createObjectNode();
+            defaultBot.put("botId", "default");
+            defaultBot.put("displayName", "DingTalk Default");
+            defaultBot.put("enabled", enabled);
+            defaultBot.put("isDefault", true);
+            defaultBot.put("requireMention", dingtalk.path("requireMention").asBoolean(true));
+            defaultBot.set("allowList", dingtalk.path("allowList").isArray() ? dingtalk.path("allowList") : MAPPER.createArrayNode());
+            defaultBot.put("clientId", trim(dingtalk.path("clientId").asText("")));
+            defaultBot.put("clientSecret", trim(dingtalk.path("clientSecret").asText("")));
+            defaultBot.put("robotCode", trim(dingtalk.path("robotCode").asText("")));
+            bots.add(defaultBot);
         }
-    }
-
-    private void setIfMissing(ObjectNode node, String key, JsonNode value) {
-        if (!node.has(key)) {
-            node.set(key, value);
-        }
+        dingtalk.removeAll();
+        dingtalk.put("enabled", enabled);
+        dingtalk.set("bots", bots);
+        return dingtalk;
     }
 
     private Map<String, Object> toChannelProperties(ObjectNode channels) {
@@ -123,24 +138,54 @@ public class ChannelConfigEnvironmentPostProcessor implements EnvironmentPostPro
         boolean feishuEnabled = feishu.path("enabled").asBoolean(false);
         boolean dingtalkEnabled = dingtalk.path("enabled").asBoolean(false);
 
+        ObjectNode feishuDefaultBot = pickDefaultEnabledBot(feishu.path("bots"));
+        ObjectNode dingtalkDefaultBot = pickDefaultEnabledBot(dingtalk.path("bots"));
+
         Map<String, Object> props = new LinkedHashMap<>();
         props.put("agent.channels.enabled", feishuEnabled || dingtalkEnabled);
         props.put("agent.channels.processing-ack-enabled", true);
         props.put("agent.channels.processing-ack-text", "正在处理，请稍候...");
-        props.put("agent.channels.feishu.enabled", feishuEnabled);
-        props.put("agent.channels.feishu.require-mention", feishu.path("requireMention").asBoolean(true));
-        props.put("agent.channels.feishu.allow-list", joinList(feishu.path("allowList")));
-        props.put("agent.channels.feishu.processing-ack-reaction-enabled", feishu.path("processingAckReactionEnabled").asBoolean(true));
-        props.put("agent.channels.feishu.processing-ack-reaction-type", trim(feishu.path("processingAckReactionType").asText("OK")));
-        props.put("agent.channels.feishu.app-id", trim(feishu.path("appId").asText("")));
-        props.put("agent.channels.feishu.app-secret", trim(feishu.path("appSecret").asText("")));
-        props.put("agent.channels.dingtalk.enabled", dingtalkEnabled);
-        props.put("agent.channels.dingtalk.require-mention", dingtalk.path("requireMention").asBoolean(true));
-        props.put("agent.channels.dingtalk.allow-list", joinList(dingtalk.path("allowList")));
-        props.put("agent.channels.dingtalk.client-id", trim(dingtalk.path("clientId").asText("")));
-        props.put("agent.channels.dingtalk.client-secret", trim(dingtalk.path("clientSecret").asText("")));
-        props.put("agent.channels.dingtalk.robot-code", trim(dingtalk.path("robotCode").asText("")));
+        props.put("agent.channels.feishu.enabled", feishuEnabled && feishuDefaultBot != null);
+        props.put("agent.channels.feishu.require-mention", feishuDefaultBot != null && feishuDefaultBot.path("requireMention").asBoolean(true));
+        props.put("agent.channels.feishu.allow-list", feishuDefaultBot == null ? "" : joinList(feishuDefaultBot.path("allowList")));
+        props.put("agent.channels.feishu.processing-ack-reaction-enabled",
+                feishuDefaultBot != null && feishuDefaultBot.path("processingAckReactionEnabled").asBoolean(true));
+        props.put("agent.channels.feishu.processing-ack-reaction-type",
+                feishuDefaultBot == null ? "OK" : fallback(trim(feishuDefaultBot.path("processingAckReactionType").asText("")), "OK"));
+        props.put("agent.channels.feishu.app-id", feishuDefaultBot == null ? "" : trim(feishuDefaultBot.path("appId").asText("")));
+        props.put("agent.channels.feishu.app-secret", feishuDefaultBot == null ? "" : trim(feishuDefaultBot.path("appSecret").asText("")));
+        props.put("agent.channels.dingtalk.enabled", dingtalkEnabled && dingtalkDefaultBot != null);
+        props.put("agent.channels.dingtalk.require-mention", dingtalkDefaultBot != null && dingtalkDefaultBot.path("requireMention").asBoolean(true));
+        props.put("agent.channels.dingtalk.allow-list", dingtalkDefaultBot == null ? "" : joinList(dingtalkDefaultBot.path("allowList")));
+        props.put("agent.channels.dingtalk.client-id", dingtalkDefaultBot == null ? "" : trim(dingtalkDefaultBot.path("clientId").asText("")));
+        props.put("agent.channels.dingtalk.client-secret", dingtalkDefaultBot == null ? "" : trim(dingtalkDefaultBot.path("clientSecret").asText("")));
+        props.put("agent.channels.dingtalk.robot-code", dingtalkDefaultBot == null ? "" : trim(dingtalkDefaultBot.path("robotCode").asText("")));
         return props;
+    }
+
+    private ObjectNode pickDefaultEnabledBot(JsonNode botsNode) {
+        if (!(botsNode instanceof ArrayNode bots) || bots.isEmpty()) {
+            return null;
+        }
+        ObjectNode defaultBot = null;
+        ObjectNode firstEnabled = null;
+        for (JsonNode item : bots) {
+            if (!(item instanceof ObjectNode bot)) {
+                continue;
+            }
+            boolean enabled = bot.path("enabled").asBoolean(false);
+            if (!enabled) {
+                continue;
+            }
+            if (firstEnabled == null) {
+                firstEnabled = bot;
+            }
+            if (bot.path("isDefault").asBoolean(false)) {
+                defaultBot = bot;
+                break;
+            }
+        }
+        return defaultBot != null ? defaultBot : firstEnabled;
     }
 
     private String joinList(JsonNode node) {
@@ -171,6 +216,10 @@ public class ChannelConfigEnvironmentPostProcessor implements EnvironmentPostPro
         } catch (Exception ex) {
             throw new IllegalStateException("failed to init channel config file: " + file, ex);
         }
+    }
+
+    private String fallback(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
     }
 
     private String trim(String value) {

@@ -16,7 +16,6 @@ import org.quartz.SchedulerException;
 import org.quartz.Trigger;
 import org.quartz.TriggerBuilder;
 import org.quartz.TriggerKey;
-import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.JsonNodeFactory;
@@ -27,7 +26,6 @@ import java.time.ZoneId;
 import java.util.Date;
 
 @Service
-@DependsOn("cronJobSchemaInitializer")
 @Slf4j
 public class CronJobSchedulerService {
 

@@ -6,7 +6,7 @@ import DirectoryRail from "@/components/chat/DirectoryRail.vue";
 import AppPageHeader from "@/components/layout/AppPageHeader.vue";
 import { channelApi } from "@/api/channelApi";
 import { message } from "@/discrete";
-import type { ChannelConfig } from "@/types/api";
+import type { ChannelConfig, ChannelDingTalkBotConfig, ChannelFeishuBotConfig } from "@/types/api";
 
 type ChannelKey = "feishu" | "dingtalk";
 const { t } = useI18n();
@@ -15,49 +15,9 @@ const loading = ref(false);
 const saving = ref(false);
 const showEditor = ref(false);
 const editingKey = ref<ChannelKey>("feishu");
-const config = reactive<ChannelConfig>({
-  channels: {
-    feishu: {
-      enabled: false,
-      requireMention: true,
-      allowList: [],
-      appId: "",
-      appSecret: "",
-      processingAckReactionEnabled: true,
-      processingAckReactionType: "OK"
-    },
-    dingtalk: {
-      enabled: false,
-      requireMention: true,
-      allowList: [],
-      clientId: "",
-      clientSecret: "",
-      robotCode: ""
-    }
-  }
-});
-const draft = reactive<ChannelConfig>({
-  channels: {
-    feishu: {
-      enabled: false,
-      requireMention: true,
-      allowList: [],
-      appId: "",
-      appSecret: "",
-      processingAckReactionEnabled: true,
-      processingAckReactionType: "OK"
-    },
-    dingtalk: {
-      enabled: false,
-      requireMention: true,
-      allowList: [],
-      clientId: "",
-      clientSecret: "",
-      robotCode: ""
-    }
-  }
-});
-const allowListText = reactive({ feishu: "", dingtalk: "" });
+const config = reactive<ChannelConfig>(createEmptyConfig());
+const draft = reactive<ChannelConfig>(createEmptyConfig());
+const allowListText = reactive<Record<string, string>>({});
 
 const channelCards = computed(() => [
   {
@@ -65,26 +25,76 @@ const channelCards = computed(() => [
     title: t("channels.cards.feishu.title"),
     subtitle: t("channels.cards.feishu.subtitle"),
     enabled: config.channels.feishu.enabled,
-    mention: config.channels.feishu.requireMention,
-    summary: config.channels.feishu.appId
-      ? t("channels.cards.feishu.summaryConfigured", { appId: config.channels.feishu.appId })
-      : t("channels.cards.feishu.summaryEmpty")
+    botCount: config.channels.feishu.bots.length,
+    defaultBot: config.channels.feishu.bots.find((item) => item.isDefault)?.displayName || "-"
   },
   {
     key: "dingtalk" as ChannelKey,
     title: t("channels.cards.dingtalk.title"),
     subtitle: t("channels.cards.dingtalk.subtitle"),
     enabled: config.channels.dingtalk.enabled,
-    mention: config.channels.dingtalk.requireMention,
-    summary: config.channels.dingtalk.robotCode
-      ? t("channels.cards.dingtalk.summaryConfigured", { robotCode: config.channels.dingtalk.robotCode })
-      : t("channels.cards.dingtalk.summaryEmpty")
+    botCount: config.channels.dingtalk.bots.length,
+    defaultBot: config.channels.dingtalk.bots.find((item) => item.isDefault)?.displayName || "-"
   }
 ]);
 
 const editorTitle = computed(() =>
   editingKey.value === "feishu" ? t("channels.editor.feishuTitle") : t("channels.editor.dingtalkTitle")
 );
+
+const editingFeishuBots = computed(() => draft.channels.feishu.bots);
+const editingDingTalkBots = computed(() => draft.channels.dingtalk.bots);
+
+function createDefaultFeishuBot(): ChannelFeishuBotConfig {
+  return {
+    botId: `feishu_${Date.now()}`,
+    displayName: "Feishu Bot",
+    enabled: true,
+    isDefault: false,
+    requireMention: true,
+    allowList: [],
+    appId: "",
+    appSecret: "",
+    processingAckReactionEnabled: true,
+    processingAckReactionType: "OK"
+  };
+}
+
+function createDefaultDingTalkBot(): ChannelDingTalkBotConfig {
+  return {
+    botId: `dingtalk_${Date.now()}`,
+    displayName: "DingTalk Bot",
+    enabled: true,
+    isDefault: false,
+    requireMention: true,
+    allowList: [],
+    clientId: "",
+    clientSecret: "",
+    robotCode: ""
+  };
+}
+
+function createEmptyConfig(): ChannelConfig {
+  return {
+    channels: {
+      feishu: { enabled: false, bots: [createDefaultFeishuBot()] },
+      dingtalk: { enabled: false, bots: [createDefaultDingTalkBot()] }
+    }
+  };
+}
+
+function cloneConfig(source: ChannelConfig): ChannelConfig {
+  return JSON.parse(JSON.stringify(source)) as ChannelConfig;
+}
+
+function syncAllowListText() {
+  for (const bot of config.channels.feishu.bots) {
+    allowListText[`feishu:${bot.botId}`] = (bot.allowList || []).join(", ");
+  }
+  for (const bot of config.channels.dingtalk.bots) {
+    allowListText[`dingtalk:${bot.botId}`] = (bot.allowList || []).join(", ");
+  }
+}
 
 function normalizeAllowList(raw: string): string[] {
   if (!raw.trim()) {
@@ -93,21 +103,30 @@ function normalizeAllowList(raw: string): string[] {
   return Array.from(new Set(raw.split(",").map((item) => item.trim()).filter(Boolean)));
 }
 
-function syncAllowListText() {
-  allowListText.feishu = config.channels.feishu.allowList.join(", ");
-  allowListText.dingtalk = config.channels.dingtalk.allowList.join(", ");
-}
-
-function cloneConfig(source: ChannelConfig): ChannelConfig {
-  return JSON.parse(JSON.stringify(source)) as ChannelConfig;
+function ensureSingleDefault(channel: ChannelKey) {
+  const bots = channel === "feishu" ? draft.channels.feishu.bots : draft.channels.dingtalk.bots;
+  if (!bots.length) {
+    return;
+  }
+  const firstDefaultIndex = bots.findIndex((item) => item.isDefault);
+  const winnerIndex = firstDefaultIndex >= 0 ? firstDefaultIndex : 0;
+  bots.forEach((item, index) => {
+    item.isDefault = index === winnerIndex;
+  });
 }
 
 async function loadConfig() {
   loading.value = true;
   try {
     const data = await channelApi.getChannelConfig();
-    config.channels.feishu = { ...data.channels.feishu, allowList: data.channels.feishu.allowList ?? [] };
-    config.channels.dingtalk = { ...data.channels.dingtalk, allowList: data.channels.dingtalk.allowList ?? [] };
+    config.channels.feishu = { enabled: data.channels.feishu.enabled, bots: data.channels.feishu.bots || [] };
+    config.channels.dingtalk = { enabled: data.channels.dingtalk.enabled, bots: data.channels.dingtalk.bots || [] };
+    if (!config.channels.feishu.bots.length) {
+      config.channels.feishu.bots = [createDefaultFeishuBot()];
+    }
+    if (!config.channels.dingtalk.bots.length) {
+      config.channels.dingtalk.bots = [createDefaultDingTalkBot()];
+    }
     syncAllowListText();
   } finally {
     loading.value = false;
@@ -129,38 +148,83 @@ function openEditor(key: ChannelKey) {
   const copied = cloneConfig(config);
   draft.channels.feishu = copied.channels.feishu;
   draft.channels.dingtalk = copied.channels.dingtalk;
-  // Feishu defaults: keep mention + reaction ack enabled and hidden from UI.
-  draft.channels.feishu.requireMention = true;
-  draft.channels.feishu.processingAckReactionEnabled = true;
-  draft.channels.feishu.processingAckReactionType = "OK";
-  allowListText.feishu = draft.channels.feishu.allowList.join(", ");
-  allowListText.dingtalk = draft.channels.dingtalk.allowList.join(", ");
+  ensureSingleDefault("feishu");
+  ensureSingleDefault("dingtalk");
+  for (const bot of draft.channels.feishu.bots) {
+    allowListText[`feishu:${bot.botId}`] = (bot.allowList || []).join(", ");
+  }
+  for (const bot of draft.channels.dingtalk.bots) {
+    allowListText[`dingtalk:${bot.botId}`] = (bot.allowList || []).join(", ");
+  }
   showEditor.value = true;
+}
+
+function addBot(channel: ChannelKey) {
+  if (channel === "feishu") {
+    draft.channels.feishu.bots.push(createDefaultFeishuBot());
+  } else {
+    draft.channels.dingtalk.bots.push(createDefaultDingTalkBot());
+  }
+  ensureSingleDefault(channel);
+}
+
+function removeBot(channel: ChannelKey, index: number) {
+  const bots = channel === "feishu" ? draft.channels.feishu.bots : draft.channels.dingtalk.bots;
+  if (bots.length <= 1) {
+    return;
+  }
+  bots.splice(index, 1);
+  ensureSingleDefault(channel);
+}
+
+function setDefaultBot(channel: ChannelKey, index: number) {
+  const bots = channel === "feishu" ? draft.channels.feishu.bots : draft.channels.dingtalk.bots;
+  bots.forEach((item, idx) => {
+    item.isDefault = idx === index;
+  });
 }
 
 function validateChannelDraft() {
   if (editingKey.value === "feishu") {
-    const feishu = draft.channels.feishu;
-    if (feishu.enabled && (!feishu.appId.trim() || !feishu.appSecret.trim())) {
+    const section = draft.channels.feishu;
+    if (section.enabled && !section.bots.some((item) => item.enabled)) {
       throw new Error(t("channels.errors.feishuRequired"));
     }
+    section.bots.forEach((bot) => {
+      if (section.enabled && bot.enabled && (!bot.appId.trim() || !bot.appSecret.trim())) {
+        throw new Error(t("channels.errors.feishuRequired"));
+      }
+    });
     return;
   }
-  const dingtalk = draft.channels.dingtalk;
-  if (dingtalk.enabled && (!dingtalk.clientId.trim() || !dingtalk.clientSecret.trim() || !dingtalk.robotCode.trim())) {
+  const section = draft.channels.dingtalk;
+  if (section.enabled && !section.bots.some((item) => item.enabled)) {
     throw new Error(t("channels.errors.dingtalkRequired"));
   }
+  section.bots.forEach((bot) => {
+    if (section.enabled && bot.enabled && (!bot.clientId.trim() || !bot.clientSecret.trim() || !bot.robotCode.trim())) {
+      throw new Error(t("channels.errors.dingtalkRequired"));
+    }
+  });
+}
+
+function normalizeDraftBeforeSave() {
+  draft.channels.feishu.bots.forEach((bot) => {
+    bot.allowList = normalizeAllowList(allowListText[`feishu:${bot.botId}`] || "");
+    bot.processingAckReactionEnabled = true;
+    bot.processingAckReactionType = "OK";
+  });
+  draft.channels.dingtalk.bots.forEach((bot) => {
+    bot.allowList = normalizeAllowList(allowListText[`dingtalk:${bot.botId}`] || "");
+  });
+  ensureSingleDefault("feishu");
+  ensureSingleDefault("dingtalk");
 }
 
 async function saveEditor() {
   saving.value = true;
   try {
-    // Feishu defaults: keep mention + reaction ack enabled and hidden from UI.
-    draft.channels.feishu.requireMention = true;
-    draft.channels.feishu.processingAckReactionEnabled = true;
-    draft.channels.feishu.processingAckReactionType = "OK";
-    draft.channels.feishu.allowList = normalizeAllowList(allowListText.feishu);
-    draft.channels.dingtalk.allowList = normalizeAllowList(allowListText.dingtalk);
+    normalizeDraftBeforeSave();
     validateChannelDraft();
     const saved = await channelApi.updateChannelConfig(cloneConfig(draft));
     config.channels.feishu = { ...saved.channels.feishu };
@@ -211,8 +275,8 @@ onMounted(() => {
                 </div>
               </template>
               <div class="card-subtitle">{{ item.subtitle }}</div>
-              <div class="card-row"><span class="meta-label">{{ t("channels.cards.mentionPolicy") }}</span><span>{{ item.mention ? t("channels.cards.mentionOnly") : t("channels.cards.allMessages") }}</span></div>
-              <div class="card-row"><span class="meta-label">{{ t("channels.cards.summary") }}</span><span>{{ item.summary }}</span></div>
+              <div class="card-row"><span class="meta-label">{{ t("channels.cards.summary") }}</span><span>{{ t("channels.editor.botCount", { count: item.botCount }) }}</span></div>
+              <div class="card-row"><span class="meta-label">{{ t("channels.editor.defaultBot") }}</span><span>{{ item.defaultBot }}</span></div>
               <div class="card-foot">
                 <n-button size="small" tertiary type="primary">{{ t("common.edit") }}</n-button>
               </div>
@@ -224,53 +288,105 @@ onMounted(() => {
     </div>
   </div>
 
-  <n-drawer v-model:show="showEditor" :width="520" placement="right">
+  <n-drawer v-model:show="showEditor" :width="700" placement="right">
     <n-drawer-content :title="editorTitle" closable>
-    <n-form v-if="editingKey === 'feishu'" label-placement="top" class="channel-edit-form">
-      <div class="channel-switch-stack">
-        <span class="channel-enable-label">{{ t("channels.editor.enable") }}</span>
-        <n-switch v-model:value="draft.channels.feishu.enabled" />
-      </div>
-      <n-form-item :label="t('channels.editor.feishuAppId')">
-        <n-input v-model:value="draft.channels.feishu.appId" :placeholder="t('channels.editor.feishuAppIdPlaceholder')" />
-      </n-form-item>
-      <n-form-item :label="t('channels.editor.feishuAppSecret')">
-        <n-input v-model:value="draft.channels.feishu.appSecret" type="password" show-password-on="click" />
-      </n-form-item>
-      <n-form-item :label="t('channels.editor.allowList')">
-        <n-input v-model:value="allowListText.feishu" :placeholder="t('channels.editor.allowListFeishuPlaceholder')" />
-      </n-form-item>
-    </n-form>
+      <n-form v-if="editingKey === 'feishu'" label-placement="top" class="channel-edit-form">
+        <div class="editor-toolbar">
+          <div class="channel-switch-row">
+            <span class="meta-label">{{ t("channels.editor.enable") }}</span>
+            <n-switch v-model:value="draft.channels.feishu.enabled" />
+          </div>
+          <n-button tertiary type="primary" @click="addBot('feishu')">{{ t("channels.editor.addBot") }}</n-button>
+        </div>
+        <div v-for="(bot, idx) in editingFeishuBots" :key="`feishu-${bot.botId}-${idx}`" class="bot-card">
+          <div class="bot-head">
+            <div class="bot-title">
+              <div class="bot-name">{{ bot.displayName || bot.botId }}</div>
+              <div class="bot-id-sub">{{ bot.botId }}</div>
+            </div>
+            <div class="bot-head-actions">
+              <n-button size="small" tertiary :type="bot.isDefault ? 'success' : 'default'" @click="setDefaultBot('feishu', idx)">
+                {{ bot.isDefault ? t("channels.editor.defaultBot") : t("channels.editor.setDefault") }}
+              </n-button>
+              <n-button size="small" tertiary type="error" :disabled="editingFeishuBots.length <= 1" @click="removeBot('feishu', idx)">
+                {{ t("common.delete") }}
+              </n-button>
+            </div>
+          </div>
+          <div class="bot-switch-row">
+            <span class="meta-label">{{ t("common.enabled") }}</span>
+            <n-switch v-model:value="bot.enabled" />
+          </div>
+          <div class="bot-field-grid">
+            <n-form-item :label="t('channels.editor.botName')">
+              <n-input v-model:value="bot.displayName" />
+            </n-form-item>
+            <n-form-item :label="t('channels.editor.feishuAppId')">
+              <n-input v-model:value="bot.appId" />
+            </n-form-item>
+            <n-form-item :label="t('channels.editor.feishuAppSecret')">
+              <n-input v-model:value="bot.appSecret" type="password" show-password-on="click" />
+            </n-form-item>
+          </div>
+          <n-form-item class="bot-full-row" :label="t('channels.editor.allowList')">
+            <n-input v-model:value="allowListText[`feishu:${bot.botId}`]" />
+          </n-form-item>
+        </div>
+      </n-form>
 
-    <n-form v-else label-placement="top" class="channel-edit-form">
-      <div class="channel-switch-row">
-        <span class="meta-label">{{ t("channels.editor.enableDingtalk") }}</span>
-        <n-switch v-model:value="draft.channels.dingtalk.enabled" />
-      </div>
-      <div class="channel-switch-row">
-        <span class="meta-label">{{ t("channels.editor.mentionOnly") }}</span>
-        <n-switch v-model:value="draft.channels.dingtalk.requireMention" />
-      </div>
-      <n-form-item :label="t('channels.editor.dingtalkClientId')">
-        <n-input v-model:value="draft.channels.dingtalk.clientId" />
-      </n-form-item>
-      <n-form-item :label="t('channels.editor.dingtalkClientSecret')">
-        <n-input v-model:value="draft.channels.dingtalk.clientSecret" type="password" show-password-on="click" />
-      </n-form-item>
-      <n-form-item :label="t('channels.editor.dingtalkRobotCode')">
-        <n-input v-model:value="draft.channels.dingtalk.robotCode" :placeholder="t('channels.editor.dingtalkRobotCodePlaceholder')" />
-      </n-form-item>
-      <n-form-item :label="t('channels.editor.allowList')">
-        <n-input v-model:value="allowListText.dingtalk" :placeholder="t('channels.editor.allowListDingtalkPlaceholder')" />
-      </n-form-item>
-    </n-form>
+      <n-form v-else label-placement="top" class="channel-edit-form">
+        <div class="editor-toolbar">
+          <div class="channel-switch-row">
+            <span class="meta-label">{{ t("channels.editor.enableDingtalk") }}</span>
+            <n-switch v-model:value="draft.channels.dingtalk.enabled" />
+          </div>
+          <n-button tertiary type="primary" @click="addBot('dingtalk')">{{ t("channels.editor.addBot") }}</n-button>
+        </div>
+        <div v-for="(bot, idx) in editingDingTalkBots" :key="`dingtalk-${bot.botId}-${idx}`" class="bot-card">
+          <div class="bot-head">
+            <div class="bot-title">
+              <div class="bot-name">{{ bot.displayName || bot.botId }}</div>
+              <div class="bot-id-sub">{{ bot.botId }}</div>
+            </div>
+            <div class="bot-head-actions">
+              <n-button size="small" tertiary :type="bot.isDefault ? 'success' : 'default'" @click="setDefaultBot('dingtalk', idx)">
+                {{ bot.isDefault ? t("channels.editor.defaultBot") : t("channels.editor.setDefault") }}
+              </n-button>
+              <n-button size="small" tertiary type="error" :disabled="editingDingTalkBots.length <= 1" @click="removeBot('dingtalk', idx)">
+                {{ t("common.delete") }}
+              </n-button>
+            </div>
+          </div>
+          <div class="bot-switch-row">
+            <span class="meta-label">{{ t("common.enabled") }}</span>
+            <n-switch v-model:value="bot.enabled" />
+          </div>
+          <div class="bot-field-grid">
+            <n-form-item :label="t('channels.editor.botName')">
+              <n-input v-model:value="bot.displayName" />
+            </n-form-item>
+            <n-form-item :label="t('channels.editor.dingtalkClientId')">
+              <n-input v-model:value="bot.clientId" />
+            </n-form-item>
+            <n-form-item :label="t('channels.editor.dingtalkClientSecret')">
+              <n-input v-model:value="bot.clientSecret" type="password" show-password-on="click" />
+            </n-form-item>
+          </div>
+          <n-form-item :label="t('channels.editor.dingtalkRobotCode')">
+            <n-input v-model:value="bot.robotCode" />
+          </n-form-item>
+          <n-form-item class="bot-full-row" :label="t('channels.editor.allowList')">
+            <n-input v-model:value="allowListText[`dingtalk:${bot.botId}`]" />
+          </n-form-item>
+        </div>
+      </n-form>
 
-    <template #footer>
-      <div class="ui-actions-end">
-        <n-button @click="showEditor = false">{{ t("common.cancel") }}</n-button>
-        <n-button type="primary" :loading="saving" @click="saveEditor">{{ t("common.save") }}</n-button>
-      </div>
-    </template>
+      <template #footer>
+        <div class="ui-actions-end">
+          <n-button @click="showEditor = false">{{ t("common.cancel") }}</n-button>
+          <n-button type="primary" :loading="saving" @click="saveEditor">{{ t("common.save") }}</n-button>
+        </div>
+      </template>
     </n-drawer-content>
   </n-drawer>
 </template>
@@ -328,49 +444,103 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--space-5);
-}
-
-.channel-enable-label {
-  font-size: var(--font-size-lg);
-  font-weight: 400;
-  color: var(--color-text-primary);
-}
-
-.channel-switch-stack {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
   gap: var(--space-3);
-  margin-bottom: var(--space-5);
+}
+
+.bot-card {
+  padding: var(--space-4);
+  border: var(--size-1) solid var(--color-border-soft);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-4);
+  background: color-mix(in srgb, var(--color-bg-surface) 90%, var(--color-bg-surface-soft));
+}
+
+.bot-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3_5);
+}
+
+.bot-head-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.bot-name {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+}
+
+.bot-id-sub {
+  margin-top: var(--space-1);
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.bot-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3_5);
+  padding: var(--space-2_5) 0;
+  border-top: var(--size-1) solid var(--color-border-soft);
+  border-bottom: var(--size-1) solid var(--color-border-soft);
+}
+
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.bot-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.bot-full-row {
+  margin-top: var(--space-1);
 }
 
 .channel-edit-form :deep(.n-form-item) {
-  margin-bottom: var(--space-5);
+  margin-bottom: var(--space-2_5);
 }
 
-@media (min-width: 1440px) {
-  .channel-grid {
-    grid-template-columns: repeat(4, minmax(240px, 1fr));
-  }
-}
-
-@media (max-width: 1200px) {
-  .channel-grid {
-    grid-template-columns: repeat(3, minmax(220px, 1fr));
-  }
-}
-
-@media (max-width: 900px) {
-  .channel-grid {
-    grid-template-columns: repeat(2, minmax(210px, 1fr));
-  }
+.bot-field-grid :deep(.n-form-item) {
+  margin-bottom: 0;
 }
 
 @media (max-width: 640px) {
   .channel-grid {
     grid-template-columns: 1fr;
   }
+}
 
+@media (max-width: 920px) {
+  .editor-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .bot-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .bot-head-actions {
+    justify-content: flex-start;
+  }
+
+  .bot-field-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

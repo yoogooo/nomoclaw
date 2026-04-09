@@ -7,6 +7,7 @@ public record CronSubscriptionDto(
         String jobUid,
         String channel,
         String target,
+        String botId,
         boolean enabled,
         LocalDateTime createdTime,
         LocalDateTime updatedTime

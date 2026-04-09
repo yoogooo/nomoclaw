@@ -46,6 +46,10 @@ public class CronNotificationFanoutService {
         String summary = summarizeForIm(content);
         Map<String, String> metadata = buildMetadata(job, status);
         for (TargetRoute route : routes) {
+            Map<String, String> routeMetadata = new LinkedHashMap<>(metadata);
+            if (!trim(route.botId()).isBlank()) {
+                routeMetadata.put("botId", trim(route.botId()));
+            }
             sendWithRetry(new NotificationRequest(
                     job.getJobUid(),
                     job.getAgentUid(),
@@ -55,7 +59,7 @@ public class CronNotificationFanoutService {
                     route.channel(),
                     route.target(),
                     executedAt,
-                    metadata
+                    Map.copyOf(routeMetadata)
             ));
         }
     }
@@ -94,7 +98,7 @@ public class CronNotificationFanoutService {
                     log.warn("[CronNotify] no target found for subscription jobUid={} channel={}", job.getJobUid(), item.channel());
                     continue;
                 }
-                routes.add(new TargetRoute(item.channel(), target));
+                routes.add(new TargetRoute(item.channel(), target, item.botId()));
             }
             return List.copyOf(routes);
         }
@@ -106,7 +110,7 @@ public class CronNotificationFanoutService {
         if (route == null) {
             return List.of();
         }
-        return List.of(new TargetRoute(route.channel(), route.target()));
+        return List.of(new TargetRoute(route.channel(), route.target(), ""));
     }
 
     private TargetRoute loadLegacyRoute(AgentCronJobEntity job) {
@@ -118,7 +122,7 @@ public class CronNotificationFanoutService {
         if (target.isBlank()) {
             return null;
         }
-        return new TargetRoute(channel, target);
+        return new TargetRoute(channel, target, "");
     }
 
     private String resolveTitle(AgentCronJobEntity job, String status) {
@@ -172,6 +176,6 @@ public class CronNotificationFanoutService {
         return value == null ? "" : value.trim();
     }
 
-    private record TargetRoute(String channel, String target) {
+    private record TargetRoute(String channel, String target, String botId) {
     }
 }

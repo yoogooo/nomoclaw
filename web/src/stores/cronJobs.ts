@@ -183,7 +183,7 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
     await fileApi.openFile(path);
   }
 
-  async function updateSubscriptions(jobUid: string, payload: Array<{ channel: string; target: string; enabled: boolean }>) {
+  async function updateSubscriptions(jobUid: string, payload: Array<{ channel: string; target: string; botId?: string; enabled: boolean }>) {
     const updated = await cronApi.updateCronSubscriptions(jobUid, { subscriptions: payload });
     currentSubscriptions.value = updated;
     message.success(tr("toast.subscriptionsSaved"));

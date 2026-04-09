@@ -224,12 +224,13 @@ CREATE TABLE IF NOT EXISTS agent_cron_subscription (
     job_uid VARCHAR(64) NOT NULL DEFAULT '',
     channel VARCHAR(32) NOT NULL DEFAULT '',
     target VARCHAR(256) NOT NULL DEFAULT '',
+    bot_id VARCHAR(64) NOT NULL DEFAULT '',
     enabled TINYINT(1) NOT NULL DEFAULT 1,
     created_time TIMESTAMP(3) NOT NULL,
     updated_time TIMESTAMP(3) NOT NULL,
     PRIMARY KEY (id),
     UNIQUE (subscription_uid),
-    UNIQUE (job_uid, channel, target),
+    UNIQUE (job_uid, channel, target, bot_id),
     INDEX idx_agent_cron_subscription_job_enabled (job_uid, enabled)
 );
 

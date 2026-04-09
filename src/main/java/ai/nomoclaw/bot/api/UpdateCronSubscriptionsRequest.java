@@ -8,6 +8,7 @@ public record UpdateCronSubscriptionsRequest(
     public record Item(
             String channel,
             String target,
+            String botId,
             boolean enabled
     ) {
     }

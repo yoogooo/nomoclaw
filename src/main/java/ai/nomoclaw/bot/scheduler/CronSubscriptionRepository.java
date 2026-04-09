@@ -18,6 +18,7 @@ public interface CronSubscriptionRepository {
             String jobUid,
             String channel,
             String target,
+            String botId,
             boolean enabled,
             LocalDateTime createdTime,
             LocalDateTime updatedTime
@@ -27,6 +28,7 @@ public interface CronSubscriptionRepository {
     record CronSubscriptionUpsert(
             String channel,
             String target,
+            String botId,
             boolean enabled
     ) {
     }
