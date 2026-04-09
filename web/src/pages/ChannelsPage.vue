@@ -106,21 +106,17 @@ function normalizeAllowList(raw: string): string[] {
   return Array.from(new Set(raw.split(",").map((item) => item.trim()).filter(Boolean)));
 }
 
-function maskTarget(value: string): string {
-  const raw = value.trim();
+function extractOpenId(target: string): string {
+  const raw = target.trim();
   if (!raw) {
     return "";
   }
+  const prefix = "feishu:open_id:";
+  if (raw.startsWith(prefix)) {
+    return raw.slice(prefix.length);
+  }
   const index = raw.lastIndexOf(":");
-  if (index < 0 || index === raw.length - 1) {
-    return "***";
-  }
-  const prefix = raw.slice(0, index + 1);
-  const id = raw.slice(index + 1);
-  if (id.length <= 10) {
-    return `${prefix}***`;
-  }
-  return `${prefix}${id.slice(0, 4)}...${id.slice(-4)}`;
+  return index >= 0 ? raw.slice(index + 1) : raw;
 }
 
 function ensureSingleDefault(channel: ChannelKey) {
@@ -352,12 +348,12 @@ onMounted(() => {
             <n-input v-model:value="allowListText[`feishu:${bot.botId}`]" />
           </n-form-item>
           <div class="bot-target-status">
-            <span class="meta-label">{{ t("channels.editor.defaultTargetStatus") }}</span>
+            <span class="meta-label">{{ t("channels.editor.openIdLabel") }}</span>
             <n-tag v-if="bot.defaultTarget" size="small" type="success" round>
-              {{ t("channels.editor.defaultTargetResolved") }} · {{ maskTarget(bot.defaultTarget) }}
+              {{ extractOpenId(bot.defaultTarget) }}
             </n-tag>
             <n-tag v-else size="small" type="warning" round>
-              {{ t("channels.editor.defaultTargetMissing") }}
+              {{ t("channels.editor.openIdMissing") }}
             </n-tag>
           </div>
         </div>
