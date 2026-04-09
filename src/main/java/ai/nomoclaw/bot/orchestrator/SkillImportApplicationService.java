@@ -58,6 +58,8 @@ public class SkillImportApplicationService {
     );
     private static final Pattern URL_PATTERN = Pattern.compile("https?://[^\\s\"'<>]+");
     private static final Pattern HREF_PATTERN = Pattern.compile("href\\s*=\\s*['\"]([^'\"]+)['\"]", Pattern.CASE_INSENSITIVE);
+    private static final String ARCHIVE_STRUCTURE_INVALID_MESSAGE =
+            "archive skill structure invalid: SKILL.md must be at archive root or single top-level directory root";
 
     private final SkillDefinitionRepository skillDefinitionRepository;
     private final AgentSkillRelationRepository agentSkillRelationRepository;
@@ -412,15 +414,25 @@ public class SkillImportApplicationService {
         if (Files.isRegularFile(extractedDir.resolve(SKILL_FILE))) {
             return extractedDir;
         }
-        List<Path> skillFiles = new ArrayList<>();
-        try (var walk = Files.walk(extractedDir)) {
-            walk.filter(path -> path.getFileName() != null && SKILL_FILE.equals(path.getFileName().toString()))
-                    .forEach(skillFiles::add);
+
+        List<Path> topLevelEntries;
+        try (var stream = Files.list(extractedDir)) {
+            topLevelEntries = stream
+                    .filter(path -> {
+                        String name = path.getFileName() == null ? "" : path.getFileName().toString();
+                        return !"__MACOSX".equals(name) && !".DS_Store".equals(name);
+                    })
+                    .toList();
         }
-        if (skillFiles.isEmpty()) {
-            throw new IllegalArgumentException("archive does not contain SKILL.md");
+        if (topLevelEntries.size() != 1 || !Files.isDirectory(topLevelEntries.get(0))) {
+            throw new IllegalArgumentException(ARCHIVE_STRUCTURE_INVALID_MESSAGE);
         }
-        return skillFiles.get(0).getParent();
+
+        Path singleTopLevelDir = topLevelEntries.get(0);
+        if (Files.isRegularFile(singleTopLevelDir.resolve(SKILL_FILE))) {
+            return singleTopLevelDir;
+        }
+        throw new IllegalArgumentException(ARCHIVE_STRUCTURE_INVALID_MESSAGE);
     }
 
     private void copyDirectory(Path sourceDir, Path targetDir) throws Exception {

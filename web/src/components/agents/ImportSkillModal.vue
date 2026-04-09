@@ -16,7 +16,7 @@ const emit = defineEmits<{
 }>();
 const { t } = useI18n();
 
-const activeTab = ref<"url" | "archive" | "create">("url");
+const activeTab = ref<"url" | "archive" | "create">("archive");
 const attachToAgent = ref(true);
 const importing = ref(false);
 const archiveFile = ref<File | null>(null);
@@ -113,27 +113,6 @@ function handleFileChange(event: Event) {
     </div>
 
     <n-tabs v-model:value="activeTab" type="segment" animated>
-      <n-tab-pane name="url" :tab="t('agents.import.tabUrl')">
-        <div class="import-skill-panel">
-          <div class="ui-note-card">
-            <div class="ui-note-title">{{ t("agents.import.supportedSources") }}</div>
-            <ul class="ui-list-compact">
-              <li v-for="source in supportedSources" :key="source">{{ source }}</li>
-            </ul>
-            <div class="ui-note-title">{{ t("agents.import.urlExamples") }}</div>
-            <ul class="ui-list-compact">
-              <li v-for="example in urlExamples" :key="example">{{ example }}</li>
-            </ul>
-          </div>
-
-          <n-form label-placement="top">
-            <n-form-item label="Skill URL">
-              <n-input v-model:value="urlForm.url" :placeholder="t('agents.import.urlPlaceholder')" />
-            </n-form-item>
-          </n-form>
-        </div>
-      </n-tab-pane>
-
       <n-tab-pane name="archive" :tab="t('agents.import.tabArchive')">
         <div class="import-skill-panel">
           <div class="ui-note-card">
@@ -148,6 +127,27 @@ function handleFileChange(event: Event) {
             >
             <span>{{ archiveFile ? archiveFile.name : t("agents.import.pickArchive") }}</span>
           </label>
+        </div>
+      </n-tab-pane>
+
+      <n-tab-pane name="url" :tab="t('agents.import.tabUrl')">
+        <div class="import-skill-panel">
+          <div class="ui-note-card">
+            <div class="ui-note-title">{{ t("agents.import.supportedSources") }}</div>
+            <ul class="ui-list-compact">
+              <li v-for="source in supportedSources" :key="source">{{ source }}</li>
+            </ul>
+            <div class="ui-note-title">{{ t("agents.import.urlExamples") }}</div>
+            <ul class="ui-list-compact">
+              <li v-for="example in urlExamples" :key="example">{{ example }}</li>
+            </ul>
+          </div>
+
+          <n-form label-placement="top" class="import-url-form">
+            <n-form-item label="Skill URL">
+              <n-input v-model:value="urlForm.url" :placeholder="t('agents.import.urlPlaceholder')" />
+            </n-form-item>
+          </n-form>
         </div>
       </n-tab-pane>
 
@@ -199,6 +199,10 @@ function handleFileChange(event: Event) {
 
 <style scoped>
 .import-skill-panel {
+  margin-top: var(--space-4);
+}
+
+.import-url-form {
   margin-top: var(--space-4);
 }
 </style>
