@@ -1,0 +1,264 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Build a macOS DMG for Apple Silicon (arm64) from a Spring Boot fat jar.
+# Usage:
+#   ./scripts/build-dmg-apple-silicon.sh
+# Optional env:
+#   APP_NAME=NomoClaw APP_VERSION=1.0.0 JAVA_OPTIONS='-Xms256m -Xmx1024m -Dspring.profiles.active=h2' ./scripts/build-dmg-apple-silicon.sh
+
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+TARGET_DIR="$ROOT_DIR/target"
+DIST_DIR="$ROOT_DIR/dist"
+BUILD_DIR="$ROOT_DIR/build/macos"
+RUNTIME_DIR="$BUILD_DIR/runtime-arm64"
+WEB_DIR="$ROOT_DIR/web"
+WEB_DIST_DIR="$WEB_DIR/dist"
+STATIC_DIR="$ROOT_DIR/src/main/resources/static/nomoclaw"
+
+APP_NAME="${APP_NAME:-NomoClaw}"
+APP_VERSION="${APP_VERSION:-1.0.1}"
+ICON_FILE="${ICON_FILE:-}"
+# Default profile for customer local install: embedded H2 (no external MySQL needed).
+JAVA_OPTIONS="${JAVA_OPTIONS:--Xms256m -Xmx1024m -Dspring.profiles.active=h2}"
+SKIP_TESTS="${SKIP_TESTS:-true}"
+SKIP_WEB_BUILD="${SKIP_WEB_BUILD:-false}"
+
+log() {
+  printf '[build-dmg] %s\n' "$*"
+}
+
+fail() {
+  printf '[build-dmg] ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+require_cmd() {
+  command -v "$1" >/dev/null 2>&1 || fail "Missing command: $1"
+}
+
+normalize_app_version() {
+  local input="$1"
+  local v="${input//[^0-9.]/}"
+  local major minor patch
+
+  IFS='.' read -r major minor patch _ <<< "$v"
+  major="${major:-1}"
+  minor="${minor:-0}"
+  patch="${patch:-0}"
+
+  [[ "$major" =~ ^[0-9]+$ ]] || major=1
+  [[ "$minor" =~ ^[0-9]+$ ]] || minor=0
+  [[ "$patch" =~ ^[0-9]+$ ]] || patch=0
+
+  if [[ "$major" -le 0 ]]; then
+    major=1
+  fi
+
+  printf '%s.%s.%s' "$major" "$minor" "$patch"
+}
+
+ensure_required_modules() {
+  local modules="$1"
+  local required=(
+    java.se
+    java.base
+    java.desktop
+    java.instrument
+    java.logging
+    java.management
+    java.naming
+    java.net.http
+    java.security.jgss
+    java.sql
+    java.xml
+    jdk.crypto.ec
+    jdk.unsupported
+  )
+  local m
+  for m in "${required[@]}"; do
+    case ",$modules," in
+      *",$m,"*) ;;
+      *)
+        if [[ -z "$modules" ]]; then
+          modules="$m"
+        else
+          modules="$modules,$m"
+        fi
+        ;;
+    esac
+  done
+  printf '%s' "$modules"
+}
+
+ensure_java21_arm64() {
+  local current_major=""
+  local desired_home=""
+
+  if command -v java >/dev/null 2>&1; then
+    current_major="$(java -version 2>&1 | awk -F '"' '/version/ {print $2}' | awk -F. '{if ($1=="1") print $2; else print $1}')"
+  fi
+
+  if [[ "$current_major" == "21" ]]; then
+    return
+  fi
+
+  desired_home="$(/usr/libexec/java_home -v 21 -a arm64 2>/dev/null || true)"
+  [[ -n "$desired_home" ]] || fail "JDK 21 (arm64) not found. Please install Temurin 21 arm64 first."
+
+  export JAVA_HOME="$desired_home"
+  export PATH="$JAVA_HOME/bin:$PATH"
+  log "Switched JAVA_HOME to: $JAVA_HOME"
+
+  current_major="$(java -version 2>&1 | awk -F '"' '/version/ {print $2}' | awk -F. '{if ($1=="1") print $2; else print $1}')"
+  [[ "$current_major" == "21" ]] || fail "Active java is not 21 after switching JAVA_HOME."
+}
+
+build_frontend_assets() {
+  [[ -d "$WEB_DIR" ]] || fail "Web directory not found: $WEB_DIR"
+  require_cmd pnpm
+
+  log "Building web frontend"
+  if [[ ! -d "$WEB_DIR/node_modules" ]]; then
+    log "Installing web dependencies"
+    pnpm --dir "$WEB_DIR" install --frozen-lockfile
+  fi
+
+  pnpm --dir "$WEB_DIR" build
+  [[ -d "$WEB_DIST_DIR" ]] || fail "Web dist directory not found after build: $WEB_DIST_DIR"
+
+  log "Syncing web dist to Spring static path"
+  rm -rf "$STATIC_DIR"
+  mkdir -p "$STATIC_DIR"
+  cp -R "$WEB_DIST_DIR"/. "$STATIC_DIR"/
+}
+
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  fail "This script only supports macOS."
+fi
+
+if [[ "$(uname -m)" != "arm64" ]]; then
+  fail "Current machine is not Apple Silicon (arm64). Please run this script on arm64 macOS."
+fi
+
+APP_VERSION="$(normalize_app_version "$APP_VERSION")"
+log "Using app version: $APP_VERSION"
+
+ensure_java21_arm64
+require_cmd jdeps
+require_cmd jlink
+require_cmd jpackage
+
+mkdir -p "$DIST_DIR" "$BUILD_DIR"
+
+if [[ "$SKIP_WEB_BUILD" != "true" ]]; then
+  build_frontend_assets
+else
+  log "Skipping web build (SKIP_WEB_BUILD=true)"
+fi
+
+log "Building Spring Boot jar"
+cd "$ROOT_DIR"
+if [[ -x "$ROOT_DIR/mvnw" ]]; then
+  if [[ "$SKIP_TESTS" == "true" ]]; then
+    "$ROOT_DIR/mvnw" -DskipTests clean package
+  else
+    "$ROOT_DIR/mvnw" clean package
+  fi
+else
+  require_cmd mvn
+  if [[ "$SKIP_TESTS" == "true" ]]; then
+    mvn -DskipTests clean package
+  else
+    mvn clean package
+  fi
+fi
+
+# Find an executable jar produced by Spring Boot (exclude original-*.jar).
+# Use a bash 3.2-compatible array fill (mapfile is not available on macOS default bash).
+CANDIDATES=()
+while IFS= read -r candidate; do
+  CANDIDATES+=("$candidate")
+done < <(find "$TARGET_DIR" -maxdepth 1 -type f -name '*.jar' ! -name 'original-*.jar' | sort)
+[[ ${#CANDIDATES[@]} -gt 0 ]] || fail "No jar found in $TARGET_DIR"
+
+MAIN_JAR=""
+for candidate in "${CANDIDATES[@]}"; do
+  if jar tf "$candidate" | grep -q '^BOOT-INF/'; then
+    MAIN_JAR="$candidate"
+    break
+  fi
+done
+
+if [[ -z "$MAIN_JAR" ]]; then
+  MAIN_JAR="${CANDIDATES[0]}"
+  log "No BOOT-INF jar detected, fallback to: $(basename "$MAIN_JAR")"
+fi
+
+JAR_NAME="$(basename "$MAIN_JAR")"
+log "Using jar: $JAR_NAME"
+
+# Derive required JDK modules for jlink.
+log "Resolving JDK modules with jdeps"
+set +e
+MODULES="$(jdeps \
+  --multi-release 21 \
+  --ignore-missing-deps \
+  --recursive \
+  --print-module-deps \
+  "$MAIN_JAR" 2>/dev/null)"
+JDEPS_EXIT=$?
+set -e
+
+if [[ $JDEPS_EXIT -ne 0 || -z "$MODULES" ]]; then
+  log "jdeps auto-detection failed, using fallback modules"
+  MODULES="java.base,java.desktop,java.instrument,java.logging,java.management,java.naming,java.net.http,java.security.jgss,java.sql,java.xml,jdk.crypto.ec,jdk.unsupported"
+fi
+MODULES="$(ensure_required_modules "$MODULES")"
+log "Using JDK modules: $MODULES"
+
+log "Creating runtime image"
+rm -rf "$RUNTIME_DIR"
+jlink \
+  --add-modules "$MODULES" \
+  --strip-debug \
+  --no-header-files \
+  --no-man-pages \
+  --output "$RUNTIME_DIR"
+
+log "Packaging DMG (arm64)"
+JPACKAGE_ARGS=(
+  --type dmg
+  --name "$APP_NAME"
+  --app-version "$APP_VERSION"
+  --input "$TARGET_DIR"
+  --main-jar "$JAR_NAME"
+  --runtime-image "$RUNTIME_DIR"
+  --dest "$DIST_DIR"
+)
+
+for opt in $JAVA_OPTIONS; do
+  JPACKAGE_ARGS+=(--java-options "$opt")
+done
+
+if [[ -n "$ICON_FILE" ]]; then
+  if [[ -f "$ICON_FILE" ]]; then
+    JPACKAGE_ARGS+=(--icon "$ICON_FILE")
+  elif [[ -f "$ROOT_DIR/$ICON_FILE" ]]; then
+    JPACKAGE_ARGS+=(--icon "$ROOT_DIR/$ICON_FILE")
+  else
+    fail "ICON_FILE set but not found: $ICON_FILE"
+  fi
+fi
+
+jpackage "${JPACKAGE_ARGS[@]}"
+
+DEFAULT_DMG="$DIST_DIR/${APP_NAME}-${APP_VERSION}.dmg"
+ARCH_DMG="$DIST_DIR/${APP_NAME}-${APP_VERSION}-macos-aarch64.dmg"
+if [[ -f "$DEFAULT_DMG" ]]; then
+  mv -f "$DEFAULT_DMG" "$ARCH_DMG"
+fi
+
+[[ -f "$ARCH_DMG" ]] || fail "DMG not found at expected path: $ARCH_DMG"
+
+log "Done: $ARCH_DMG"
