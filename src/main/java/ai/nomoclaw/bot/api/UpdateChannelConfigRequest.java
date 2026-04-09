@@ -34,7 +34,10 @@ public record UpdateChannelConfigRequest(
             String appId,
             String appSecret,
             boolean processingAckReactionEnabled,
-            String processingAckReactionType
+            String processingAckReactionType,
+            String defaultTarget,
+            String defaultTargetDisplayName,
+            String targetResolvedAt
     ) {
     }
 

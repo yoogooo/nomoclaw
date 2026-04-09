@@ -2,8 +2,10 @@ package ai.nomoclaw.bot.orchestrator;
 
 import ai.nomoclaw.bot.application.dto.ChannelConfigDto;
 import ai.nomoclaw.bot.application.dto.SystemConfigDto;
+import ai.nomoclaw.bot.channel.platform.FeishuBotTargetResolverService;
 import ai.nomoclaw.bot.util.JsonUtil;
 import ai.nomoclaw.bot.workspace.NomoClawPaths;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -21,15 +23,19 @@ import java.util.Objects;
 import java.util.Set;
 
 @Service
+@Slf4j
 public class SystemAppService {
 
     private static final String CONFIG_FILE_NAME = "nomoclaw.json";
     private static final ObjectMapper MAPPER = JsonUtil.mapper();
 
     private final AgentApplicationService facade;
+    private final FeishuBotTargetResolverService feishuBotTargetResolverService;
 
-    public SystemAppService(AgentApplicationService facade) {
+    public SystemAppService(AgentApplicationService facade,
+                            FeishuBotTargetResolverService feishuBotTargetResolverService) {
         this.facade = facade;
+        this.feishuBotTargetResolverService = feishuBotTargetResolverService;
     }
 
     public SystemConfigDto getSystemConfig() {
@@ -58,6 +64,7 @@ public class SystemAppService {
 
     public synchronized ChannelConfigDto updateChannelConfig(ChannelConfigDto request) {
         ChannelConfigDto sanitized = sanitize(request);
+        sanitized = enrichFeishuDefaultTargets(sanitized);
         validateRequired(sanitized);
         ObjectNode root = readRootConfig();
         root.set("channels", MAPPER.valueToTree(sanitized.channels()));
@@ -123,7 +130,10 @@ public class SystemAppService {
                             trim(bot.appId()),
                             trim(bot.appSecret()),
                             bot.processingAckReactionEnabled(),
-                            fallback(trim(bot.processingAckReactionType()), "OK")
+                            fallback(trim(bot.processingAckReactionType()), "OK"),
+                            trim(bot.defaultTarget()),
+                            trim(bot.defaultTargetDisplayName()),
+                            trim(bot.targetResolvedAt())
                     );
                 })
                 .toList();
@@ -173,7 +183,10 @@ public class SystemAppService {
                         bot.appId(),
                         bot.appSecret(),
                         bot.processingAckReactionEnabled(),
-                        bot.processingAckReactionType()
+                        bot.processingAckReactionType(),
+                        bot.defaultTarget(),
+                        bot.defaultTargetDisplayName(),
+                        bot.targetResolvedAt()
                 ))
                 .toList();
     }
@@ -272,12 +285,100 @@ public class SystemAppService {
             migrated.put("appSecret", trim(feishu.path("appSecret").asText("")));
             migrated.put("processingAckReactionEnabled", feishu.path("processingAckReactionEnabled").asBoolean(true));
             migrated.put("processingAckReactionType", fallback(trim(feishu.path("processingAckReactionType").asText("")), "OK"));
+            migrated.put("defaultTarget", "");
+            migrated.put("defaultTargetDisplayName", "");
+            migrated.put("targetResolvedAt", "");
             bots.add(migrated);
         }
         feishu.removeAll();
         feishu.put("enabled", enabled);
         feishu.set("bots", bots);
         return feishu;
+    }
+
+    private ChannelConfigDto enrichFeishuDefaultTargets(ChannelConfigDto config) {
+        List<ChannelConfigDto.FeishuBot> updatedBots = config.channels().feishu().bots().stream()
+                .map(this::enrichFeishuBotTarget)
+                .toList();
+        return new ChannelConfigDto(new ChannelConfigDto.Channels(
+                new ChannelConfigDto.Feishu(config.channels().feishu().enabled(), updatedBots),
+                config.channels().dingtalk()
+        ));
+    }
+
+    private ChannelConfigDto.FeishuBot enrichFeishuBotTarget(ChannelConfigDto.FeishuBot bot) {
+        String appId = trim(bot.appId());
+        String appSecret = trim(bot.appSecret());
+        if (appId.isBlank() || appSecret.isBlank()) {
+            return new ChannelConfigDto.FeishuBot(
+                    bot.botId(),
+                    bot.displayName(),
+                    bot.enabled(),
+                    bot.isDefault(),
+                    bot.requireMention(),
+                    bot.allowList(),
+                    bot.appId(),
+                    bot.appSecret(),
+                    bot.processingAckReactionEnabled(),
+                    bot.processingAckReactionType(),
+                    "",
+                    "",
+                    ""
+            );
+        }
+        FeishuBotTargetResolverService.ResolveResult result = feishuBotTargetResolverService.resolve(appId, appSecret);
+        if (!result.resolved()) {
+            log.warn("[ChannelConfig] feishu bot target unresolved botId={} reason={}", bot.botId(), result.error());
+            return new ChannelConfigDto.FeishuBot(
+                    bot.botId(),
+                    bot.displayName(),
+                    bot.enabled(),
+                    bot.isDefault(),
+                    bot.requireMention(),
+                    bot.allowList(),
+                    bot.appId(),
+                    bot.appSecret(),
+                    bot.processingAckReactionEnabled(),
+                    bot.processingAckReactionType(),
+                    trim(bot.defaultTarget()),
+                    trim(bot.defaultTargetDisplayName()),
+                    trim(bot.targetResolvedAt())
+            );
+        }
+        log.info("[ChannelConfig] feishu bot target resolved botId={} target={}",
+                bot.botId(), maskTarget(result.defaultTarget()));
+        return new ChannelConfigDto.FeishuBot(
+                bot.botId(),
+                bot.displayName(),
+                bot.enabled(),
+                bot.isDefault(),
+                bot.requireMention(),
+                bot.allowList(),
+                bot.appId(),
+                bot.appSecret(),
+                bot.processingAckReactionEnabled(),
+                bot.processingAckReactionType(),
+                result.defaultTarget(),
+                result.defaultTargetDisplayName(),
+                result.resolvedAt()
+        );
+    }
+
+    private String maskTarget(String value) {
+        String raw = trim(value);
+        if (raw.isBlank()) {
+            return "";
+        }
+        int index = raw.lastIndexOf(':');
+        if (index < 0 || index == raw.length() - 1) {
+            return "***";
+        }
+        String prefix = raw.substring(0, index + 1);
+        String id = raw.substring(index + 1);
+        if (id.length() <= 8) {
+            return prefix + "***";
+        }
+        return prefix + id.substring(0, 4) + "..." + id.substring(id.length() - 4);
     }
 
     private ObjectNode normalizeDingTalkNode(JsonNode node) {

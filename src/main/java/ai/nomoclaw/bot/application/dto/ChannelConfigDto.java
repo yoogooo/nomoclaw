@@ -32,7 +32,10 @@ public record ChannelConfigDto(
                 "",
                 "",
                 true,
-                "OK"
+                "OK",
+                "",
+                "",
+                ""
         );
     }
 
@@ -78,7 +81,10 @@ public record ChannelConfigDto(
             String appId,
             String appSecret,
             boolean processingAckReactionEnabled,
-            String processingAckReactionType
+            String processingAckReactionType,
+            String defaultTarget,
+            String defaultTargetDisplayName,
+            String targetResolvedAt
     ) {
     }
 

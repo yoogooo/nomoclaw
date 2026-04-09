@@ -56,7 +56,10 @@ function createDefaultFeishuBot(): ChannelFeishuBotConfig {
     appId: "",
     appSecret: "",
     processingAckReactionEnabled: true,
-    processingAckReactionType: "OK"
+    processingAckReactionType: "OK",
+    defaultTarget: "",
+    defaultTargetDisplayName: "",
+    targetResolvedAt: ""
   };
 }
 
@@ -101,6 +104,23 @@ function normalizeAllowList(raw: string): string[] {
     return [];
   }
   return Array.from(new Set(raw.split(",").map((item) => item.trim()).filter(Boolean)));
+}
+
+function maskTarget(value: string): string {
+  const raw = value.trim();
+  if (!raw) {
+    return "";
+  }
+  const index = raw.lastIndexOf(":");
+  if (index < 0 || index === raw.length - 1) {
+    return "***";
+  }
+  const prefix = raw.slice(0, index + 1);
+  const id = raw.slice(index + 1);
+  if (id.length <= 10) {
+    return `${prefix}***`;
+  }
+  return `${prefix}${id.slice(0, 4)}...${id.slice(-4)}`;
 }
 
 function ensureSingleDefault(channel: ChannelKey) {
@@ -331,6 +351,15 @@ onMounted(() => {
           <n-form-item class="bot-full-row" :label="t('channels.editor.allowList')">
             <n-input v-model:value="allowListText[`feishu:${bot.botId}`]" />
           </n-form-item>
+          <div class="bot-target-status">
+            <span class="meta-label">{{ t("channels.editor.defaultTargetStatus") }}</span>
+            <n-tag v-if="bot.defaultTarget" size="small" type="success" round>
+              {{ t("channels.editor.defaultTargetResolved") }} · {{ maskTarget(bot.defaultTarget) }}
+            </n-tag>
+            <n-tag v-else size="small" type="warning" round>
+              {{ t("channels.editor.defaultTargetMissing") }}
+            </n-tag>
+          </div>
         </div>
       </n-form>
 
@@ -508,6 +537,13 @@ onMounted(() => {
 
 .bot-full-row {
   margin-top: var(--space-1);
+}
+
+.bot-target-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
 }
 
 .channel-edit-form :deep(.n-form-item) {

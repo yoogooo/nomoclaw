@@ -185,7 +185,10 @@ public class FeishuChannelMessageSender implements ChannelMessageSender {
                 appId,
                 appSecret,
                 processingAckReactionEnabled,
-                processingAckReactionType
+                processingAckReactionType,
+                "",
+                "",
+                ""
         );
     }
 
