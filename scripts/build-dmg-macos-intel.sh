@@ -9,7 +9,7 @@ set -euo pipefail
 # Usage:
 #   ./scripts/build-dmg-macos-intel.sh
 # Optional env:
-#   APP_NAME=NomoClaw APP_VERSION=1.0.0 JAVA_OPTIONS='-Xms256m -Xmx1024m -Dspring.profiles.active=h2 -Dserver.port=18080' ./scripts/build-dmg-macos-intel.sh
+#   APP_NAME=NomoClaw APP_VERSION=2026.406.31014 JAVA_OPTIONS='-Xms256m -Xmx1024m -Dspring.profiles.active=h2 -Dserver.port=18080' ./scripts/build-dmg-macos-intel.sh
 #   LOG_FILE_PATH='/tmp/NomoClaw.log' ./scripts/build-dmg-macos-intel.sh
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -23,13 +23,14 @@ WEB_DIST_DIR="$WEB_DIR/dist"
 STATIC_DIR="$ROOT_DIR/src/main/resources/static/nomoclaw"
 
 APP_NAME="${APP_NAME:-NomoClaw}"
-APP_VERSION="${APP_VERSION:-1.0.1}"
+APP_VERSION="${APP_VERSION:-}"
 ICON_FILE="${ICON_FILE:-}"
 JAVA_OPTIONS="${JAVA_OPTIONS:--Xms256m -Xmx1024m -Dspring.profiles.active=h2 -Dserver.port=18080}"
 LOG_FILE_PATH="${LOG_FILE_PATH:-/tmp/NomoClaw.log}"
 SKIP_TESTS="${SKIP_TESTS:-true}"
 MAVEN_PROFILE="${MAVEN_PROFILE:-prod-lite}"
 SKIP_WEB_BUILD="${SKIP_WEB_BUILD:-false}"
+MAC_UI_ELEMENT="${MAC_UI_ELEMENT:-false}"
 
 ARCH_PREFIX=()
 JAVA_HOME_X64=""
@@ -49,6 +50,32 @@ fail() {
 
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || fail "Missing command: $1"
+}
+
+set_lsui_element() {
+  local app_image="$1"
+  local ui_element="$2"
+  local plist_file="$app_image/Contents/Info.plist"
+  [[ -f "$plist_file" ]] || fail "Info.plist not found: $plist_file"
+  if [[ "$ui_element" == "true" ]]; then
+    /usr/libexec/PlistBuddy -c "Set :LSUIElement true" "$plist_file" >/dev/null 2>&1 \
+      || /usr/libexec/PlistBuddy -c "Add :LSUIElement bool true" "$plist_file" >/dev/null 2>&1 \
+      || fail "Failed to set LSUIElement in $plist_file"
+  else
+    /usr/libexec/PlistBuddy -c "Delete :LSUIElement" "$plist_file" >/dev/null 2>&1 || true
+  fi
+}
+
+generate_default_app_version() {
+  local year month_day hour minute second second_of_day
+  year="$(date +%Y)"
+  month_day="$(date +%-m%d)"
+  hour=$((10#$(date +%H)))
+  minute=$((10#$(date +%M)))
+  second=$((10#$(date +%S)))
+  second_of_day=$((hour * 3600 + minute * 60 + second))
+
+  printf '%s.%s.%05d' "$year" "$month_day" "$second_of_day"
 }
 
 run_arch() {
@@ -171,6 +198,19 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   fail "This script only supports macOS."
 fi
 
+if [[ -z "$APP_VERSION" ]]; then
+  APP_VERSION="$(generate_default_app_version)"
+fi
+
+case "$(printf '%s' "$MAC_UI_ELEMENT" | tr '[:upper:]' '[:lower:]')" in
+  true|1|yes|y)
+    MAC_UI_ELEMENT="true"
+    ;;
+  *)
+    MAC_UI_ELEMENT="false"
+    ;;
+esac
+
 APP_VERSION="$(normalize_app_version "$APP_VERSION")"
 log "Using app version: $APP_VERSION"
 
@@ -257,9 +297,9 @@ rm -rf "$APP_INPUT_DIR"
 mkdir -p "$APP_INPUT_DIR"
 cp "$MAIN_JAR" "$APP_INPUT_DIR/$JAR_NAME"
 
-log "Packaging DMG (x64)"
-JPACKAGE_ARGS=(
-  --type dmg
+log "Packaging app image (x64)"
+JPACKAGE_APP_ARGS=(
+  --type app-image
   --name "$APP_NAME"
   --app-version "$APP_VERSION"
   --input "$APP_INPUT_DIR"
@@ -269,24 +309,40 @@ JPACKAGE_ARGS=(
 )
 
 for opt in $JAVA_OPTIONS; do
-  JPACKAGE_ARGS+=(--java-options "$opt")
+  JPACKAGE_APP_ARGS+=(--java-options "$opt")
 done
 
-JPACKAGE_ARGS+=(--java-options "-Dlogging.file.name=$LOG_FILE_PATH")
-JPACKAGE_ARGS+=(--java-options "-Dnomoclaw.desktop.open-browser-on-startup=true")
-JPACKAGE_ARGS+=(--java-options "-Dnomoclaw.desktop.open-browser-url=http://localhost:18080/nomoclaw/#/")
+JPACKAGE_APP_ARGS+=(--java-options "-Dlogging.file.name=$LOG_FILE_PATH")
+JPACKAGE_APP_ARGS+=(--java-options "-Djava.awt.headless=false")
+JPACKAGE_APP_ARGS+=(--java-options "--add-exports=java.desktop/com.apple.eawt=ALL-UNNAMED")
+JPACKAGE_APP_ARGS+=(--java-options "-Dserver.shutdown=immediate")
+JPACKAGE_APP_ARGS+=(--java-options "-Dspring.lifecycle.timeout-per-shutdown-phase=2s")
+JPACKAGE_APP_ARGS+=(--java-options "-Dnomoclaw.desktop.open-browser-on-startup=true")
+JPACKAGE_APP_ARGS+=(--java-options "-Dnomoclaw.desktop.open-browser-url=http://localhost:18080/nomoclaw/#/")
 
 if [[ -n "$ICON_FILE" ]]; then
   if [[ -f "$ICON_FILE" ]]; then
-    JPACKAGE_ARGS+=(--icon "$ICON_FILE")
+    JPACKAGE_APP_ARGS+=(--icon "$ICON_FILE")
   elif [[ -f "$ROOT_DIR/$ICON_FILE" ]]; then
-    JPACKAGE_ARGS+=(--icon "$ROOT_DIR/$ICON_FILE")
+    JPACKAGE_APP_ARGS+=(--icon "$ROOT_DIR/$ICON_FILE")
   else
     fail "ICON_FILE set but not found: $ICON_FILE"
   fi
 fi
 
-run_arch "$JPACKAGE_BIN" "${JPACKAGE_ARGS[@]}"
+APP_IMAGE="$DIST_DIR/${APP_NAME}.app"
+rm -rf "$APP_IMAGE"
+run_arch "$JPACKAGE_BIN" "${JPACKAGE_APP_ARGS[@]}"
+[[ -d "$APP_IMAGE" ]] || fail "App image not found at expected path: $APP_IMAGE"
+set_lsui_element "$APP_IMAGE" "$MAC_UI_ELEMENT"
+
+log "Packaging DMG (x64)"
+run_arch "$JPACKAGE_BIN" \
+  --type dmg \
+  --name "$APP_NAME" \
+  --app-version "$APP_VERSION" \
+  --app-image "$APP_IMAGE" \
+  --dest "$DIST_DIR"
 
 DEFAULT_DMG="$DIST_DIR/${APP_NAME}-${APP_VERSION}.dmg"
 ARCH_DMG="$DIST_DIR/${APP_NAME}-${APP_VERSION}-macos-x64.dmg"
