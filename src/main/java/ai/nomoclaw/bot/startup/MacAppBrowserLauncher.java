@@ -20,7 +20,7 @@ public class MacAppBrowserLauncher {
 
     public MacAppBrowserLauncher(
             @Value("${nomoclaw.desktop.open-browser-on-startup:false}") boolean enabled,
-            @Value("${nomoclaw.desktop.open-browser-url:http://localhost:18080/nomoclaw/}") String url) {
+            @Value("${nomoclaw.desktop.open-browser-url:http://localhost:18080/nomoclaw/#/}") String url) {
         this.enabled = enabled;
         this.url = url;
     }

@@ -9,7 +9,8 @@ public class WebEntryConfig implements WebMvcConfigurer {
 
     @Override
     public void addViewControllers(ViewControllerRegistry registry) {
-        registry.addViewController("/nomoclaw").setViewName("forward:/nomoclaw/index.html");
-        registry.addViewController("/nomoclaw/").setViewName("forward:/nomoclaw/index.html");
+        String forward = "forward:/nomoclaw/index.html";
+        registry.addViewController("/nomoclaw").setViewName(forward);
+        registry.addViewController("/nomoclaw/").setViewName(forward);
     }
 }

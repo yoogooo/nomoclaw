@@ -28,6 +28,7 @@ JAVA_OPTIONS="${JAVA_OPTIONS:--Xms256m -Xmx1024m -Dspring.profiles.active=h2 -Ds
 # Use a plain absolute path (no ${...} placeholders) to avoid jpackage cfg parser issues.
 LOG_FILE_PATH="${LOG_FILE_PATH:-/tmp/NomoClaw.log}"
 SKIP_TESTS="${SKIP_TESTS:-true}"
+MAVEN_PROFILE="${MAVEN_PROFILE:-prod-lite}"
 SKIP_WEB_BUILD="${SKIP_WEB_BUILD:-false}"
 
 log() {
@@ -167,16 +168,16 @@ log "Building Spring Boot jar"
 cd "$ROOT_DIR"
 if [[ -x "$ROOT_DIR/mvnw" ]]; then
   if [[ "$SKIP_TESTS" == "true" ]]; then
-    "$ROOT_DIR/mvnw" -DskipTests clean package
+    "$ROOT_DIR/mvnw" -P"$MAVEN_PROFILE" -Dmaven.test.skip=true clean package
   else
-    "$ROOT_DIR/mvnw" clean package
+    "$ROOT_DIR/mvnw" -P"$MAVEN_PROFILE" clean package
   fi
 else
   require_cmd mvn
   if [[ "$SKIP_TESTS" == "true" ]]; then
-    mvn -DskipTests clean package
+    mvn -P"$MAVEN_PROFILE" -Dmaven.test.skip=true clean package
   else
-    mvn clean package
+    mvn -P"$MAVEN_PROFILE" clean package
   fi
 fi
 
@@ -258,7 +259,7 @@ done
 JPACKAGE_ARGS+=(--java-options "-Dlogging.file.name=$LOG_FILE_PATH")
 # Auto-open local web console when launching app from Finder.
 JPACKAGE_ARGS+=(--java-options "-Dnomoclaw.desktop.open-browser-on-startup=true")
-JPACKAGE_ARGS+=(--java-options "-Dnomoclaw.desktop.open-browser-url=http://localhost:18080/nomoclaw/")
+JPACKAGE_ARGS+=(--java-options "-Dnomoclaw.desktop.open-browser-url=http://localhost:18080/nomoclaw/#/")
 
 if [[ -n "$ICON_FILE" ]]; then
   if [[ -f "$ICON_FILE" ]]; then

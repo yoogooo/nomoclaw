@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from "vue-router";
+import { createRouter, createWebHashHistory } from "vue-router";
 import ChatPage from "@/pages/ChatPage.vue";
 import CronPage from "@/pages/CronPage.vue";
 import AgentsPage from "@/pages/AgentsPage.vue";
@@ -9,7 +9,7 @@ import ForbiddenPage from "@/pages/ForbiddenPage.vue";
 import DesignSystemPage from "@/pages/design-system/DesignSystemPage.vue";
 
 export const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  history: createWebHashHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: "/",
