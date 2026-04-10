@@ -9,7 +9,7 @@ const THEME_STORAGE_KEY = "ui:theme-mode";
 const LOCALE_STORAGE_KEY = "ui:locale";
 
 function normalizeThemeMode(value: string | null | undefined): UiThemeMode {
-  return value === "dark" ? "dark" : "light";
+  return value === "light" ? "light" : "dark";
 }
 
 function applyThemeAttribute(mode: UiThemeMode) {
@@ -31,7 +31,7 @@ function normalizeLocale(value: string | null | undefined): AppLocale {
 }
 
 export const useUiPreferencesStore = defineStore("ui-preferences", () => {
-  const themeMode = ref<UiThemeMode>("light");
+  const themeMode = ref<UiThemeMode>("dark");
   const locale = ref<AppLocale>("zh-CN");
   const ready = ref(false);
   const isDarkTheme = computed(() => themeMode.value === "dark");

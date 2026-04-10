@@ -14,7 +14,7 @@ let cachedApis: DiscreteApis | null = null;
 
 function resolveThemeMode(): UiThemeMode {
   if (typeof document === "undefined") {
-    return "light";
+    return "dark";
   }
   return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
 }
