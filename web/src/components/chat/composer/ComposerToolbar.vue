@@ -190,12 +190,12 @@ const modelSelectWidthCh = computed(() => {
 }
 
 .composer-submit-cancel {
-  background: color-mix(in srgb, var(--color-danger) 78%, var(--color-bg-surface) 22%);
+  background: var(--color-button-danger-bg);
   color: var(--color-button-danger-text);
 }
 
 .composer-submit-cancel:hover {
-  background: color-mix(in srgb, var(--color-danger) 88%, var(--color-bg-surface) 12%);
+  background: var(--color-button-danger-bg-hover);
 }
 
 .composer-submit:disabled {
