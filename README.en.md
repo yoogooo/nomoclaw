@@ -80,6 +80,7 @@ Frontend:
 
 ```bash
 cd web
+pnpm dev
 pnpm build
 ```
 

@@ -154,6 +154,17 @@ export interface ModelConfig {
   providers: ModelProvider[];
 }
 
+export interface TestModelProviderRequest {
+  providerId: string;
+  baseUrl: string;
+  apiKey: string;
+}
+
+export interface ModelProviderTestResult {
+  success: boolean;
+  message: string;
+}
+
 export interface UploadPolicy {
   enabled: boolean;
   allowedMimeGroups: string[];

@@ -14,9 +14,11 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.JsonNode;
 
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Function;
@@ -181,6 +183,39 @@ public class ModelConfigAppService {
             providerConfigRepository.updateById(provider);
         }
         return getModelConfig();
+    }
+
+    @Transactional(readOnly = true)
+    public ProbeResult testProviderConnection(String providerId, String overrideBaseUrl, String overrideApiKey) {
+        ModelConfigDto config = getModelConfig();
+        String normalizedProviderId = trim(providerId);
+        ModelConfigDto.Provider provider = config.providers().stream()
+                .filter(item -> item.id().equals(normalizedProviderId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("provider not found: " + normalizedProviderId));
+        String baseUrl = trim(overrideBaseUrl).isBlank() ? trim(provider.baseUrl()) : trim(overrideBaseUrl);
+        String apiKey = trim(overrideApiKey).isBlank() ? trim(provider.apiKey()) : trim(overrideApiKey);
+        if (baseUrl.isBlank()) {
+            throw new IllegalArgumentException(provider.name() + " 需要填写 Base URL");
+        }
+        if (!provider.local() && provider.requireApiKey() && apiKey.isBlank()) {
+            throw new IllegalArgumentException(provider.name() + " 需要填写 API Key");
+        }
+        if (provider.local() || provider.id().equals("ollama")) {
+            fetchOllamaModelIds(baseUrl);
+            return new ProbeResult(true, "连接成功，" + provider.name() + " 可访问");
+        }
+        String protocol = trim(provider.protocol()).toLowerCase(Locale.ROOT);
+        if (protocol.contains("gemini")) {
+            requestGeminiModels(provider.name(), baseUrl, apiKey);
+            return new ProbeResult(true, "连接成功，" + provider.name() + " API 可访问");
+        }
+        if (protocol.contains("anthropic")) {
+            requestAnthropicModels(provider.name(), baseUrl, apiKey);
+            return new ProbeResult(true, "连接成功，" + provider.name() + " API 可访问");
+        }
+        requestOpenAiModels(provider.name(), baseUrl, apiKey);
+        return new ProbeResult(true, "连接成功，" + provider.name() + " API 可访问");
     }
 
     private void initializeDefaultsIfNeeded() {
@@ -420,6 +455,110 @@ public class ModelConfigAppService {
         return value == null ? "" : value;
     }
 
+    private HttpResponse<String> sendProbeRequest(HttpRequest request, String providerName) {
+        HttpResponse<String> response;
+        try {
+            response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        } catch (Exception ex) {
+            throw new IllegalArgumentException(providerName + " 连接失败: " + ex.getMessage(), ex);
+        }
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            String body = trim(response.body());
+            String extracted = extractErrorMessage(body);
+            String detail = extracted.isBlank() ? "" : " - " + extracted;
+            throw new IllegalArgumentException(providerName + " 返回状态码 " + response.statusCode() + detail);
+        }
+        return response;
+    }
+
+    private void requestOpenAiModels(String providerName, String baseUrl, String apiKey) {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(joinUrl(baseUrl, "/models")))
+                .GET()
+                .header("Accept", "application/json")
+                .header("Authorization", "Bearer " + apiKey)
+                .build();
+        sendProbeRequest(request, providerName);
+    }
+
+    private void requestGeminiModels(String providerName, String baseUrl, String apiKey) {
+        String encodedKey = URLEncoder.encode(apiKey, StandardCharsets.UTF_8);
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(joinUrl(baseUrl, "/v1beta/models") + "?key=" + encodedKey))
+                .GET()
+                .header("Accept", "application/json")
+                .build();
+        sendProbeRequest(request, providerName);
+    }
+
+    private void requestAnthropicModels(String providerName, String baseUrl, String apiKey) {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(joinUrl(baseUrl, "/v1/models")))
+                .GET()
+                .header("Accept", "application/json")
+                .header("x-api-key", apiKey)
+                .header("anthropic-version", "2023-06-01")
+                .build();
+        sendProbeRequest(request, providerName);
+    }
+
+    private String joinUrl(String baseUrl, String path) {
+        String normalizedBase = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+        String normalizedPath = path.startsWith("/") ? path : "/" + path;
+        return normalizedBase + normalizedPath;
+    }
+
+    private String extractErrorMessage(String body) {
+        String normalized = trim(body);
+        if (normalized.isBlank()) {
+            return "";
+        }
+        try {
+            JsonNode root = JsonUtil.fromJson(normalized, JsonNode.class);
+            String direct = trim(root.path("message").asText(""));
+            if (!direct.isBlank()) {
+                return direct;
+            }
+            direct = trim(root.path("reason").asText(""));
+            if (!direct.isBlank()) {
+                return direct;
+            }
+            direct = trim(root.path("detail").asText(""));
+            if (!direct.isBlank()) {
+                return direct;
+            }
+            direct = trim(root.path("status").asText(""));
+            if (!direct.isBlank()) {
+                return direct;
+            }
+            JsonNode error = root.path("error");
+            if (error.isTextual()) {
+                return trim(error.asText(""));
+            }
+            if (error.isObject()) {
+                String nested = trim(error.path("message").asText(""));
+                if (!nested.isBlank()) {
+                    return nested;
+                }
+                nested = trim(error.path("reason").asText(""));
+                if (!nested.isBlank()) {
+                    return nested;
+                }
+                nested = trim(error.path("detail").asText(""));
+                if (!nested.isBlank()) {
+                    return nested;
+                }
+                nested = trim(error.path("code").asText(""));
+                if (!nested.isBlank()) {
+                    return nested;
+                }
+            }
+            return normalized;
+        } catch (Exception ex) {
+            return normalized;
+        }
+    }
+
     private List<String> fetchOllamaModelIds(String baseUrl) {
         String normalized = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
         HttpRequest request = HttpRequest.newBuilder()
@@ -453,5 +592,8 @@ public class ModelConfigAppService {
             }
         }
         return List.copyOf(modelIds);
+    }
+
+    public record ProbeResult(boolean success, String message) {
     }
 }

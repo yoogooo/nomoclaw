@@ -249,7 +249,9 @@ async function testProviderConnection() {
     }
     message.warning(result.message || t("models.toast.connectionTestFailed"));
   } catch (error) {
-    message.error(error instanceof Error ? error.message : t("models.toast.connectionTestFailed"));
+    if (!(error instanceof Error)) {
+      message.error(t("models.toast.connectionTestFailed"));
+    }
   } finally {
     testingProviderConnection.value = false;
   }
@@ -348,7 +350,18 @@ onMounted(() => {
         </n-form-item>
 
         <n-form-item v-if="!editingProvider.local" label="API Key">
-          <n-input v-model:value="editingProvider.apiKey" type="password" show-password-on="click" :placeholder="t('models.editor.apiKeyPlaceholder')" />
+          <div class="api-key-test-inline">
+            <n-input class="api-key-test-input" v-model:value="editingProvider.apiKey" type="password" show-password-on="click" :placeholder="t('models.editor.apiKeyPlaceholder')" />
+            <n-button class="api-key-test-btn" :loading="testingProviderConnection" @click="testProviderConnection">
+              {{ t("models.actions.testConnection") }}
+            </n-button>
+          </div>
+        </n-form-item>
+
+        <n-form-item v-else>
+          <n-button :loading="testingProviderConnection" @click="testProviderConnection">
+            {{ t("models.actions.testConnection") }}
+          </n-button>
         </n-form-item>
 
         <n-form-item :label="t('models.labels.defaultModel')">
@@ -443,9 +456,6 @@ onMounted(() => {
 
       <template #footer>
         <div class="ui-actions-end">
-          <n-button :loading="testingProviderConnection" @click="testProviderConnection">
-            {{ t("models.actions.testConnection") }}
-          </n-button>
           <n-button @click="showEditor = false">{{ t("common.cancel") }}</n-button>
           <n-button type="primary" :loading="saving" @click="saveEditor">{{ t("common.save") }}</n-button>
         </div>
@@ -556,6 +566,22 @@ onMounted(() => {
 
 .provider-form :deep(.n-form-item) {
   margin-bottom: var(--space-2_5);
+}
+
+.api-key-test-inline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.api-key-test-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.api-key-test-btn {
+  flex: 0 0 auto;
 }
 
 .model-card :deep(.n-form-item) {

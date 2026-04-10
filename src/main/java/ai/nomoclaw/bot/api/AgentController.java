@@ -221,6 +221,18 @@ public class AgentController {
         return ApiDtoMapper.toModelConfig(modelConfigAppService.loadLocalModels(providerId));
     }
 
+    @PostMapping("/system/models/providers/test")
+    public ModelProviderTestResponse testModelProvider(@RequestBody(required = false) TestModelProviderRequest request) {
+        String providerId = request == null ? "" : request.providerId();
+        log.info("[AgentAPI] testModelProvider providerId={}", providerId);
+        ModelConfigAppService.ProbeResult result = modelConfigAppService.testProviderConnection(
+                providerId,
+                request == null ? "" : request.baseUrl(),
+                request == null ? "" : request.apiKey()
+        );
+        return new ModelProviderTestResponse(result.success(), result.message());
+    }
+
     @PatchMapping("/agents/{agentUid}/skills/{skillKey}")
     public AgentSkillResponse updateAgentSkillStatus(@PathVariable String agentUid,
                                                      @PathVariable String skillKey,

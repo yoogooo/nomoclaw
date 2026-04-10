@@ -41,8 +41,23 @@ function normalizeErrorMessage(text: string): string {
     return "";
   }
   try {
-    const payload = JSON.parse(text) as { message?: string; error?: string; reason?: string; detail?: string };
-    return payload.message || payload.reason || payload.detail || payload.error || text;
+    const payload = JSON.parse(text) as {
+      message?: string;
+      error?: string | { message?: string; reason?: string; detail?: string };
+      reason?: string;
+      detail?: string;
+      status?: string;
+    };
+    if (typeof payload.error === "object" && payload.error) {
+      const nested = payload.error.message || payload.error.reason || payload.error.detail;
+      if (nested) {
+        return nested;
+      }
+    }
+    if (typeof payload.error === "string" && payload.error.trim()) {
+      return payload.error;
+    }
+    return payload.message || payload.reason || payload.detail || payload.status || text;
   } catch {
     return text;
   }

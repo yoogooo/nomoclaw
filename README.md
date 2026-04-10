@@ -80,6 +80,7 @@ SPRING_PROFILES_ACTIVE=h2 ./mvnw spring-boot:run
 
 ```bash
 cd web
+pnpm dev
 pnpm build
 ```
 
