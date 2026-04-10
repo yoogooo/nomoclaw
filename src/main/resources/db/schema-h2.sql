@@ -352,17 +352,7 @@ INSERT INTO agent_definition (
     model_provider_id, model_id, sort_index, is_group_entry, status, ext_config, created_time, updated_time
 ) VALUES
     ('agent_general_assistant', 'general_assistant', '通用助手', '🤝', '负责综合规划、协调执行与最终总结。', '["planning","coordination","delivery"]',
-     'generalist', '', '', 10, 0, 'ACTIVE', '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('agent_test_expert', 'test_expert', '测试专家', '🧪', '负责测试设计、缺陷定位与质量把关。', '["testing","qa","review"]',
-     'qa-specialist', '', '', 20, 0, 'ACTIVE', '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('agent_public_opinion', 'public_opinion_monitor', '舆情监测', '📡', '负责舆情跟踪、热点观察与风险提示。', '["monitoring","trend","risk"]',
-     'opinion-specialist', '', '', 30, 0, 'ACTIVE', '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('agent_marketing_assistant', 'marketing_assistant', '营销助理', '📣', '负责传播文案、活动建议与投放辅助。', '["marketing","campaign","copywriting"]',
-     'marketing-specialist', '', '', 40, 0, 'ACTIVE', '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('agent_screenwriter', 'screenwriter', '短剧编剧', '✍️', '负责短剧剧情设定、人物弧线与分场创作。', '["screenwriting","story","character"]',
-     'screenwriter-specialist', '', '', 50, 0, 'ACTIVE', '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('agent_director', 'director', '短剧导演', '🎬', '负责镜头节奏、视听表达与导演层决策。', '["direction","visual","production"]',
-     'director-specialist', '', '', 60, 0, 'ACTIVE', '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+     'generalist', '', '', 10, 0, 'ACTIVE', '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO tool_definition (
     tool_key, display_name, description, risk_level, status, sort_index, config_json, created_time, updated_time
@@ -388,12 +378,7 @@ INSERT INTO skill_definition (
 INSERT INTO agent_group_member (
     member_uid, agent_group_uid, agent_uid, member_role, responsibility, sort_index, is_primary, status, created_time, updated_time
 ) VALUES
-    ('member_short_drama_general', 'group_short_drama', 'agent_general_assistant', 'owner', '统筹项目组整体规划、协调执行与最终交付。', 10, 1, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('member_short_drama_test', 'group_short_drama', 'agent_test_expert', 'reviewer', '负责测试方案设计、缺陷校验与质量反馈。', 20, 0, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('member_short_drama_public', 'group_short_drama', 'agent_public_opinion', 'analyst', '负责舆情监测、风险发现与热点观察。', 30, 0, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('member_short_drama_marketing', 'group_short_drama', 'agent_marketing_assistant', 'strategist', '负责营销传播建议与活动辅助。', 40, 0, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('member_short_drama_screenwriter', 'group_short_drama', 'agent_screenwriter', 'creator', '负责短剧剧本、人物与桥段创作。', 50, 0, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('member_short_drama_director', 'group_short_drama', 'agent_director', 'director', '负责镜头、节奏与导演侧统筹。', 60, 0, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+    ('member_short_drama_general', 'group_short_drama', 'agent_general_assistant', 'owner', '统筹项目组整体规划、协调执行与最终交付。', 10, 1, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO agent_tool_relation (
     relation_uid, agent_uid, tool_key, status, sort_index, config_json, created_time, updated_time
@@ -409,40 +394,12 @@ INSERT INTO agent_tool_relation (
     ('rel_general_time', 'agent_general_assistant', 'current_time_tool', 'ACTIVE', 90, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('rel_general_token', 'agent_general_assistant', 'token_usage_tool', 'ACTIVE', 100, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('rel_general_memory', 'agent_general_assistant', 'memory_search_tool', 'ACTIVE', 110, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_general_send', 'agent_general_assistant', 'send_file_tool', 'ACTIVE', 120, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_test_command', 'agent_test_expert', 'command_tool', 'ACTIVE', 10, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_test_file', 'agent_test_expert', 'file_io_tool', 'ACTIVE', 20, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_test_search', 'agent_test_expert', 'file_search_tool', 'ACTIVE', 30, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_test_time', 'agent_test_expert', 'current_time_tool', 'ACTIVE', 40, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_test_memory', 'agent_test_expert', 'memory_search_tool', 'ACTIVE', 50, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_public_browser', 'agent_public_opinion', 'browser_tool', 'ACTIVE', 10, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_public_browser_control', 'agent_public_opinion', 'browser_control_tool', 'ACTIVE', 20, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_public_search', 'agent_public_opinion', 'file_search_tool', 'ACTIVE', 30, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_public_time', 'agent_public_opinion', 'current_time_tool', 'ACTIVE', 40, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_public_memory', 'agent_public_opinion', 'memory_search_tool', 'ACTIVE', 50, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_market_command', 'agent_marketing_assistant', 'command_tool', 'ACTIVE', 10, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_market_browser', 'agent_marketing_assistant', 'browser_tool', 'ACTIVE', 20, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_market_search', 'agent_marketing_assistant', 'file_search_tool', 'ACTIVE', 30, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_market_time', 'agent_marketing_assistant', 'current_time_tool', 'ACTIVE', 40, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_market_memory', 'agent_marketing_assistant', 'memory_search_tool', 'ACTIVE', 50, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_writer_command', 'agent_screenwriter', 'command_tool', 'ACTIVE', 10, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_writer_file', 'agent_screenwriter', 'file_io_tool', 'ACTIVE', 20, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_writer_time', 'agent_screenwriter', 'current_time_tool', 'ACTIVE', 30, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_writer_memory', 'agent_screenwriter', 'memory_search_tool', 'ACTIVE', 40, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_director_command', 'agent_director', 'command_tool', 'ACTIVE', 10, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_director_browser', 'agent_director', 'browser_tool', 'ACTIVE', 20, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_director_shot', 'agent_director', 'desktop_screenshot_tool', 'ACTIVE', 30, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_director_time', 'agent_director', 'current_time_tool', 'ACTIVE', 40, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+    ('rel_general_send', 'agent_general_assistant', 'send_file_tool', 'ACTIVE', 120, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO agent_skill_relation (
     relation_uid, agent_uid, skill_key, status, sort_index, config_json, created_time, updated_time
 ) VALUES
-    ('rel_general_pdf', 'agent_general_assistant', 'pdf', 'ACTIVE', 10, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_test_pdf', 'agent_test_expert', 'pdf', 'ACTIVE', 10, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_public_pdf', 'agent_public_opinion', 'pdf', 'ACTIVE', 10, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_market_pdf', 'agent_marketing_assistant', 'pdf', 'ACTIVE', 10, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_writer_pdf', 'agent_screenwriter', 'pdf', 'ACTIVE', 10, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_director_pdf', 'agent_director', 'pdf', 'ACTIVE', 10, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+    ('rel_general_pdf', 'agent_general_assistant', 'pdf', 'ACTIVE', 10, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO agent_tip (
     tip_uid, agent_uid, title, summary, source_content, source_conversation_uid, source_message_uid,
