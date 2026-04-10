@@ -74,15 +74,16 @@ function createConversationAndFocusInput() {
 
 <template>
   <aside class="panel conversation-shell">
-    <div class="panel-header">
-      <div class="panel-title">{{ t("chat.sidebar.history") }}</div>
+    <div class="panel-header conversation-header">
+      <div class="conversation-header-top">
+        <div class="panel-title">{{ t("chat.sidebar.history") }}</div>
+        <button class="create-conversation-button ui-pill-btn" @click="createConversationAndFocusInput()">
+          {{ t("chat.sidebar.createConversation") }}
+        </button>
+      </div>
       <div class="panel-subtitle">{{ description }}</div>
     </div>
     <div class="panel-body conversation-panel">
-      <button class="create-conversation-button ui-pill-btn ui-button-brand" @click="createConversationAndFocusInput()">
-        {{ t("chat.sidebar.createConversation") }}
-      </button>
-
       <div class="scroll-area conversation-list">
         <div v-if="conversationStore.filteredConversations.length">
           <div
@@ -117,15 +118,33 @@ function createConversationAndFocusInput() {
   display: flex;
   min-height: 0;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: 0;
+}
+
+.conversation-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
 }
 
 .create-conversation-button {
-  width: 100%;
-  padding: var(--space-3) var(--space-4_5);
-  font-size: var(--font-size-sm);
-  font-weight: 400;
+  flex: none;
+  white-space: nowrap;
+  padding: var(--space-1_5) var(--space-3);
+  border-color: var(--color-border-strong);
+  background: var(--color-bg-surface-soft);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
   cursor: pointer;
+  transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease;
+}
+
+.create-conversation-button:hover {
+  border-color: var(--color-border-active);
+  background: var(--color-bg-soft-hover);
+  color: var(--color-text-primary);
 }
 
 .conversation-list {
@@ -232,6 +251,11 @@ function createConversationAndFocusInput() {
 @media (max-width: var(--size-breakpoint-lg)) {
   .conversation-panel {
     gap: var(--space-3);
+  }
+
+  .create-conversation-button {
+    padding: var(--space-1) var(--space-2_5);
+    font-size: var(--font-size-2xs);
   }
 
   .conversation-list {

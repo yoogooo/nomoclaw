@@ -35,6 +35,30 @@ const latestMessageUid = computed(() => {
   const items = conversationStore.messages;
   return (items.length ? items[items.length - 1].messageUid : "") || "";
 });
+const isRunningCurrentConversation = computed(() =>
+  Boolean(conversationStore.currentConversationUid)
+  && conversationStore.runningConversationUid === conversationStore.currentConversationUid
+);
+const starterTemplates = computed(() => [
+  {
+    id: "project-plan",
+    title: t("chat.messages.starterTemplate1Title"),
+    summary: t("chat.messages.starterTemplate1Summary"),
+    prompt: t("chat.messages.starterTemplate1Prompt")
+  },
+  {
+    id: "clarify-then-solve",
+    title: t("chat.messages.starterTemplate2Title"),
+    summary: t("chat.messages.starterTemplate2Summary"),
+    prompt: t("chat.messages.starterTemplate2Prompt")
+  },
+  {
+    id: "overseas-landing",
+    title: t("chat.messages.starterTemplate3Title"),
+    summary: t("chat.messages.starterTemplate3Summary"),
+    prompt: t("chat.messages.starterTemplate3Prompt")
+  }
+]);
 
 function runTone(status: string) {
   if (status === "completed") return "success";
@@ -42,11 +66,6 @@ function runTone(status: string) {
   if (status === "waiting_approval") return "warning";
   if (status === "running") return "info";
   return "default";
-}
-
-function copyConversationUid() {
-  if (!conversationStore.currentConversationUid) return;
-  void window.navigator.clipboard.writeText(conversationStore.currentConversationUid);
 }
 
 function messageActionKey(messageItem: ConversationMessage) {
@@ -189,23 +208,42 @@ function isTipSaved(messageItem: ConversationMessage) {
   const messageUid = (messageItem.messageUid || "").trim();
   return !!messageUid && savedTipMessageUidSet.value.has(messageUid);
 }
+
+function applyStarterPrompt(prompt: string) {
+  conversationStore.draftMessage = prompt;
+  window.requestAnimationFrame(() => {
+    const input = document.getElementById("messageInput") as HTMLTextAreaElement | null;
+    if (!input) return;
+    input.focus();
+    const length = input.value.length;
+    input.setSelectionRange(length, length);
+  });
+}
 </script>
 
 <template>
   <section class="panel message-panel">
-    <div class="panel-header message-panel-header">
-      <div class="panel-title">{{ t("chat.messages.panelTitle") }}</div>
-      <button class="conversation-badge" :disabled="!conversationStore.currentConversationUid" @click="copyConversationUid">
-        {{ conversationStore.currentConversationUid || "Conversation" }}
-      </button>
-    </div>
-
     <div class="panel-body message-list scroll-area">
       <div
-        v-if="!conversationStore.messages.length && conversationStore.runningConversationUid !== conversationStore.currentConversationUid"
-        class="empty-state conversation-empty"
+        v-if="!conversationStore.messages.length && !isRunningCurrentConversation"
+        class="conversation-empty-state"
       >
-        {{ t("chat.messages.noMessages") }}
+        <div class="conversation-empty-hero">
+          <div class="conversation-empty-title">{{ t("chat.messages.newConversationTitle") }}</div>
+          <div class="conversation-empty-hint">{{ t("chat.messages.newConversationHint") }}</div>
+          <div class="conversation-starter-prompts">
+            <button
+              v-for="template in starterTemplates"
+              :key="template.id"
+              type="button"
+              class="starter-prompt-btn"
+              @click="applyStarterPrompt(template.prompt)"
+            >
+              <span class="starter-prompt-title">{{ template.title }}</span>
+              <span class="starter-prompt-summary">{{ template.summary }}</span>
+            </button>
+          </div>
+        </div>
       </div>
       <template v-else>
         <div
@@ -373,37 +411,111 @@ function isTipSaved(messageItem: ConversationMessage) {
   flex-direction: column;
 }
 
-.message-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding: var(--space-5) var(--space-6);
-  border-bottom: var(--size-1) solid var(--color-border-soft);
-}
-
 .message-list {
   flex: 1;
 }
 
-.conversation-badge {
-  padding: var(--space-1) var(--space-3);
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: var(--color-bg-soft-hover);
-  color: var(--color-text-subtle);
+.conversation-empty-state {
+  display: grid;
+  gap: var(--space-4_5);
+  place-items: center;
+  min-height: 100%;
+}
+
+.conversation-empty-hero {
+  width: min(100%, var(--size-720));
+  border-radius: var(--radius-xl);
+  padding: var(--space-6) var(--space-6);
+  background: color-mix(in srgb, var(--color-bg-surface) 74%, transparent);
+  backdrop-filter: blur(var(--size-8));
+  display: grid;
+  place-items: center;
+  gap: var(--space-4);
+}
+
+.conversation-empty-title {
+  color: var(--color-text-heading);
+  font-size: clamp(var(--size-24), 2.8vw, var(--size-26));
+  line-height: 1.12;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.conversation-empty-hint {
+  color: var(--color-text-muted);
   font-size: var(--font-size-xs);
-  font-weight: 500;
+}
+
+.conversation-starter-prompts {
+  margin-top: var(--space-2);
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.starter-prompt-btn {
+  border: var(--size-1) solid var(--color-border-soft);
+  border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--color-bg-surface-soft) 76%, transparent);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  padding: var(--space-4);
+  min-height: var(--size-108);
+  text-align: left;
+  display: grid;
+  align-content: start;
+  gap: var(--space-1_5);
   cursor: pointer;
-  transition: background-color 0.18s ease;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+  transition: border-color 0.16s ease, background-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
 }
 
-.conversation-badge:hover {
-  background: var(--color-bg-soft-active);
+.starter-prompt-btn:hover {
+  border-color: var(--color-border-active);
+  background: var(--color-bg-soft-hover);
+  color: var(--color-text-primary);
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.1);
+  transform: translateY(calc(var(--size-2) * -1));
 }
 
-.conversation-empty {
-  margin-top: var(--space-1_5);
+.starter-prompt-title {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.starter-prompt-summary {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  line-height: 1.45;
+  min-height: calc(1.45em * 3);
+}
+
+@media (max-width: var(--size-breakpoint-lg)) {
+  .conversation-empty-hero {
+    width: min(100%, var(--size-620));
+  }
+
+  .conversation-starter-prompts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: var(--size-breakpoint-md)) {
+  .conversation-empty-hero {
+    width: 100%;
+    padding: var(--space-5);
+  }
+
+  .conversation-starter-prompts {
+    grid-template-columns: 1fr;
+  }
+
+  .starter-prompt-btn {
+    min-height: var(--size-96);
+  }
 }
 
 .message-wrap {
