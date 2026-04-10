@@ -37,10 +37,10 @@ const enUS = {
     languageEnUS: "English"
   },
   modelGate: {
-    title: "Configure a model first",
-    description: "No available model is configured yet. Chat, Agents, Scheduled Tasks, and Channels are unavailable until model setup is completed.",
+    title: "Set up a model first",
+    description: "Model setup only takes about a minute. Once done, Chat, Agents, Scheduled Tasks, and Channels are ready to use.",
     status: {
-      missingModel: "No available model detected. Go to Model Management to finish setup.",
+      missingModel: "No available model detected yet. Open Model Management to complete setup.",
       checkFailed: "Failed to check model readiness. Try again later or open Model Management directly."
     },
     actions: {

@@ -37,10 +37,10 @@ const zhCN = {
     languageEnUS: "English"
   },
   modelGate: {
-    title: "请先完成模型配置",
-    description: "当前尚未配置可用模型。聊天、Agent、定时任务和渠道能力在完成模型配置前不可用。",
+    title: "先配置一个可用模型",
+    description: "只需 1 分钟完成模型配置，完成后即可使用聊天、Agent、定时任务和渠道能力。",
     status: {
-      missingModel: "未检测到可用模型，请前往模型管理完成配置。",
+      missingModel: "还没检测到可用模型，前往模型管理完成配置即可。",
       checkFailed: "模型状态检查失败，请稍后重试或直接前往模型管理。"
     },
     actions: {
