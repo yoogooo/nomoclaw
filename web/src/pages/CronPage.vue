@@ -139,7 +139,7 @@ onMounted(() => {
   padding: var(--size-16);
   border: var(--size-1) solid var(--color-border-panel);
   border-radius: var(--size-18);
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--color-bg-surface-soft);
   text-align: left;
   cursor: pointer;
   transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
@@ -148,7 +148,7 @@ onMounted(() => {
 .cron-empty-template-card:hover {
   transform: translateY(calc(var(--size-1) * -1));
   border-color: var(--color-border-brand-light);
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  box-shadow: var(--shadow-card-hover);
 }
 
 .cron-empty-template-icon {

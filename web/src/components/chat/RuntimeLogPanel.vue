@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { ChevronLeft, ChevronRight } from "lucide-vue-next";
+import UiInstantTooltip from "@/components/UiInstantTooltip.vue";
 import { useRuntimeLogStore } from "@/stores/runtimeLog";
 
 const props = withDefaults(defineProps<{
@@ -27,9 +28,11 @@ const { t } = useI18n();
         <p v-if="!props.collapsed" class="runtime-subtitle">{{ t("chat.runtime.subtitle") }}</p>
       </div>
       <div class="runtime-tools">
-        <button class="runtime-toggle" :title="props.collapsed ? t('chat.runtime.expand') : t('chat.runtime.collapse')" @click="emit('toggle')">
-          <component :is="props.collapsed ? ChevronLeft : ChevronRight" :size="16" />
-        </button>
+        <UiInstantTooltip :content="props.collapsed ? t('chat.runtime.expand') : t('chat.runtime.collapse')">
+          <button class="runtime-toggle" :aria-label="props.collapsed ? t('chat.runtime.expand') : t('chat.runtime.collapse')" @click="emit('toggle')">
+            <component :is="props.collapsed ? ChevronLeft : ChevronRight" :size="16" />
+          </button>
+        </UiInstantTooltip>
       </div>
     </div>
     <div v-if="!props.collapsed" class="runtime-body scroll-area">

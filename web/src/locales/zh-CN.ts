@@ -41,7 +41,7 @@ const zhCN = {
       history: "历史对话",
       viewingGroup: "正在查看 {label} 下的全部对话。",
       viewingAgent: "正在查看 {label} 下的对话记录。",
-      createConversation: "创建新对话",
+      createConversation: "+ 新建对话",
       noConversations: "暂无历史对话",
       unnamed: "未命名对话",
       updatedAt: "更新于 {time}",

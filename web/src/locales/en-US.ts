@@ -41,7 +41,7 @@ const enUS = {
       history: "Conversations",
       viewingGroup: "Viewing all conversations under {label}.",
       viewingAgent: "Viewing conversations under {label}.",
-      createConversation: "New Conversation",
+      createConversation: "+ New Chat",
       noConversations: "No conversation history",
       unnamed: "Untitled Conversation",
       updatedAt: "Updated at {time}",

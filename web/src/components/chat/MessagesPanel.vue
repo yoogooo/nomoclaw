@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp, Check, Copy, Sparkles } from "lucide-vue-next";
 import { NButton, NCard, NCollapse, NCollapseItem, NFlex, NPopconfirm, NTag } from "naive-ui";
 import ApprovalBanner from "./ApprovalBanner.vue";
 import ComposerPanel from "./composer/ComposerPanel.vue";
+import UiInstantTooltip from "@/components/UiInstantTooltip.vue";
 import { message as discreteMessage } from "@/discrete";
 import { useConversationStore } from "@/stores/conversation";
 import { useConversationRunsStore } from "@/stores/conversationRuns";
@@ -304,17 +305,18 @@ function applyStarterPrompt(prompt: string) {
               <span class="message-token-total">{{ messageTokenUsageText(message) }}</span>
             </div>
             <div class="message-actions">
-              <button
-                class="message-action-btn icon-only"
-                :class="{ copied: copiedMessageMap[messageActionKey(message)] }"
-                type="button"
-                :title="t('chat.messages.copy')"
-                :aria-label="t('chat.messages.copy')"
-                @click="copyAssistantMessage(message)"
-              >
-                <Check v-if="copiedMessageMap[messageActionKey(message)]" :size="14" />
-                <Copy v-else :size="14" />
-              </button>
+              <UiInstantTooltip :content="t('chat.messages.copy')">
+                <button
+                  class="message-action-btn icon-only"
+                  :class="{ copied: copiedMessageMap[messageActionKey(message)] }"
+                  type="button"
+                  :aria-label="t('chat.messages.copy')"
+                  @click="copyAssistantMessage(message)"
+                >
+                  <Check v-if="copiedMessageMap[messageActionKey(message)]" :size="14" />
+                  <Copy v-else :size="14" />
+                </button>
+              </UiInstantTooltip>
               <div class="save-tip-wrap">
                 <n-popconfirm
                   :show-icon="false"
@@ -324,20 +326,21 @@ function applyStarterPrompt(prompt: string) {
                   @positive-click="saveJinnang(message)"
                 >
                   <template #trigger>
-                    <button
-                      class="message-action-btn icon-only"
-                      :class="{
-                        loading: savingTipMap[messageActionKey(message)],
-                        saved: isTipSaved(message)
-                      }"
-                      :disabled="savingTipMap[messageActionKey(message)] || isTipSaved(message)"
-                      type="button"
-                      :title="isTipSaved(message) ? t('chat.messages.tipSaved') : t('chat.messages.saveTip')"
-                      :aria-label="isTipSaved(message) ? t('chat.messages.tipSaved') : t('chat.messages.saveTip')"
-                    >
-                      <Check v-if="isTipSaved(message) && !savingTipMap[messageActionKey(message)]" :size="14" />
-                      <Sparkles v-else-if="!savingTipMap[messageActionKey(message)]" :size="14" />
-                    </button>
+                    <UiInstantTooltip :content="isTipSaved(message) ? t('chat.messages.tipSaved') : t('chat.messages.saveTip')">
+                      <button
+                        class="message-action-btn icon-only"
+                        :class="{
+                          loading: savingTipMap[messageActionKey(message)],
+                          saved: isTipSaved(message)
+                        }"
+                        :disabled="savingTipMap[messageActionKey(message)] || isTipSaved(message)"
+                        type="button"
+                        :aria-label="isTipSaved(message) ? t('chat.messages.tipSaved') : t('chat.messages.saveTip')"
+                      >
+                        <Check v-if="isTipSaved(message) && !savingTipMap[messageActionKey(message)]" :size="14" />
+                        <Sparkles v-else-if="!savingTipMap[messageActionKey(message)]" :size="14" />
+                      </button>
+                    </UiInstantTooltip>
                   </template>
                   {{ t("chat.messages.saveTipConfirm") }}
                 </n-popconfirm>

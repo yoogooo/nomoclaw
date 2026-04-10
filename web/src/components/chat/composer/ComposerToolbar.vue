@@ -3,6 +3,7 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { ArrowUp, Lightbulb, Paperclip, Square } from "lucide-vue-next";
 import { NSelect } from "naive-ui";
+import UiInstantTooltip from "@/components/UiInstantTooltip.vue";
 
 const props = defineProps<{
   selectedModelKey: string;
@@ -54,41 +55,44 @@ const modelSelectWidthCh = computed(() => {
 
     <div class="composer-upload-inline">
       <div class="composer-tools">
-        <button
-          class="composer-tool-btn icon-only"
-          type="button"
-          :title="t('chat.composer.upload')"
-          :aria-label="t('chat.composer.upload')"
-          :disabled="uploadDisabled || uploadingFiles || switchingContext"
-          @click="emit('trigger-upload')"
-        >
-          <Paperclip :size="16" />
-        </button>
-        <button
-          class="composer-tool-btn icon-only"
-          :class="{ active: showJinnangPicker }"
-          type="button"
-          :title="t('chat.composer.jinnang')"
-          :aria-label="t('chat.composer.jinnang')"
-          @click="emit('toggle-jinnang')"
-        >
-          <Lightbulb :size="16" />
-        </button>
+        <UiInstantTooltip :content="t('chat.composer.upload')">
+          <button
+            class="composer-tool-btn icon-only"
+            type="button"
+            :aria-label="t('chat.composer.upload')"
+            :disabled="uploadDisabled || uploadingFiles || switchingContext"
+            @click="emit('trigger-upload')"
+          >
+            <Paperclip :size="16" />
+          </button>
+        </UiInstantTooltip>
+        <UiInstantTooltip :content="t('chat.composer.jinnang')">
+          <button
+            class="composer-tool-btn icon-only"
+            :class="{ active: showJinnangPicker }"
+            type="button"
+            :aria-label="t('chat.composer.jinnang')"
+            @click="emit('toggle-jinnang')"
+          >
+            <Lightbulb :size="16" />
+          </button>
+        </UiInstantTooltip>
       </div>
     </div>
 
     <div class="composer-meta">
-      <button
-        class="composer-submit"
-        :class="{ 'composer-submit-cancel': isRunningCurrentConversation }"
-        :disabled="isSubmitDisabled"
-        :title="isRunningCurrentConversation ? t('chat.composer.stop') : t('chat.composer.send')"
-        :aria-label="isRunningCurrentConversation ? t('chat.composer.stop') : t('chat.composer.send')"
-        @click="emit('submit')"
-      >
-        <Square v-if="isRunningCurrentConversation" :size="14" class="composer-stop-icon" />
-        <ArrowUp v-else :size="20" />
-      </button>
+      <UiInstantTooltip :content="isRunningCurrentConversation ? t('chat.composer.stop') : t('chat.composer.send')">
+        <button
+          class="composer-submit"
+          :class="{ 'composer-submit-cancel': isRunningCurrentConversation }"
+          :disabled="isSubmitDisabled"
+          :aria-label="isRunningCurrentConversation ? t('chat.composer.stop') : t('chat.composer.send')"
+          @click="emit('submit')"
+        >
+          <Square v-if="isRunningCurrentConversation" :size="14" class="composer-stop-icon" />
+          <ArrowUp v-else :size="20" />
+        </button>
+      </UiInstantTooltip>
     </div>
   </div>
 </template>

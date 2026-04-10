@@ -3,6 +3,7 @@ import { computed } from "vue";
 import { Bot, Brain, CalendarClock, MessageCircleMore, Moon, Settings, Sun, PlugZap } from "lucide-vue-next";
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
+import UiInstantTooltip from "@/components/UiInstantTooltip.vue";
 import { useUiPreferencesStore } from "@/stores/uiPreferences";
 
 const route = useRoute();
@@ -49,31 +50,36 @@ function toggleThemeMode() {
     </div>
 
     <nav class="rail-nav" aria-label="Primary">
-      <button
+      <UiInstantTooltip
         v-for="item in navItems"
         :key="item.key"
-        class="rail-item"
-        :class="{ active: isActive(item.to) }"
-        type="button"
-        :aria-label="item.label"
-        :title="item.label"
-        @click="openNavItem(item)"
+        :content="item.label"
+        placement="right"
       >
-        <component :is="item.icon" class="rail-icon" :size="22" :stroke-width="1.9" />
-      </button>
+        <button
+          class="rail-item"
+          :class="{ active: isActive(item.to) }"
+          type="button"
+          :aria-label="item.label"
+          @click="openNavItem(item)"
+        >
+          <component :is="item.icon" class="rail-icon" :size="22" :stroke-width="1.9" />
+        </button>
+      </UiInstantTooltip>
     </nav>
 
     <div class="rail-bottom">
-      <button
-        class="rail-item rail-theme-toggle"
-        type="button"
-        :aria-label="themeToggleTitle"
-        :title="themeToggleTitle"
-        @click="toggleThemeMode"
-      >
-        <Sun v-if="uiPreferencesStore.themeMode === 'dark'" class="rail-icon" :size="22" :stroke-width="1.9" />
-        <Moon v-else class="rail-icon" :size="22" :stroke-width="1.9" />
-      </button>
+      <UiInstantTooltip :content="themeToggleTitle" placement="right">
+        <button
+          class="rail-item rail-theme-toggle"
+          type="button"
+          :aria-label="themeToggleTitle"
+          @click="toggleThemeMode"
+        >
+          <Sun v-if="uiPreferencesStore.themeMode === 'dark'" class="rail-icon" :size="22" :stroke-width="1.9" />
+          <Moon v-else class="rail-icon" :size="22" :stroke-width="1.9" />
+        </button>
+      </UiInstantTooltip>
       <div class="rail-avatar">AI</div>
     </div>
   </aside>
