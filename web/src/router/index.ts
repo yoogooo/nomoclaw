@@ -9,12 +9,16 @@ import ForbiddenPage from "@/pages/ForbiddenPage.vue";
 import DesignSystemPage from "@/pages/design-system/DesignSystemPage.vue";
 
 export const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: "/",
       name: "chat",
       component: ChatPage
+    },
+    {
+      path: "/index.html",
+      redirect: "/"
     },
     {
       path: "/cron",
