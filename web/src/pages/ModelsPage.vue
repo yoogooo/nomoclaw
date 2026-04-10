@@ -19,6 +19,7 @@ import DirectoryRail from "@/components/chat/DirectoryRail.vue";
 import AppPageHeader from "@/components/layout/AppPageHeader.vue";
 import { modelApi } from "@/api/modelApi";
 import { message } from "@/discrete";
+import { useModelGateStore } from "@/stores/modelGate";
 import type { ModelConfig, ModelProvider, ModelProviderOption } from "@/types/api";
 
 type ProviderStatusType = "success" | "warning";
@@ -43,8 +44,10 @@ const UPLOAD_MIME_GROUP_OPTIONS = [
 const loading = ref(false);
 const saving = ref(false);
 const loadingLocalModels = ref(false);
+const testingProviderConnection = ref(false);
 const showEditor = ref(false);
 const editingProviderId = ref("");
+const modelGateStore = useModelGateStore();
 
 const config = reactive<ModelConfig>({ providers: [] });
 const draft = reactive<ModelConfig>({ providers: [] });
@@ -218,12 +221,37 @@ async function saveEditor() {
     validateProvider(provider);
     const saved = await modelApi.updateModelConfig(cloneConfig(draft));
     config.providers = saved.providers.map(normalizeProvider);
+    await modelGateStore.refreshModelReadiness();
     showEditor.value = false;
     message.success(t("models.toast.saved"));
   } catch (error) {
     message.error(error instanceof Error ? error.message : t("toast.saveFailed"));
   } finally {
     saving.value = false;
+  }
+}
+
+async function testProviderConnection() {
+  const provider = editingProvider.value;
+  if (!provider) {
+    return;
+  }
+  testingProviderConnection.value = true;
+  try {
+    const result = await modelApi.testProviderConnection({
+      providerId: provider.id,
+      baseUrl: provider.baseUrl.trim(),
+      apiKey: provider.apiKey.trim()
+    });
+    if (result.success) {
+      message.success(result.message || t("models.toast.connectionTestSuccess"));
+      return;
+    }
+    message.warning(result.message || t("models.toast.connectionTestFailed"));
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : t("models.toast.connectionTestFailed"));
+  } finally {
+    testingProviderConnection.value = false;
   }
 }
 
@@ -313,15 +341,8 @@ onMounted(() => {
   </div>
 
   <n-drawer v-model:show="showEditor" :width="720" placement="right">
-    <n-drawer-content :title="editingProvider?.name || t('models.editor.defaultTitle')" closable>
+      <n-drawer-content :title="editingProvider?.name || t('models.editor.defaultTitle')" closable>
       <n-form v-if="editingProvider" label-placement="top" class="provider-form">
-          <div class="editor-summary">
-            <n-tag size="small" :bordered="false">{{ editingProvider.protocol }}</n-tag>
-            <span class="editor-summary-text">
-              {{ editingProvider.freezeUrl ? t("models.editor.freezeUrlHint") : t("models.editor.customUrlHint") }}
-            </span>
-          </div>
-
         <n-form-item label="Base URL">
           <n-input v-model:value="editingProvider.baseUrl" :disabled="editingProvider.freezeUrl" />
         </n-form-item>
@@ -422,6 +443,9 @@ onMounted(() => {
 
       <template #footer>
         <div class="ui-actions-end">
+          <n-button :loading="testingProviderConnection" @click="testProviderConnection">
+            {{ t("models.actions.testConnection") }}
+          </n-button>
           <n-button @click="showEditor = false">{{ t("common.cancel") }}</n-button>
           <n-button type="primary" :loading="saving" @click="saveEditor">{{ t("common.save") }}</n-button>
         </div>
@@ -484,19 +508,6 @@ onMounted(() => {
 
 .provider-card-footer {
   margin-top: var(--space-5);
-}
-
-.editor-summary {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin-bottom: var(--space-4);
-}
-
-.editor-summary-text {
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-sm);
-  line-height: 1.6;
 }
 
 .models-toolbar {

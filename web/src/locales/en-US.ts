@@ -36,6 +36,18 @@ const enUS = {
     languageZhCN: "简体中文",
     languageEnUS: "English"
   },
+  modelGate: {
+    title: "Configure a model first",
+    description: "No available model is configured yet. Chat, Agents, Scheduled Tasks, and Channels are unavailable until model setup is completed.",
+    status: {
+      missingModel: "No available model detected. Go to Model Management to finish setup.",
+      checkFailed: "Failed to check model readiness. Try again later or open Model Management directly."
+    },
+    actions: {
+      goConfig: "Go to Model Config",
+      dismissForever: "Don't show again"
+    }
+  },
   chat: {
     sidebar: {
       history: "Conversations",
@@ -556,7 +568,8 @@ const enUS = {
     actions: {
       editConfig: "Edit Config",
       loadLocalModels: "Load Local Models",
-      addModel: "Add Model"
+      addModel: "Add Model",
+      testConnection: "Test Connection"
     },
     labels: {
       defaultModel: "Default Model",
@@ -594,7 +607,9 @@ const enUS = {
     toast: {
       saved: "Model configuration saved",
       localModelsLoaded: "Local Ollama models loaded",
-      localModelsLoadFailed: "Failed to load local models"
+      localModelsLoadFailed: "Failed to load local models",
+      connectionTestSuccess: "Connection test succeeded",
+      connectionTestFailed: "Connection test failed"
     }
   },
   pages: {

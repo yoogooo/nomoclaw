@@ -36,6 +36,18 @@ const zhCN = {
     languageZhCN: "简体中文",
     languageEnUS: "English"
   },
+  modelGate: {
+    title: "请先完成模型配置",
+    description: "当前尚未配置可用模型。聊天、Agent、定时任务和渠道能力在完成模型配置前不可用。",
+    status: {
+      missingModel: "未检测到可用模型，请前往模型管理完成配置。",
+      checkFailed: "模型状态检查失败，请稍后重试或直接前往模型管理。"
+    },
+    actions: {
+      goConfig: "前往模型配置",
+      dismissForever: "不再提示"
+    }
+  },
   chat: {
     sidebar: {
       history: "历史对话",
@@ -556,7 +568,8 @@ const zhCN = {
     actions: {
       editConfig: "编辑配置",
       loadLocalModels: "加载本地模型",
-      addModel: "新增模型"
+      addModel: "新增模型",
+      testConnection: "测试连接"
     },
     labels: {
       defaultModel: "默认模型",
@@ -594,7 +607,9 @@ const zhCN = {
     toast: {
       saved: "模型配置已保存",
       localModelsLoaded: "已加载本地 Ollama 模型",
-      localModelsLoadFailed: "加载本地模型失败"
+      localModelsLoadFailed: "加载本地模型失败",
+      connectionTestSuccess: "连接测试成功",
+      connectionTestFailed: "连接测试失败"
     }
   },
   pages: {
