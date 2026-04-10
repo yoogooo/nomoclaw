@@ -158,20 +158,19 @@ const { t } = useI18n();
   width: var(--size-32);
   height: var(--size-32);
   padding: 0;
-  border: var(--size-1) solid var(--color-border-strong);
+  border: 0;
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--color-bg-surface-soft) 85%, var(--color-bg-surface));
-  color: var(--color-text-primary);
+  background: color-mix(in srgb, var(--color-accent-brand) 88%, var(--color-bg-surface) 12%);
+  color: var(--color-button-primary-text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: box-shadow 0.18s ease, transform 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
+  transition: box-shadow 0.18s ease, transform 0.18s ease, background-color 0.18s ease, opacity 0.18s ease;
 }
 
 .composer-submit:hover {
-  background: var(--color-bg-surface-soft);
-  border-color: var(--color-border-active);
+  background: color-mix(in srgb, var(--color-accent-brand) 96%, var(--color-bg-surface) 4%);
 }
 
 .composer-submit:active {
@@ -179,19 +178,19 @@ const { t } = useI18n();
 }
 
 .composer-submit-cancel {
-  color: var(--color-text-danger);
+  background: color-mix(in srgb, var(--color-danger) 78%, var(--color-bg-surface) 22%);
+  color: var(--color-button-danger-text);
 }
 
 .composer-submit-cancel:hover {
-  border-color: color-mix(in srgb, var(--color-text-danger) 45%, var(--color-border-strong));
-  background: color-mix(in srgb, var(--color-danger-soft-bg) 35%, var(--color-bg-surface-soft));
+  background: color-mix(in srgb, var(--color-danger) 88%, var(--color-bg-surface) 12%);
 }
 
 .composer-submit:disabled {
-  background: color-mix(in srgb, var(--color-bg-surface-soft) 75%, var(--color-bg-surface));
-  border-color: var(--color-border-soft);
+  background: var(--color-border-strong);
   color: var(--color-disabled-text);
   box-shadow: none;
+  opacity: 0.85;
   cursor: not-allowed;
 }
 
