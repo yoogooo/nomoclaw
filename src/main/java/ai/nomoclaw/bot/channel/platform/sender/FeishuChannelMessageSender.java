@@ -32,7 +32,7 @@ import java.util.Map;
 public class FeishuChannelMessageSender implements ChannelMessageSender {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+    private final HttpClient httpClient;
     private final String appId;
     private final String appSecret;
     private final boolean processingAckReactionEnabled;
@@ -41,13 +41,16 @@ public class FeishuChannelMessageSender implements ChannelMessageSender {
     private final ChannelBotCredentialResolver botCredentialResolver;
     private final Map<String, TokenState> tokenCache = new HashMap<>();
 
-    public FeishuChannelMessageSender(AgentChannelsProperties properties, ChannelBotCredentialResolver botCredentialResolver) {
+    public FeishuChannelMessageSender(AgentChannelsProperties properties,
+                                      ChannelBotCredentialResolver botCredentialResolver,
+                                      HttpClient appHttpClient) {
         this.appId = properties.getFeishu().getAppId();
         this.appSecret = properties.getFeishu().getAppSecret();
         this.processingAckReactionEnabled = properties.getFeishu().isProcessingAckReactionEnabled();
         this.processingAckReactionType = properties.getFeishu().getProcessingAckReactionType();
         this.larkClient = Client.newBuilder(this.appId, this.appSecret).build();
         this.botCredentialResolver = botCredentialResolver;
+        this.httpClient = appHttpClient;
     }
 
     @Override

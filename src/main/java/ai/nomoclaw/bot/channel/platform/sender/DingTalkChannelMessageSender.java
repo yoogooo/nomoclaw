@@ -23,7 +23,11 @@ import java.util.Map;
 public class DingTalkChannelMessageSender implements ChannelMessageSender {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+    private final HttpClient httpClient;
+
+    public DingTalkChannelMessageSender(HttpClient appHttpClient) {
+        this.httpClient = appHttpClient;
+    }
 
     @Override
     public ChannelType channelType() {

@@ -21,9 +21,11 @@ public class FeishuBotTargetResolverService {
 
     private static final ObjectMapper MAPPER = JsonUtil.mapper();
 
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
-            .build();
+    private final HttpClient httpClient;
+
+    public FeishuBotTargetResolverService(HttpClient appHttpClient) {
+        this.httpClient = appHttpClient;
+    }
 
     public ResolveResult resolve(String appId, String appSecret) {
         String normalizedAppId = trim(appId);

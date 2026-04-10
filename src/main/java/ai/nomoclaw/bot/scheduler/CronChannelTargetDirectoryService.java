@@ -36,9 +36,10 @@ public class CronChannelTargetDirectoryService {
     private final Map<String, TokenState> feishuTokenCache = new ConcurrentHashMap<>();
     private final Map<String, NameState> feishuBotNameCache = new ConcurrentHashMap<>();
 
-    public CronChannelTargetDirectoryService(ChannelBotCredentialResolver botCredentialResolver) {
+    public CronChannelTargetDirectoryService(ChannelBotCredentialResolver botCredentialResolver,
+                                             HttpClient appHttpClient) {
         this.botCredentialResolver = botCredentialResolver;
-        this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+        this.httpClient = appHttpClient;
     }
 
     public SearchResult search(String channel, String keyword, String botId, int limit) {

@@ -16,6 +16,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.io.ByteArrayOutputStream;
+import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -60,7 +61,7 @@ class SkillImportApplicationServiceTests {
         doReturn(agent("agent-1")).when(agentRepo).findByUid("agent-1");
         doReturn(null).when(skillRepo).findByKey("daily-report-writer");
         doReturn(null).when(relationRepo).findByAgentUidAndSkillKey("agent-1", "daily-report-writer");
-        SkillImportApplicationService service = new SkillImportApplicationService(skillRepo, relationRepo, agentRepo);
+        SkillImportApplicationService service = new SkillImportApplicationService(skillRepo, relationRepo, agentRepo, HttpClient.newHttpClient());
 
         AgentSkillDto created = service.createSkill("agent-1", new CreateSkillCommand(
                 "daily-report-writer",
@@ -93,7 +94,7 @@ class SkillImportApplicationServiceTests {
         AgentDefinitionRepository agentRepo = mock(AgentDefinitionRepository.class);
         doReturn(agent("agent-1")).when(agentRepo).findByUid("agent-1");
         doReturn(null).when(skillRepo).findByKey("duplicate-skill");
-        SkillImportApplicationService service = new SkillImportApplicationService(skillRepo, relationRepo, agentRepo);
+        SkillImportApplicationService service = new SkillImportApplicationService(skillRepo, relationRepo, agentRepo, HttpClient.newHttpClient());
 
         service.createSkill("agent-1", new CreateSkillCommand(
                 "duplicate-skill",
@@ -126,7 +127,7 @@ class SkillImportApplicationServiceTests {
         doReturn(agent("agent-1")).when(agentRepo).findByUid("agent-1");
         doReturn(null).when(skillRepo).findByKey("root-skill");
         doReturn(null).when(relationRepo).findByAgentUidAndSkillKey("agent-1", "root-skill");
-        SkillImportApplicationService service = new SkillImportApplicationService(skillRepo, relationRepo, agentRepo);
+        SkillImportApplicationService service = new SkillImportApplicationService(skillRepo, relationRepo, agentRepo, HttpClient.newHttpClient());
 
         MockMultipartFile archive = new MockMultipartFile(
                 "file",
@@ -154,7 +155,7 @@ class SkillImportApplicationServiceTests {
         doReturn(agent("agent-1")).when(agentRepo).findByUid("agent-1");
         doReturn(null).when(skillRepo).findByKey("wrapped-skill");
         doReturn(null).when(relationRepo).findByAgentUidAndSkillKey("agent-1", "wrapped-skill");
-        SkillImportApplicationService service = new SkillImportApplicationService(skillRepo, relationRepo, agentRepo);
+        SkillImportApplicationService service = new SkillImportApplicationService(skillRepo, relationRepo, agentRepo, HttpClient.newHttpClient());
 
         MockMultipartFile archive = new MockMultipartFile(
                 "file",
@@ -180,7 +181,7 @@ class SkillImportApplicationServiceTests {
         AgentSkillRelationRepository relationRepo = mock(AgentSkillRelationRepository.class);
         AgentDefinitionRepository agentRepo = mock(AgentDefinitionRepository.class);
         doReturn(agent("agent-1")).when(agentRepo).findByUid("agent-1");
-        SkillImportApplicationService service = new SkillImportApplicationService(skillRepo, relationRepo, agentRepo);
+        SkillImportApplicationService service = new SkillImportApplicationService(skillRepo, relationRepo, agentRepo, HttpClient.newHttpClient());
 
         MockMultipartFile archive = new MockMultipartFile(
                 "file",
@@ -206,7 +207,7 @@ class SkillImportApplicationServiceTests {
         AgentSkillRelationRepository relationRepo = mock(AgentSkillRelationRepository.class);
         AgentDefinitionRepository agentRepo = mock(AgentDefinitionRepository.class);
         doReturn(agent("agent-1")).when(agentRepo).findByUid("agent-1");
-        SkillImportApplicationService service = new SkillImportApplicationService(skillRepo, relationRepo, agentRepo);
+        SkillImportApplicationService service = new SkillImportApplicationService(skillRepo, relationRepo, agentRepo, HttpClient.newHttpClient());
 
         MockMultipartFile archive = new MockMultipartFile(
                 "file",

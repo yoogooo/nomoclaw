@@ -4,10 +4,12 @@ import org.quartz.spi.TriggerFiredBundle;
 import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.scheduling.quartz.SpringBeanJobFactory;
+import org.springframework.core.env.Environment;
 import org.springframework.scheduling.quartz.SchedulerFactoryBean;
+import org.springframework.scheduling.quartz.SpringBeanJobFactory;
 
 import javax.sql.DataSource;
+import java.util.Properties;
 
 @Configuration
 public class QuartzConfig {
@@ -26,12 +28,30 @@ public class QuartzConfig {
 
     @Bean
     public SchedulerFactoryBean schedulerFactoryBean(DataSource dataSource,
-                                                     SpringBeanJobFactory quartzJobFactory) {
+                                                     SpringBeanJobFactory quartzJobFactory,
+                                                     Environment environment) {
         SchedulerFactoryBean factoryBean = new SchedulerFactoryBean();
         factoryBean.setDataSource(dataSource);
         factoryBean.setJobFactory(quartzJobFactory);
+        Properties properties = new Properties();
+        copyQuartzProperty(environment, properties, "org.quartz.scheduler.instanceName");
+        copyQuartzProperty(environment, properties, "org.quartz.scheduler.instanceId");
+        copyQuartzProperty(environment, properties, "org.quartz.jobStore.isClustered");
+        copyQuartzProperty(environment, properties, "org.quartz.jobStore.misfireThreshold");
+        copyQuartzProperty(environment, properties, "org.quartz.threadPool.threadCount");
+        if (!properties.containsKey("org.quartz.threadPool.threadCount")) {
+            properties.setProperty("org.quartz.threadPool.threadCount", "3");
+        }
+        factoryBean.setQuartzProperties(properties);
         factoryBean.setWaitForJobsToCompleteOnShutdown(true);
         factoryBean.setStartupDelay(2);
         return factoryBean;
+    }
+
+    private static void copyQuartzProperty(Environment environment, Properties target, String quartzKey) {
+        String value = environment.getProperty("spring.quartz.properties." + quartzKey);
+        if (value != null && !value.isBlank()) {
+            target.setProperty(quartzKey, value);
+        }
     }
 }

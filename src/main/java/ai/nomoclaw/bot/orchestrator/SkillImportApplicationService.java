@@ -23,21 +23,11 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
@@ -68,14 +58,12 @@ public class SkillImportApplicationService {
 
     public SkillImportApplicationService(SkillDefinitionRepository skillDefinitionRepository,
                                          AgentSkillRelationRepository agentSkillRelationRepository,
-                                         AgentDefinitionRepository agentDefinitionRepository) {
+                                         AgentDefinitionRepository agentDefinitionRepository,
+                                         HttpClient appHttpClient) {
         this.skillDefinitionRepository = skillDefinitionRepository;
         this.agentSkillRelationRepository = agentSkillRelationRepository;
         this.agentDefinitionRepository = agentDefinitionRepository;
-        this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(15))
-                .followRedirects(HttpClient.Redirect.NORMAL)
-                .build();
+        this.httpClient = appHttpClient;
     }
 
     public AgentSkillDto importSkillFromUrl(String agentUid, ImportSkillFromUrlCommand command) {

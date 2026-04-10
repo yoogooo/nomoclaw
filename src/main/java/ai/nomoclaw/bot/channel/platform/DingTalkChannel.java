@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import java.net.http.HttpClient;
 import java.util.Map;
 
 @Component
@@ -22,11 +23,14 @@ public class DingTalkChannel extends AbstractWebhookChannel implements Channel {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public DingTalkChannel(ChannelOrchestratorService orchestratorService, AgentChannelsProperties properties) {
+    public DingTalkChannel(ChannelOrchestratorService orchestratorService,
+                           AgentChannelsProperties properties,
+                           HttpClient appHttpClient) {
         super(
                 ChannelType.DINGTALK,
                 orchestratorService,
-                new ChannelPolicy(properties.getDingtalk().isRequireMention(), properties.getDingtalk().allowSet())
+                new ChannelPolicy(properties.getDingtalk().isRequireMention(), properties.getDingtalk().allowSet()),
+                appHttpClient
         );
     }
 

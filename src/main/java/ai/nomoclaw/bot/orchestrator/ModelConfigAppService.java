@@ -33,14 +33,16 @@ public class ModelConfigAppService {
     private final LlmProviderConfigRepository providerConfigRepository;
     private final LlmProviderModelRepository providerModelRepository;
     private final ModelConfigCryptoService cryptoService;
-    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final HttpClient httpClient;
 
     public ModelConfigAppService(LlmProviderConfigRepository providerConfigRepository,
                                  LlmProviderModelRepository providerModelRepository,
-                                 ModelConfigCryptoService cryptoService) {
+                                 ModelConfigCryptoService cryptoService,
+                                 HttpClient appHttpClient) {
         this.providerConfigRepository = providerConfigRepository;
         this.providerModelRepository = providerModelRepository;
         this.cryptoService = cryptoService;
+        this.httpClient = appHttpClient;
     }
 
     @Transactional
