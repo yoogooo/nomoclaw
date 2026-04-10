@@ -174,7 +174,6 @@ function openResultPreview(executedTime: string, content: string) {
 <template>
   <div class="panel detail-panel">
     <div class="panel-header detail-header">
-      <div class="ui-kicker">DETAIL</div>
       <div class="panel-title ui-title-xl">{{ t("cron.detail.title") }}</div>
       <div class="panel-subtitle ui-subtitle">
         {{ cronJobsStore.currentJob ? `${displayCronJobTitle(cronJobsStore.currentJob)} · ${fallbackAgentLabel(cronJobsStore.currentJob)}` : t("cron.detail.selectOneHint") }}

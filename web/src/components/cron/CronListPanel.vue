@@ -52,7 +52,6 @@ const groupedJobs = computed(() => {
 <template>
   <div class="panel">
     <div class="panel-header cron-list-header">
-      <div class="ui-kicker">SCHEDULER</div>
       <div class="panel-title ui-title-xl">{{ t("cron.list.title") }}</div>
       <div class="panel-subtitle ui-subtitle">{{ t("cron.list.subtitle") }}</div>
     </div>
