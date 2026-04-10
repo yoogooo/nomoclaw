@@ -27,8 +27,8 @@ class CronNotificationFanoutServiceTests {
         CronNotifyProperties props = notifyProps();
         CronChannelTargetResolver resolver = mock(CronChannelTargetResolver.class);
         CronSubscriptionRepository repository = new InMemorySubscriptionRepository(List.of(
-                new CronSubscriptionRepository.CronSubscription("s1", "job-1", "feishu", "feishu:chat_id:1", true, LocalDateTime.now(), LocalDateTime.now()),
-                new CronSubscriptionRepository.CronSubscription("s2", "job-1", "dingtalk", "dingtalk:session:https://x", true, LocalDateTime.now(), LocalDateTime.now())
+                new CronSubscriptionRepository.CronSubscription("s1", "job-1", "feishu", "feishu:chat_id:1", "default", true, LocalDateTime.now(), LocalDateTime.now()),
+                new CronSubscriptionRepository.CronSubscription("s2", "job-1", "dingtalk", "dingtalk:session:https://x", "default", true, LocalDateTime.now(), LocalDateTime.now())
         ));
         CronNotificationFanoutService service = new CronNotificationFanoutService(sender, repository, props, resolver);
 
@@ -46,7 +46,7 @@ class CronNotificationFanoutServiceTests {
         props.setRetryBackoffMs(1L);
         CronChannelTargetResolver resolver = mock(CronChannelTargetResolver.class);
         CronSubscriptionRepository repository = new InMemorySubscriptionRepository(List.of(
-                new CronSubscriptionRepository.CronSubscription("s1", "job-1", "feishu", "feishu:chat_id:1", true, LocalDateTime.now(), LocalDateTime.now())
+                new CronSubscriptionRepository.CronSubscription("s1", "job-1", "feishu", "feishu:chat_id:1", "default", true, LocalDateTime.now(), LocalDateTime.now())
         ));
         CronNotificationFanoutService service = new CronNotificationFanoutService(sender, repository, props, resolver);
 

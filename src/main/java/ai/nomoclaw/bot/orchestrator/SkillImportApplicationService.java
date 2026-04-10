@@ -481,9 +481,7 @@ public class SkillImportApplicationService {
         }
 
         String frontMatter = normalized.substring(4, end);
-        String name = null;
-        String description = null;
-        boolean collectingDescription = false;
+        FrontMatterParsingState state = new FrontMatterParsingState();
         List<String> descriptionLines = new ArrayList<>();
         try (Reader reader = new InputStreamReader(new ByteArrayInputStream(frontMatter.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8)) {
             StringBuilder lineBuffer = new StringBuilder();
@@ -492,40 +490,50 @@ public class SkillImportApplicationService {
                 if (read == '\n') {
                     String line = lineBuffer.toString().stripTrailing();
                     lineBuffer.setLength(0);
-                    if (line.trim().isEmpty() || line.trim().startsWith("#")) {
-                        continue;
-                    }
-                    if (line.startsWith(" ") || line.startsWith("\t")) {
-                        if (collectingDescription) {
-                            descriptionLines.add(line.trim());
-                        }
-                        continue;
-                    }
-                    collectingDescription = false;
-                    int colonIndex = line.indexOf(':');
-                    if (colonIndex < 0) {
-                        continue;
-                    }
-                    String key = line.substring(0, colonIndex).trim();
-                    String value = stripQuotes(line.substring(colonIndex + 1).trim());
-                    if ("name".equals(key)) {
-                        name = value;
-                    } else if ("description".equals(key)) {
-                        if ("|".equals(value) || ">".equals(value)) {
-                            collectingDescription = true;
-                        } else {
-                            description = value;
-                        }
-                    }
+                    applyFrontMatterLine(state, descriptionLines, line);
                 } else {
                     lineBuffer.append((char) read);
                 }
             }
+            if (!lineBuffer.isEmpty()) {
+                applyFrontMatterLine(state, descriptionLines, lineBuffer.toString().stripTrailing());
+            }
         }
         if (!descriptionLines.isEmpty()) {
-            description = String.join("\n", descriptionLines).trim();
+            state.description = String.join("\n", descriptionLines).trim();
         }
-        return new FrontMatter(name, description);
+        return new FrontMatter(state.name, state.description);
+    }
+
+    private void applyFrontMatterLine(FrontMatterParsingState state, List<String> descriptionLines, String line) {
+        String trimmed = line.trim();
+        if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+            return;
+        }
+        if (line.startsWith(" ") || line.startsWith("\t")) {
+            if (state.collectingDescription) {
+                descriptionLines.add(trimmed);
+            }
+            return;
+        }
+        state.collectingDescription = false;
+        int colonIndex = line.indexOf(':');
+        if (colonIndex < 0) {
+            return;
+        }
+        String key = line.substring(0, colonIndex).trim();
+        String value = stripQuotes(line.substring(colonIndex + 1).trim());
+        if ("name".equals(key)) {
+            state.name = value;
+            return;
+        }
+        if ("description".equals(key)) {
+            if ("|".equals(value) || ">".equals(value)) {
+                state.collectingDescription = true;
+                return;
+            }
+            state.description = value;
+        }
     }
 
     private List<URI> extractCandidateUrls(URI baseUri, String html) {
@@ -674,5 +682,11 @@ public class SkillImportApplicationService {
     }
 
     private record FrontMatter(String name, String description) {
+    }
+
+    private static class FrontMatterParsingState {
+        private String name;
+        private String description;
+        private boolean collectingDescription;
     }
 }
