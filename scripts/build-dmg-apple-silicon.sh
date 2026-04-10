@@ -5,13 +5,15 @@ set -euo pipefail
 # Usage:
 #   ./scripts/build-dmg-apple-silicon.sh
 # Optional env:
-#   APP_NAME=NomoClaw APP_VERSION=1.0.0 JAVA_OPTIONS='-Xms256m -Xmx1024m -Dspring.profiles.active=h2' ./scripts/build-dmg-apple-silicon.sh
+#   APP_NAME=NomoClaw APP_VERSION=1.0.0 JAVA_OPTIONS='-Xms256m -Xmx1024m -Dspring.profiles.active=h2 -Dserver.port=18080' ./scripts/build-dmg-apple-silicon.sh
+#   LOG_FILE_PATH='/tmp/NomoClaw.log' ./scripts/build-dmg-apple-silicon.sh
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 TARGET_DIR="$ROOT_DIR/target"
 DIST_DIR="$ROOT_DIR/dist"
 BUILD_DIR="$ROOT_DIR/build/macos"
 RUNTIME_DIR="$BUILD_DIR/runtime-arm64"
+APP_INPUT_DIR="$BUILD_DIR/app-input"
 WEB_DIR="$ROOT_DIR/web"
 WEB_DIST_DIR="$WEB_DIR/dist"
 STATIC_DIR="$ROOT_DIR/src/main/resources/static/nomoclaw"
@@ -20,7 +22,11 @@ APP_NAME="${APP_NAME:-NomoClaw}"
 APP_VERSION="${APP_VERSION:-1.0.1}"
 ICON_FILE="${ICON_FILE:-}"
 # Default profile for customer local install: embedded H2 (no external MySQL needed).
-JAVA_OPTIONS="${JAVA_OPTIONS:--Xms256m -Xmx1024m -Dspring.profiles.active=h2}"
+JAVA_OPTIONS="${JAVA_OPTIONS:--Xms256m -Xmx1024m -Dspring.profiles.active=h2 -Dserver.port=18080}"
+# Log file used when users launch app from Finder icon (no visible console).
+# Check logs with: tail -f /tmp/NomoClaw.log
+# Use a plain absolute path (no ${...} placeholders) to avoid jpackage cfg parser issues.
+LOG_FILE_PATH="${LOG_FILE_PATH:-/tmp/NomoClaw.log}"
 SKIP_TESTS="${SKIP_TESTS:-true}"
 SKIP_WEB_BUILD="${SKIP_WEB_BUILD:-false}"
 
@@ -61,7 +67,6 @@ normalize_app_version() {
 ensure_required_modules() {
   local modules="$1"
   local required=(
-    java.se
     java.base
     java.desktop
     java.instrument
@@ -69,6 +74,7 @@ ensure_required_modules() {
     java.management
     java.naming
     java.net.http
+    java.rmi
     java.security.jgss
     java.sql
     java.xml
@@ -124,7 +130,7 @@ build_frontend_assets() {
     pnpm --dir "$WEB_DIR" install --frozen-lockfile
   fi
 
-  pnpm --dir "$WEB_DIR" build
+  VITE_BASE=/nomoclaw/ pnpm --dir "$WEB_DIR" build
   [[ -d "$WEB_DIST_DIR" ]] || fail "Web dist directory not found after build: $WEB_DIST_DIR"
 
   log "Syncing web dist to Spring static path"
@@ -212,7 +218,7 @@ set -e
 
 if [[ $JDEPS_EXIT -ne 0 || -z "$MODULES" ]]; then
   log "jdeps auto-detection failed, using fallback modules"
-  MODULES="java.base,java.desktop,java.instrument,java.logging,java.management,java.naming,java.net.http,java.security.jgss,java.sql,java.xml,jdk.crypto.ec,jdk.unsupported"
+  MODULES="java.base,java.desktop,java.instrument,java.logging,java.management,java.naming,java.net.http,java.rmi,java.security.jgss,java.sql,java.xml,jdk.crypto.ec,jdk.unsupported"
 fi
 MODULES="$(ensure_required_modules "$MODULES")"
 log "Using JDK modules: $MODULES"
@@ -221,17 +227,24 @@ log "Creating runtime image"
 rm -rf "$RUNTIME_DIR"
 jlink \
   --add-modules "$MODULES" \
+  --compress=2 \
+  --strip-native-commands \
   --strip-debug \
   --no-header-files \
   --no-man-pages \
   --output "$RUNTIME_DIR"
+
+log "Preparing minimal app input directory"
+rm -rf "$APP_INPUT_DIR"
+mkdir -p "$APP_INPUT_DIR"
+cp "$MAIN_JAR" "$APP_INPUT_DIR/$JAR_NAME"
 
 log "Packaging DMG (arm64)"
 JPACKAGE_ARGS=(
   --type dmg
   --name "$APP_NAME"
   --app-version "$APP_VERSION"
-  --input "$TARGET_DIR"
+  --input "$APP_INPUT_DIR"
   --main-jar "$JAR_NAME"
   --runtime-image "$RUNTIME_DIR"
   --dest "$DIST_DIR"
@@ -240,6 +253,12 @@ JPACKAGE_ARGS=(
 for opt in $JAVA_OPTIONS; do
   JPACKAGE_ARGS+=(--java-options "$opt")
 done
+
+# Persist runtime logs to file so double-click launch can still be diagnosed.
+JPACKAGE_ARGS+=(--java-options "-Dlogging.file.name=$LOG_FILE_PATH")
+# Auto-open local web console when launching app from Finder.
+JPACKAGE_ARGS+=(--java-options "-Dnomoclaw.desktop.open-browser-on-startup=true")
+JPACKAGE_ARGS+=(--java-options "-Dnomoclaw.desktop.open-browser-url=http://localhost:18080/nomoclaw/")
 
 if [[ -n "$ICON_FILE" ]]; then
   if [[ -f "$ICON_FILE" ]]; then
