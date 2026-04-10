@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { Bot, Brain, CalendarClock, MessageCircleMore, Settings, PlugZap } from "lucide-vue-next";
+import { Bot, Brain, CalendarClock, MessageCircleMore, Moon, Settings, Sun, PlugZap } from "lucide-vue-next";
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
+import { useUiPreferencesStore } from "@/stores/uiPreferences";
 
 const route = useRoute();
 const router = useRouter();
 const { t } = useI18n();
+const uiPreferencesStore = useUiPreferencesStore();
 
 const navItems = computed(() => [
   { key: "chat", label: t("nav.chat"), icon: MessageCircleMore, to: "/" },
@@ -27,6 +29,14 @@ function openNavItem(item: { to: string; newPage?: boolean }) {
     return;
   }
   void router.push(item.to);
+}
+
+const themeToggleTitle = computed(() =>
+  uiPreferencesStore.themeMode === "dark" ? t("settings.themeLight") : t("settings.themeDark")
+);
+
+function toggleThemeMode() {
+  uiPreferencesStore.toggleThemeMode();
 }
 </script>
 
@@ -54,6 +64,16 @@ function openNavItem(item: { to: string; newPage?: boolean }) {
     </nav>
 
     <div class="rail-bottom">
+      <button
+        class="rail-item rail-theme-toggle"
+        type="button"
+        :aria-label="themeToggleTitle"
+        :title="themeToggleTitle"
+        @click="toggleThemeMode"
+      >
+        <Sun v-if="uiPreferencesStore.themeMode === 'dark'" class="rail-icon" :size="22" :stroke-width="1.9" />
+        <Moon v-else class="rail-icon" :size="22" :stroke-width="1.9" />
+      </button>
       <div class="rail-avatar">AI</div>
     </div>
   </aside>
@@ -122,6 +142,17 @@ function openNavItem(item: { to: string; newPage?: boolean }) {
   background: var(--color-bg-rail-active);
   color: var(--color-text-inverse);
   box-shadow: var(--color-shadow-rail-active);
+}
+
+.rail-theme-toggle {
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--color-text-rail);
+}
+
+.rail-theme-toggle:hover {
+  background: transparent;
+  color: var(--color-text-primary);
 }
 
 .rail-avatar {
