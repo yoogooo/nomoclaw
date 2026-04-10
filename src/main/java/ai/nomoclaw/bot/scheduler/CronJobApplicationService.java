@@ -9,6 +9,7 @@ import ai.nomoclaw.bot.application.command.CreateCronJobCommand;
 import ai.nomoclaw.bot.application.command.UpdateCronJobCommand;
 import ai.nomoclaw.bot.channel.model.ChannelType;
 import ai.nomoclaw.bot.channel.config.AgentChannelsProperties;
+import ai.nomoclaw.bot.channel.config.ChannelBotCredentialResolver;
 import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
 import ai.nomoclaw.bot.store.entity.AgentCronJobEntity;
 import ai.nomoclaw.bot.store.repository.AgentDefinitionRepository;
@@ -41,19 +42,22 @@ public class CronJobApplicationService {
     private final CronSubscriptionRepository cronSubscriptionRepository;
     private final AgentChannelsProperties channelsProperties;
     private final CronChannelTargetResolver channelTargetResolver;
+    private final ChannelBotCredentialResolver botCredentialResolver;
 
     public CronJobApplicationService(AgentCronJobRepository agentCronJobRepository,
                                      CronJobSchedulerService cronJobSchedulerService,
                                      AgentDefinitionRepository agentDefinitionRepository,
                                      CronSubscriptionRepository cronSubscriptionRepository,
                                      AgentChannelsProperties channelsProperties,
-                                     CronChannelTargetResolver channelTargetResolver) {
+                                     CronChannelTargetResolver channelTargetResolver,
+                                     ChannelBotCredentialResolver botCredentialResolver) {
         this.agentCronJobRepository = agentCronJobRepository;
         this.cronJobSchedulerService = cronJobSchedulerService;
         this.agentDefinitionRepository = agentDefinitionRepository;
         this.cronSubscriptionRepository = cronSubscriptionRepository;
         this.channelsProperties = channelsProperties;
         this.channelTargetResolver = channelTargetResolver;
+        this.botCredentialResolver = botCredentialResolver;
     }
 
     public List<CronJobDto> listCronJobs() {
@@ -215,6 +219,7 @@ public class CronJobApplicationService {
                         item.jobUid(),
                         item.channel(),
                         item.target(),
+                        item.botId(),
                         item.enabled(),
                         item.createdTime(),
                         item.updatedTime()
@@ -523,14 +528,22 @@ public class CronJobApplicationService {
         }
         String target = item.target() == null ? "" : item.target().trim();
         if (target.isBlank()) {
-            target = channelTargetResolver.resolveLatestReplyTarget(channelType.value());
+            target = botCredentialResolver.resolveDefaultTarget(channelType, item.botId());
         }
         if (target.isBlank()) {
-            throw new IllegalArgumentException(channelLabel(channelType) + " 订阅缺少可用推送目标，请先在该渠道与机器人产生一次会话，或填写 webhook/session target");
+            throw new IllegalArgumentException("当前机器人未配置默认推送目标，请先在渠道配置中完成飞书机器人目标解析");
+        }
+        String normalizedBotId = item.botId() == null ? "" : item.botId().trim();
+        if (normalizedBotId.isBlank()) {
+            normalizedBotId = botCredentialResolver.resolveDefaultBotId(channelType);
+        }
+        if (normalizedBotId.isBlank() || !botCredentialResolver.hasEnabledBot(channelType, normalizedBotId)) {
+            throw new IllegalArgumentException("未选择可用机器人，请先在渠道配置中启用机器人");
         }
         return List.of(new CronSubscriptionRepository.CronSubscriptionUpsert(
                 channelType.value(),
                 target,
+                normalizedBotId,
                 true
         ));
     }

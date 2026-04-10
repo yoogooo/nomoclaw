@@ -256,6 +256,27 @@ const enUS = {
       saveSubscription: "Save Subscription",
       noEnabledChannels: "No enabled channels. Enable Feishu or DingTalk in Channel Management first.",
       noSubscriptionYet: "No push channel configured yet. Click Add Subscription to select one.",
+      targetRequired: "No delivery target selected. Please choose a contact/group or enter target manually.",
+      botRequired: "No bot selected. Please select an available bot first.",
+      botPlaceholder: "Select bot",
+      targetSearchPlaceholder: "Search Feishu contacts, groups, or bot name",
+      targetManualPlaceholder: "Enter target manually (webhook/chat_id/open_id)",
+      targetCustomValue: "Manual value",
+      searchTargetError: "Target search failed. Switch to manual input.",
+      searchTargetFallback: "Directory search unavailable. Manual input is still available.",
+      targetMode: {
+        search: "Search Directory",
+        manual: "Manual Input"
+      },
+      targetKind: {
+        group: "Group",
+        user: "User",
+        webhook: "Webhook"
+      },
+      targetSource: {
+        platform: "Platform",
+        history: "History"
+      },
       noResults: "No execution records yet.",
       noResultSummary: "No result summary",
       previewResult: "Preview Result",
@@ -493,6 +514,14 @@ const enUS = {
       feishuAppIdPlaceholder: "cli_xxx",
       allowList: "Allow List (optional, comma-separated)",
       allowListFeishuPlaceholder: "ou_xxx, ou_yyy",
+      addBot: "Add Bot",
+      setDefault: "Set Default",
+      defaultBot: "Default Bot",
+      botCount: "{count} bots",
+      botName: "Bot Name",
+      botId: "Bot ID",
+      openIdLabel: "Open ID",
+      openIdMissing: "Not resolved yet (auto-resolve on save)",
       dingtalkClientId: "Client ID (required when enabled)",
       dingtalkClientSecret: "Client Secret (required when enabled)",
       dingtalkRobotCode: "Robot Code (required when enabled)",

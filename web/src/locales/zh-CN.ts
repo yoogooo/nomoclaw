@@ -256,6 +256,27 @@ const zhCN = {
       saveSubscription: "保存订阅",
       noEnabledChannels: "暂无启用中的通道，请先到 Channel 管理页面启用飞书或钉钉。",
       noSubscriptionYet: "暂未配置推送通道，点击“新增订阅”后选择一个通道。",
+      targetRequired: "未选择推送目标，请先选择联系人/群，或手工填写 target。",
+      botRequired: "未选择机器人，请先选择一个可用机器人。",
+      botPlaceholder: "选择机器人",
+      targetSearchPlaceholder: "搜索飞书联系人、群聊或机器人名",
+      targetManualPlaceholder: "手工输入 target（如 webhook/chat_id/open_id）",
+      targetCustomValue: "手工值",
+      searchTargetError: "目标搜索失败，请切换手工输入。",
+      searchTargetFallback: "通讯录搜索不可用，已保留手工输入兜底。",
+      targetMode: {
+        search: "从平台搜索",
+        manual: "手工输入"
+      },
+      targetKind: {
+        group: "群聊",
+        user: "联系人",
+        webhook: "Webhook"
+      },
+      targetSource: {
+        platform: "平台",
+        history: "历史"
+      },
       noResults: "当前任务还没有执行记录。",
       noResultSummary: "无结果摘要",
       previewResult: "预览结果",
@@ -493,6 +514,14 @@ const zhCN = {
       feishuAppIdPlaceholder: "cli_xxx",
       allowList: "Allow List（可选，逗号分隔）",
       allowListFeishuPlaceholder: "ou_xxx, ou_yyy",
+      addBot: "新增机器人",
+      setDefault: "设为默认",
+      defaultBot: "默认机器人",
+      botCount: "{count} 个机器人",
+      botName: "机器人名称",
+      botId: "机器人 ID",
+      openIdLabel: "Open ID",
+      openIdMissing: "未获取（保存后自动解析）",
       dingtalkClientId: "Client ID（启用时必填）",
       dingtalkClientSecret: "Client Secret（启用时必填）",
       dingtalkRobotCode: "Robot Code（启用时必填）",

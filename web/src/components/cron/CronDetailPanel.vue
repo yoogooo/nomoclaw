@@ -5,6 +5,7 @@ import { NButton, NCard, NCollapse, NCollapseItem, NEmpty, NFlex, NModal, NPopco
 import CronEditModal from "./CronEditModal.vue";
 import { useCronJobsStore } from "@/stores/cronJobs";
 import { channelApi } from "@/api/channelApi";
+import { message } from "@/discrete";
 import {
   cronStatusLabel,
   displayCronJobTitle,
@@ -21,7 +22,12 @@ const showEditModal = ref(false);
 const savingSubscriptions = ref(false);
 const switchingJobStatus = ref(false);
 const selectedChannel = ref<"feishu" | "dingtalk" | null>(null);
+const selectedBotId = ref("");
 const enabledChannelOptions = ref<Array<{ label: string; value: "feishu" | "dingtalk" }>>([]);
+const channelBotOptions = ref<Record<"feishu" | "dingtalk", Array<{ label: string; value: string }>>>({
+  feishu: [],
+  dingtalk: []
+});
 
 const scheduleSummary = computed(() => cronJobsStore.currentJob ? humanizeCronExpression(cronJobsStore.currentJob.expression) : "-");
 const nextRunText = computed(() => cronJobsStore.currentJob ? formatDateTime(cronJobsStore.currentJob.nextRunTime) : "-");
@@ -52,6 +58,7 @@ watch(
     selectedChannel.value = first
       ? (first.channel === "dingtalk" ? "dingtalk" : "feishu")
       : null;
+    selectedBotId.value = first?.botId || "";
   },
   { immediate: true, deep: true }
 );
@@ -62,6 +69,14 @@ async function loadEnabledChannels() {
   try {
     const config = await channelApi.getChannelConfig();
     const options: Array<{ label: string; value: "feishu" | "dingtalk" }> = [];
+    channelBotOptions.value.feishu = (config.channels.feishu.bots || []).filter((item) => item.enabled).map((item) => ({
+      label: item.displayName || item.botId,
+      value: item.botId
+    }));
+    channelBotOptions.value.dingtalk = (config.channels.dingtalk.bots || []).filter((item) => item.enabled).map((item) => ({
+      label: item.displayName || item.botId,
+      value: item.botId
+    }));
     if (config.channels.feishu.enabled) {
       options.push({ label: t("cron.detail.channel.feishu"), value: "feishu" });
     }
@@ -71,10 +86,15 @@ async function loadEnabledChannels() {
     enabledChannelOptions.value = options;
     if (selectedChannel.value && !options.some((item) => item.value === selectedChannel.value)) {
       selectedChannel.value = null;
+      selectedBotId.value = "";
+    } else if (selectedChannel.value && !selectedBotId.value) {
+      const firstBot = channelBotOptions.value[selectedChannel.value][0];
+      selectedBotId.value = firstBot?.value || "";
     }
   } catch {
     enabledChannelOptions.value = [];
     selectedChannel.value = null;
+    selectedBotId.value = "";
   }
 }
 
@@ -83,14 +103,29 @@ function addSubscription() {
     return;
   }
   selectedChannel.value = enabledChannelOptions.value[0].value;
+  selectedBotId.value = channelBotOptions.value[selectedChannel.value][0]?.value || "";
 }
+
+watch(
+  () => selectedChannel.value,
+  (next, prev) => {
+    if (next === prev) {
+      return;
+    }
+    selectedBotId.value = next ? channelBotOptions.value[next][0]?.value || "" : "";
+  }
+);
 
 async function saveSubscriptions() {
   if (!cronJobsStore.currentJob) {
     return;
   }
+  if (selectedChannel.value && !selectedBotId.value.trim()) {
+    message.warning(t("cron.detail.botRequired"));
+    return;
+  }
   const payload = selectedChannel.value
-    ? [{ channel: selectedChannel.value, target: "", enabled: true }]
+    ? [{ channel: selectedChannel.value, target: "", botId: selectedBotId.value || "", enabled: true }]
     : [];
   savingSubscriptions.value = true;
   try {
@@ -274,6 +309,12 @@ function openResultPreview(executedTime: string, content: string) {
                     v-model:value="selectedChannel"
                     class="subscription-channel"
                     :options="enabledChannelOptions"
+                  />
+                  <n-select
+                    v-model:value="selectedBotId"
+                    class="subscription-channel"
+                    :options="selectedChannel ? channelBotOptions[selectedChannel] : []"
+                    :placeholder="t('cron.detail.botPlaceholder')"
                   />
                   <n-button text type="error" @click="selectedChannel = null">{{ t("common.delete") }}</n-button>
                 </div>
@@ -581,8 +622,8 @@ function openResultPreview(executedTime: string, content: string) {
 
 .subscription-item {
   display: grid;
-  grid-template-columns: 220px auto;
-  align-items: center;
+  grid-template-columns: 220px 220px auto;
+  align-items: start;
   gap: var(--space-3);
 }
 
