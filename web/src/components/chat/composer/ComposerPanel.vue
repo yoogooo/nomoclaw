@@ -152,11 +152,20 @@ function onPreviewKeydown(event: KeyboardEvent) {
   }
 }
 
+function displayModelName(label: string) {
+  const raw = (label || "").trim();
+  if (!raw) {
+    return raw;
+  }
+  const markerIndex = raw.lastIndexOf("::");
+  return markerIndex >= 0 ? raw.slice(markerIndex + 2) : raw;
+}
+
 function renderModelLabel(option: any) {
   if (Array.isArray(option.children)) {
     return h("span", { style: "font-weight: 800;" }, option.label || "");
   }
-  return option.label || "";
+  return displayModelName(option.label || "");
 }
 
 function renderModelOption(params: any) {
@@ -187,55 +196,59 @@ onBeforeUnmount(() => {
   >
     <ComposerDropMask v-if="isDragActive">{{ uploadHint }}</ComposerDropMask>
 
-    <ComposerTextarea
-      :model-value="conversationStore.draftMessage"
-      @update:model-value="conversationStore.draftMessage = $event"
-      @keydown="onKeydown"
-    />
+    <div class="composer-input-shell">
+      <ComposerTextarea
+        :model-value="conversationStore.draftMessage"
+        @update:model-value="conversationStore.draftMessage = $event"
+        @keydown="onKeydown"
+      />
 
-    <ComposerAttachmentStrip
-      :attachments="conversationStore.draftAttachments"
-      @preview="openImagePreview"
-      @remove="conversationStore.removeDraftAttachment($event)"
-    />
+      <ComposerAttachmentStrip
+        :attachments="conversationStore.draftAttachments"
+        @preview="openImagePreview"
+        @remove="conversationStore.removeDraftAttachment($event)"
+      />
+
+      <JinnangPicker
+        v-if="showJinnangPicker"
+        :tips="jinnangStore.tips"
+        :selected-id="appliedJinnangId"
+        @pick="applyJinnangById($event)"
+        @close="showJinnangPicker = false"
+      />
+
+      <div v-if="appliedJinnang" class="applied-jinnang">
+        <Sparkles :size="14" class="applied-jinnang-icon" />
+        <span class="applied-jinnang-title">{{ appliedJinnang.title }}</span>
+        <button class="applied-jinnang-remove" type="button" @click="removeAppliedJinnang()" :aria-label="t('chat.composer.removeTip')">
+          <X :size="12" />
+        </button>
+      </div>
+
+      <div class="composer-toolbar-shell">
+        <ComposerToolbar
+          :selected-model-key="conversationStore.selectedModelKey"
+          :model-options="conversationStore.availableModelOptions"
+          :show-jinnang-picker="showJinnangPicker"
+          :upload-disabled="Boolean(conversationStore.uploadDisabledReason)"
+          :uploading-files="conversationStore.uploadingFiles"
+          :switching-context="conversationStore.loading"
+          :is-running-current-conversation="isRunningCurrentConversation"
+          :is-submit-disabled="isSubmitDisabled"
+          :render-label="renderModelLabel"
+          :render-option="renderModelOption"
+          @change-model="onModelChange"
+          @trigger-upload="triggerFilePicker"
+          @toggle-jinnang="toggleJinnangPicker"
+          @submit="conversationStore.sendMessage()"
+        />
+      </div>
+    </div>
 
     <ComposerPreviewOverlay
       v-if="previewImageUrl"
       :image-url="previewImageUrl"
       @close="closeImagePreview"
-    />
-
-    <JinnangPicker
-      v-if="showJinnangPicker"
-      :tips="jinnangStore.tips"
-      :selected-id="appliedJinnangId"
-      @pick="applyJinnangById($event)"
-      @close="showJinnangPicker = false"
-    />
-
-    <div v-if="appliedJinnang" class="applied-jinnang">
-      <Sparkles :size="14" class="applied-jinnang-icon" />
-      <span class="applied-jinnang-title">{{ appliedJinnang.title }}</span>
-      <button class="applied-jinnang-remove" type="button" @click="removeAppliedJinnang()" :aria-label="t('chat.composer.removeTip')">
-        <X :size="12" />
-      </button>
-    </div>
-
-    <ComposerToolbar
-      :selected-model-key="conversationStore.selectedModelKey"
-      :model-options="conversationStore.availableModelOptions"
-      :show-jinnang-picker="showJinnangPicker"
-      :upload-disabled="Boolean(conversationStore.uploadDisabledReason)"
-      :uploading-files="conversationStore.uploadingFiles"
-      :switching-context="conversationStore.loading"
-      :is-running-current-conversation="isRunningCurrentConversation"
-      :is-submit-disabled="isSubmitDisabled"
-      :render-label="renderModelLabel"
-      :render-option="renderModelOption"
-      @change-model="onModelChange"
-      @trigger-upload="triggerFilePicker"
-      @toggle-jinnang="toggleJinnangPicker"
-      @submit="conversationStore.sendMessage()"
     />
 
     <div class="composer-upload-status">
@@ -254,7 +267,7 @@ onBeforeUnmount(() => {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2_5);
   padding: var(--space-4_5) var(--space-6) var(--space-5_5);
   border-top: var(--size-1) solid var(--color-border-panel);
 }
@@ -275,6 +288,23 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-pill);
   background: var(--color-bg-brand-soft);
   padding: var(--space-1_5) var(--space-2_5);
+}
+
+.composer-input-shell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4_5);
+  border: var(--size-1) solid var(--color-border-strong);
+  border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--color-bg-surface-mute) 84%, var(--color-bg-surface));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 6%, transparent);
+}
+
+.composer-toolbar-shell {
+  margin-top: 0;
+  padding-top: var(--space-1_5);
+  border-top: 0;
 }
 
 .applied-jinnang-remove {
@@ -342,6 +372,11 @@ onBeforeUnmount(() => {
     border-top: var(--size-1) solid var(--color-border-strong);
     background: var(--color-bg-overlay-strong);
     backdrop-filter: blur(var(--size-8));
+  }
+
+  .composer-input-shell {
+    padding: var(--space-3_5);
+    border-radius: var(--radius-lg);
   }
 }
 </style>

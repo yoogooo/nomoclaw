@@ -17,7 +17,7 @@ const { t } = useI18n();
   <textarea
     id="messageInput"
     :value="modelValue"
-    class="composer-textarea ui-focus-highlight"
+    class="composer-textarea"
     :placeholder="t('chat.composer.placeholder')"
     @input="emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"
     @keydown="emit('keydown', $event)"
@@ -26,16 +26,38 @@ const { t } = useI18n();
 
 <style scoped>
 .composer-textarea {
-  min-height: var(--size-88);
+  min-height: 3.2em;
   width: 100%;
-  resize: vertical;
-  padding: var(--space-4_5) var(--space-4_5);
-  border: var(--size-1) solid var(--color-border-strong);
-  border-radius: var(--radius-xl);
-  background: var(--color-bg-surface-mute);
+  overflow-y: auto;
+  resize: none;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--color-text-primary);
   font: inherit;
+  line-height: 1.6;
   outline: none;
+  box-shadow: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+
+.composer-textarea::-webkit-scrollbar {
+  width: var(--size-8);
+}
+
+.composer-textarea::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.composer-textarea::-webkit-scrollbar-thumb {
+  border-radius: var(--radius-pill);
+  background: var(--color-border-strong);
+}
+
+.composer-textarea::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-active);
 }
 
 .composer-textarea::placeholder {
@@ -44,9 +66,8 @@ const { t } = useI18n();
 
 @media (max-width: var(--size-breakpoint-md)) {
   .composer-textarea {
-    min-height: var(--size-76);
-    border-radius: var(--radius-lg);
-    padding: var(--space-3_5) var(--space-3_5);
+    min-height: 3.2em;
+    padding: 0;
   }
 }
 </style>

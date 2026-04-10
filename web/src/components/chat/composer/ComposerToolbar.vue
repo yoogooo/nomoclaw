@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
-import { Lightbulb, Paperclip } from "lucide-vue-next";
+import { ArrowUp, Lightbulb, Paperclip, Square } from "lucide-vue-next";
 import { NSelect } from "naive-ui";
 
 defineProps<{
@@ -70,9 +70,12 @@ const { t } = useI18n();
         class="composer-submit"
         :class="{ 'composer-submit-cancel': isRunningCurrentConversation }"
         :disabled="isSubmitDisabled"
+        :title="isRunningCurrentConversation ? t('chat.composer.stop') : t('chat.composer.send')"
+        :aria-label="isRunningCurrentConversation ? t('chat.composer.stop') : t('chat.composer.send')"
         @click="emit('submit')"
       >
-        {{ isRunningCurrentConversation ? t("chat.composer.stop") : t("chat.composer.send") }}
+        <Square v-if="isRunningCurrentConversation" :size="14" class="composer-stop-icon" />
+        <ArrowUp v-else :size="20" />
       </button>
     </div>
   </div>
@@ -82,17 +85,17 @@ const { t } = useI18n();
 .composer-toolbar-row {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-3);
   flex-wrap: wrap;
 }
 
 .composer-toolbar-row-bottom {
-  margin-top: var(--space-1);
+  margin-top: 0;
 }
 
 .composer-model-inline {
-  width: min(100%, 250px);
-  flex: 0 1 250px;
+  width: min(100%, 280px);
+  flex: 0 1 280px;
 }
 
 .composer-upload-inline {
@@ -110,34 +113,35 @@ const { t } = useI18n();
   margin-left: auto;
   display: flex;
   align-items: center;
+  gap: var(--space-2_5);
   flex: none;
 }
 
 .composer-tool-btn {
   padding: var(--size-7) var(--space-3);
-  border: var(--size-1) solid var(--color-border-strong);
+  border: 0;
   border-radius: var(--radius-pill);
-  background: var(--color-bg-surface-soft);
+  background: transparent;
   color: var(--color-text-subtle);
   font-size: var(--font-size-xs);
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.16s ease, color 0.16s ease, background-color 0.16s ease;
+  transition: color 0.16s ease, background-color 0.16s ease;
 }
 
 .composer-tool-btn.icon-only {
-  width: var(--size-34);
-  height: var(--size-34);
+  width: var(--size-32);
+  height: var(--size-32);
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  border-radius: var(--radius-pill);
 }
 
 .composer-tool-btn:hover:not(:disabled) {
-  border-color: var(--color-border-brand-soft-hover);
-  background: var(--color-bg-brand-soft-hover);
-  color: var(--color-text-brand);
+  background: var(--color-bg-surface-soft);
+  color: var(--color-text-primary);
 }
 
 .composer-tool-btn:disabled {
@@ -146,27 +150,28 @@ const { t } = useI18n();
 }
 
 .composer-tool-btn.active {
-  border-color: var(--color-border-brand-hover);
   background: var(--color-bg-brand-soft);
   color: var(--color-text-brand);
 }
 
 .composer-submit {
-  min-width: var(--size-84);
-  padding: var(--space-3) var(--space-5_5);
-  border: 0;
+  width: var(--size-32);
+  height: var(--size-32);
+  padding: 0;
+  border: var(--size-1) solid var(--color-border-strong);
   border-radius: var(--radius-pill);
-  background: var(--color-button-primary-bg);
-  color: var(--color-button-primary-text);
-  font-size: var(--font-size-lg);
-  font-weight: 700;
+  background: color-mix(in srgb, var(--color-bg-surface-soft) 85%, var(--color-bg-surface));
+  color: var(--color-text-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  transition: box-shadow 0.18s ease, transform 0.18s ease, background-color 0.18s ease;
+  transition: box-shadow 0.18s ease, transform 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
 }
 
 .composer-submit:hover {
-  background: var(--color-button-primary-bg-hover);
-  box-shadow: var(--shadow-button-brand);
+  background: var(--color-bg-surface-soft);
+  border-color: var(--color-border-active);
 }
 
 .composer-submit:active {
@@ -174,20 +179,34 @@ const { t } = useI18n();
 }
 
 .composer-submit-cancel {
-  background: var(--color-button-danger-bg);
-  color: var(--color-button-danger-text);
+  color: var(--color-text-danger);
 }
 
 .composer-submit-cancel:hover {
-  background: var(--color-button-danger-bg-hover);
-  box-shadow: var(--shadow-button-danger);
+  border-color: color-mix(in srgb, var(--color-text-danger) 45%, var(--color-border-strong));
+  background: color-mix(in srgb, var(--color-danger-soft-bg) 35%, var(--color-bg-surface-soft));
 }
 
 .composer-submit:disabled {
-  background: var(--color-border-strong);
+  background: color-mix(in srgb, var(--color-bg-surface-soft) 75%, var(--color-bg-surface));
+  border-color: var(--color-border-soft);
   color: var(--color-disabled-text);
   box-shadow: none;
   cursor: not-allowed;
+}
+
+.composer-stop-icon {
+  fill: currentColor;
+}
+
+.composer-model-inline :deep(.n-base-selection) {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.composer-model-inline :deep(.n-base-selection-label) {
+  color: var(--color-text-secondary);
 }
 
 @media (max-width: var(--size-breakpoint-md)) {
@@ -202,6 +221,7 @@ const { t } = useI18n();
 
   .composer-meta {
     margin-left: 0;
+    justify-content: flex-end;
   }
 }
 </style>
