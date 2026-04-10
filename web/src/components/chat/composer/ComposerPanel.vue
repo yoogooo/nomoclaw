@@ -269,7 +269,7 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: var(--space-2_5);
   padding: var(--space-4_5) var(--space-6) var(--space-5_5);
-  border-top: var(--size-1) solid var(--color-border-panel);
+  border-top: 0;
 }
 
 .composer-wrap-dragging {
@@ -294,7 +294,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: var(--space-4_5);
+  padding: var(--space-3);
   border: var(--size-1) solid var(--color-border-strong);
   border-radius: var(--radius-xl);
   background: color-mix(in srgb, var(--color-bg-surface-mute) 84%, var(--color-bg-surface));
@@ -369,13 +369,13 @@ onBeforeUnmount(() => {
     z-index: 70;
     padding: var(--space-3_5) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom));
     gap: var(--space-2_5);
-    border-top: var(--size-1) solid var(--color-border-strong);
+    border-top: 0;
     background: var(--color-bg-overlay-strong);
     backdrop-filter: blur(var(--size-8));
   }
 
   .composer-input-shell {
-    padding: var(--space-3_5);
+    padding: var(--space-3);
     border-radius: var(--radius-lg);
   }
 }

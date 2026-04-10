@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { ArrowUp, Lightbulb, Paperclip, Square } from "lucide-vue-next";
 import { NSelect } from "naive-ui";
 
-defineProps<{
+const props = defineProps<{
   selectedModelKey: string;
   modelOptions: any[];
   showJinnangPicker: boolean;
@@ -24,11 +25,22 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+
+const selectedModelLabel = computed(() => {
+  const selected = props.modelOptions.find((option) => option?.value === props.selectedModelKey);
+  const label = selected?.label;
+  return typeof label === "string" && label.trim().length > 0 ? label.trim() : t("chat.composer.modelPlaceholder");
+});
+
+const modelSelectWidthCh = computed(() => {
+  const labelLength = selectedModelLabel.value.length;
+  return Math.min(Math.max(labelLength + 6, 14), 34);
+});
 </script>
 
 <template>
   <div class="composer-toolbar-row composer-toolbar-row-bottom">
-    <div class="composer-model-inline">
+    <div class="composer-model-inline" :style="{ '--model-select-width-ch': `${modelSelectWidthCh}ch` }">
       <n-select
         :value="selectedModelKey"
         :options="modelOptions"
@@ -94,8 +106,8 @@ const { t } = useI18n();
 }
 
 .composer-model-inline {
-  width: min(100%, 280px);
-  flex: 0 1 280px;
+  width: clamp(11rem, var(--model-select-width-ch), 24rem);
+  flex: 0 1 auto;
 }
 
 .composer-upload-inline {
