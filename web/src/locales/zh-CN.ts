@@ -34,7 +34,10 @@ const zhCN = {
     themeDark: "深色",
     language: "语言",
     languageZhCN: "简体中文",
-    languageEnUS: "English"
+    languageEnUS: "English",
+    runtimeLogVisibility: "运行时日志",
+    runtimeLogOn: "显示",
+    runtimeLogOff: "隐藏"
   },
   modelGate: {
     title: "先配置一个可用模型",

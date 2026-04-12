@@ -34,7 +34,10 @@ const enUS = {
     themeDark: "Dark",
     language: "Language",
     languageZhCN: "简体中文",
-    languageEnUS: "English"
+    languageEnUS: "English",
+    runtimeLogVisibility: "Runtime Log",
+    runtimeLogOn: "Visible",
+    runtimeLogOff: "Hidden"
   },
   modelGate: {
     title: "Set up a model first",

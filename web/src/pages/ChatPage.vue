@@ -10,15 +10,20 @@ import RuntimeLogPanel from "@/components/chat/RuntimeLogPanel.vue";
 import { useAgentCatalogStore } from "@/stores/agentCatalog";
 import { useConversationStore } from "@/stores/conversation";
 import { useJinnangStore } from "@/stores/jinnang";
+import { useUiPreferencesStore } from "@/stores/uiPreferences";
 import { themeTokens } from "@/themeTokens";
 
 const conversationStore = useConversationStore();
 const agentCatalogStore = useAgentCatalogStore();
 const jinnangStore = useJinnangStore();
+const uiPreferencesStore = useUiPreferencesStore();
+uiPreferencesStore.init();
 const runtimeCollapsedStorageKey = "chat:runtime-collapsed";
 const runtimeCollapsed = ref(false);
 const { t } = useI18n();
 const browserRuntimeOverlay = computed(() => conversationStore.browserRuntimeOverlay);
+const showRuntimeLogPanel = computed(() => uiPreferencesStore.chatRuntimeLogVisible);
+const runtimeAreaCollapsed = computed(() => !showRuntimeLogPanel.value || runtimeCollapsed.value);
 
 if (typeof window !== "undefined") {
   runtimeCollapsed.value = window.localStorage.getItem(runtimeCollapsedStorageKey) === "1";
@@ -53,14 +58,14 @@ watch(
 
 <template>
   <div class="page-frame chat-page">
-    <div class="grid-chat" :class="{ 'runtime-collapsed': runtimeCollapsed }">
+    <div class="grid-chat" :class="{ 'runtime-collapsed': runtimeAreaCollapsed }">
       <DirectoryRail />
       <AgentSidebar />
       <ConversationSidebar />
       <MessagesPanel />
-      <RuntimeLogPanel v-if="!runtimeCollapsed" :collapsed="runtimeCollapsed" @toggle="runtimeCollapsed = !runtimeCollapsed" />
+      <RuntimeLogPanel v-if="showRuntimeLogPanel && !runtimeCollapsed" :collapsed="runtimeCollapsed" @toggle="runtimeCollapsed = !runtimeCollapsed" />
     </div>
-    <button v-if="runtimeCollapsed" class="runtime-expand-toggle" :title="t('chat.runtime.expand')" @click="runtimeCollapsed = false">
+    <button v-if="showRuntimeLogPanel && runtimeCollapsed" class="runtime-expand-toggle" :title="t('chat.runtime.expand')" @click="runtimeCollapsed = false">
       <ChevronLeft :size="16" />
     </button>
     <div v-if="browserRuntimeOverlay.visible" class="browser-runtime-overlay" role="status" aria-live="polite">

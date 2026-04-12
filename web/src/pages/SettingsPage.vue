@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NSelect } from "naive-ui";
+import { NSelect, NSwitch } from "naive-ui";
 import { useI18n } from "vue-i18n";
 import DirectoryRail from "@/components/chat/DirectoryRail.vue";
 import AppPageHeader from "@/components/layout/AppPageHeader.vue";
@@ -65,6 +65,16 @@ function onLocaleChange(value: AppLocale | null) {
                   />
                 </div>
               </div>
+              <div>
+                <div class="meta-label">{{ t("settings.runtimeLogVisibility") }}</div>
+                <div class="settings-switch-row">
+                  <n-switch
+                    :value="uiPreferencesStore.chatRuntimeLogVisible"
+                    @update:value="(value) => uiPreferencesStore.setChatRuntimeLogVisible(Boolean(value))"
+                  />
+                  <span class="ui-value-strong">{{ uiPreferencesStore.chatRuntimeLogVisible ? t("settings.runtimeLogOn") : t("settings.runtimeLogOff") }}</span>
+                </div>
+              </div>
             </div>
           </section>
           </div>
@@ -88,6 +98,13 @@ function onLocaleChange(value: AppLocale | null) {
 .settings-language-select {
   width: var(--size-180);
   min-width: var(--size-170);
+}
+
+.settings-switch-row {
+  margin-top: var(--space-1_5);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 @media (max-width: var(--size-breakpoint-lg)) {
