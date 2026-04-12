@@ -62,104 +62,127 @@ public class BrowserTool implements Tool {
     @Override
     public ToolResult execute(ToolRequest request) {
         long start = System.currentTimeMillis();
+        String profileKey = profileByConversation.computeIfAbsent(
+                request.conversationUid(),
+                ignored -> resolveProfileKey(request)
+        );
         try {
             if (cancellationRegistry.isCanceled(request.messageUid())) {
                 return ToolResult.failure("CANCELLED", "message canceled", metric(start));
             }
-            String profileKey = profileByConversation.computeIfAbsent(
-                    request.conversationUid(),
-                    ignored -> resolveProfileKey(request)
-            );
-            BrowserContext context = resolveContext(profileKey, request);
-            Page page = currentPage(request.conversationUid(), context);
-            page.setDefaultTimeout(request.timeoutMs());
-
             String action = request.args().path("action").asText("");
             log.info("[Tool][browser] execute conversationUid={} messageUid={} stepUid={} action={}",
                     request.conversationUid(), request.messageUid(), request.stepUid(), action);
-            return switch (action) {
-                case "open" -> {
-                    String url = request.args().path("url").asText("");
-                    page.navigate(url);
-                    page.waitForLoadState(LoadState.NETWORKIDLE);
-                    yield ToolResult.success("opened " + url, textArtifacts("url", url), metric(start));
-                }
-                case "navigate" -> {
-                    String url = request.args().path("url").asText("");
-                    page.navigate(url);
-                    page.waitForLoadState(LoadState.NETWORKIDLE);
-                    yield ToolResult.success("navigated " + url, textArtifacts("url", url), metric(start));
-                }
-                case "navigate_back" -> {
-                    page.goBack();
-                    yield ToolResult.success("navigated back", textArtifacts("url", page.url()), metric(start));
-                }
-                case "click" -> {
-                    String selector = request.args().path("selector").asText("");
-                    page.locator(selector).first().click();
-                    yield ToolResult.success("clicked " + selector, textArtifacts("selector", selector), metric(start));
-                }
-                case "type" -> {
-                    String selector = request.args().path("selector").asText("");
-                    String text = request.args().path("text").asText("");
-                    page.locator(selector).first().fill(text);
-                    yield ToolResult.success("typed into " + selector, textArtifacts("selector", selector), metric(start));
-                }
-                case "extract_text" -> {
-                    String selector = request.args().path("selector").asText("body");
-                    String text = page.locator(selector).first().innerText();
-                    ObjectNode artifacts = textArtifacts("selector", selector);
-                    artifacts.put("length", text.length());
-                    yield ToolResult.success(text, artifacts, metric(start));
-                }
-                case "screenshot" -> {
-                    String output = request.args().path("output").asText("");
-                    Path outputPath = output == null || output.isBlank()
-                            ? request.tmpDirectory().resolve(UUID.randomUUID() + ".png").toAbsolutePath().normalize()
-                            : PathResolver.resolveInAgentWorkspace(output, request);
-                    java.nio.file.Files.createDirectories(outputPath.getParent());
-                    page.screenshot(new Page.ScreenshotOptions().setPath(outputPath));
-                    yield ToolResult.success("screenshot saved", textArtifacts("path", outputPath.toString()), metric(start));
-                }
-                case "download" -> {
-                    String selector = request.args().path("selector").asText("");
-                    String output = request.args().path("output").asText("");
-                    Download download = page.waitForDownload(() -> page.locator(selector).first().click());
-                    Path targetPath = resolveDownloadPath(request, download, output);
-                    Files.createDirectories(targetPath.getParent());
-                    download.saveAs(targetPath);
-                    ObjectNode artifacts = textArtifacts("path", targetPath.toString());
-                    artifacts.put("fileName", download.suggestedFilename());
-                    artifacts.put("selector", selector);
-                    yield ToolResult.success("download saved", artifacts, metric(start));
-                }
-                case "snapshot" -> {
-                    String html = page.content();
-                    ObjectNode artifacts = textArtifacts("url", page.url());
-                    artifacts.put("title", page.title());
-                    yield ToolResult.success(ToolTextUtils.truncateHead(html), artifacts, metric(start));
-                }
-                case "wait_for" -> {
-                    String selector = request.args().path("selector").asText("");
-                    page.locator(selector).first().waitFor();
-                    yield ToolResult.success("waited for " + selector, textArtifacts("selector", selector), metric(start));
-                }
-                case "press_key" -> {
-                    String key = request.args().path("key").asText("");
-                    page.keyboard().press(key);
-                    yield ToolResult.success("pressed key " + key, textArtifacts("key", key), metric(start));
-                }
-                case "close" -> {
-                    page.close();
-                    pageByConversation.remove(request.conversationUid());
-                    yield ToolResult.success("page closed", textArtifacts("conversationUid", request.conversationUid()), metric(start));
-                }
-                default -> ToolResult.failure("INVALID_ACTION", "unsupported browser action: " + action, metric(start));
-            };
+            return executeWithRecovery(request, profileKey, start);
         } catch (Exception ex) {
             log.warn("[Tool][browser] failed stepUid={} err={}", request.stepUid(), ex.getMessage());
             return ToolResult.failure("BROWSER_ERROR", ex.getMessage(), metric(start));
         }
+    }
+
+    private ToolResult executeWithRecovery(ToolRequest request, String profileKey, long start) {
+        Exception last = null;
+        for (int attempt = 0; attempt < 2; attempt++) {
+            try {
+                BrowserContext context = resolveContext(profileKey, request);
+                Page page = currentPage(request.conversationUid(), context);
+                page.setDefaultTimeout(request.timeoutMs());
+                return executeAction(request, page, start);
+            } catch (Exception ex) {
+                last = ex;
+                if (!isTargetClosed(ex) || attempt == 1) {
+                    break;
+                }
+                log.info("[Tool][browser] target closed detected, rebuilding context/profile={} conversationUid={}",
+                        profileKey, request.conversationUid());
+                invalidateProfileContext(profileKey);
+                pageByConversation.remove(request.conversationUid());
+            }
+        }
+        throw new IllegalStateException(last == null ? "browser action failed" : last.getMessage(), last);
+    }
+
+    private ToolResult executeAction(ToolRequest request, Page page, long start) throws Exception {
+        String action = request.args().path("action").asText("");
+        return switch (action) {
+            case "open" -> {
+                String url = request.args().path("url").asText("");
+                page.navigate(url);
+                page.waitForLoadState(LoadState.NETWORKIDLE);
+                yield ToolResult.success("opened " + url, textArtifacts("url", url), metric(start));
+            }
+            case "navigate" -> {
+                String url = request.args().path("url").asText("");
+                page.navigate(url);
+                page.waitForLoadState(LoadState.NETWORKIDLE);
+                yield ToolResult.success("navigated " + url, textArtifacts("url", url), metric(start));
+            }
+            case "navigate_back" -> {
+                page.goBack();
+                yield ToolResult.success("navigated back", textArtifacts("url", page.url()), metric(start));
+            }
+            case "click" -> {
+                String selector = request.args().path("selector").asText("");
+                page.locator(selector).first().click();
+                yield ToolResult.success("clicked " + selector, textArtifacts("selector", selector), metric(start));
+            }
+            case "type" -> {
+                String selector = request.args().path("selector").asText("");
+                String text = request.args().path("text").asText("");
+                page.locator(selector).first().fill(text);
+                yield ToolResult.success("typed into " + selector, textArtifacts("selector", selector), metric(start));
+            }
+            case "extract_text" -> {
+                String selector = request.args().path("selector").asText("body");
+                String text = page.locator(selector).first().innerText();
+                ObjectNode artifacts = textArtifacts("selector", selector);
+                artifacts.put("length", text.length());
+                yield ToolResult.success(text, artifacts, metric(start));
+            }
+            case "screenshot" -> {
+                String output = request.args().path("output").asText("");
+                Path outputPath = output == null || output.isBlank()
+                        ? request.tmpDirectory().resolve(UUID.randomUUID() + ".png").toAbsolutePath().normalize()
+                        : PathResolver.resolveInAgentWorkspace(output, request);
+                java.nio.file.Files.createDirectories(outputPath.getParent());
+                page.screenshot(new Page.ScreenshotOptions().setPath(outputPath));
+                yield ToolResult.success("screenshot saved", textArtifacts("path", outputPath.toString()), metric(start));
+            }
+            case "download" -> {
+                String selector = request.args().path("selector").asText("");
+                String output = request.args().path("output").asText("");
+                Download download = page.waitForDownload(() -> page.locator(selector).first().click());
+                Path targetPath = resolveDownloadPath(request, download, output);
+                Files.createDirectories(targetPath.getParent());
+                download.saveAs(targetPath);
+                ObjectNode artifacts = textArtifacts("path", targetPath.toString());
+                artifacts.put("fileName", download.suggestedFilename());
+                artifacts.put("selector", selector);
+                yield ToolResult.success("download saved", artifacts, metric(start));
+            }
+            case "snapshot" -> {
+                String html = page.content();
+                ObjectNode artifacts = textArtifacts("url", page.url());
+                artifacts.put("title", page.title());
+                yield ToolResult.success(ToolTextUtils.truncateHead(html), artifacts, metric(start));
+            }
+            case "wait_for" -> {
+                String selector = request.args().path("selector").asText("");
+                page.locator(selector).first().waitFor();
+                yield ToolResult.success("waited for " + selector, textArtifacts("selector", selector), metric(start));
+            }
+            case "press_key" -> {
+                String key = request.args().path("key").asText("");
+                page.keyboard().press(key);
+                yield ToolResult.success("pressed key " + key, textArtifacts("key", key), metric(start));
+            }
+            case "close" -> {
+                page.close();
+                pageByConversation.remove(request.conversationUid());
+                yield ToolResult.success("page closed", textArtifacts("conversationUid", request.conversationUid()), metric(start));
+            }
+            default -> ToolResult.failure("INVALID_ACTION", "unsupported browser action: " + action, metric(start));
+        };
     }
 
     @PreDestroy
@@ -187,14 +210,15 @@ public class BrowserTool implements Tool {
     }
 
     private BrowserContext resolveContext(String profileKey, ToolRequest request) {
-        BrowserContext existing = contextByProfile.get(profileKey);
-        if (existing != null) {
-            return existing;
-        }
         synchronized (contextByProfile) {
-            BrowserContext doubleCheck = contextByProfile.get(profileKey);
-            if (doubleCheck != null) {
-                return doubleCheck;
+            BrowserContext existing = contextByProfile.get(profileKey);
+            if (existing != null && isContextUsable(existing)) {
+                return existing;
+            }
+            if (existing != null) {
+                safelyCloseContext(existing);
+                contextByProfile.remove(profileKey);
+                resetPagesForProfile(profileKey);
             }
             BrowserContext created = createContext(profileKey, request);
             contextByProfile.put(profileKey, created);
@@ -206,12 +230,17 @@ public class BrowserTool implements Tool {
         Path cacheRoot = resolvePlaywrightCacheRoot();
         long baselineBytes = cacheRoot == null ? 0L : safeDirectorySize(cacheRoot);
         long monitorStartedAt = System.currentTimeMillis();
-        request.reportProgress(
-                "browser.runtime.preparing",
-                "browser.runtime.checking_dependencies",
-                progressMetrics("checking", baselineBytes, baselineBytes, monitorStartedAt)
-        );
-        DownloadMonitor monitor = startDownloadMonitor(request, cacheRoot, baselineBytes, monitorStartedAt);
+        boolean maybeNeedDownload = !hasAnyChromiumCache(cacheRoot);
+        if (maybeNeedDownload) {
+            request.reportProgress(
+                    "browser.runtime.preparing",
+                    "browser.runtime.checking_dependencies",
+                    progressMetrics("checking", baselineBytes, baselineBytes, monitorStartedAt)
+            );
+        }
+        DownloadMonitor monitor = maybeNeedDownload
+                ? startDownloadMonitor(request, cacheRoot, baselineBytes, monitorStartedAt)
+                : null;
         try {
             if (playwright == null) {
                 ensureChromiumInstalled(request);
@@ -237,11 +266,13 @@ public class BrowserTool implements Tool {
             String details = downloadedBytes > 0
                     ? "browser.runtime.ready_with_cache_delta:" + formatBytes(downloadedBytes)
                     : "browser.runtime.ready";
-            request.reportProgress(
-                    "browser.runtime.ready",
-                    details,
-                    progressMetrics("ready", finalBytes, downloadedBytes, monitorStartedAt)
-            );
+            if (maybeNeedDownload) {
+                request.reportProgress(
+                        "browser.runtime.ready",
+                        details,
+                        progressMetrics("ready", finalBytes, downloadedBytes, monitorStartedAt)
+                );
+            }
             log.info("[Tool][browser] persistent context created profile={} dir={} headless={}",
                     profileKey, userDataDir, headless);
             return context;
@@ -429,12 +460,81 @@ public class BrowserTool implements Tool {
 
     private Page currentPage(String conversationUid, BrowserContext context) {
         Page existing = pageByConversation.get(conversationUid);
-        if (existing != null && !existing.isClosed()) {
+        if (isPageUsable(existing)) {
             return existing;
         }
+        pageByConversation.remove(conversationUid);
         Page page = context.newPage();
         pageByConversation.put(conversationUid, page);
         return page;
+    }
+
+    private boolean isPageUsable(Page page) {
+        if (page == null || page.isClosed()) {
+            return false;
+        }
+        try {
+            page.url();
+            return true;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private boolean isContextUsable(BrowserContext context) {
+        if (context == null) {
+            return false;
+        }
+        try {
+            context.pages();
+            return true;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private void safelyCloseContext(BrowserContext context) {
+        try {
+            context.close();
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void resetPagesForProfile(String profileKey) {
+        profileByConversation.forEach((conversationUid, mappedProfile) -> {
+            if (!profileKey.equals(mappedProfile)) {
+                return;
+            }
+            Page page = pageByConversation.remove(conversationUid);
+            if (page != null) {
+                try {
+                    page.close();
+                } catch (Exception ignored) {
+                }
+            }
+        });
+    }
+
+    private void invalidateProfileContext(String profileKey) {
+        synchronized (contextByProfile) {
+            BrowserContext stale = contextByProfile.remove(profileKey);
+            if (stale != null) {
+                safelyCloseContext(stale);
+            }
+        }
+        resetPagesForProfile(profileKey);
+    }
+
+    private boolean isTargetClosed(Exception ex) {
+        Throwable current = ex;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null && message.contains("Target page, context or browser has been closed")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private ObjectNode metric(long start) {
