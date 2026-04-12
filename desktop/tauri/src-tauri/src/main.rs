@@ -27,6 +27,7 @@ const INSTANCE_LOCK_FILE: &str = "app.lock";
 const BACKEND_PGID_FILE: &str = "backend.pgid";
 
 static EXITING: AtomicBool = AtomicBool::new(false);
+static BACKEND_RESTARTING: AtomicBool = AtomicBool::new(false);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum BackendMode {
@@ -73,6 +74,7 @@ fn main() {
                 eprintln!("backend bootstrap failed: {error:#}");
                 show_bootstrap_error_page(app, &format!("{error:#}"))?;
             }
+            install_backend_watchdog(app)?;
             Ok(())
         });
 
@@ -154,9 +156,7 @@ fn register_tray<R: Runtime>(app: &tauri::App<R>) -> Result<()> {
             }
             TRAY_MENU_RESTART => {
                 let app_handle = app.clone();
-                tauri::async_runtime::spawn(async move {
-                    let _ = restart_backend(&app_handle);
-                });
+                request_backend_restart(app_handle, "tray menu");
             }
             TRAY_MENU_QUIT => shutdown_and_exit(app),
             _ => {}
@@ -222,6 +222,93 @@ fn restart_backend<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
     *guard = Some(runtime);
 
     Ok(())
+}
+
+fn request_backend_restart<R: Runtime>(app: AppHandle<R>, reason: &'static str) {
+    if EXITING.load(Ordering::SeqCst) {
+        return;
+    }
+    if BACKEND_RESTARTING
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return;
+    }
+
+    tauri::async_runtime::spawn(async move {
+        if let Err(error) = restart_backend(&app) {
+            eprintln!("backend restart failed ({reason}): {error:#}");
+        }
+        BACKEND_RESTARTING.store(false, Ordering::SeqCst);
+    });
+}
+
+fn install_backend_watchdog<R: Runtime>(app: &tauri::App<R>) -> Result<()> {
+    let app_handle = app.handle().clone();
+    let interval = Duration::from_millis(env_u64("NOMOCLAW_BACKEND_WATCH_INTERVAL_MS", 10_000).max(500));
+    thread::Builder::new()
+        .name("backend-watchdog".to_string())
+        .spawn(move || loop {
+            if EXITING.load(Ordering::SeqCst) {
+                return;
+            }
+            thread::sleep(interval);
+            if EXITING.load(Ordering::SeqCst) {
+                return;
+            }
+            if backend_needs_restart(&app_handle) {
+                request_backend_restart(app_handle.clone(), "watchdog");
+            }
+        })
+        .context("failed to spawn backend watchdog thread")?;
+    Ok(())
+}
+
+fn backend_needs_restart<R: Runtime>(app: &AppHandle<R>) -> bool {
+    let port = {
+        let state = app.state::<DesktopState>();
+        let mut guard = match state.runtime.lock() {
+            Ok(guard) => guard,
+            Err(_) => return false,
+        };
+
+        let Some(runtime) = guard.as_mut() else {
+            return false;
+        };
+        if runtime.mode != BackendMode::Spawn {
+            return false;
+        }
+
+        if let Some(child) = runtime.child.as_mut() {
+            match child.try_wait() {
+                Ok(Some(status)) => {
+                    eprintln!("backend process exited: {status}");
+                    return true;
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    eprintln!("failed to query backend process status: {error:#}");
+                    return true;
+                }
+            }
+        }
+
+        runtime.port
+    };
+
+    !check_backend_ready_once(port, Duration::from_millis(800))
+}
+
+fn check_backend_ready_once(port: u16, timeout: Duration) -> bool {
+    let health_url = format!("http://127.0.0.1:{port}/api/system/config");
+    let client = match Client::builder().timeout(timeout).build() {
+        Ok(client) => client,
+        Err(_) => return false,
+    };
+    match client.get(health_url).send() {
+        Ok(response) => response.status().is_success(),
+        Err(_) => false,
+    }
 }
 
 fn stop_backend<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
