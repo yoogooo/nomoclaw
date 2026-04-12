@@ -28,6 +28,7 @@ import ai.nomoclaw.bot.model.AgentEvent;
 import ai.nomoclaw.bot.model.AgentEventType;
 import ai.nomoclaw.bot.model.ApprovalStatus;
 import ai.nomoclaw.bot.model.MessageStatus;
+import ai.nomoclaw.bot.model.ModelProviderDefaults;
 import ai.nomoclaw.bot.model.PlanStep;
 import ai.nomoclaw.bot.model.RiskLevel;
 import ai.nomoclaw.bot.model.StepStatus;
@@ -2058,8 +2059,21 @@ public class AgentApplicationService {
     private RuntimeModelSelection resolveRuntimeModelSelection(AgentConversation conversation, String modelProvider, String modelName) {
         String providerId = modelProvider == null ? "" : modelProvider.trim();
         String modelId = modelName == null ? "" : modelName.trim();
+        // Priority 1: request-level override (web API usually passes model info explicitly).
+        // If request-level model is absent (e.g. channel inbound), fallback to conversation agent model.
         if (providerId.isBlank() || modelId.isBlank()) {
             RuntimeModelSelection fallback = resolveDefaultRuntimeModel(conversation.agentUid());
+            if (providerId.isBlank()) {
+                providerId = fallback.modelProvider();
+            }
+            if (modelId.isBlank()) {
+                modelId = fallback.modelName();
+            }
+        }
+        // Priority 2: system model config fallback.
+        // This prevents channel messages from failing when default agent model fields are empty.
+        if (providerId.isBlank() || modelId.isBlank()) {
+            RuntimeModelSelection fallback = resolveSystemDefaultRuntimeModel();
             if (providerId.isBlank()) {
                 providerId = fallback.modelProvider();
             }
@@ -2084,6 +2098,57 @@ public class AgentApplicationService {
                 agent.getModelProviderId() == null ? "" : agent.getModelProviderId().trim(),
                 resolveAgentPrimaryModelId(agent)
         );
+    }
+
+    private RuntimeModelSelection resolveSystemDefaultRuntimeModel() {
+        // Prefer user-configured and currently available providers/models.
+        RuntimeModelSelection fromAvailable = pickRuntimeModelFromConfig(modelConfigAppService.getAvailableModelConfig());
+        if (!fromAvailable.modelProvider().isBlank() && !fromAvailable.modelName().isBlank()) {
+            return fromAvailable;
+        }
+        // Then try full persisted provider config.
+        RuntimeModelSelection fromConfig = pickRuntimeModelFromConfig(modelConfigAppService.getModelConfig());
+        if (!fromConfig.modelProvider().isBlank() && !fromConfig.modelName().isBlank()) {
+            return fromConfig;
+        }
+        // Last resort: built-in provider defaults to avoid blank model selection at runtime.
+        return pickRuntimeModelFromProviders(ModelProviderDefaults.providers());
+    }
+
+    private RuntimeModelSelection pickRuntimeModelFromConfig(ModelConfigDto config) {
+        if (config == null) {
+            return new RuntimeModelSelection("", "");
+        }
+        return pickRuntimeModelFromProviders(config.providers());
+    }
+
+    private RuntimeModelSelection pickRuntimeModelFromProviders(List<ModelConfigDto.Provider> providers) {
+        if (providers == null || providers.isEmpty()) {
+            return new RuntimeModelSelection("", "");
+        }
+        for (ModelConfigDto.Provider provider : providers) {
+            if (provider == null) {
+                continue;
+            }
+            String providerId = trim(provider.id());
+            if (providerId.isBlank()) {
+                continue;
+            }
+            String modelId = trim(provider.defaultModel());
+            if (modelId.isBlank() && provider.models() != null && !provider.models().isEmpty()) {
+                for (ModelConfigDto.Model model : provider.models()) {
+                    String candidate = model == null ? "" : trim(model.id());
+                    if (!candidate.isBlank()) {
+                        modelId = candidate;
+                        break;
+                    }
+                }
+            }
+            if (!modelId.isBlank()) {
+                return new RuntimeModelSelection(providerId, modelId);
+            }
+        }
+        return new RuntimeModelSelection("", "");
     }
 
     private record RuntimeModelSelection(String modelProvider, String modelName) {
