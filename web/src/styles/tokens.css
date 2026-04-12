@@ -22,6 +22,8 @@
   --color-brand-500: #0F766E;
   --color-brand-400: #12958A;
   --color-brand-600: #0B5E58;
+  --color-brand-primary: var(--color-accent-brand);
+  --color-brand-deep: var(--color-accent-brand-hover);
 
   /* Feedback */
   --color-info-500: #3B82F6;
@@ -29,6 +31,8 @@
   --color-warning-500: #C06A2B;
   --color-semantic-warning: var(--color-warning-500);
   --color-danger-500: #B64B36;
+  --color-semantic-success: var(--color-accent-brand);
+  --color-semantic-danger: var(--color-accent-danger);
 
   /* Neutral surfaces */
   --color-bg-canvas: #F1F5FB;
@@ -181,6 +185,7 @@
   --color-overlay-slate-90: rgba(226, 232, 240, 0.9);
   --color-overlay-gray-92: rgba(241, 245, 249, 0.92);
   --color-overlay-cloud-72: rgba(248, 250, 252, 0.72);
+  --btn-focus-ring: var(--color-overlay-brand-15);
   --color-text-steel: #8CA0B8;
   --color-text-heading-deep: #132036;
   --color-shadow-xl: 0 24px 80px rgba(30, 41, 59, 0.12);
@@ -230,6 +235,8 @@
   --space-5: 20px;
   --space-5_5: 22px;
   --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
 
   /* Semantic spacing aliases */
   --space-gap-xs: var(--space-1);
@@ -276,6 +283,7 @@
   --size-32: 32px;
   --size-34: 34px;
   --size-36: 36px;
+  --size-40: 40px;
   --size-42: 42px;
   --size-44: 44px;
   --size-48: 48px;
@@ -304,6 +312,7 @@
   --size-720: 720px;
   --size-760: 760px;
   --size-860: 860px;
+  --size-900: 900px;
   --size-980: 980px;
   --size-percent-message-max: 92%;
 
@@ -319,10 +328,26 @@
   --radius-m-lg: 14px;
   --radius-md: 16px;
   --radius-lg: 18px;
+  --radius-l: var(--radius-lg);
   --radius-xl-2: 20px;
   --radius-xl: 24px;
   --radius-2xl: 28px;
   --radius-pill: 999px;
+  --radius-round: var(--radius-pill);
+
+  /* Runtime-overridable component variables with sensible defaults */
+  --ds-bg-card: var(--color-bg-surface);
+  --ds-bg-card-soft: var(--color-bg-surface-soft);
+  --ds-border: var(--color-border-soft);
+  --ds-text-primary: var(--color-text-primary);
+  --ds-text-secondary: var(--color-text-secondary);
+  --ds-text-muted: var(--color-text-muted);
+  --input-default-bg: var(--color-bg-surface-soft);
+  --input-default-border: var(--size-1) solid var(--color-border-default);
+  --input-hover-border: var(--size-1) solid var(--color-border-active);
+  --input-focus-bg: var(--color-bg-surface);
+  --input-focus-border: var(--size-1) solid var(--color-accent-brand);
+  --model-select-width-ch: 16ch;
 
   /* Shadow semantics (default = none) */
   --shadow-card-primary: 0 2px 8px rgba(2, 6, 23, 0.08);
