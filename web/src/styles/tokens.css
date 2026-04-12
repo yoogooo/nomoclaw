@@ -173,6 +173,9 @@
   --color-button-danger-bg: var(--color-accent-danger);
   --color-button-danger-bg-hover: var(--color-accent-danger-hover);
   --color-button-danger-text: var(--color-text-inverse);
+  --color-composer-stop-bg: #000000;
+  --color-composer-stop-bg-hover: #141414;
+  --color-composer-stop-fg: #FFFFFF;
   --color-button-neutral-bg-light: #EEF1F5;
   --color-button-neutral-bg-hover-light: #E2E7EE;
   --color-button-neutral-bg-pressed-light: #D6DEE8;
@@ -467,6 +470,9 @@
   --color-button-danger-bg: var(--color-accent-danger);
   --color-button-danger-bg-hover: var(--color-accent-danger-hover);
   --color-button-danger-text: var(--color-text-inverse);
+  --color-composer-stop-bg: #F2F3F5;
+  --color-composer-stop-bg-hover: #FFFFFF;
+  --color-composer-stop-fg: #000000;
   --color-button-neutral-bg-light: #EEF1F5;
   --color-button-neutral-bg-hover-light: #E2E7EE;
   --color-button-neutral-bg-pressed-light: #D6DEE8;
