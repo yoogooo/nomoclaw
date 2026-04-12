@@ -44,6 +44,8 @@ agent:
   browser:
     step-timeout-seconds: 10
     headless: false
+    shared-profile-enabled: true
+    shared-profile-name: shared
   retry:
     max-attempts: 2
   loop:

@@ -731,6 +731,14 @@ public class BrowserTool implements Tool {
     }
 
     private String resolveProfileKey(ToolRequest request) {
+        if (agentProperties.getBrowser().isSharedProfileEnabled()) {
+            String configured = agentProperties.getBrowser().getSharedProfileName();
+            String shared = configured == null ? "" : configured.trim();
+            if (!shared.isBlank()) {
+                return sanitizeKey(shared);
+            }
+            return "shared";
+        }
         String agentUid = request.agentUid() == null ? "" : request.agentUid().trim();
         if (!agentUid.isBlank()) {
             return sanitizeKey(agentUid);
