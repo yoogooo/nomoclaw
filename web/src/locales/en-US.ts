@@ -364,7 +364,7 @@ const enUS = {
     batchDeletePartial: "{success} tasks deleted, {failed} failed"
   },
   http: {
-    networkError: "Request was not sent successfully: network error or service unavailable. Please check and retry.",
+    networkError: "Cannot reach backend service (it may not be started). Start the service and try again.",
     withReason: "{base} Reason: {reason}",
     400: "Invalid request parameters. Please review your input and retry.",
     401: "Session expired. Please sign in again.",

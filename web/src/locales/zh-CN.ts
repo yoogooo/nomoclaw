@@ -364,7 +364,7 @@ const zhCN = {
     batchDeletePartial: "成功删除 {success} 个任务，失败 {failed} 个"
   },
   http: {
-    networkError: "请求未发送成功：网络连接异常或服务不可达，请检查网络/服务后重试。",
+    networkError: "无法连接后端服务（可能未启动）。请先启动服务后重试。",
     withReason: "{base} 原因：{reason}",
     400: "请求参数有误，请检查输入后重试。",
     401: "登录状态已失效，请重新登录后重试。",
