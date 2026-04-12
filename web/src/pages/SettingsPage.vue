@@ -50,10 +50,6 @@ function onLocaleChange(value: AppLocale | null) {
             <div class="surface-card-title">{{ t("settings.preferences") }}</div>
             <div class="ui-detail-list">
               <div>
-                <div class="meta-label">{{ t("settings.layoutMode") }}</div>
-                <div class="ui-value-strong">{{ t("settings.workspaceMode") }}</div>
-              </div>
-              <div>
                 <div class="meta-label">{{ t("settings.language") }}</div>
                 <div class="ui-value-strong settings-language-select-wrap">
                   <n-select
@@ -72,7 +68,7 @@ function onLocaleChange(value: AppLocale | null) {
                     :value="uiPreferencesStore.chatRuntimeLogVisible"
                     @update:value="(value) => uiPreferencesStore.setChatRuntimeLogVisible(Boolean(value))"
                   />
-                  <span class="ui-value-strong">{{ uiPreferencesStore.chatRuntimeLogVisible ? t("settings.runtimeLogOn") : t("settings.runtimeLogOff") }}</span>
+                  <span class="settings-switch-state">{{ uiPreferencesStore.chatRuntimeLogVisible ? t("settings.runtimeLogOn") : t("settings.runtimeLogOff") }}</span>
                 </div>
               </div>
             </div>
@@ -102,9 +98,16 @@ function onLocaleChange(value: AppLocale | null) {
 
 .settings-switch-row {
   margin-top: var(--space-1_5);
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: var(--space-2);
+  min-height: var(--space-8);
+}
+
+.settings-switch-state {
+  font-size: var(--text-body-size);
+  font-weight: 400;
+  line-height: 1.2;
 }
 
 @media (max-width: var(--size-breakpoint-lg)) {

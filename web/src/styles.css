@@ -634,7 +634,7 @@ a {
 
 .ui-button-state-grid {
   display: grid;
-  grid-template-columns: var(--size-72) repeat(4, minmax(var(--size-84), 1fr));
+  grid-template-columns: var(--size-72) repeat(4, minmax(var(--size-80), 1fr));
   column-gap: var(--space-2);
   row-gap: var(--space-3);
   align-items: center;
@@ -716,7 +716,7 @@ a {
 
 .app-layout {
   display: grid;
-  grid-template-columns: var(--size-96) minmax(0, 1fr);
+  grid-template-columns: var(--size-80) minmax(0, 1fr);
   height: 100vh;
   min-height: 100vh;
   max-height: 100vh;
@@ -778,7 +778,7 @@ a {
 
 .grid-chat {
   display: grid;
-  grid-template-columns: var(--size-96) var(--size-220) var(--size-280) minmax(0, 1fr) var(--size-420);
+  grid-template-columns: var(--size-80) var(--size-220) var(--size-280) minmax(0, 1fr) var(--size-420);
   gap: 0;
   height: 100vh;
   min-height: 100vh;
@@ -787,7 +787,7 @@ a {
 }
 
 .grid-chat.runtime-collapsed {
-  grid-template-columns: var(--size-96) var(--size-220) var(--size-280) minmax(0, 1fr);
+  grid-template-columns: var(--size-80) var(--size-220) var(--size-280) minmax(0, 1fr);
 }
 
 .runtime-expand-toggle {
@@ -1167,7 +1167,7 @@ a {
 
 @media (max-width: var(--size-breakpoint-xl)) {
   .grid-chat {
-    grid-template-columns: var(--size-96) var(--size-220) var(--size-280) minmax(0, 1fr);
+    grid-template-columns: var(--size-80) var(--size-220) var(--size-280) minmax(0, 1fr);
   }
 
   .grid-chat > :last-child {

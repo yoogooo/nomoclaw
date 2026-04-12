@@ -72,7 +72,7 @@ function dismissModelGate() {
 .model-gate-overlay {
   position: fixed;
   z-index: 999;
-  inset: 0 0 0 var(--size-96);
+  inset: 0 0 0 var(--size-80);
   display: grid;
   place-items: center;
   padding: var(--space-6);
@@ -81,7 +81,7 @@ function dismissModelGate() {
 }
 
 .model-gate-panel {
-  width: min(var(--container-sm), calc(100vw - var(--size-96) - var(--size-48)));
+  width: min(var(--container-sm), calc(100vw - var(--size-80) - var(--size-48)));
   padding: var(--space-6);
   border-radius: var(--radius-xl);
   border: var(--size-1) solid var(--color-border-strong);
