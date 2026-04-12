@@ -542,7 +542,7 @@ function applyStarterPrompt(prompt: string) {
 
 .message-bubble {
   max-width: 92%;
-  padding: var(--space-4_5) var(--space-5);
+  padding: var(--space-2_5) var(--space-4);
   border-radius: var(--radius-xl) var(--radius-xl) var(--radius-xl) var(--radius-s-md);
   background: var(--color-chat-bubble-assistant-bg);
   line-height: 1.75;
@@ -837,7 +837,7 @@ function applyStarterPrompt(prompt: string) {
 .typing-indicator {
   display: flex;
   gap: var(--space-2);
-  padding: var(--space-4_5) var(--space-5);
+  padding: var(--space-4) var(--space-4_5);
   border-radius: var(--radius-xl) var(--radius-xl) var(--radius-xl) var(--radius-s-md);
   background: var(--color-chat-bubble-assistant-bg);
 }
