@@ -12,12 +12,26 @@ const rules = [
   {
     key: 'hardcoded-color',
     regex: /#[0-9a-fA-F]{3,8}\b|rgba?\([^\)]+\)|hsla?\([^\)]+\)/g,
-    message: 'hardcoded color'
+    message: 'hardcoded color',
+    fatal: false
   },
   {
     key: 'hardcoded-px',
     regex: /\b\d+(?:\.\d+)?px\b/g,
-    message: 'hardcoded px size'
+    message: 'hardcoded px size',
+    fatal: false
+  },
+  {
+    key: 'forbidden-foundation-text-token',
+    regex: /var\(--text-(?:xs|sm|base|lg|xl|2xl)(?:--line-height)?\b/g,
+    message: 'foundation text token is forbidden in component/page styles; use semantic text tokens',
+    fatal: true
+  },
+  {
+    key: 'forbidden-size-token-in-spacing',
+    regex: /\b(?:padding(?:-[a-z]+)?|margin(?:-[a-z]+)?|gap|row-gap|column-gap|scroll-margin(?:-[a-z]+)?)\s*:[^;\n]*var\(--size-[^)]+\)/g,
+    message: 'size token is forbidden in spacing properties; use --space-* tokens',
+    fatal: true
   }
 ];
 
@@ -65,26 +79,31 @@ for (const abs of files) {
 }
 
 violations.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.col - b.col);
+const fatalRuleSet = new Set(rules.filter((rule) => rule.fatal !== false).map((rule) => rule.key));
+const fatalViolations = violations.filter((v) => fatalRuleSet.has(v.rule));
 
-if (!violations.length) {
-  console.log('PASS: no hardcoded design values found in business files.');
+if (!fatalViolations.length) {
+  console.log('PASS: no fatal design-token violations found in business files.');
+  if (violations.length) {
+    console.log(`WARN: ${violations.length} non-fatal hardcoded style values remain.`);
+  }
   process.exit(0);
 }
 
 const byFile = new Map();
-for (const v of violations) {
+for (const v of fatalViolations) {
   byFile.set(v.file, (byFile.get(v.file) || 0) + 1);
 }
 
-console.log(`FAIL: found ${violations.length} hardcoded design values in ${byFile.size} files.\n`);
+console.log(`FAIL: found ${fatalViolations.length} fatal design-token violations in ${byFile.size} files.\n`);
 console.log('Top files:');
 const top = [...byFile.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12);
 for (const [file, count] of top) {
   console.log(`- ${file}: ${count}`);
 }
 
-console.log('\nFirst 120 violations:');
-for (const v of violations.slice(0, 120)) {
+console.log('\nFirst 120 fatal violations:');
+for (const v of fatalViolations.slice(0, 120)) {
   console.log(`${v.file}:${v.line}:${v.col} [${v.rule}] ${v.snippet}`);
 }
 

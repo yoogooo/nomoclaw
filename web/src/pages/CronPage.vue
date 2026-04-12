@@ -100,10 +100,10 @@ onMounted(() => {
 .cron-page-content {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: var(--size-16);
+  gap: var(--space-4);
   min-height: 0;
   height: 100vh;
-  padding: var(--size-24) var(--size-28) var(--size-28);
+  padding: var(--space-6) var(--space-7) var(--space-7);
   overflow: hidden;
 }
 
@@ -136,9 +136,9 @@ onMounted(() => {
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
-  padding: var(--size-16);
+  padding: var(--space-4);
   border: var(--size-1) solid var(--color-border-panel);
-  border-radius: var(--size-18);
+  border-radius: var(--space-4_5);
   background: var(--color-bg-surface-soft);
   text-align: left;
   cursor: pointer;
@@ -157,7 +157,7 @@ onMounted(() => {
   justify-content: center;
   width: var(--size-40);
   height: var(--size-40);
-  border-radius: var(--radius-round);
+  border-radius: var(--radius-pill);
   background: transparent;
   flex-shrink: 0;
 }
@@ -167,7 +167,7 @@ onMounted(() => {
 }
 
 .cron-empty-template-title {
-  font-size: var(--font-size-lg);
+  font-size: var(--text-title-sm-size);
   font-weight: 700;
   color: var(--color-text-heading);
 }
@@ -175,7 +175,7 @@ onMounted(() => {
 .cron-empty-template-description {
   margin-top: var(--space-2);
   color: var(--color-text-cool-gray);
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   line-height: 1.7;
 }
 
@@ -187,7 +187,7 @@ onMounted(() => {
   .cron-page-content {
     height: auto;
     min-height: 100dvh;
-    padding: var(--size-16);
+    padding: var(--space-4);
     overflow: visible;
   }
 

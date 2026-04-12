@@ -134,12 +134,12 @@ const modelSelectWidthCh = computed(() => {
 }
 
 .composer-tool-btn {
-  padding: var(--size-7) var(--space-3);
+  padding: var(--space-1_5) var(--space-3);
   border: 0;
   border-radius: var(--radius-pill);
   background: transparent;
   color: var(--color-text-subtle);
-  font-size: var(--font-size-xs);
+  font-size: var(--text-caption-size);
   font-weight: 600;
   cursor: pointer;
   transition: color 0.16s ease, background-color 0.16s ease;

@@ -280,7 +280,7 @@ onBeforeUnmount(() => {
 .applied-jinnang {
   display: inline-flex;
   align-items: center;
-  gap: var(--size-8);
+  gap: var(--space-2);
   align-self: flex-start;
   width: fit-content;
   max-width: 100%;
@@ -326,7 +326,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--font-size-xs);
+  font-size: var(--text-caption-size);
   font-weight: 700;
   color: var(--color-text-brand);
 }
@@ -345,7 +345,7 @@ onBeforeUnmount(() => {
 }
 
 .composer-upload-hint {
-  font-size: var(--font-size-xs);
+  font-size: var(--text-caption-size);
   color: var(--color-text-muted);
   line-height: 1.5;
 }

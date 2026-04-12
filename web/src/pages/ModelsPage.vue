@@ -484,14 +484,14 @@ onMounted(() => {
 }
 
 .provider-name {
-  font-size: var(--font-size-lg);
+  font-size: var(--text-title-sm-size);
   font-weight: 600;
 }
 
 .provider-protocol {
   margin-top: var(--space-1_5);
   color: var(--color-text-muted);
-  font-size: var(--font-size-xs);
+  font-size: var(--text-caption-size);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -502,7 +502,7 @@ onMounted(() => {
   gap: var(--space-3);
   margin-bottom: var(--space-3);
   color: var(--color-text-secondary);
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
 }
 
 .provider-meta span:last-child {

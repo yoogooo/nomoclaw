@@ -86,8 +86,8 @@ function closePreview() {
   position: absolute;
   right: var(--space-2);
   top: var(--space-2);
-  width: var(--size-24);
-  height: var(--size-24);
+  width: var(--space-6);
+  height: var(--space-6);
   border: 0;
   border-radius: var(--radius-pill);
   background: transparent;
@@ -103,8 +103,8 @@ function closePreview() {
 }
 
 .jinnang-picker-title {
-  font-size: var(--font-size-xs);
-  padding-right: var(--size-28);
+  font-size: var(--text-caption-size);
+  padding-right: var(--space-7);
 }
 
 .jinnang-picker-list {
@@ -167,8 +167,8 @@ function closePreview() {
 .jinnang-radio-ui {
   display: inline-block;
   flex: none;
-  width: var(--size-16);
-  height: var(--size-16);
+  width: var(--space-4);
+  height: var(--space-4);
   border: var(--size-1_5) solid var(--color-border-strong);
   border-radius: var(--radius-pill);
   background: var(--color-bg-surface-mute);
@@ -177,7 +177,7 @@ function closePreview() {
 
 .jinnang-option.active .jinnang-radio-ui {
   border-color: var(--color-accent-brand);
-  box-shadow: 0 0 0 var(--size-2) var(--color-overlay-brand-15);
+  box-shadow: 0 0 0 var(--space-0_5) var(--color-overlay-brand-15);
 }
 
 .jinnang-option.active .jinnang-radio-ui::after {
@@ -197,16 +197,16 @@ function closePreview() {
   display: flex;
   flex-direction: column;
   gap: var(--space-1_5);
-  padding-right: var(--size-96);
+  padding-right: var(--space-jinnang-preview-right);
 }
 
 .jinnang-option-title {
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
 }
 
 .jinnang-option-summary {
   color: var(--color-text-subtle);
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   line-height: 1.45;
 }
 
@@ -218,10 +218,10 @@ function closePreview() {
   align-items: center;
   border: var(--size-1) solid var(--color-border-brand-soft-hover);
   border-radius: var(--radius-pill);
-  padding: var(--size-3) var(--space-1_5);
+  padding: var(--space-1) var(--space-1_5);
   background: var(--color-bg-brand-soft);
   color: var(--color-text-brand-strong);
-  font-size: var(--font-size-2xs);
+  font-size: var(--text-caption-size);
   font-weight: 600;
   letter-spacing: 0.01em;
   box-shadow: var(--shadow-soft-sm);
@@ -245,7 +245,7 @@ function closePreview() {
 .jinnang-picker-empty {
   margin-top: var(--space-2);
   color: var(--color-text-runtime-subtle);
-  font-size: var(--font-size-xs);
+  font-size: var(--text-caption-size);
 }
 
 .jinnang-preview-panel {
@@ -272,7 +272,7 @@ function closePreview() {
 }
 
 .jinnang-preview-title {
-  font-size: var(--font-size-md);
+  font-size: var(--text-body-size);
   font-weight: 700;
   color: var(--color-text-heading);
   line-height: 1.45;
@@ -281,8 +281,8 @@ function closePreview() {
 .jinnang-preview-close {
   border: 0;
   background: transparent;
-  width: var(--size-24);
-  height: var(--size-24);
+  width: var(--space-6);
+  height: var(--space-6);
   border-radius: var(--radius-pill);
   color: var(--color-text-subtle);
   display: inline-flex;
@@ -296,7 +296,7 @@ function closePreview() {
 }
 
 .jinnang-preview-summary {
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   line-height: 1.6;
   color: var(--color-text-subtle);
 }

@@ -81,14 +81,14 @@ const { t } = useI18n();
 
 .runtime-title {
   margin: 0;
-  font-size: var(--font-size-lg);
+  font-size: var(--text-title-sm-size);
   font-weight: 600;
   color: var(--color-text-runtime);
 }
 
 .runtime-subtitle {
   margin: var(--space-1) 0 0;
-  font-size: var(--font-size-md);
+  font-size: var(--text-body-size);
   line-height: 1.5;
   color: var(--color-text-runtime-subtle);
 }
@@ -144,14 +144,14 @@ const { t } = useI18n();
 .runtime-log-list {
   display: flex;
   flex-direction: column;
-  gap: var(--size-2);
+  gap: var(--space-0_5);
 }
 
 .runtime-line {
   padding: var(--space-2) 0;
   white-space: pre-wrap;
   word-break: break-word;
-  font-size: var(--font-size-md);
+  font-size: var(--text-body-size);
   line-height: 1.6;
   color: var(--color-text-runtime-line);
 }

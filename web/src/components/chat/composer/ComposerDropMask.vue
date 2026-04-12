@@ -28,7 +28,7 @@ const { t } = useI18n();
 }
 
 .composer-drop-title {
-  font-size: var(--font-size-lg);
+  font-size: var(--text-title-sm-size);
   font-weight: 800;
   color: var(--color-text-brand);
 }
@@ -36,7 +36,7 @@ const { t } = useI18n();
 .composer-drop-subtitle {
   max-width: var(--size-420);
   text-align: center;
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   color: var(--color-text-secondary);
   line-height: 1.6;
 }

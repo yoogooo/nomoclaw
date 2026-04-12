@@ -171,7 +171,7 @@ function toggleThemeMode() {
   background: var(--color-bg-rail-avatar);
   border: var(--size-1) solid var(--color-border-rail-avatar);
   color: var(--color-text-rail-avatar);
-  font-size: var(--font-size-md);
+  font-size: var(--text-body-size);
   font-weight: 700;
   letter-spacing: 0.01em;
 }
@@ -204,7 +204,7 @@ function toggleThemeMode() {
   .rail-item {
     width: var(--size-44);
     height: var(--size-44);
-    border-radius: var(--radius-m-lg);
+    border-radius: var(--radius-md);
   }
 
   .rail-brand-mark {

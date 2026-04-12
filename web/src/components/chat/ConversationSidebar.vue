@@ -135,7 +135,7 @@ function createConversationAndFocusInput() {
   border-color: var(--color-border-strong);
   background: var(--color-bg-surface-soft);
   color: var(--color-text-secondary);
-  font-size: var(--font-size-xs);
+  font-size: var(--text-caption-size);
   font-weight: 600;
   cursor: pointer;
   transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease;
@@ -150,7 +150,7 @@ function createConversationAndFocusInput() {
 .conversation-list {
   flex: 1;
   width: calc(100% + var(--size-48));
-  margin: 0 calc(var(--size-24) * -1);
+  margin: 0 calc(var(--space-6) * -1);
 }
 
 .conversation-list-empty {
@@ -158,7 +158,7 @@ function createConversationAndFocusInput() {
   min-height: 100%;
   place-items: center;
   color: var(--color-text-runtime-subtle);
-  font-size: var(--font-size-md);
+  font-size: var(--text-body-size);
 }
 
 .conversation-row {
@@ -197,7 +197,7 @@ function createConversationAndFocusInput() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--font-size-md);
+  font-size: var(--text-body-size);
   line-height: 1.4;
   font-weight: 500;
   color: var(--color-text-primary);
@@ -209,7 +209,7 @@ function createConversationAndFocusInput() {
 
 .conversation-time {
   margin-top: var(--space-2);
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   color: var(--text-muted);
 }
 
@@ -255,7 +255,7 @@ function createConversationAndFocusInput() {
 
   .create-conversation-button {
     padding: var(--space-1) var(--space-2_5);
-    font-size: var(--font-size-2xs);
+    font-size: var(--text-caption-size);
   }
 
   .conversation-list {

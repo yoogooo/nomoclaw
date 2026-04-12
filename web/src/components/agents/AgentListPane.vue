@@ -84,7 +84,7 @@ function avatarFallbackText(agent: ManagedAgent) {
 
 .new-agent-btn {
   min-width: var(--size-108);
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-md);
 }
 
 .agent-list {
@@ -102,7 +102,7 @@ function avatarFallbackText(agent: ManagedAgent) {
   gap: var(--space-3);
   padding: var(--space-2_5) var(--space-3);
   border: var(--size-1) solid var(--color-border-soft);
-  border-radius: var(--radius-xl-2);
+  border-radius: var(--radius-xl);
   background: var(--color-bg-surface);
   text-align: left;
   cursor: pointer;
@@ -147,7 +147,7 @@ function avatarFallbackText(agent: ManagedAgent) {
 .agent-item-meta {
   margin-top: var(--space-1);
   color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
 }
 
 .agent-row.active .agent-item-avatar {

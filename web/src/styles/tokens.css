@@ -1,22 +1,42 @@
 :root {
   color-scheme: light;
+  /*
+   * Tokens V2 conventions:
+   * 1) Components should consume semantic tokens (text/container/control/space aliases).
+   * 2) Foundation tokens (e.g. --text-sm, --size-*) are reserved for token composition.
+   * 3) Spacing properties must use --space-* tokens, not --size-* tokens.
+   */
 
-  /* Typography */
+  /* Typography (Foundation: Tailwind-aligned scale) */
   --font-sans: "IBM Plex Sans", "PingFang SC", sans-serif;
   --font-mono: "IBM Plex Mono", "SFMono-Regular", monospace;
-  --font-size-2xs: 11px;
-  --font-size-xs: 12px;
-  --font-size-sm: 13px;
-  --font-size-md: 14px;
-  --font-size-lg: 16px;
-  --font-size-body-xs: 12px;
-  --font-size-body-sm: 14px;
-  --font-size-body-md: 16px;
-  --font-size-title-lg: 20px;
-  --font-size-title-xl: 24px;
+  --text-xs: 0.75rem; /* 12px */
+  --text-sm: 0.875rem; /* 14px */
+  --text-base: 1rem; /* 16px */
+  --text-lg: 1.125rem; /* 18px */
+  --text-xl: 1.25rem; /* 20px */
+  --text-2xl: 1.5rem; /* 24px */
+  --text-xs--line-height: calc(1rem / 0.75rem);
+  --text-sm--line-height: calc(1.25rem / 0.875rem);
+  --text-base--line-height: calc(1.5rem / 1rem);
+  --text-lg--line-height: calc(1.75rem / 1.125rem);
+  --text-xl--line-height: calc(1.75rem / 1.25rem);
+  --text-2xl--line-height: calc(2rem / 1.5rem);
   --font-weight-regular: 400;
+  --font-weight-medium: 500;
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
+  /* Typography (Semantic) */
+  --text-caption-size: var(--text-xs);
+  --text-caption-line-height: var(--text-xs--line-height);
+  --text-body-size: var(--text-sm);
+  --text-body-line-height: var(--text-sm--line-height);
+  --text-title-sm-size: var(--text-base);
+  --text-title-sm-line-height: var(--text-base--line-height);
+  --text-title-md-size: var(--text-xl);
+  --text-title-md-line-height: var(--text-xl--line-height);
+  --text-title-lg-size: var(--text-2xl);
+  --text-title-lg-line-height: var(--text-2xl--line-height);
 
   /* Brand */
   --color-brand-500: #0F766E;
@@ -223,21 +243,22 @@
   --color-avatar-chip: #0369A1;
   --color-avatar-design: #DB2777;
 
-  /* Spacing */
-  --space-1: 4px;
-  --space-1_5: 6px;
-  --space-2: 8px;
-  --space-2_5: 10px;
-  --space-3: 12px;
-  --space-3_5: 14px;
-  --space-4: 16px;
-  --space-4_5: 18px;
-  --space-5: 20px;
-  --space-5_5: 22px;
-  --space-6: 24px;
-  --space-7: 28px;
-  --space-8: 32px;
-
+  /* Spacing (Foundation, rem-first) */
+  --space-0: 0;
+  --space-0_5: 0.125rem;
+  --space-1: 0.25rem;
+  --space-1_5: 0.375rem;
+  --space-2: 0.5rem;
+  --space-2_5: 0.625rem;
+  --space-3: 0.75rem;
+  --space-3_5: 0.875rem;
+  --space-4: 1rem;
+  --space-4_5: 1.125rem;
+  --space-5: 1.25rem;
+  --space-5_5: 1.375rem;
+  --space-6: 1.5rem;
+  --space-7: 1.75rem;
+  --space-8: 2rem;
   /* Semantic spacing aliases */
   --space-gap-xs: var(--space-1);
   --space-gap-sm: var(--space-2);
@@ -249,14 +270,16 @@
   --space-section-gap: var(--space-6);
   --space-form-item-gap: var(--space-3);
   --space-inline-control-gap: var(--space-2);
-  --space-detail-list-offset: var(--size-18);
-  --space-detail-list-gap: var(--size-16);
-
+  --space-detail-list-offset: var(--space-4_5);
+  --space-detail-list-gap: var(--space-4);
+  --space-anchor-offset: 5.5rem;
+  --space-jinnang-preview-right: 6rem;
+  --space-chat-mobile-input-offset: 11.875rem;
   /* Layout semantics */
-  --layout-main-content-padding-desktop: var(--size-28);
-  --layout-main-content-padding-mobile: var(--size-18);
+  --layout-main-content-padding-desktop: var(--space-7);
+  --layout-main-content-padding-mobile: var(--space-4_5);
 
-  /* Fixed size */
+  /* Size (Foundation, non-spacing only) */
   --size-1: 1px;
   --size-1_5: 1.5px;
   --size-2: 2px;
@@ -264,36 +287,27 @@
   --size-4: 4px;
   --size-7: 7px;
   --size-8: 8px;
-  --size-9: 9px;
   --size-10: 10px;
   --size-12: 12px;
-  --size-13: 13px;
   --size-14: 14px;
-  --size-16: 16px;
   --size-15: 15px;
-  --size-17: 17px;
+  --size-16: 16px;
   --size-18: 18px;
   --size-20: 20px;
-  --size-22: 22px;
-  --size-23: 23px;
   --size-24: 24px;
   --size-26: 26px;
   --size-28: 28px;
   --size-30: 30px;
   --size-32: 32px;
-  --size-34: 34px;
   --size-36: 36px;
   --size-40: 40px;
   --size-42: 42px;
   --size-44: 44px;
   --size-48: 48px;
-  --size-56: 56px;
   --size-54: 54px;
+  --size-56: 56px;
   --size-72: 72px;
-  --size-76: 76px;
   --size-84: 84px;
-  --size-88: 88px;
-  --size-92: 92px;
   --size-96: 96px;
   --size-108: 108px;
   --size-140: 140px;
@@ -307,33 +321,40 @@
   --size-320: 320px;
   --size-360: 360px;
   --size-420: 420px;
-  --size-460: 460px;
-  --size-620: 620px;
-  --size-720: 720px;
   --size-760: 760px;
-  --size-860: 860px;
   --size-900: 900px;
-  --size-980: 980px;
   --size-percent-message-max: 92%;
-
-  /* Breakpoint */
+  /* Breakpoints */
   --size-breakpoint-md: 860px;
   --size-breakpoint-lg: 1120px;
   --size-breakpoint-xl: 1480px;
+  /* Container semantics */
+  --container-xs: 26.25rem; /* 420px */
+  --container-sm: 38.75rem; /* 620px */
+  --container-md: 45rem; /* 720px */
+  --container-lg: 53.75rem; /* 860px */
+  --container-xl: 61.25rem; /* 980px */
+  /* Control semantics */
+  --control-height-sm: 2rem;
+  --control-height-md: 2.5rem;
+  --control-height-lg: 2.75rem;
+  --control-radius-sm: 0.5rem;
+  --control-radius-md: 0.625rem;
+  --control-radius-lg: 0.75rem;
+  --control-padding-x-sm: var(--space-2_5);
+  --control-padding-x-md: var(--space-3);
+  --control-padding-x-lg: var(--space-4);
+  --control-padding-y-sm: var(--space-1_5);
+  --control-padding-y-md: var(--space-2);
+  --control-padding-y-lg: var(--space-2_5);
 
-  /* Radius & spacing */
-  --radius-sm: 6px;
-  --radius-s-md: 10px;
-  --radius-m: 12px;
-  --radius-m-lg: 14px;
-  --radius-md: 16px;
-  --radius-lg: 18px;
-  --radius-l: var(--radius-lg);
-  --radius-xl-2: 20px;
-  --radius-xl: 24px;
-  --radius-2xl: 28px;
+  /* Radius */
+  --radius-sm: 0.375rem; /* 6px */
+  --radius-md: 0.75rem; /* 12px */
+  --radius-lg: 1.125rem; /* 18px */
+  --radius-xl: 1.5rem; /* 24px */
+  --radius-2xl: 1.75rem; /* 28px */
   --radius-pill: 999px;
-  --radius-round: var(--radius-pill);
 
   /* Runtime-overridable component variables with sensible defaults */
   --ds-bg-card: var(--color-bg-surface);

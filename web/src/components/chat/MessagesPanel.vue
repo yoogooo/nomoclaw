@@ -463,7 +463,7 @@ function applyStarterPrompt(prompt: string) {
 }
 
 .conversation-empty-hero {
-  width: min(100%, var(--size-720));
+  width: min(100%, var(--container-md));
   border-radius: var(--radius-xl);
   padding: var(--space-6) var(--space-6);
   background: color-mix(in srgb, var(--color-bg-surface) 74%, transparent);
@@ -475,7 +475,7 @@ function applyStarterPrompt(prompt: string) {
 
 .conversation-empty-title {
   color: var(--color-text-heading);
-  font-size: clamp(var(--size-24), 2.8vw, var(--size-26));
+  font-size: clamp(var(--space-6), 2.8vw, var(--size-26));
   line-height: 1.12;
   font-weight: 600;
   letter-spacing: 0.01em;
@@ -483,7 +483,7 @@ function applyStarterPrompt(prompt: string) {
 
 .conversation-empty-hint {
   color: var(--color-text-muted);
-  font-size: var(--font-size-xs);
+  font-size: var(--text-caption-size);
 }
 
 .conversation-starter-prompts {
@@ -499,7 +499,7 @@ function applyStarterPrompt(prompt: string) {
   border-radius: var(--radius-xl);
   background: color-mix(in srgb, var(--color-bg-surface-soft) 76%, transparent);
   color: var(--color-text-secondary);
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   padding: var(--space-4);
   min-height: var(--size-108);
   text-align: left;
@@ -516,26 +516,26 @@ function applyStarterPrompt(prompt: string) {
   background: var(--color-bg-soft-hover);
   color: var(--color-text-primary);
   box-shadow: 0 14px 28px rgba(15, 23, 42, 0.1);
-  transform: translateY(calc(var(--size-2) * -1));
+  transform: translateY(calc(var(--space-0_5) * -1));
 }
 
 .starter-prompt-title {
   color: var(--color-text-primary);
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   line-height: 1.35;
   font-weight: 600;
 }
 
 .starter-prompt-summary {
   color: var(--color-text-muted);
-  font-size: var(--font-size-xs);
+  font-size: var(--text-caption-size);
   line-height: 1.45;
   min-height: calc(1.45em * 3);
 }
 
 @media (max-width: var(--size-breakpoint-lg)) {
   .conversation-empty-hero {
-    width: min(100%, var(--size-620));
+    width: min(100%, var(--container-sm));
   }
 
   .conversation-starter-prompts {
@@ -571,7 +571,7 @@ function applyStarterPrompt(prompt: string) {
 
 .message-role {
   margin-bottom: var(--space-2);
-  font-size: var(--font-size-2xs);
+  font-size: var(--text-caption-size);
   font-weight: 700;
   letter-spacing: 0.22em;
   color: var(--text-muted);
@@ -580,7 +580,7 @@ function applyStarterPrompt(prompt: string) {
 .message-bubble {
   max-width: 92%;
   padding: var(--space-2_5) var(--space-4);
-  border-radius: var(--radius-xl) var(--radius-xl) var(--radius-xl) var(--radius-s-md);
+  border-radius: var(--radius-xl) var(--radius-xl) var(--radius-xl) var(--control-radius-md);
   background: var(--color-chat-bubble-assistant-bg);
   line-height: 1.75;
   overflow-wrap: anywhere;
@@ -588,7 +588,7 @@ function applyStarterPrompt(prompt: string) {
 }
 
 .message-bubble.user {
-  border-radius: var(--radius-xl) var(--radius-xl) var(--radius-s-md) var(--radius-xl);
+  border-radius: var(--radius-xl) var(--radius-xl) var(--control-radius-md) var(--radius-xl);
   background: var(--color-chat-bubble-user-bg);
   color: var(--color-text-inverse);
 }
@@ -610,7 +610,7 @@ function applyStarterPrompt(prompt: string) {
   border: none;
   background: transparent;
   color: var(--color-text-brand-strong);
-  font-size: var(--font-size-xs);
+  font-size: var(--text-caption-size);
   line-height: 1.3;
   cursor: pointer;
   padding: 0;
@@ -662,7 +662,7 @@ function applyStarterPrompt(prompt: string) {
   justify-content: center;
   background: var(--color-bg-brand-soft);
   color: var(--color-text-brand);
-  font-size: var(--font-size-2xs);
+  font-size: var(--text-caption-size);
   font-weight: 800;
   letter-spacing: 0.08em;
 }
@@ -672,7 +672,7 @@ function applyStarterPrompt(prompt: string) {
 }
 
 .message-attachment-name {
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   font-weight: 700;
   color: inherit;
   overflow: hidden;
@@ -682,17 +682,17 @@ function applyStarterPrompt(prompt: string) {
 
 .message-attachment-subtitle {
   margin-top: var(--space-1);
-  font-size: var(--font-size-xs);
+  font-size: var(--text-caption-size);
   color: var(--color-text-muted);
 }
 
 .message-time {
-  font-size: var(--font-size-2xs);
+  font-size: var(--text-caption-size);
   color: var(--text-muted);
 }
 
 .user-message-time {
-  width: min(var(--size-percent-message-max), var(--size-980));
+  width: min(var(--size-percent-message-max), var(--container-xl));
   margin-top: var(--space-1);
   padding-right: var(--space-1_5);
   text-align: right;
@@ -703,7 +703,7 @@ function applyStarterPrompt(prompt: string) {
   align-items: center;
   justify-content: flex-start;
   gap: var(--space-3);
-  width: min(var(--size-percent-message-max), var(--size-980));
+  width: min(var(--size-percent-message-max), var(--container-xl));
   margin-top: var(--space-1);
   opacity: 0;
   visibility: hidden;
@@ -739,7 +739,7 @@ function applyStarterPrompt(prompt: string) {
   align-items: center;
   gap: var(--space-2);
   color: var(--color-text-cool-gray);
-  font-size: var(--font-size-2xs);
+  font-size: var(--text-caption-size);
   line-height: 1;
 }
 
@@ -759,15 +759,15 @@ function applyStarterPrompt(prompt: string) {
   padding: var(--space-1) var(--space-2_5);
   background: var(--color-bg-overlay-light);
   color: var(--color-text-subtle);
-  font-size: var(--font-size-2xs);
+  font-size: var(--text-caption-size);
   line-height: 1.2;
   cursor: pointer;
   transition: all 0.16s ease;
 }
 
 .message-action-btn.icon-only {
-  width: var(--size-24);
-  height: var(--size-24);
+  width: var(--space-6);
+  height: var(--space-6);
   padding: 0;
   border: none;
   background: transparent;
@@ -844,12 +844,12 @@ function applyStarterPrompt(prompt: string) {
   right: 0;
   bottom: calc(100% + var(--space-1_5));
   white-space: nowrap;
-  font-size: var(--font-size-2xs);
+  font-size: var(--text-caption-size);
   color: var(--color-text-brand-strong);
   background: var(--color-bg-brand-tint-12);
   border: var(--size-1) solid var(--color-border-accent-soft);
   border-radius: var(--radius-pill);
-  padding: var(--size-3) var(--space-2);
+  padding: var(--space-1) var(--space-2);
   box-shadow: var(--shadow-soft-md);
   animation: hint-in 0.16s ease-out;
 }
@@ -857,7 +857,7 @@ function applyStarterPrompt(prompt: string) {
 @keyframes hint-in {
   from {
     opacity: 0;
-    transform: translateY(var(--size-3));
+    transform: translateY(var(--space-1));
   }
   to {
     opacity: 1;
@@ -875,12 +875,12 @@ function applyStarterPrompt(prompt: string) {
 }
 
 .run-card {
-  width: min(var(--size-percent-message-max), var(--size-980));
+  width: min(var(--size-percent-message-max), var(--container-xl));
   margin-top: var(--space-3_5);
 }
 
 .run-title {
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -901,7 +901,7 @@ function applyStarterPrompt(prompt: string) {
   display: flex;
   gap: var(--space-2);
   padding: var(--space-4) var(--space-4_5);
-  border-radius: var(--radius-xl) var(--radius-xl) var(--radius-xl) var(--radius-s-md);
+  border-radius: var(--radius-xl) var(--radius-xl) var(--radius-xl) var(--control-radius-md);
   background: var(--color-chat-bubble-assistant-bg);
 }
 
@@ -928,7 +928,7 @@ function applyStarterPrompt(prompt: string) {
   }
   40% {
     opacity: 1;
-    transform: translateY(calc(var(--size-3) * -1));
+    transform: translateY(calc(var(--space-1) * -1));
   }
 }
 
@@ -943,7 +943,7 @@ function applyStarterPrompt(prompt: string) {
 
 @media (max-width: var(--size-breakpoint-lg)) {
   .message-list {
-    padding-bottom: calc(var(--size-190) + env(safe-area-inset-bottom));
+    padding-bottom: calc(var(--space-chat-mobile-input-offset) + env(safe-area-inset-bottom));
     -webkit-overflow-scrolling: touch;
   }
 }

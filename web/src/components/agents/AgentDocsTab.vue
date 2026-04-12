@@ -146,7 +146,7 @@ const { t } = useI18n();
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2_5);
-  font-size: var(--font-size-xs);
+  font-size: var(--text-caption-size);
   color: var(--color-text-soft);
 }
 
@@ -173,7 +173,7 @@ const { t } = useI18n();
 }
 
 .docs-editor-title {
-  font-size: var(--font-size-lg);
+  font-size: var(--text-title-sm-size);
   font-weight: 600;
 }
 

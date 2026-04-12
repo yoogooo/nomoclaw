@@ -448,7 +448,7 @@ onMounted(() => {
   gap: var(--space-2);
   margin-bottom: var(--space-2);
   color: var(--color-text-secondary);
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
 }
 
 .card-row span:last-child {
@@ -496,14 +496,14 @@ onMounted(() => {
 }
 
 .bot-name {
-  font-size: var(--font-size-md);
+  font-size: var(--text-body-size);
   font-weight: 600;
 }
 
 .bot-id-sub {
   margin-top: var(--space-1);
   color: var(--color-text-tertiary);
-  font-size: var(--font-size-xs);
+  font-size: var(--text-caption-size);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 

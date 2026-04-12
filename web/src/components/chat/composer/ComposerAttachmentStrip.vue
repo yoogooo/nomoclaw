@@ -123,7 +123,7 @@ function isImageAttachment(attachment: ConversationAttachment) {
 
 .composer-attachment-name {
   max-width: 122px;
-  font-size: var(--font-size-xs);
+  font-size: var(--text-caption-size);
   font-weight: 500;
   color: var(--color-text-primary);
   overflow: hidden;

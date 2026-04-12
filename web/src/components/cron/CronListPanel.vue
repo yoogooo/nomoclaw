@@ -134,7 +134,7 @@ const groupedJobs = computed(() => {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  padding: var(--size-2) var(--size-2) var(--space-1_5);
+  padding: var(--space-0_5) var(--space-0_5) var(--space-1_5);
 }
 
 .cron-group {
@@ -155,14 +155,14 @@ const groupedJobs = computed(() => {
 }
 
 .cron-group-title {
-  font-size: var(--size-15);
+  font-size: var(--text-title-sm-size);
   font-weight: 600;
   color: var(--color-text-heading);
 }
 
 .cron-group-count {
   margin-top: var(--space-1);
-  font-size: var(--font-size-xs);
+  font-size: var(--text-caption-size);
   color: var(--text-muted);
 }
 
@@ -173,7 +173,7 @@ const groupedJobs = computed(() => {
   margin: var(--space-2) var(--space-2_5);
   padding: var(--space-3) var(--space-3);
   border: var(--size-1) solid var(--color-border-slate-light);
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-md);
   background: var(--color-bg-surface-soft);
 }
 
@@ -195,13 +195,13 @@ const groupedJobs = computed(() => {
 }
 
 .cron-title {
-  font-size: var(--font-size-md);
+  font-size: var(--text-body-size);
   font-weight: 600;
 }
 
 .cron-next {
   margin-top: var(--space-1_5);
-  font-size: var(--font-size-xs);
+  font-size: var(--text-caption-size);
   color: var(--text-muted);
 }
 
@@ -216,7 +216,7 @@ const groupedJobs = computed(() => {
 }
 
 .cron-empty-title {
-  font-size: var(--font-size-lg);
+  font-size: var(--text-title-sm-size);
   font-weight: 600;
   color: var(--color-text-heading);
 }
@@ -224,12 +224,12 @@ const groupedJobs = computed(() => {
 .cron-empty-subtitle {
   max-width: var(--size-320);
   color: var(--color-text-cool-gray);
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   line-height: 1.6;
 }
 
 .cron-bulk-selected {
   color: var(--color-text-secondary);
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
 }
 </style>
