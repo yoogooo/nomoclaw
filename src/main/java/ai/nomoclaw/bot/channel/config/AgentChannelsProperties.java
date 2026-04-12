@@ -16,7 +16,7 @@ public class AgentChannelsProperties {
     private boolean processingAckEnabled = true;
     private String processingAckText = "正在处理，请稍候...";
     @Min(1)
-    private int workers = 4;
+    private int workers = 1;
     @Min(10)
     private int queueSize = 1000;
     private final Feishu feishu = new Feishu();

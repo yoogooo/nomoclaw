@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { NButton } from "naive-ui";
 import { useConversationStore } from "@/stores/conversation";
 
@@ -10,6 +11,7 @@ const props = withDefaults(defineProps<{
 });
 
 const conversationStore = useConversationStore();
+const { t } = useI18n();
 const visible = computed(() => props.forceVisible || Boolean(conversationStore.approval.stepUid));
 const bannerRef = ref<HTMLElement | null>(null);
 const isSubmitting = computed(() => conversationStore.approval.submitting);
@@ -48,13 +50,13 @@ onMounted(() => {
     role="alertdialog"
     tabindex="-1"
     aria-live="assertive"
-    aria-label="高风险操作待确认"
+    :aria-label="t('chat.approval.waiting')"
   >
     <div class="ui-approval-content">
       <div class="ui-approval-head">
         <div class="ui-approval-icon" aria-hidden="true">!</div>
         <div>
-          <div class="ui-approval-headline">高风险操作待确认</div>
+          <div class="ui-approval-headline">{{ t("chat.approval.waiting") }}</div>
           <div class="ui-approval-title">{{ conversationStore.approval.title }}</div>
         </div>
       </div>
@@ -67,7 +69,7 @@ onMounted(() => {
           :disabled="isSubmitting || missingStepUid"
           @click="conversationStore.approveStep()"
         >
-          {{ approveLoading ? "继续执行中" : "继续执行" }}
+          {{ approveLoading ? t("chat.approval.approving") : t("chat.approval.approve") }}
         </n-button>
         <n-button
           class="ui-approval-reject-btn"
@@ -77,7 +79,7 @@ onMounted(() => {
           :disabled="isSubmitting || missingStepUid"
           @click="conversationStore.rejectStep()"
         >
-          {{ rejectLoading ? "拒绝中" : "拒绝本次操作" }}
+          {{ rejectLoading ? t("chat.approval.rejecting") : t("chat.approval.reject") }}
         </n-button>
       </div>
     </div>

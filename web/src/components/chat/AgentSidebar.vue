@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import {
   Bot,
   Briefcase,
@@ -23,9 +24,11 @@ import {
 } from "lucide-vue-next";
 import { useAgentCatalogStore } from "@/stores/agentCatalog";
 import { useConversationStore } from "@/stores/conversation";
+import { getSortLocale } from "@/i18n";
 
 const agentCatalogStore = useAgentCatalogStore();
 const conversationStore = useConversationStore();
+const { t } = useI18n();
 
 const AVATAR_ICON_MAP = {
   bot: Bot,
@@ -76,7 +79,7 @@ const agents = computed(() =>
     if (left.sortIndex !== right.sortIndex) {
       return left.sortIndex - right.sortIndex;
     }
-    return (left.displayName || left.agentName).localeCompare(right.displayName || right.agentName, "zh-CN");
+    return (left.displayName || left.agentName).localeCompare(right.displayName || right.agentName, getSortLocale());
   })
 );
 
@@ -107,11 +110,11 @@ function avatarBgColor(raw?: string | null, explicitColor?: string | null) {
   <aside class="panel agent-sidebar">
     <div class="agent-brand">
       <div class="agent-brand-title">NomoClaw</div>
-      <div class="agent-brand-subtitle">你的私人助理</div>
+      <div class="agent-brand-subtitle">{{ t("chat.agentSidebar.subtitle") }}</div>
     </div>
 
     <div class="panel-body agent-sidebar-body">
-      <div class="section-label">单聊</div>
+      <div class="section-label">{{ t("chat.agentSidebar.directChat") }}</div>
       <div class="agent-list">
         <button
           v-for="agent in agents"
@@ -128,7 +131,7 @@ function avatarBgColor(raw?: string | null, explicitColor?: string | null) {
         </button>
       </div>
 
-      <div class="section-label section-spacing">团队</div>
+      <div class="section-label section-spacing">{{ t("chat.agentSidebar.team") }}</div>
       <div class="agent-list">
         <button
           v-for="group in agentCatalogStore.groups"
@@ -248,7 +251,7 @@ function avatarBgColor(raw?: string | null, explicitColor?: string | null) {
   z-index: 1;
   margin: 0;
   padding: var(--space-1_5) 0 var(--space-2);
-  background: var(--color-gradient-agent-sticky);
+  background: transparent;
 }
 
 @media (max-width: var(--size-breakpoint-lg)) {

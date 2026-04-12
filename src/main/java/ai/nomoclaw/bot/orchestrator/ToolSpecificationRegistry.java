@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -193,7 +194,7 @@ public class ToolSpecificationRegistry {
         }
         return enabledToolKeys.stream()
                 .map(toolSpecificationsByName::get)
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .toList();
     }
 
@@ -216,7 +217,8 @@ public class ToolSpecificationRegistry {
 
         List<AgentToolRelationEntity> relations = agentToolRelationRepository.listActiveByAgentUid(agent.getAgentUid());
         if (relations.isEmpty()) {
-            return null;
+            // No active relation means "no tools enabled" for this agent.
+            return List.of();
         }
 
         Set<String> builtinKeys = toolSpecificationsByName.keySet();

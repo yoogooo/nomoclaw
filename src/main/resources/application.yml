@@ -20,16 +20,20 @@ spring:
       "org.quartz.scheduler.instanceId": AUTO
       "org.quartz.jobStore.isClustered": false
       "org.quartz.jobStore.misfireThreshold": 60000
-      "org.quartz.threadPool.threadCount": 5
+      "org.quartz.threadPool.threadCount": 3
     # initialize-schema can be enabled with:
     # spring:
     #   sql:
     #     init:
     #       mode: always
-    #       schema-locations: classpath:db/schema.sql
+    #       schema-locations: classpath:db/schema-mysql.sql
 
 server:
   address: 127.0.0.1
+  tomcat:
+    threads:
+      min-spare: 2
+      max: 20
 
 agent:
   command:

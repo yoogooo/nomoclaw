@@ -4,6 +4,7 @@ import ai.nomoclaw.bot.channel.model.ChannelType;
 import ai.nomoclaw.bot.channel.model.OutboundMessage;
 import ai.nomoclaw.bot.channel.spi.ChannelMessageSender;
 import ai.nomoclaw.bot.channel.config.AgentChannelsProperties;
+import ai.nomoclaw.bot.channel.config.ChannelBotCredentialResolver;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lark.oapi.Client;
@@ -22,6 +23,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 
 @Component
@@ -30,21 +32,25 @@ import java.util.Map;
 public class FeishuChannelMessageSender implements ChannelMessageSender {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+    private final HttpClient httpClient;
     private final String appId;
     private final String appSecret;
     private final boolean processingAckReactionEnabled;
     private final String processingAckReactionType;
     private final Client larkClient;
-    private volatile String tokenValue;
-    private volatile Instant tokenExpireAt = Instant.EPOCH;
+    private final ChannelBotCredentialResolver botCredentialResolver;
+    private final Map<String, TokenState> tokenCache = new HashMap<>();
 
-    public FeishuChannelMessageSender(AgentChannelsProperties properties) {
+    public FeishuChannelMessageSender(AgentChannelsProperties properties,
+                                      ChannelBotCredentialResolver botCredentialResolver,
+                                      HttpClient appHttpClient) {
         this.appId = properties.getFeishu().getAppId();
         this.appSecret = properties.getFeishu().getAppSecret();
         this.processingAckReactionEnabled = properties.getFeishu().isProcessingAckReactionEnabled();
         this.processingAckReactionType = properties.getFeishu().getProcessingAckReactionType();
         this.larkClient = Client.newBuilder(this.appId, this.appSecret).build();
+        this.botCredentialResolver = botCredentialResolver;
+        this.httpClient = appHttpClient;
     }
 
     @Override
@@ -75,7 +81,16 @@ public class FeishuChannelMessageSender implements ChannelMessageSender {
             return;
         }
         try {
-            String token = tenantAccessToken();
+            String requestedBotId = trim(message.metadata().get("botId"));
+            ChannelBotCredentialResolver.FeishuBotCredential credential = botCredentialResolver.resolveFeishu(requestedBotId);
+            if (credential == null) {
+                credential = fallbackCredential();
+            }
+            if (credential == null) {
+                log.warn("[FeishuSender] no available bot credential botId={}", requestedBotId);
+                return;
+            }
+            String token = tenantAccessToken(credential);
             String content = objectMapper.writeValueAsString(Map.of("text", formattedText));
             String body = objectMapper.writeValueAsString(Map.of(
                     "receive_id", target,
@@ -155,13 +170,40 @@ public class FeishuChannelMessageSender implements ChannelMessageSender {
         }
     }
 
-    private synchronized String tenantAccessToken() throws Exception {
-        if (tokenValue != null && Instant.now().isBefore(tokenExpireAt.minusSeconds(60))) {
-            return tokenValue;
+    private ChannelBotCredentialResolver.FeishuBotCredential fallbackCredential() {
+        String defaultBotId = botCredentialResolver.resolveDefaultBotId(ChannelType.FEISHU);
+        ChannelBotCredentialResolver.FeishuBotCredential fromConfig = botCredentialResolver.resolveFeishu(defaultBotId);
+        if (fromConfig != null) {
+            return fromConfig;
+        }
+        if (isBlank(appId) || isBlank(appSecret)) {
+            return null;
+        }
+        return new ChannelBotCredentialResolver.FeishuBotCredential(
+                "default",
+                "Feishu Default",
+                true,
+                true,
+                true,
+                appId,
+                appSecret,
+                processingAckReactionEnabled,
+                processingAckReactionType,
+                "",
+                "",
+                ""
+        );
+    }
+
+    private synchronized String tenantAccessToken(ChannelBotCredentialResolver.FeishuBotCredential credential) throws Exception {
+        String cacheKey = credential.botId() + "|" + credential.appId();
+        TokenState state = tokenCache.get(cacheKey);
+        if (state != null && state.token() != null && Instant.now().isBefore(state.expireAt().minusSeconds(60))) {
+            return state.token();
         }
         String requestBody = objectMapper.writeValueAsString(Map.of(
-                "app_id", appId == null ? "" : appId,
-                "app_secret", appSecret == null ? "" : appSecret
+                "app_id", credential.appId(),
+                "app_secret", credential.appSecret()
         ));
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"))
@@ -175,13 +217,21 @@ public class FeishuChannelMessageSender implements ChannelMessageSender {
         if (code != 0) {
             throw new IllegalStateException("fetch token failed: " + response.body());
         }
-        tokenValue = jsonNode.path("tenant_access_token").asText("");
+        String tokenValue = jsonNode.path("tenant_access_token").asText("");
         int expire = jsonNode.path("expire").asInt(7200);
-        tokenExpireAt = Instant.now().plusSeconds(Math.max(120, expire));
+        Instant tokenExpireAt = Instant.now().plusSeconds(Math.max(120, expire));
+        tokenCache.put(cacheKey, new TokenState(tokenValue, tokenExpireAt));
         return tokenValue;
     }
 
     private String trim(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    private record TokenState(String token, Instant expireAt) {
     }
 }

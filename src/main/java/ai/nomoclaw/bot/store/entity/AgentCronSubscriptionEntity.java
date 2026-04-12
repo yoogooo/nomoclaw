@@ -17,6 +17,7 @@ public class AgentCronSubscriptionEntity {
     private String jobUid;
     private String channel;
     private String target;
+    private String botId;
     private Integer enabled;
     private LocalDateTime createdTime;
     private LocalDateTime updatedTime;

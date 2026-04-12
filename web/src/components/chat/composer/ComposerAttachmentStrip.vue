@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import { FileText, X } from "lucide-vue-next";
 import type { ConversationAttachment } from "@/types/api";
 
@@ -10,6 +11,7 @@ const emit = defineEmits<{
   (e: "preview", fileUrl: string): void;
   (e: "remove", fileUrl: string): void;
 }>();
+const { t } = useI18n();
 
 function formatFileSize(sizeBytes: number) {
   if (sizeBytes >= 1024 * 1024) {
@@ -38,7 +40,7 @@ function isImageAttachment(attachment: ConversationAttachment) {
         v-if="isImageAttachment(attachment)"
         class="composer-attachment-thumb-btn"
         type="button"
-        :aria-label="`预览图片 ${attachment.name}`"
+        :aria-label="t('chat.composer.previewImageAttachment', { name: attachment.name })"
         @click="emit('preview', attachment.fileUrl)"
       >
         <img
@@ -53,7 +55,7 @@ function isImageAttachment(attachment: ConversationAttachment) {
         </span>
         <span class="composer-attachment-name">{{ attachment.name }}</span>
       </div>
-      <button class="composer-attachment-remove" type="button" :aria-label="`移除附件 ${attachment.name}`" @click="emit('remove', attachment.fileUrl)">
+      <button class="composer-attachment-remove" type="button" :aria-label="t('chat.composer.removeAttachment', { name: attachment.name })" @click="emit('remove', attachment.fileUrl)">
         <X :size="16" :stroke-width="2.75" />
       </button>
     </div>

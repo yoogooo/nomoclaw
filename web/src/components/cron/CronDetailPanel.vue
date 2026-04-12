@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { NButton, NCard, NCollapse, NCollapseItem, NEmpty, NFlex, NModal, NPopconfirm, NSelect, NSwitch, NTabPane, NTabs, NTag } from "naive-ui";
 import CronEditModal from "./CronEditModal.vue";
 import { useCronJobsStore } from "@/stores/cronJobs";
 import { channelApi } from "@/api/channelApi";
+import { message } from "@/discrete";
 import {
   cronStatusLabel,
   displayCronJobTitle,
@@ -15,11 +17,17 @@ import {
 import { renderMarkdown } from "@/utils/markdown";
 
 const cronJobsStore = useCronJobsStore();
+const { t } = useI18n();
 const showEditModal = ref(false);
 const savingSubscriptions = ref(false);
 const switchingJobStatus = ref(false);
 const selectedChannel = ref<"feishu" | "dingtalk" | null>(null);
+const selectedBotId = ref("");
 const enabledChannelOptions = ref<Array<{ label: string; value: "feishu" | "dingtalk" }>>([]);
+const channelBotOptions = ref<Record<"feishu" | "dingtalk", Array<{ label: string; value: string }>>>({
+  feishu: [],
+  dingtalk: []
+});
 
 const scheduleSummary = computed(() => cronJobsStore.currentJob ? humanizeCronExpression(cronJobsStore.currentJob.expression) : "-");
 const nextRunText = computed(() => cronJobsStore.currentJob ? formatDateTime(cronJobsStore.currentJob.nextRunTime) : "-");
@@ -30,7 +38,7 @@ const shouldShowNextRun = computed(() =>
 );
 const deadlineText = computed(() => {
   if (!cronJobsStore.currentJob) return "-";
-  return cronJobsStore.currentJob.endAt ? formatDateTime(cronJobsStore.currentJob.endAt) : "长期执行";
+  return cronJobsStore.currentJob.endAt ? formatDateTime(cronJobsStore.currentJob.endAt) : t("cron.detail.longRunning");
 });
 const statusText = computed(() => cronJobsStore.currentJob ? cronStatusLabel(cronJobsStore.currentJob.status) : "-");
 const recentResults = computed(() => cronJobsStore.currentResults.slice(0, 20));
@@ -50,6 +58,7 @@ watch(
     selectedChannel.value = first
       ? (first.channel === "dingtalk" ? "dingtalk" : "feishu")
       : null;
+    selectedBotId.value = first?.botId || "";
   },
   { immediate: true, deep: true }
 );
@@ -60,19 +69,32 @@ async function loadEnabledChannels() {
   try {
     const config = await channelApi.getChannelConfig();
     const options: Array<{ label: string; value: "feishu" | "dingtalk" }> = [];
+    channelBotOptions.value.feishu = (config.channels.feishu.bots || []).filter((item) => item.enabled).map((item) => ({
+      label: item.displayName || item.botId,
+      value: item.botId
+    }));
+    channelBotOptions.value.dingtalk = (config.channels.dingtalk.bots || []).filter((item) => item.enabled).map((item) => ({
+      label: item.displayName || item.botId,
+      value: item.botId
+    }));
     if (config.channels.feishu.enabled) {
-      options.push({ label: "飞书", value: "feishu" });
+      options.push({ label: t("cron.detail.channel.feishu"), value: "feishu" });
     }
     if (config.channels.dingtalk.enabled) {
-      options.push({ label: "钉钉", value: "dingtalk" });
+      options.push({ label: t("cron.detail.channel.dingtalk"), value: "dingtalk" });
     }
     enabledChannelOptions.value = options;
     if (selectedChannel.value && !options.some((item) => item.value === selectedChannel.value)) {
       selectedChannel.value = null;
+      selectedBotId.value = "";
+    } else if (selectedChannel.value && !selectedBotId.value) {
+      const firstBot = channelBotOptions.value[selectedChannel.value][0];
+      selectedBotId.value = firstBot?.value || "";
     }
   } catch {
     enabledChannelOptions.value = [];
     selectedChannel.value = null;
+    selectedBotId.value = "";
   }
 }
 
@@ -81,14 +103,29 @@ function addSubscription() {
     return;
   }
   selectedChannel.value = enabledChannelOptions.value[0].value;
+  selectedBotId.value = channelBotOptions.value[selectedChannel.value][0]?.value || "";
 }
+
+watch(
+  () => selectedChannel.value,
+  (next, prev) => {
+    if (next === prev) {
+      return;
+    }
+    selectedBotId.value = next ? channelBotOptions.value[next][0]?.value || "" : "";
+  }
+);
 
 async function saveSubscriptions() {
   if (!cronJobsStore.currentJob) {
     return;
   }
+  if (selectedChannel.value && !selectedBotId.value.trim()) {
+    message.warning(t("cron.detail.botRequired"));
+    return;
+  }
   const payload = selectedChannel.value
-    ? [{ channel: selectedChannel.value, target: "", enabled: true }]
+    ? [{ channel: selectedChannel.value, target: "", botId: selectedBotId.value || "", enabled: true }]
     : [];
   savingSubscriptions.value = true;
   try {
@@ -122,13 +159,13 @@ async function toggleCurrentJobStatus(enabled: boolean) {
 
 function executionStatusText(status: string | null | undefined) {
   const normalized = (status || "").toUpperCase();
-  if (normalized === "COMPLETED") return "成功";
-  if (normalized === "FAILED") return "失败";
-  return normalized || "未知";
+  if (normalized === "COMPLETED") return t("common.success");
+  if (normalized === "FAILED") return t("common.failed");
+  return normalized || t("common.unknown");
 }
 
 function openResultPreview(executedTime: string, content: string) {
-  previewTitle.value = `执行结果预览 · ${formatDateTime(executedTime)}`;
+  previewTitle.value = t("cron.detail.previewTitle", { time: formatDateTime(executedTime) });
   previewMarkdown.value = content;
   previewModalVisible.value = true;
 }
@@ -137,20 +174,19 @@ function openResultPreview(executedTime: string, content: string) {
 <template>
   <div class="panel detail-panel">
     <div class="panel-header detail-header">
-      <div class="ui-kicker">DETAIL</div>
-      <div class="panel-title ui-title-xl">任务详情</div>
+      <div class="panel-title ui-title-xl">{{ t("cron.detail.title") }}</div>
       <div class="panel-subtitle ui-subtitle">
-        {{ cronJobsStore.currentJob ? `${displayCronJobTitle(cronJobsStore.currentJob)} · ${fallbackAgentLabel(cronJobsStore.currentJob)}` : "请选择左侧的一个定时任务。" }}
+        {{ cronJobsStore.currentJob ? `${displayCronJobTitle(cronJobsStore.currentJob)} · ${fallbackAgentLabel(cronJobsStore.currentJob)}` : t("cron.detail.selectOneHint") }}
       </div>
     </div>
     <div class="panel-body scroll-area">
       <div v-if="!cronJobsStore.currentJob" class="detail-empty">
-        <div class="detail-empty-title">等待任务创建</div>
-        <div class="detail-empty-subtitle">当左侧出现任务后，这里会自动展示第一个任务的完整详情。</div>
+        <div class="detail-empty-title">{{ t("cron.detail.emptyTitle") }}</div>
+        <div class="detail-empty-subtitle">{{ t("cron.detail.emptySubtitle") }}</div>
         <ol class="detail-empty-steps">
-          <li>创建并注册一个定时任务</li>
-          <li>返回任务列表点击“刷新”</li>
-          <li>在详情区查看配置和执行记录</li>
+          <li>{{ t("cron.detail.emptyStep1") }}</li>
+          <li>{{ t("cron.detail.emptyStep2") }}</li>
+          <li>{{ t("cron.detail.emptyStep3") }}</li>
         </ol>
       </div>
       <template v-else>
@@ -159,7 +195,7 @@ function openResultPreview(executedTime: string, content: string) {
             <div class="detail-title">{{ displayCronJobTitle(cronJobsStore.currentJob) }}</div>
             <div class="detail-subtitle">
               <template v-if="shouldShowNextRun">
-                {{ fallbackAgentLabel(cronJobsStore.currentJob) }} · 下次执行 {{ formatDateTime(cronJobsStore.currentJob.nextRunTime) }}
+                {{ fallbackAgentLabel(cronJobsStore.currentJob) }} · {{ t("cron.list.nextRunAt", { time: formatDateTime(cronJobsStore.currentJob.nextRunTime) }) }}
               </template>
               <template v-else>
                 {{ fallbackAgentLabel(cronJobsStore.currentJob) }}
@@ -167,7 +203,7 @@ function openResultPreview(executedTime: string, content: string) {
             </div>
           </div>
           <div class="job-status-switch">
-            <span class="job-status-label">{{ isCurrentJobEnabled ? "已启用" : "已暂停" }}</span>
+            <span class="job-status-label">{{ isCurrentJobEnabled ? t("common.enabled") : t("cron.detail.paused") }}</span>
             <n-switch
               :value="isCurrentJobEnabled"
               :loading="switchingJobStatus"
@@ -179,58 +215,58 @@ function openResultPreview(executedTime: string, content: string) {
 
         <n-flex :size="12" class="detail-actions detail-global-actions">
           <n-popconfirm
-            positive-text="立即执行"
-            negative-text="取消"
+            :positive-text="t('cron.detail.runNow')"
+            :negative-text="t('common.cancel')"
             @positive-click="cronJobsStore.runJob(cronJobsStore.currentJob.jobUid)"
           >
             <template #trigger>
-              <n-button type="primary">立即执行</n-button>
+              <n-button type="primary">{{ t("cron.detail.runNow") }}</n-button>
             </template>
-            确认现在执行这个任务吗？
+            {{ t("cron.detail.runNowConfirm") }}
           </n-popconfirm>
-          <n-button secondary @click="showEditModal = true">修改任务</n-button>
-          <n-button type="error" secondary @click="cronJobsStore.confirmDeleteJob(cronJobsStore.currentJob)">删除任务</n-button>
+          <n-button secondary @click="showEditModal = true">{{ t("cron.detail.editTask") }}</n-button>
+          <n-button type="error" secondary @click="cronJobsStore.confirmDeleteJob(cronJobsStore.currentJob)">{{ t("cron.detail.deleteTask") }}</n-button>
         </n-flex>
 
         <n-tabs v-model:value="cronJobsStore.selectedTab" type="line" animated>
-          <n-tab-pane name="config" tab="配置">
+          <n-tab-pane name="config" :tab="t('cron.detail.tabConfig')">
             <n-card embedded>
               <div class="job-overview-grid">
                 <div class="job-overview-item">
-                  <div class="job-overview-label">执行频率</div>
+                  <div class="job-overview-label">{{ t("cron.detail.frequency") }}</div>
                   <div class="job-overview-value">{{ scheduleSummary }}</div>
                 </div>
                 <div v-if="shouldShowNextRun" class="job-overview-item">
-                  <div class="job-overview-label">下次执行</div>
+                  <div class="job-overview-label">{{ t("cron.detail.nextRun") }}</div>
                   <div class="job-overview-value emph">{{ nextRunText }}</div>
                 </div>
                 <div class="job-overview-item">
-                  <div class="job-overview-label">当前状态</div>
+                  <div class="job-overview-label">{{ t("cron.detail.currentStatus") }}</div>
                   <div class="job-overview-value">
                     <n-tag size="small" :type="isCurrentJobEnabled ? 'success' : 'warning'">{{ statusText }}</n-tag>
                   </div>
                 </div>
                 <div class="job-overview-item">
-                  <div class="job-overview-label">截止日期</div>
+                  <div class="job-overview-label">{{ t("cron.detail.endAt") }}</div>
                   <div class="job-overview-value">{{ deadlineText }}</div>
                 </div>
               </div>
 
               <div class="job-section">
-                <div class="job-overview-label">任务内容</div>
-                <div class="job-content-card">{{ cronJobsStore.currentJob.taskContent || "暂无任务内容" }}</div>
+                <div class="job-overview-label">{{ t("cron.form.taskContent") }}</div>
+                <div class="job-content-card">{{ cronJobsStore.currentJob.taskContent || t("cron.detail.noTaskContent") }}</div>
               </div>
 
               <div class="job-section">
-                <div class="job-overview-label">执行时区</div>
+                <div class="job-overview-label">{{ t("cron.form.timezone") }}</div>
                 <div class="job-content-card">{{ humanizeTimezone(cronJobsStore.currentJob.timezone) }}</div>
               </div>
 
               <n-collapse class="job-tech-collapse">
-                <n-collapse-item name="tech" title="系统信息">
+                <n-collapse-item name="tech" :title="t('cron.detail.systemInfo')">
                   <div class="job-tech-grid">
                     <div class="job-tech-item">
-                      <span class="job-tech-key">Cron 表达式</span>
+                      <span class="job-tech-key">{{ t("cron.detail.cronExpression") }}</span>
                       <span class="job-tech-value">{{ cronJobsStore.currentJob.expression || "-" }}</span>
                     </div>
                     <div class="job-tech-item">
@@ -238,7 +274,7 @@ function openResultPreview(executedTime: string, content: string) {
                       <span class="job-tech-value uid">{{ cronJobsStore.currentJob.jobUid }}</span>
                     </div>
                     <div class="job-tech-item">
-                      <span class="job-tech-key">调度状态</span>
+                      <span class="job-tech-key">{{ t("cron.detail.triggerState") }}</span>
                       <span class="job-tech-value">{{ cronJobsStore.currentJob.triggerState || "-" }}</span>
                     </div>
                   </div>
@@ -248,23 +284,23 @@ function openResultPreview(executedTime: string, content: string) {
 
             <n-card embedded class="subscription-card">
               <n-flex justify="space-between" align="center" class="subscription-head">
-                <div class="detail-title detail-title-sm">通知推送 Channel</div>
+                <div class="detail-title detail-title-sm">{{ t("cron.detail.subscriptionTitle") }}</div>
                 <n-flex :size="8">
                   <n-button
                     secondary
                     :disabled="!!selectedChannel || !enabledChannelOptions.length"
                     @click="addSubscription"
                   >
-                    新增订阅
+                    {{ t("cron.detail.addSubscription") }}
                   </n-button>
-                  <n-button type="primary" :loading="savingSubscriptions" @click="saveSubscriptions">保存订阅</n-button>
+                  <n-button type="primary" :loading="savingSubscriptions" @click="saveSubscriptions">{{ t("cron.detail.saveSubscription") }}</n-button>
                 </n-flex>
               </n-flex>
               <div v-if="!enabledChannelOptions.length" class="subscription-empty">
-                <n-empty description="暂无启用中的通道，请先到 Channel 管理页面启用飞书或钉钉。" />
+                <n-empty :description="t('cron.detail.noEnabledChannels')" />
               </div>
               <div v-else-if="!selectedChannel" class="subscription-empty">
-                <n-empty description="暂未配置推送通道，点击“新增订阅”后选择一个通道。" />
+                <n-empty :description="t('cron.detail.noSubscriptionYet')" />
               </div>
               <div v-else class="subscription-list">
                 <div class="subscription-item">
@@ -273,15 +309,21 @@ function openResultPreview(executedTime: string, content: string) {
                     class="subscription-channel"
                     :options="enabledChannelOptions"
                   />
-                  <n-button text type="error" @click="selectedChannel = null">删除</n-button>
+                  <n-select
+                    v-model:value="selectedBotId"
+                    class="subscription-channel"
+                    :options="selectedChannel ? channelBotOptions[selectedChannel] : []"
+                    :placeholder="t('cron.detail.botPlaceholder')"
+                  />
+                  <n-button text type="error" @click="selectedChannel = null">{{ t("common.delete") }}</n-button>
                 </div>
               </div>
             </n-card>
           </n-tab-pane>
 
-          <n-tab-pane name="result" tab="执行记录">
+          <n-tab-pane name="result" :tab="t('cron.detail.tabResult')">
             <n-card embedded>
-              <n-empty v-if="!recentResults.length" description="当前任务还没有执行记录。" />
+              <n-empty v-if="!recentResults.length" :description="t('cron.detail.noResults')" />
               <div v-else class="recent-result-list">
                 <div
                   v-for="(item, index) in recentResults"
@@ -294,14 +336,14 @@ function openResultPreview(executedTime: string, content: string) {
                       {{ executionStatusText(item.status) }}
                     </n-tag>
                   </div>
-                  <div class="recent-result-summary">{{ item.summary || "无结果摘要" }}</div>
+                  <div class="recent-result-summary">{{ item.summary || t("cron.detail.noResultSummary") }}</div>
                   <div v-if="item.reportContent" class="recent-result-actions">
                     <n-button
                       text
                       type="primary"
                       @click="openResultPreview(item.executedTime, item.reportContent)"
                     >
-                      预览结果
+                      {{ t("cron.detail.previewResult") }}
                     </n-button>
                     <n-button
                       v-if="item.reportPath"
@@ -310,7 +352,7 @@ function openResultPreview(executedTime: string, content: string) {
                       class="recent-result-open"
                       @click="cronJobsStore.openReportFile(item.reportPath)"
                     >
-                      打开报告
+                      {{ t("cron.detail.openReport") }}
                     </n-button>
                   </div>
                   <n-button
@@ -320,7 +362,7 @@ function openResultPreview(executedTime: string, content: string) {
                     class="recent-result-open"
                     @click="cronJobsStore.openReportFile(item.reportPath)"
                   >
-                    打开报告
+                    {{ t("cron.detail.openReport") }}
                   </n-button>
                 </div>
               </div>
@@ -579,8 +621,8 @@ function openResultPreview(executedTime: string, content: string) {
 
 .subscription-item {
   display: grid;
-  grid-template-columns: 220px auto;
-  align-items: center;
+  grid-template-columns: 220px 220px auto;
+  align-items: start;
   gap: var(--space-3);
 }
 

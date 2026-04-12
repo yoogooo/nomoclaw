@@ -4,7 +4,8 @@ import { conversationApi } from "@/api/conversationApi";
 import { fileApi } from "@/api/fileApi";
 import { subscribeConversationEvents } from "@/api/eventStreamApi";
 import { modelApi } from "@/api/modelApi";
-import { dialog, message } from "@/discrete";
+import { dialog, message, warningDialogPreset } from "@/discrete";
+import { tr } from "@/i18n";
 import { useAgentCatalogStore } from "@/stores/agentCatalog";
 import { useConversationRunsStore } from "@/stores/conversationRuns";
 import { useRuntimeLogStore } from "@/stores/runtimeLog";
@@ -126,6 +127,7 @@ export const useConversationStore = defineStore("conversation", () => {
   });
 
   let eventSource: EventSource | null = null;
+  const streamingAssistantByParentUid = ref<Record<string, number>>({});
 
   const filteredConversations = computed(() =>
     conversations.value.filter((item) => agentCatalogStore.matchesConversation(item))
@@ -181,13 +183,24 @@ export const useConversationStore = defineStore("conversation", () => {
 
   const uploadDisabledReason = computed(() => {
     if (!selectedModelProvider.value || !selectedModelName.value) {
-      return "请先选择模型";
+      return tr("toast.chooseModelFirst");
     }
     if (!currentUploadPolicy.value.enabled) {
-      return "当前模型不支持上传文件";
+      return tr("chat.composer.uploadDisabled");
     }
     return "";
   });
+
+  function hasConfiguredModel(modelProvider: string, modelName: string) {
+    if (!modelProvider || !modelName) {
+      return false;
+    }
+    const provider = configuredProviders.value.find((item) => item.id === modelProvider);
+    if (!provider) {
+      return false;
+    }
+    return provider.models.some((model) => model.id === modelName);
+  }
 
   function clearApproval() {
     approval.value = {
@@ -202,8 +215,8 @@ export const useConversationStore = defineStore("conversation", () => {
 
   function buildApprovalBodyFromStep(step: ConversationRunStep) {
     const details = (step.displayDetails || step.displaySummary || "").trim();
-    const main = details || `步骤 ${step.stepIndex || "-"} 需要人工确认后才能继续执行。`;
-    return `${main}\n\n风险说明：此操作可能改动本地环境、页面状态或产生不可逆结果。若与当前意图不符，请直接拒绝。`;
+    const main = details || tr("chat.runtime.stepNeedApproval", { index: step.stepIndex || "-" });
+    return `${main}\n\n${tr("chat.runtime.approvalRiskHint")}`;
   }
 
   function restoreApprovalFromRuns(runs: ConversationMessageRun[]) {
@@ -233,7 +246,7 @@ export const useConversationStore = defineStore("conversation", () => {
 
     approval.value = {
       stepUid: current.step.stepUid || null,
-      title: current.step.displayTitle || "系统准备执行高风险步骤",
+      title: current.step.displayTitle || tr("chat.runtime.highRiskStep"),
       body: buildApprovalBodyFromStep(current.step),
       riskLevel: "HIGH",
       submitting: approval.value.stepUid === current.step.stepUid ? approval.value.submitting : false,
@@ -248,10 +261,60 @@ export const useConversationStore = defineStore("conversation", () => {
     }
   }
 
+  function clearStreamingAssistantDraft(parentMessageUid?: string) {
+    if (!parentMessageUid) {
+      const indexes = Object.values(streamingAssistantByParentUid.value);
+      if (!indexes.length) return;
+      const indexSet = new Set(indexes);
+      messages.value = messages.value.filter((_, index) => !indexSet.has(index));
+      streamingAssistantByParentUid.value = {};
+      return;
+    }
+    const index = streamingAssistantByParentUid.value[parentMessageUid];
+    if (index === undefined) return;
+    messages.value = messages.value.filter((_, i) => i !== index);
+    const nextMap: Record<string, number> = {};
+    for (const [key, value] of Object.entries(streamingAssistantByParentUid.value)) {
+      if (key === parentMessageUid) continue;
+      nextMap[key] = value > index ? value - 1 : value;
+    }
+    streamingAssistantByParentUid.value = nextMap;
+  }
+
+  function upsertStreamingAssistantDelta(parentMessageUid: string, textDelta: string, createdTime?: string, accumulatedText?: string, done?: boolean) {
+    if (!parentMessageUid) return;
+    const existingIndex = streamingAssistantByParentUid.value[parentMessageUid];
+    if (existingIndex !== undefined && messages.value[existingIndex]) {
+      const existing = messages.value[existingIndex];
+      messages.value[existingIndex] = {
+        ...existing,
+        content: done && accumulatedText !== undefined ? accumulatedText : `${existing.content || ""}${textDelta}`,
+        status: done ? "COMPLETED" : "RUNNING"
+      };
+      return;
+    }
+    if (!textDelta && accumulatedText === undefined) return;
+    const assistantDraft: ConversationMessage = {
+      role: "assistant",
+      parentMessageUid,
+      content: accumulatedText ?? textDelta,
+      status: done ? "COMPLETED" : "RUNNING",
+      createdTime: createdTime || new Date().toISOString(),
+      fileLinks: [],
+      attachments: []
+    };
+    messages.value = [...messages.value, assistantDraft];
+    streamingAssistantByParentUid.value = {
+      ...streamingAssistantByParentUid.value,
+      [parentMessageUid]: messages.value.length - 1
+    };
+  }
+
   function resetRuntimePanels() {
     runtimeLogStore.clear();
     conversationRunsStore.clear();
     clearApproval();
+    clearStreamingAssistantDraft();
   }
 
   function findAgentDefaultModel() {
@@ -331,7 +394,7 @@ export const useConversationStore = defineStore("conversation", () => {
 
   function validateFilesAgainstPolicy(policy: UploadPolicy, existing: ConversationAttachment[], files: File[]) {
     if (!policy.enabled) {
-      throw new Error("当前模型不支持上传文件");
+      throw new Error(tr("chat.composer.uploadDisabled"));
     }
     const combinedGroups = new Set<string>([
       ...existing.map((item) => item.mimeGroup),
@@ -341,13 +404,13 @@ export const useConversationStore = defineStore("conversation", () => {
       return;
     }
     if (policy.singleMimeGroupOnly && combinedGroups.size > 1) {
-      throw new Error("同一条消息只能上传同一类型的文件");
+      throw new Error(tr("chat.composer.singleTypeOnly"));
     }
     const unsupportedGroup = [...combinedGroups].find((group) =>
       policy.allowedMimeGroups.length && !policy.allowedMimeGroups.includes(group)
     );
     if (unsupportedGroup) {
-      throw new Error("当前模型不支持该类型文件");
+      throw new Error(tr("chat.composer.unsupportedType"));
     }
 
     const existingImageCount = existing.filter((item) => item.mimeGroup === "image").length;
@@ -357,13 +420,13 @@ export const useConversationStore = defineStore("conversation", () => {
     const nonImageCount = totalCount - imageCount;
 
     if (imageCount > 0 && nonImageCount > 0 && !policy.allowMixedImageAndFile) {
-      throw new Error("图片和其他文件不能混合上传");
+      throw new Error(tr("chat.composer.mixedTypeNotAllowed"));
     }
     if (imageCount > 0 && imageCount > policy.maxImagesPerMessage) {
-      throw new Error(`当前模型最多上传 ${policy.maxImagesPerMessage} 张图片`);
+      throw new Error(tr("chat.composer.maxImages", { count: policy.maxImagesPerMessage }));
     }
     if (nonImageCount > 0 && nonImageCount > policy.maxFilesPerMessage) {
-      throw new Error(`当前模型最多上传 ${policy.maxFilesPerMessage} 个非图片文件`);
+      throw new Error(tr("chat.composer.maxFiles", { count: policy.maxFilesPerMessage }));
     }
   }
 
@@ -495,7 +558,7 @@ export const useConversationStore = defineStore("conversation", () => {
         }
       })();
       if (!existingFits) {
-        clearDraftAttachments("已清空当前草稿附件，新模型不支持这些文件");
+        clearDraftAttachments(tr("chat.composer.clearedByModelSwitch"));
       }
     }
     selectedModelProvider.value = modelProvider;
@@ -510,16 +573,24 @@ export const useConversationStore = defineStore("conversation", () => {
     try {
       validateFilesAgainstPolicy(currentUploadPolicy.value, draftAttachments.value, files);
     } catch (error) {
-      message.error(error instanceof Error ? error.message : "文件不符合当前模型上传规则");
+      message.error(error instanceof Error ? error.message : tr("toast.uploadRuleNotMatch"));
       return;
     }
+    const lockedProvider = selectedModelProvider.value;
+    const lockedModelName = selectedModelName.value;
     const conversationUid = await ensureConversationForInteraction();
+    const effectiveProvider = hasConfiguredModel(lockedProvider, lockedModelName) ? lockedProvider : selectedModelProvider.value;
+    const effectiveModelName = hasConfiguredModel(lockedProvider, lockedModelName) ? lockedModelName : selectedModelName.value;
+    if (effectiveProvider && effectiveModelName) {
+      selectedModelProvider.value = effectiveProvider;
+      selectedModelName.value = effectiveModelName;
+    }
     uploadingFiles.value = true;
     try {
       const uploaded = await conversationApi.uploadConversationFiles(conversationUid, {
         files,
-        modelProvider: selectedModelProvider.value,
-        modelName: selectedModelName.value
+        modelProvider: effectiveProvider,
+        modelName: effectiveModelName
       });
       draftAttachments.value = [...draftAttachments.value, ...uploaded.items];
     } finally {
@@ -542,18 +613,28 @@ export const useConversationStore = defineStore("conversation", () => {
       return;
     }
     if (!selectedModelProvider.value || !selectedModelName.value) {
-      message.error("请先选择模型");
+      message.error(tr("toast.chooseModelFirst"));
       return;
     }
 
+    const lockedProvider = selectedModelProvider.value;
+    const lockedModelName = selectedModelName.value;
     const conversationUid = await ensureConversationForInteraction();
+    const effectiveProvider = hasConfiguredModel(lockedProvider, lockedModelName) ? lockedProvider : selectedModelProvider.value;
+    const effectiveModelName = hasConfiguredModel(lockedProvider, lockedModelName) ? lockedModelName : selectedModelName.value;
+    if (!effectiveProvider || !effectiveModelName) {
+      message.error(tr("toast.chooseModelFirst"));
+      return;
+    }
+    selectedModelProvider.value = effectiveProvider;
+    selectedModelName.value = effectiveModelName;
     const attachments = [...draftAttachments.value];
     const tempMessage: ConversationMessage = {
       role: "user",
       content,
       status: "CREATED",
-      provider: selectedModelProvider.value,
-      modelName: selectedModelName.value,
+      provider: effectiveProvider,
+      modelName: effectiveModelName,
       createdTime: new Date().toISOString(),
       attachments
     };
@@ -566,12 +647,12 @@ export const useConversationStore = defineStore("conversation", () => {
       const accepted = await conversationApi.sendMessage(conversationUid, {
         message: content,
         fileUrls: attachments.map((item) => item.fileUrl),
-        modelProvider: selectedModelProvider.value,
-        modelName: selectedModelName.value
+        modelProvider: effectiveProvider,
+        modelName: effectiveModelName
       });
       tempMessage.messageUid = accepted.messageUid;
       runningConversationUid.value = conversationUid;
-      runtimeLogStore.append(`消息已提交 messageUid=${accepted.messageUid}`);
+      runtimeLogStore.append(tr("chat.runtime.messageSubmitted", { messageUid: accepted.messageUid }));
       await refreshConversations(conversationUid);
     } catch (error) {
       messages.value = messages.value.filter((item) => item !== tempMessage);
@@ -597,15 +678,15 @@ export const useConversationStore = defineStore("conversation", () => {
     };
     try {
       await conversationApi.approveStep(currentConversationUid.value, stepUid);
-      message.success("已批准，任务继续执行");
-      runtimeLogStore.append(`审批已提交: approve ${stepUid}`);
+      message.success(tr("toast.approveSuccess"));
+      runtimeLogStore.append(tr("chat.runtime.approvalSubmitted", { action: "approve", stepUid }));
     } catch (error) {
       approval.value = {
         ...approval.value,
         submitting: false,
         submittingAction: null
       };
-      message.error("批准失败，请重试");
+      message.error(tr("toast.approveFailed"));
       throw error;
     }
   }
@@ -620,15 +701,15 @@ export const useConversationStore = defineStore("conversation", () => {
     };
     try {
       await conversationApi.rejectStep(currentConversationUid.value, stepUid);
-      message.warning("已拒绝当前步骤");
-      runtimeLogStore.append(`审批已提交: reject ${stepUid}`);
+      message.warning(tr("toast.rejectSuccess"));
+      runtimeLogStore.append(tr("chat.runtime.approvalSubmitted", { action: "reject", stepUid }));
     } catch (error) {
       approval.value = {
         ...approval.value,
         submitting: false,
         submittingAction: null
       };
-      message.error("拒绝失败，请重试");
+      message.error(tr("toast.rejectFailed"));
       throw error;
     }
   }
@@ -656,7 +737,7 @@ export const useConversationStore = defineStore("conversation", () => {
         roundIndex: Number(step.roundIndex || 1),
         stepIndex: Number(step.stepIndex || 1),
         status: step.status || "planned",
-        displayTitle: step.displayTitle || "正在处理任务步骤",
+        displayTitle: step.displayTitle || tr("chat.runtime.processingStep"),
         displaySummary: step.displaySummary || "",
         displayDetails: step.displayDetails || "",
         updatedTime: step.updatedTime || new Date().toISOString()
@@ -684,7 +765,7 @@ export const useConversationStore = defineStore("conversation", () => {
       roundIndex: event.payload.roundIndex || 1,
       stepIndex: event.payload.stepIndex || 1,
       status: event.payload.status || "planned",
-      displayTitle: event.payload.displayTitle || "正在处理任务步骤",
+      displayTitle: event.payload.displayTitle || tr("chat.runtime.processingStep"),
       displaySummary: event.payload.displaySummary || "",
       displayDetails: event.payload.displayDetails || "",
       updatedTime: new Date().toISOString()
@@ -694,8 +775,8 @@ export const useConversationStore = defineStore("conversation", () => {
   function showApprovalAlert(event: AgentEvent) {
     approval.value = {
       stepUid: event.stepUid || null,
-      title: event.payload.title || "系统准备执行高风险步骤",
-      body: `步骤 ${event.payload.stepIndex || "-"}：${approvalActionSummary(event.payload)}\n\n风险说明：此操作可能改动本地环境、页面状态或产生不可逆结果。若与当前意图不符，请直接拒绝。`,
+      title: event.payload.title || tr("chat.runtime.highRiskStep"),
+      body: `${tr("chat.runtime.stepPrefix", { index: event.payload.stepIndex || "-" })}：${approvalActionSummary(event.payload)}\n\n${tr("chat.runtime.approvalRiskHint")}`,
       riskLevel: event.payload.riskLevel || "HIGH",
       submitting: approval.value.stepUid === (event.stepUid || null) ? approval.value.submitting : false,
       submittingAction: approval.value.stepUid === (event.stepUid || null) ? approval.value.submittingAction : null
@@ -704,10 +785,10 @@ export const useConversationStore = defineStore("conversation", () => {
 
   function renderPlanSteps(steps: Record<string, any>[]) {
     if (!steps.length) {
-      runtimeLogStore.append("计划已生成，但没有可展示的步骤。");
+      runtimeLogStore.append(tr("chat.runtime.planCreatedWithoutSteps"));
       return;
     }
-    runtimeLogStore.append("计划已生成:");
+    runtimeLogStore.append(tr("chat.runtime.planCreated"));
     steps.forEach((step) => {
       runtimeLogStore.append(
         `${step.stepIndex}. ${step.title}\n   tool=${step.toolName} risk=${step.riskLevel}\n   args=${JSON.stringify(step.toolArgs)}`
@@ -717,14 +798,26 @@ export const useConversationStore = defineStore("conversation", () => {
 
   async function handleEvent(event: AgentEvent) {
     const type = event.eventType;
+    if (type === "MESSAGE_DELTA") {
+      if (!event.messageUid) return;
+      const textDelta = String(event.payload.textDelta || "");
+      const done = Boolean(event.payload.done);
+      const accumulatedText = event.payload.accumulatedText === undefined ? undefined : String(event.payload.accumulatedText || "");
+      if (!textDelta && !done) return;
+      upsertStreamingAssistantDelta(event.messageUid, textDelta, event.timestamp, accumulatedText, done);
+      return;
+    }
     if (type === "PLAN_CREATED") {
-      runtimeLogStore.append(`模型请求工具调用 (Round ${event.payload.roundIndex || 1})`);
+      if (event.messageUid) {
+        clearStreamingAssistantDraft(event.messageUid);
+      }
+      runtimeLogStore.append(tr("chat.runtime.modelToolCall", { round: event.payload.roundIndex || 1 }));
       renderPlanSteps(event.payload.steps || []);
       handlePlanCreated(event);
       return;
     }
     if (type === "STEP_WAITING_APPROVAL") {
-      runtimeLogStore.append(`步骤等待审批: ${event.stepUid}`);
+      runtimeLogStore.append(tr("chat.runtime.stepWaitingApproval", { stepUid: event.stepUid }));
       handleRunStepEvent(event);
       showApprovalAlert(event);
       return;
@@ -733,22 +826,22 @@ export const useConversationStore = defineStore("conversation", () => {
       if (approval.value.stepUid && approval.value.stepUid === event.stepUid) {
         clearApproval();
       }
-      runtimeLogStore.append(`开始执行: [Round ${event.payload.roundIndex || 1}] ${event.payload.title}`);
+      runtimeLogStore.append(tr("chat.runtime.stepStarted", { round: event.payload.roundIndex || 1, title: event.payload.title }));
       handleRunStepEvent(event);
       return;
     }
     if (type === "STEP_FINISHED") {
-      runtimeLogStore.append(`步骤完成: ${event.payload.title}\n输出: ${event.payload.output || ""}`);
+      runtimeLogStore.append(tr("chat.runtime.stepFinished", { title: event.payload.title, output: event.payload.output || "" }));
       handleRunStepEvent(event);
       return;
     }
     if (type === "STEP_FAILED") {
-      runtimeLogStore.append(`步骤失败: ${event.payload.title}\n错误: ${event.payload.errorMessage || ""}`);
+      runtimeLogStore.append(tr("chat.runtime.stepFailed", { title: event.payload.title, errorMessage: event.payload.errorMessage || "" }));
       handleRunStepEvent(event);
       return;
     }
     if (type === "STEP_REJECTED") {
-      runtimeLogStore.append(`步骤已被拒绝: ${event.payload.title}`);
+      runtimeLogStore.append(tr("chat.runtime.stepRejected", { title: event.payload.title }));
       handleRunStepEvent(event);
       clearApproval();
       return;
@@ -759,14 +852,21 @@ export const useConversationStore = defineStore("conversation", () => {
       const output = Number(event.payload.outputTokens || 0);
       const total = Number(event.payload.totalTokens || 0);
       const modelName = event.payload.modelName || "-";
-      runtimeLogStore.append(`Round ${round} Token 使用: input=${input}, output=${output}, total=${total}, model=${modelName}`);
+      runtimeLogStore.append(tr("chat.runtime.roundTokenUsage", { round, input, output, total, modelName }));
       return;
     }
     if (type === "MESSAGE_COMPLETED") {
       clearApproval();
-      runtimeLogStore.append(`消息处理结束: ${event.payload.status} / ${event.payload.message}`);
+      if (event.messageUid) {
+        clearStreamingAssistantDraft(event.messageUid);
+      }
+      runtimeLogStore.append(tr("chat.runtime.messageCompleted", { status: event.payload.status, message: event.payload.message }));
       if (event.payload.stopReason) {
-        runtimeLogStore.append(`停止原因: ${event.payload.stopReason} (${event.payload.roundsUsed}/${event.payload.maxRounds})`);
+        runtimeLogStore.append(tr("chat.runtime.stopReason", {
+          reason: event.payload.stopReason,
+          roundsUsed: event.payload.roundsUsed,
+          maxRounds: event.payload.maxRounds
+        }));
       }
       runningConversationUid.value = null;
       if (currentConversationUid.value) {
@@ -776,12 +876,18 @@ export const useConversationStore = defineStore("conversation", () => {
       return;
     }
     if (type === "LOOP_LIMIT_REACHED") {
-      runtimeLogStore.append(`达到最大循环次数(${event.payload.maxRounds})，任务终止。失败步骤: ${event.payload.failedStepId || "-"}`);
+      runtimeLogStore.append(tr("chat.runtime.loopLimitReached", {
+        maxRounds: event.payload.maxRounds,
+        failedStepId: event.payload.failedStepId || "-"
+      }));
       return;
     }
     if (type === "MESSAGE_CANCELED") {
       clearApproval();
-      runtimeLogStore.append("消息处理已取消");
+      if (event.messageUid) {
+        clearStreamingAssistantDraft(event.messageUid);
+      }
+      runtimeLogStore.append(tr("chat.runtime.messageCanceled"));
       const latestUserMessage = [...messages.value].reverse().find((item) => item.role === "user" && item.messageUid);
       if (latestUserMessage?.messageUid) {
         conversationRunsStore.markRunCanceled(latestUserMessage.messageUid);
@@ -796,13 +902,14 @@ export const useConversationStore = defineStore("conversation", () => {
 
   async function confirmDeleteConversation(conversationUid: string, title: string) {
     dialog.warning({
-      title: "删除对话",
-      content: `确认删除“${title || "未命名对话"}”？删除后不可恢复。`,
-      positiveText: "删除",
-      negativeText: "取消",
+      title: tr("dialogs.deleteConversationTitle"),
+      content: tr("dialogs.deleteConversationContent", { title: title || tr("chat.sidebar.unnamed") }),
+      ...warningDialogPreset(),
+      positiveText: tr("dialogs.confirmDelete"),
+      negativeText: tr("common.cancel"),
       onPositiveClick: async () => {
         await deleteConversation(conversationUid);
-        message.success("对话已删除");
+        message.success(tr("toast.conversationDeleted"));
       }
     });
   }

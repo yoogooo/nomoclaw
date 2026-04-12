@@ -15,6 +15,7 @@ import java.sql.ResultSet;
 public class QuartzSchemaInitializer {
 
     private static final String MYSQL_SCHEMA_RESOURCE = "org/quartz/impl/jdbcjobstore/tables_mysql_innodb.sql";
+    private static final String H2_SCHEMA_RESOURCE = "org/quartz/impl/jdbcjobstore/tables_h2.sql";
 
     private final DataSource dataSource;
 
@@ -26,7 +27,8 @@ public class QuartzSchemaInitializer {
     public void initializeIfNeeded() {
         try (Connection connection = dataSource.getConnection()) {
             String databaseProductName = connection.getMetaData().getDatabaseProductName();
-            if (databaseProductName == null || !databaseProductName.toLowerCase().contains("mysql")) {
+            String schemaResource = quartzSchemaResource(databaseProductName);
+            if (schemaResource == null) {
                 log.info("[Quartz] skip schema bootstrap for database={}", databaseProductName);
                 return;
             }
@@ -34,16 +36,30 @@ public class QuartzSchemaInitializer {
                 log.info("[Quartz] schema already initialized");
                 return;
             }
-            ResourceDatabasePopulator populator = new ResourceDatabasePopulator(new ClassPathResource(MYSQL_SCHEMA_RESOURCE));
+            ResourceDatabasePopulator populator = new ResourceDatabasePopulator(new ClassPathResource(schemaResource));
             populator.setContinueOnError(false);
             populator.setIgnoreFailedDrops(true);
             populator.setCommentPrefixes("#", "--");
             populator.setSeparator(";");
             populator.execute(dataSource);
-            log.info("[Quartz] schema initialized from {}", MYSQL_SCHEMA_RESOURCE);
+            log.info("[Quartz] schema initialized from {}", schemaResource);
         } catch (Exception ex) {
             throw new IllegalStateException("failed to initialize Quartz schema", ex);
         }
+    }
+
+    private String quartzSchemaResource(String databaseProductName) {
+        if (databaseProductName == null) {
+            return null;
+        }
+        String normalized = databaseProductName.toLowerCase();
+        if (normalized.contains("mysql")) {
+            return MYSQL_SCHEMA_RESOURCE;
+        }
+        if (normalized.contains("h2")) {
+            return H2_SCHEMA_RESOURCE;
+        }
+        return null;
     }
 
     private boolean hasQuartzTables(Connection connection) throws Exception {

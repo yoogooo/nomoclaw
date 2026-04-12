@@ -46,4 +46,13 @@ public class AgentMessageAttachmentRepository extends CrudRepository<AgentMessag
                 .orderByAsc(AgentMessageAttachmentEntity::getId)
                 .list();
     }
+
+    public void deleteByConversationUid(String conversationUid) {
+        if (conversationUid == null || conversationUid.isBlank()) {
+            return;
+        }
+        lambdaUpdate()
+                .eq(AgentMessageAttachmentEntity::getConversationUid, conversationUid)
+                .remove();
+    }
 }

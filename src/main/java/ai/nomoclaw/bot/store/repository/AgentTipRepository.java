@@ -43,4 +43,13 @@ public class AgentTipRepository extends CrudRepository<AgentTipMapper, AgentTipE
                 .last("LIMIT 1")
                 .one();
     }
+
+    public void deleteByAgentUid(String agentUid) {
+        if (agentUid == null || agentUid.isBlank()) {
+            return;
+        }
+        lambdaUpdate()
+                .eq(AgentTipEntity::getAgentUid, agentUid)
+                .remove();
+    }
 }

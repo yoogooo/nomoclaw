@@ -1,19 +1,23 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { Bot, Brain, CalendarClock, MessageCircleMore, Palette, Settings, PlugZap } from "lucide-vue-next";
+import { Bot, Brain, CalendarClock, MessageCircleMore, Moon, Settings, Sun, PlugZap } from "lucide-vue-next";
 import { useRoute, useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
+import UiInstantTooltip from "@/components/UiInstantTooltip.vue";
+import { useUiPreferencesStore } from "@/stores/uiPreferences";
 
 const route = useRoute();
 const router = useRouter();
+const { t } = useI18n();
+const uiPreferencesStore = useUiPreferencesStore();
 
 const navItems = computed(() => [
-  { key: "chat", label: "对话控制台", icon: MessageCircleMore, to: "/" },
-  { key: "cron", label: "定时任务管理", icon: CalendarClock, to: "/cron" },
-  { key: "agents", label: "Agent 管理", icon: Bot, to: "/agents" },
-  { key: "channels", label: "Channel 管理", icon: PlugZap, to: "/channels" },
-  { key: "models", label: "模型管理", icon: Brain, to: "/models" },
-  { key: "settings", label: "个人配置", icon: Settings, to: "/settings" },
-  { key: "design-system-light", label: "UI 设计规范参考", icon: Palette, to: "/design-system/light", newPage: true }
+  { key: "chat", label: t("nav.chat"), icon: MessageCircleMore, to: "/" },
+  { key: "cron", label: t("nav.cron"), icon: CalendarClock, to: "/cron" },
+  { key: "agents", label: t("nav.agents"), icon: Bot, to: "/agents" },
+  { key: "channels", label: t("nav.channels"), icon: PlugZap, to: "/channels" },
+  { key: "models", label: t("nav.models"), icon: Brain, to: "/models" },
+  { key: "settings", label: t("nav.settings"), icon: Settings, to: "/settings" }
 ]);
 
 function isActive(path: string) {
@@ -27,6 +31,14 @@ function openNavItem(item: { to: string; newPage?: boolean }) {
   }
   void router.push(item.to);
 }
+
+const themeToggleTitle = computed(() =>
+  uiPreferencesStore.themeMode === "dark" ? t("settings.themeLight") : t("settings.themeDark")
+);
+
+function toggleThemeMode() {
+  uiPreferencesStore.toggleThemeMode();
+}
 </script>
 
 <template>
@@ -38,21 +50,36 @@ function openNavItem(item: { to: string; newPage?: boolean }) {
     </div>
 
     <nav class="rail-nav" aria-label="Primary">
-      <button
+      <UiInstantTooltip
         v-for="item in navItems"
         :key="item.key"
-        class="rail-item"
-        :class="{ active: isActive(item.to) }"
-        type="button"
-        :aria-label="item.label"
-        :title="item.label"
-        @click="openNavItem(item)"
+        :content="item.label"
+        placement="right"
       >
-        <component :is="item.icon" class="rail-icon" :size="22" :stroke-width="1.9" />
-      </button>
+        <button
+          class="rail-item"
+          :class="{ active: isActive(item.to) }"
+          type="button"
+          :aria-label="item.label"
+          @click="openNavItem(item)"
+        >
+          <component :is="item.icon" class="rail-icon" :size="22" :stroke-width="1.9" />
+        </button>
+      </UiInstantTooltip>
     </nav>
 
     <div class="rail-bottom">
+      <UiInstantTooltip :content="themeToggleTitle" placement="right">
+        <button
+          class="rail-item rail-theme-toggle"
+          type="button"
+          :aria-label="themeToggleTitle"
+          @click="toggleThemeMode"
+        >
+          <Sun v-if="uiPreferencesStore.themeMode === 'dark'" class="rail-icon" :size="22" :stroke-width="1.9" />
+          <Moon v-else class="rail-icon" :size="22" :stroke-width="1.9" />
+        </button>
+      </UiInstantTooltip>
       <div class="rail-avatar">AI</div>
     </div>
   </aside>
@@ -123,6 +150,17 @@ function openNavItem(item: { to: string; newPage?: boolean }) {
   box-shadow: var(--color-shadow-rail-active);
 }
 
+.rail-theme-toggle {
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--color-text-rail);
+}
+
+.rail-theme-toggle:hover {
+  background: transparent;
+  color: var(--color-text-primary);
+}
+
 .rail-avatar {
   display: flex;
   width: var(--size-54);
@@ -131,9 +169,11 @@ function openNavItem(item: { to: string; newPage?: boolean }) {
   justify-content: center;
   border-radius: var(--radius-pill);
   background: var(--color-bg-rail-avatar);
-  color: var(--color-text-primary);
+  border: var(--size-1) solid var(--color-border-rail-avatar);
+  color: var(--color-text-rail-avatar);
   font-size: var(--font-size-md);
   font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 @media (max-width: var(--size-breakpoint-lg)) {

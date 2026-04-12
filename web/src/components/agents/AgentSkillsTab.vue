@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import { NButton, NSwitch } from "naive-ui";
 
 interface SkillItem {
@@ -18,13 +19,14 @@ const emit = defineEmits<{
   (e: "open", skillId: string): void;
   (e: "import"): void;
 }>();
+const { t } = useI18n();
 </script>
 
 <template>
   <div class="ui-tab-body">
     <div class="ui-toolbar-between">
-      <div class="ui-copy-muted-block">为当前 Agent 管理可用 Skill，支持导入外部 Skill 或快速自建。</div>
-      <n-button type="primary" @click="emit('import')">导入 Skill</n-button>
+      <div class="ui-copy-muted-block">{{ t("agents.skills.description") }}</div>
+      <n-button type="primary" @click="emit('import')">{{ t("agents.skills.import") }}</n-button>
     </div>
     <div v-if="skills.length" class="ui-card-grid">
       <article
@@ -42,11 +44,11 @@ const emit = defineEmits<{
             @click.stop
           />
         </div>
-        <div class="skill-card-desc">{{ skill.description || "暂无描述" }}</div>
+        <div class="skill-card-desc">{{ skill.description || t("agents.common.noDescription") }}</div>
         <div class="ui-caption-muted ui-path-break skill-card-path">{{ skill.path }}</div>
       </article>
     </div>
-    <div v-else class="ui-empty-muted">暂无技能</div>
+    <div v-else class="ui-empty-muted">{{ t("agents.skills.empty") }}</div>
   </div>
 </template>
 

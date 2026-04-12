@@ -1,0 +1,15 @@
+llm:
+  qwen:
+    api-key: "${DASHSCOPE_API_KEY:sk-c4a715f37f104dbbbd638da2f601bff0}"
+    model-name: qwen3.6-plus
+
+spring:
+  datasource:
+    url: "jdbc:h2:file:${NOMOCLAW_ROOT_DIR:${user.home}/.nomoclaw}/data/nomoclaw;MODE=MySQL;DATABASE_TO_LOWER=TRUE;AUTO_SERVER=TRUE"
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  quartz:
+    job-store-type: jdbc
+    jdbc:
+      initialize-schema: never

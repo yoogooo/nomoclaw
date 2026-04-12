@@ -23,8 +23,8 @@ public final class ModelProviderDefaults {
                         "qwen3-max",
                         List.of(
                                 model("qwen3-max", "Qwen3 Max", List.of("text"), true, 0, 0, 0, disabledUpload()),
-                                model("qwen3-235b-a22b-thinking-2507", "Qwen3 235B A22B Thinking", List.of("text"), true, 0, 0, 0, disabledUpload()),
-                                model("deepseek-v3.2", "DeepSeek-V3.2", List.of("text"), true, 0, 0, 0, disabledUpload())
+                                model("qwen3.5-plus", "qwen3.5-plus", List.of("text", "image"), true, 0, 0, 0, disabledUpload()),
+                                model("qwen3.6-plus", "qwen3.6-plus", List.of("text", "image"), true, 0, 0, 0, disabledUpload())
                         )
                 ),
                 new ModelConfigDto.Provider(

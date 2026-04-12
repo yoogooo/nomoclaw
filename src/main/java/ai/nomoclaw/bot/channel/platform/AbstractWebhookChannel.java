@@ -21,14 +21,16 @@ public abstract class AbstractWebhookChannel implements Channel {
     private final ChannelType type;
     private final ChannelOrchestratorService orchestratorService;
     private final ChannelPolicy policy;
-    private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+    private final HttpClient httpClient;
 
     protected AbstractWebhookChannel(ChannelType type,
                                      ChannelOrchestratorService orchestratorService,
-                                     ChannelPolicy policy) {
+                                     ChannelPolicy policy,
+                                     HttpClient httpClient) {
         this.type = type;
         this.orchestratorService = orchestratorService;
         this.policy = policy;
+        this.httpClient = httpClient;
     }
 
     @Override

@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { ArrowDown, ArrowUp, Check, Copy, Sparkles } from "lucide-vue-next";
 import { NButton, NCard, NCollapse, NCollapseItem, NFlex, NPopconfirm, NTag } from "naive-ui";
 import ApprovalBanner from "./ApprovalBanner.vue";
 import ComposerPanel from "./composer/ComposerPanel.vue";
+import UiInstantTooltip from "@/components/UiInstantTooltip.vue";
 import { message as discreteMessage } from "@/discrete";
 import { useConversationStore } from "@/stores/conversation";
 import { useConversationRunsStore } from "@/stores/conversationRuns";
@@ -17,6 +19,7 @@ const conversationStore = useConversationStore();
 const conversationRunsStore = useConversationRunsStore();
 const agentCatalogStore = useAgentCatalogStore();
 const jinnangStore = useJinnangStore();
+const { t } = useI18n();
 const copiedMessageMap = ref<Record<string, boolean>>({});
 const savingTipMap = ref<Record<string, boolean>>({});
 const savedTipMap = ref<Record<string, boolean>>({});
@@ -33,6 +36,30 @@ const latestMessageUid = computed(() => {
   const items = conversationStore.messages;
   return (items.length ? items[items.length - 1].messageUid : "") || "";
 });
+const isRunningCurrentConversation = computed(() =>
+  Boolean(conversationStore.currentConversationUid)
+  && conversationStore.runningConversationUid === conversationStore.currentConversationUid
+);
+const starterTemplates = computed(() => [
+  {
+    id: "project-plan",
+    title: t("chat.messages.starterTemplate1Title"),
+    summary: t("chat.messages.starterTemplate1Summary"),
+    prompt: t("chat.messages.starterTemplate1Prompt")
+  },
+  {
+    id: "clarify-then-solve",
+    title: t("chat.messages.starterTemplate2Title"),
+    summary: t("chat.messages.starterTemplate2Summary"),
+    prompt: t("chat.messages.starterTemplate2Prompt")
+  },
+  {
+    id: "overseas-landing",
+    title: t("chat.messages.starterTemplate3Title"),
+    summary: t("chat.messages.starterTemplate3Summary"),
+    prompt: t("chat.messages.starterTemplate3Prompt")
+  }
+]);
 
 function runTone(status: string) {
   if (status === "completed") return "success";
@@ -40,11 +67,6 @@ function runTone(status: string) {
   if (status === "waiting_approval") return "warning";
   if (status === "running") return "info";
   return "default";
-}
-
-function copyConversationUid() {
-  if (!conversationStore.currentConversationUid) return;
-  void window.navigator.clipboard.writeText(conversationStore.currentConversationUid);
 }
 
 function messageActionKey(messageItem: ConversationMessage) {
@@ -87,7 +109,7 @@ async function copyAssistantMessage(messageItem: ConversationMessage) {
       };
     }, 1200);
   } catch {
-    discreteMessage.error("复制失败，请重试");
+    discreteMessage.error(t("chat.messages.copyFailed"));
   }
 }
 
@@ -97,7 +119,7 @@ async function saveJinnang(messageItem: ConversationMessage) {
   const conversationAgentUid = conversationStore.conversations.find((item) => item.conversationUid === conversationStore.currentConversationUid)?.agentUid || "";
   const targetAgentUid = (conversationAgentUid || agentCatalogStore.selectedAgentUid || "").trim();
   if (!targetAgentUid) {
-    discreteMessage.warning("当前未选择可归属的 Agent，无法保存锦囊。");
+    discreteMessage.warning(t("chat.messages.saveTipNoAgent"));
     return;
   }
   savingTipMap.value = {
@@ -187,23 +209,42 @@ function isTipSaved(messageItem: ConversationMessage) {
   const messageUid = (messageItem.messageUid || "").trim();
   return !!messageUid && savedTipMessageUidSet.value.has(messageUid);
 }
+
+function applyStarterPrompt(prompt: string) {
+  conversationStore.draftMessage = prompt;
+  window.requestAnimationFrame(() => {
+    const input = document.getElementById("messageInput") as HTMLTextAreaElement | null;
+    if (!input) return;
+    input.focus();
+    const length = input.value.length;
+    input.setSelectionRange(length, length);
+  });
+}
 </script>
 
 <template>
   <section class="panel message-panel">
-    <div class="panel-header message-panel-header">
-      <div class="panel-title">对话区</div>
-      <button class="conversation-badge" :disabled="!conversationStore.currentConversationUid" @click="copyConversationUid">
-        {{ conversationStore.currentConversationUid || "Conversation" }}
-      </button>
-    </div>
-
     <div class="panel-body message-list scroll-area">
       <div
-        v-if="!conversationStore.messages.length && conversationStore.runningConversationUid !== conversationStore.currentConversationUid"
-        class="empty-state conversation-empty"
+        v-if="!conversationStore.messages.length && !isRunningCurrentConversation"
+        class="conversation-empty-state"
       >
-        当前对话暂无消息。
+        <div class="conversation-empty-hero">
+          <div class="conversation-empty-title">{{ t("chat.messages.newConversationTitle") }}</div>
+          <div class="conversation-empty-hint">{{ t("chat.messages.newConversationHint") }}</div>
+          <div class="conversation-starter-prompts">
+            <button
+              v-for="template in starterTemplates"
+              :key="template.id"
+              type="button"
+              class="starter-prompt-btn"
+              @click="applyStarterPrompt(template.prompt)"
+            >
+              <span class="starter-prompt-title">{{ template.title }}</span>
+              <span class="starter-prompt-summary">{{ template.summary }}</span>
+            </button>
+          </div>
+        </div>
       </div>
       <template v-else>
         <div
@@ -246,7 +287,7 @@ function isTipSaved(messageItem: ConversationMessage) {
                 secondary
                 @click="conversationStore.openFile(fileLink.path)"
               >
-                打开 {{ fileLink.name }}
+                {{ t("chat.messages.openFile", { name: fileLink.name }) }}
               </n-button>
             </n-flex>
           </div>
@@ -264,44 +305,46 @@ function isTipSaved(messageItem: ConversationMessage) {
               <span class="message-token-total">{{ messageTokenUsageText(message) }}</span>
             </div>
             <div class="message-actions">
-              <button
-                class="message-action-btn icon-only"
-                :class="{ copied: copiedMessageMap[messageActionKey(message)] }"
-                type="button"
-                title="复制"
-                aria-label="复制"
-                @click="copyAssistantMessage(message)"
-              >
-                <Check v-if="copiedMessageMap[messageActionKey(message)]" :size="14" />
-                <Copy v-else :size="14" />
-              </button>
+              <UiInstantTooltip :content="t('chat.messages.copy')">
+                <button
+                  class="message-action-btn icon-only"
+                  :class="{ copied: copiedMessageMap[messageActionKey(message)] }"
+                  type="button"
+                  :aria-label="t('chat.messages.copy')"
+                  @click="copyAssistantMessage(message)"
+                >
+                  <Check v-if="copiedMessageMap[messageActionKey(message)]" :size="14" />
+                  <Copy v-else :size="14" />
+                </button>
+              </UiInstantTooltip>
               <div class="save-tip-wrap">
                 <n-popconfirm
                   :show-icon="false"
                   :disabled="savingTipMap[messageActionKey(message)] || isTipSaved(message)"
-                  positive-text="确定"
-                  negative-text="取消"
+                  :positive-text="t('common.confirm')"
+                  :negative-text="t('common.cancel')"
                   @positive-click="saveJinnang(message)"
                 >
                   <template #trigger>
-                    <button
-                      class="message-action-btn icon-only"
-                      :class="{
-                        loading: savingTipMap[messageActionKey(message)],
-                        saved: isTipSaved(message)
-                      }"
-                      :disabled="savingTipMap[messageActionKey(message)] || isTipSaved(message)"
-                      type="button"
-                      :title="isTipSaved(message) ? '锦囊已保存' : '保存为锦囊'"
-                      :aria-label="isTipSaved(message) ? '锦囊已保存' : '保存为锦囊'"
-                    >
-                      <Check v-if="isTipSaved(message) && !savingTipMap[messageActionKey(message)]" :size="14" />
-                      <Sparkles v-else-if="!savingTipMap[messageActionKey(message)]" :size="14" />
-                    </button>
+                    <UiInstantTooltip :content="isTipSaved(message) ? t('chat.messages.tipSaved') : t('chat.messages.saveTip')">
+                      <button
+                        class="message-action-btn icon-only"
+                        :class="{
+                          loading: savingTipMap[messageActionKey(message)],
+                          saved: isTipSaved(message)
+                        }"
+                        :disabled="savingTipMap[messageActionKey(message)] || isTipSaved(message)"
+                        type="button"
+                        :aria-label="isTipSaved(message) ? t('chat.messages.tipSaved') : t('chat.messages.saveTip')"
+                      >
+                        <Check v-if="isTipSaved(message) && !savingTipMap[messageActionKey(message)]" :size="14" />
+                        <Sparkles v-else-if="!savingTipMap[messageActionKey(message)]" :size="14" />
+                      </button>
+                    </UiInstantTooltip>
                   </template>
-                  保存为锦囊？
+                  {{ t("chat.messages.saveTipConfirm") }}
                 </n-popconfirm>
-                <span v-if="isTipSaved(message)" class="message-action-hint">已保存为锦囊</span>
+                <span v-if="isTipSaved(message)" class="message-action-hint">{{ t("chat.messages.savedAsTip") }}</span>
               </div>
             </div>
           </div>
@@ -316,7 +359,7 @@ function isTipSaved(messageItem: ConversationMessage) {
             <n-collapse>
               <n-collapse-item :name="`run-${message.messageUid}`">
                 <template #header>
-                  <div class="run-title">执行过程</div>
+                  <div class="run-title">{{ t("chat.messages.runTitle") }}</div>
                 </template>
                 <template #header-extra>
                   <n-tag size="small" :type="runTone(conversationRunsStore.runsByMessageUid[message.messageUid].status)">
@@ -334,7 +377,7 @@ function isTipSaved(messageItem: ConversationMessage) {
                     <template #header-extra>
                       <n-tag size="small" :type="runTone(step.status)">{{ step.status }}</n-tag>
                     </template>
-                    <div class="run-details">{{ step.displayDetails || step.displaySummary || "无附加详情" }}</div>
+                    <div class="run-details">{{ step.displayDetails || step.displaySummary || t("chat.messages.noExtraDetails") }}</div>
                   </n-collapse-item>
                 </n-collapse>
               </n-collapse-item>
@@ -371,37 +414,111 @@ function isTipSaved(messageItem: ConversationMessage) {
   flex-direction: column;
 }
 
-.message-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding: var(--space-5) var(--space-6);
-  border-bottom: var(--size-1) solid var(--color-border-soft);
-}
-
 .message-list {
   flex: 1;
 }
 
-.conversation-badge {
-  padding: var(--space-1) var(--space-3);
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: var(--color-bg-soft-hover);
-  color: var(--color-text-subtle);
+.conversation-empty-state {
+  display: grid;
+  gap: var(--space-4_5);
+  place-items: center;
+  min-height: 100%;
+}
+
+.conversation-empty-hero {
+  width: min(100%, var(--size-720));
+  border-radius: var(--radius-xl);
+  padding: var(--space-6) var(--space-6);
+  background: color-mix(in srgb, var(--color-bg-surface) 74%, transparent);
+  backdrop-filter: blur(var(--size-8));
+  display: grid;
+  place-items: center;
+  gap: var(--space-4);
+}
+
+.conversation-empty-title {
+  color: var(--color-text-heading);
+  font-size: clamp(var(--size-24), 2.8vw, var(--size-26));
+  line-height: 1.12;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.conversation-empty-hint {
+  color: var(--color-text-muted);
   font-size: var(--font-size-xs);
-  font-weight: 500;
+}
+
+.conversation-starter-prompts {
+  margin-top: var(--space-2);
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.starter-prompt-btn {
+  border: var(--size-1) solid var(--color-border-soft);
+  border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--color-bg-surface-soft) 76%, transparent);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  padding: var(--space-4);
+  min-height: var(--size-108);
+  text-align: left;
+  display: grid;
+  align-content: start;
+  gap: var(--space-1_5);
   cursor: pointer;
-  transition: background-color 0.18s ease;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+  transition: border-color 0.16s ease, background-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
 }
 
-.conversation-badge:hover {
-  background: var(--color-bg-soft-active);
+.starter-prompt-btn:hover {
+  border-color: var(--color-border-active);
+  background: var(--color-bg-soft-hover);
+  color: var(--color-text-primary);
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.1);
+  transform: translateY(calc(var(--size-2) * -1));
 }
 
-.conversation-empty {
-  margin-top: var(--space-1_5);
+.starter-prompt-title {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.starter-prompt-summary {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  line-height: 1.45;
+  min-height: calc(1.45em * 3);
+}
+
+@media (max-width: var(--size-breakpoint-lg)) {
+  .conversation-empty-hero {
+    width: min(100%, var(--size-620));
+  }
+
+  .conversation-starter-prompts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: var(--size-breakpoint-md)) {
+  .conversation-empty-hero {
+    width: 100%;
+    padding: var(--space-5);
+  }
+
+  .conversation-starter-prompts {
+    grid-template-columns: 1fr;
+  }
+
+  .starter-prompt-btn {
+    min-height: var(--size-96);
+  }
 }
 
 .message-wrap {
@@ -427,7 +544,7 @@ function isTipSaved(messageItem: ConversationMessage) {
   max-width: 92%;
   padding: var(--space-4_5) var(--space-5);
   border-radius: var(--radius-xl) var(--radius-xl) var(--radius-xl) var(--radius-s-md);
-  background: var(--color-bg-canvas);
+  background: var(--color-chat-bubble-assistant-bg);
   line-height: 1.75;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -435,7 +552,7 @@ function isTipSaved(messageItem: ConversationMessage) {
 
 .message-bubble.user {
   border-radius: var(--radius-xl) var(--radius-xl) var(--radius-s-md) var(--radius-xl);
-  background: var(--color-accent-brand);
+  background: var(--color-chat-bubble-user-bg);
   color: var(--color-text-inverse);
 }
 
@@ -722,7 +839,7 @@ function isTipSaved(messageItem: ConversationMessage) {
   gap: var(--space-2);
   padding: var(--space-4_5) var(--space-5);
   border-radius: var(--radius-xl) var(--radius-xl) var(--radius-xl) var(--radius-s-md);
-  background: var(--color-bg-canvas);
+  background: var(--color-chat-bubble-assistant-bg);
 }
 
 .typing-indicator span {

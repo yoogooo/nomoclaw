@@ -257,12 +257,13 @@ CREATE TABLE IF NOT EXISTS agent_cron_subscription (
     job_uid VARCHAR(64) NOT NULL DEFAULT '' COMMENT '定时任务业务ID',
     channel VARCHAR(32) NOT NULL DEFAULT '' COMMENT '推送渠道',
     target VARCHAR(256) NOT NULL DEFAULT '' COMMENT '推送目标地址',
+    bot_id VARCHAR(64) NOT NULL DEFAULT '' COMMENT '机器人ID，空表示使用默认机器人',
     enabled TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否启用订阅',
     created_time DATETIME(3) NOT NULL COMMENT '创建时间',
     updated_time DATETIME(3) NOT NULL COMMENT '更新时间',
     PRIMARY KEY (id),
     UNIQUE KEY uk_agent_cron_subscription_uid (subscription_uid),
-    UNIQUE KEY uk_agent_cron_subscription_target (job_uid, channel, target),
+    UNIQUE KEY uk_agent_cron_subscription_target (job_uid, channel, target, bot_id),
     KEY idx_agent_cron_subscription_job_enabled (job_uid, enabled)
 ) ENGINE=InnoDB
   DEFAULT CHARSET=utf8mb4

@@ -51,6 +51,7 @@ public class MybatisCronSubscriptionRepository implements CronSubscriptionReposi
             entity.setJobUid(normalizedJobUid);
             entity.setChannel(ChannelType.from(item.channel()).value());
             entity.setTarget(item.target().trim());
+            entity.setBotId(trim(item.botId()));
             entity.setEnabled(item.enabled() ? 1 : 0);
             entity.setCreatedTime(now);
             entity.setUpdatedTime(now);
@@ -78,8 +79,9 @@ public class MybatisCronSubscriptionRepository implements CronSubscriptionReposi
                 continue;
             }
             String target = trim(item.target());
-            String key = channel + "|" + target;
-            unique.put(key, new CronSubscriptionUpsert(channel, target, item.enabled()));
+            String botId = trim(item.botId());
+            String key = channel + "|" + target + "|" + botId;
+            unique.put(key, new CronSubscriptionUpsert(channel, target, botId, item.enabled()));
         }
         return List.copyOf(unique.values());
     }
@@ -90,6 +92,7 @@ public class MybatisCronSubscriptionRepository implements CronSubscriptionReposi
                 entity.getJobUid(),
                 ChannelType.from(entity.getChannel()).value(),
                 entity.getTarget(),
+                trim(entity.getBotId()),
                 entity.getEnabled() != null && entity.getEnabled() == 1,
                 entity.getCreatedTime(),
                 entity.getUpdatedTime()

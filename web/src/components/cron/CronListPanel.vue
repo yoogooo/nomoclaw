@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { NButton, NCheckbox, NFlex, NTag } from "naive-ui";
 import { useCronJobsStore } from "@/stores/cronJobs";
 import type { CronJob } from "@/types/api";
+import { getSortLocale } from "@/i18n";
 import { cronStatusLabel, displayCronJobTitle, fallbackAgentLabel, formatDateTime } from "@/utils/format";
 
 const emit = defineEmits<{
@@ -10,6 +12,7 @@ const emit = defineEmits<{
 }>();
 
 const cronJobsStore = useCronJobsStore();
+const { t } = useI18n();
 
 const groupedJobs = computed(() => {
   const order = new Map<string, number>();
@@ -40,7 +43,7 @@ const groupedJobs = computed(() => {
     if (left.sortIndex !== right.sortIndex) {
       return left.sortIndex - right.sortIndex;
     }
-    return left.label.localeCompare(right.label, "zh-CN");
+    return left.label.localeCompare(right.label, getSortLocale());
   });
 });
 
@@ -49,22 +52,21 @@ const groupedJobs = computed(() => {
 <template>
   <div class="panel">
     <div class="panel-header cron-list-header">
-      <div class="ui-kicker">SCHEDULER</div>
-      <div class="panel-title ui-title-xl">任务列表</div>
-      <div class="panel-subtitle ui-subtitle">按 Agent 分组查看调度中的任务，支持批量管理。</div>
+      <div class="panel-title ui-title-xl">{{ t("cron.list.title") }}</div>
+      <div class="panel-subtitle ui-subtitle">{{ t("cron.list.subtitle") }}</div>
     </div>
     <div class="panel-body cron-list-panel">
       <n-flex justify="space-between" align="center">
         <n-flex align="center">
-          <n-button type="primary" @click="emit('create')">创建任务</n-button>
-          <span v-if="cronJobsStore.bulkMode" class="cron-bulk-selected">已选 {{ cronJobsStore.selectedBulkJobUids.length }} 项</span>
+          <n-button type="primary" @click="emit('create')">{{ t("cron.list.createTask") }}</n-button>
+          <span v-if="cronJobsStore.bulkMode" class="cron-bulk-selected">{{ t("cron.list.selectedCount", { count: cronJobsStore.selectedBulkJobUids.length }) }}</span>
         </n-flex>
         <n-flex v-if="cronJobsStore.bulkMode" :size="8">
-          <n-button type="error" secondary @click="cronJobsStore.batchDeleteSelected()">删除选中</n-button>
-          <n-button tertiary @click="cronJobsStore.clearBulkMode()">取消</n-button>
+          <n-button type="error" secondary @click="cronJobsStore.batchDeleteSelected()">{{ t("cron.list.deleteSelected") }}</n-button>
+          <n-button tertiary @click="cronJobsStore.clearBulkMode()">{{ t("common.cancel") }}</n-button>
         </n-flex>
         <n-button v-else secondary strong @click="cronJobsStore.toggleBulkMode()">
-          批量管理
+          {{ t("cron.list.bulkManage") }}
         </n-button>
       </n-flex>
 
@@ -74,7 +76,7 @@ const groupedJobs = computed(() => {
             <header class="cron-group-header">
               <div>
                 <div class="cron-group-title">{{ group.label }}</div>
-                <div class="cron-group-count">{{ group.jobs.length }} 个任务</div>
+                <div class="cron-group-count">{{ t("cron.list.jobCount", { count: group.jobs.length }) }}</div>
               </div>
             </header>
             <div
@@ -91,7 +93,7 @@ const groupedJobs = computed(() => {
               <button class="cron-main" @click="cronJobsStore.selectJob(job.jobUid)">
                 <div class="cron-title">{{ displayCronJobTitle(job) }}</div>
                 <div v-if="job.status !== 'PAUSED' && job.nextRunTime" class="cron-next">
-                  下次执行 {{ formatDateTime(job.nextRunTime) }}
+                  {{ t("cron.list.nextRunAt", { time: formatDateTime(job.nextRunTime) }) }}
                 </div>
               </button>
               <n-tag size="small" :type="job.status === 'ACTIVE' ? 'success' : job.status === 'PAUSED' ? 'warning' : 'default'">
@@ -101,9 +103,9 @@ const groupedJobs = computed(() => {
           </section>
         </div>
         <div v-else class="cron-empty">
-          <div class="cron-empty-title">当前还没有定时任务</div>
-          <div class="cron-empty-subtitle">创建后可在此统一查看状态、执行记录和执行报告。</div>
-          <n-button type="primary" @click="emit('create')">创建第一个任务</n-button>
+          <div class="cron-empty-title">{{ t("cron.list.emptyTitle") }}</div>
+          <div class="cron-empty-subtitle">{{ t("cron.list.emptySubtitle") }}</div>
+          <n-button type="primary" @click="emit('create')">{{ t("cron.list.createFirstTask") }}</n-button>
         </div>
       </div>
     </div>

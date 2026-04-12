@@ -12,6 +12,26 @@
 
 * {
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: var(--size-8);
+  height: var(--size-8);
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  border-radius: var(--radius-pill);
+  background: var(--color-border-strong);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-active);
 }
 
 html,
@@ -23,6 +43,12 @@ body,
   font-family: var(--font-sans);
   background: radial-gradient(1200px 560px at 20% -20%, rgba(14, 165, 233, 0.08), transparent 52%), var(--color-bg-canvas);
   color: var(--text-main);
+}
+
+:root[data-theme="dark"] html,
+:root[data-theme="dark"] body,
+:root[data-theme="dark"] #app {
+  background: linear-gradient(180deg, #141518 0%, #121315 100%);
 }
 
 body {
@@ -43,7 +69,7 @@ a {
 .ui-focus-highlight:focus,
 .ui-focus-highlight:focus-visible {
   border-color: var(--color-accent-brand);
-  background: var(--color-text-inverse);
+  background: var(--color-bg-surface);
   box-shadow: 0 0 0 var(--size-4) var(--color-bg-brand-tint-14);
 }
 
@@ -237,6 +263,21 @@ a {
   color: var(--color-text-subtle);
   font-size: var(--font-size-xs);
   font-weight: 600;
+}
+
+.ui-button-brand {
+  border-color: var(--color-button-primary-bg);
+  background: var(--color-button-primary-bg);
+  color: var(--color-button-primary-text);
+  box-shadow: var(--shadow-button-brand);
+  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
+}
+
+.ui-button-brand:hover {
+  border-color: var(--color-button-primary-bg-hover);
+  background: var(--color-button-primary-bg-hover);
+  color: var(--color-button-primary-text);
+  box-shadow: var(--shadow-card-hover);
 }
 
 .ui-title-strong {
@@ -478,15 +519,41 @@ a {
   height: var(--size-36);
   border: var(--size-1) solid var(--color-border-strong);
   border-radius: var(--radius-s-md);
-  background: var(--color-text-inverse);
+  background: var(--color-bg-surface-soft);
   color: var(--color-text-label);
   cursor: pointer;
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.ui-avatar-icon-btn:hover {
+  border-color: var(--color-border-active);
+  background: var(--color-bg-brand-soft);
+  color: var(--color-text-brand);
 }
 
 .ui-avatar-icon-btn.active {
   border-color: var(--color-border-brand);
   box-shadow: 0 0 0 var(--size-2) var(--color-border-ring);
   color: var(--color-text-link);
+  background: var(--color-bg-brand-soft);
+}
+
+:root[data-theme="dark"] .ui-avatar-icon-btn {
+  background: var(--color-bg-surface-mute);
+  border-color: var(--color-border-soft);
+  color: var(--color-text-secondary);
+}
+
+:root[data-theme="dark"] .ui-avatar-icon-btn:hover {
+  border-color: var(--color-border-brand-hover);
+  background: var(--color-bg-brand-soft);
+  color: var(--color-text-brand);
+}
+
+:root[data-theme="dark"] .ui-avatar-icon-btn.active {
+  border-color: var(--color-border-brand);
+  background: var(--color-bg-brand-soft);
+  color: var(--color-text-brand-strong);
 }
 
 .ui-avatar-color-grid {
@@ -967,6 +1034,34 @@ a {
 
 .message-html tbody tr:hover td {
   background: var(--color-overlay-slate-50);
+}
+
+:root[data-theme="dark"] .message-html table {
+  border-color: var(--color-border-soft);
+  background: color-mix(in srgb, var(--color-bg-surface) 88%, var(--color-bg-surface-soft) 12%);
+  box-shadow: none;
+}
+
+:root[data-theme="dark"] .message-html thead {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-bg-surface-soft) 86%, var(--color-bg-surface) 14%) 0%,
+    color-mix(in srgb, var(--color-bg-surface-soft) 70%, var(--color-bg-surface) 30%) 100%
+  );
+}
+
+:root[data-theme="dark"] .message-html th,
+:root[data-theme="dark"] .message-html td {
+  border-right-color: var(--color-border-soft);
+  border-bottom-color: var(--color-border-soft);
+}
+
+:root[data-theme="dark"] .message-html tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--color-bg-surface-soft) 74%, transparent);
+}
+
+:root[data-theme="dark"] .message-html tbody tr:hover td {
+  background: color-mix(in srgb, var(--color-bg-soft-hover) 88%, var(--color-bg-surface) 12%);
 }
 
 .message-html th:last-child,

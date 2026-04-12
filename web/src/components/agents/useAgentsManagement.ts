@@ -1,7 +1,8 @@
 import { computed, reactive, ref } from "vue";
 import { conversationApi } from "@/api/conversationApi";
 import { modelApi } from "@/api/modelApi";
-import { dialog, message } from "@/discrete";
+import { dialog, message, warningDialogPreset } from "@/discrete";
+import { tr } from "@/i18n";
 import { useAgentCatalogStore } from "@/stores/agentCatalog";
 import type {
   AgentDocConfig,
@@ -10,7 +11,7 @@ import type {
   DocKey,
   ManagedAgent
 } from "@/components/agents/agentManagementTypes";
-import type { ImportedSkillResponse, ModelConfig } from "@/types/api";
+import type { AgentDocFile, ImportedSkillResponse, ModelConfig } from "@/types/api";
 import {
   defaultDocs,
   mapApiSkill,
@@ -56,7 +57,8 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
     agent: "",
     memory: "",
     tools: "",
-    identity: ""
+    identity: "",
+    user: ""
   });
 
   const basicForm = reactive<BasicFormModel>({
@@ -105,6 +107,7 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
       docsForm.memory = "";
       docsForm.tools = "";
       docsForm.identity = "";
+      docsForm.user = "";
       return;
     }
     docsForm.soul = selectedAgent.docs.soul;
@@ -112,6 +115,7 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
     docsForm.memory = selectedAgent.docs.memory;
     docsForm.tools = selectedAgent.docs.tools;
     docsForm.identity = selectedAgent.docs.identity;
+    docsForm.user = selectedAgent.docs.user;
   }
 
   function syncBasicFormFromSelection(selectedAgent: ManagedAgent | null) {
@@ -148,13 +152,13 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
       agentsRootDir.value = agentDir;
       skillsRootDir.value = skillDir;
     } catch {
-      message.error("系统路径配置加载失败，请检查后端 /api/system/config。");
+      message.error(tr("errors.loadSystemPathFailed"));
       throw new Error("system config load failed");
     }
     try {
       modelConfig.value = await modelApi.getModelConfig();
     } catch {
-      message.error("模型配置加载失败，请检查后端 /api/system/models。");
+      message.error(tr("errors.loadModelConfigFailed"));
       throw new Error("model config load failed");
     }
     await reloadAgentsFromCatalog();
@@ -165,17 +169,23 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
     const isPersisted = agentCatalogStore.allAgents.some((item) => item.agentUid === agentUid);
     if (!isPersisted) return;
     const requestSeq = ++workspaceLoadSeq;
-    const [skills, tools, tips] = await Promise.all([
+    const [skills, tools, tips, docs] = await Promise.all([
       conversationApi.listAgentSkills(agentUid),
       conversationApi.listAgentTools(agentUid),
-      conversationApi.listAgentTips(agentUid)
+      conversationApi.listAgentTips(agentUid),
+      conversationApi.listAgentDocs(agentUid)
     ]);
     if (requestSeq !== workspaceLoadSeq) return;
     updateAgent(agentUid, (agent) => ({
       ...agent,
       managedSkills: skills.map((item) => mapApiSkill(item, domainOptions.value)),
       managedTools: tools.map(mapApiTool),
-      tips: tips.map(mapApiTip)
+      tips: tips.map(mapApiTip),
+      docs: {
+        ...agent.docs,
+        ...mapDocsPayload(docs)
+      },
+      docStates: mergeDocUpdatedTime(agent.docStates, docs)
     }));
   }
 
@@ -183,16 +193,16 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
     const displayName = createForm.displayName.trim();
     const agentName = createForm.agentName.trim();
     if (!displayName) {
-      message.warning("请填写 Agent 名称");
+      message.warning(tr("errors.fillAgentName"));
       return "";
     }
     if (!agentName) {
-      message.warning("请填写 Agent 标识");
+      message.warning(tr("errors.fillAgentIdentifier"));
       return "";
     }
     const fallbackModel = resolveFallbackModelSelection(modelConfig.value);
     if (!fallbackModel.modelProvider || !fallbackModel.modelName) {
-      message.warning("系统中还没有可用模型，暂时无法创建 Agent");
+      message.warning(tr("errors.noAvailableModel"));
       return "";
     }
     const payload = {
@@ -214,20 +224,36 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
         docs: defaultDocs(displayName)
       }));
     }
-    message.success("Agent 已创建");
+    message.success(tr("toast.agentCreated"));
     return created.agentUid;
   }
 
   function removeAgent(agent: ManagedAgent, onDeleted?: () => void) {
+    if (agent.agentUid === "agent_general_assistant") {
+      message.warning(tr("toast.defaultAgentDeleteDenied"));
+      return;
+    }
     dialog.warning({
-      title: "删除 Agent",
-      content: `确认删除 “${agent.displayName || agent.agentName}” 吗？`,
-      positiveText: "删除",
-      negativeText: "取消",
+      title: tr("dialogs.deleteAgentTitle"),
+      content: tr("dialogs.deleteAgentContent", { name: agent.displayName || agent.agentName }),
+      ...warningDialogPreset(),
+      positiveText: tr("dialogs.confirmContinue"),
+      negativeText: tr("common.cancel"),
       onPositiveClick: () => {
-        agents.value = agents.value.filter((item) => item.agentUid !== agent.agentUid);
-        onDeleted?.();
-        message.success("Agent 已删除");
+        dialog.error({
+          title: tr("dialogs.deleteAgentRiskTitle"),
+          content: tr("dialogs.deleteAgentRiskContent"),
+          ...warningDialogPreset(),
+          positiveText: tr("dialogs.confirmPermanentDelete"),
+          negativeText: tr("common.cancel"),
+          onPositiveClick: async () => {
+            await conversationApi.deleteAgent(agent.agentUid);
+            agents.value = agents.value.filter((item) => item.agentUid !== agent.agentUid);
+            await agentCatalogStore.loadCatalog();
+            onDeleted?.();
+            message.success(tr("toast.agentDeleted"));
+          }
+        });
       }
     });
   }
@@ -277,7 +303,7 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
     const title = tipForm.title.trim();
     const content = tipForm.content.trim();
     if (!title || !content) {
-      message.warning("请填写锦囊标题和内容");
+      message.warning(tr("errors.fillTipTitleAndContent"));
       return;
     }
     const created = await conversationApi.createAgentTip(selectedAgent.agentUid, {
@@ -291,7 +317,7 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
     }));
     tipForm.title = "";
     tipForm.content = "";
-    message.success("锦囊已保存到数据库");
+    message.success(tr("toast.tipSavedToDb"));
   }
 
   async function removeTip(selectedAgent: ManagedAgent | null, tipId: string) {
@@ -301,7 +327,7 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
       ...agent,
       tips: agent.tips.filter((item) => item.id !== tipId)
     }));
-    message.success("锦囊已删除");
+    message.success(tr("toast.tipDeleted"));
   }
 
   async function updateTip(selectedAgent: ManagedAgent | null, payload: { tipId: string; title: string; content: string }) {
@@ -309,7 +335,7 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
     const title = payload.title.trim();
     const content = payload.content.trim();
     if (!title || !content) {
-      message.warning("请填写锦囊标题和内容");
+      message.warning(tr("errors.fillTipTitleAndContent"));
       return;
     }
     const updated = await conversationApi.updateAgentTip(selectedAgent.agentUid, payload.tipId, {
@@ -321,7 +347,7 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
       ...agent,
       tips: agent.tips.map((item) => (item.id === payload.tipId ? tip : item))
     }));
-    message.success("锦囊已更新");
+    message.success(tr("toast.tipUpdated"));
   }
 
   function docContentOf(selectedAgent: ManagedAgent | null, key: DocKey) {
@@ -357,17 +383,17 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
     }));
   }
 
-  function saveDocs(selectedAgent: ManagedAgent | null, selectedDocKey: DocKey) {
+  async function saveDocs(selectedAgent: ManagedAgent | null, selectedDocKey: DocKey) {
     if (!selectedAgent) return;
-    const now = new Date().toISOString();
+    const updated = await conversationApi.updateAgentDoc(selectedAgent.agentUid, selectedDocKey, {
+      content: docsForm[selectedDocKey] || ""
+    });
+    const now = updated.updatedTime || new Date().toISOString();
     updateAgent(selectedAgent.agentUid, (agent) => ({
       ...agent,
       docs: {
-        soul: docsForm.soul,
-        agent: docsForm.agent,
-        memory: docsForm.memory,
-        tools: docsForm.tools,
-        identity: docsForm.identity
+        ...agent.docs,
+        [selectedDocKey]: updated.content || ""
       },
       docStates: {
         ...agent.docStates,
@@ -377,14 +403,40 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
         }
       }
     }));
-    message.success("文档配置已保存");
+    docsForm[selectedDocKey] = updated.content || "";
+    message.success(tr("toast.docSaved"));
+  }
+
+  function mapDocsPayload(items: AgentDocFile[]) {
+    const next: Partial<AgentDocConfig> = {};
+    for (const item of items || []) {
+      const key = (item.key || "").trim().toLowerCase() as DocKey;
+      if (key === "soul" || key === "agent" || key === "memory" || key === "tools" || key === "identity" || key === "user") {
+        next[key] = item.content || "";
+      }
+    }
+    return next;
+  }
+
+  function mergeDocUpdatedTime(current: ManagedAgent["docStates"], items: AgentDocFile[]) {
+    const next = { ...current };
+    for (const item of items || []) {
+      const key = (item.key || "").trim().toLowerCase() as DocKey;
+      if (key === "soul" || key === "agent" || key === "memory" || key === "tools" || key === "identity" || key === "user") {
+        next[key] = {
+          enabled: current[key]?.enabled ?? true,
+          updatedAt: item.updatedTime || current[key]?.updatedAt || new Date().toISOString()
+        };
+      }
+    }
+    return next;
   }
 
   async function saveBasicInfo(selectedAgent: ManagedAgent | null) {
     if (!selectedAgent) return;
     const displayName = basicForm.displayName.trim();
     if (!displayName) {
-      message.warning("请填写显示名称");
+      message.warning(tr("errors.fillDisplayName"));
       return;
     }
     const fallbackModel = resolveFallbackModelSelection(modelConfig.value);
@@ -392,7 +444,7 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
     const modelName = selectedAgent.modelName || selectedAgent.modelNames?.[0] || fallbackModel.modelName;
     const modelNames = selectedAgent.modelNames?.length ? [...selectedAgent.modelNames] : (modelName ? [modelName] : fallbackModel.modelNames);
     if (!modelProvider || !modelName || !modelNames.length) {
-      message.warning("当前 Agent 缺少可用模型，请先在系统模型管理中配置模型");
+      message.warning(tr("errors.noModelForAgent"));
       return;
     }
     const payload = {
@@ -416,13 +468,13 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
       modelNames: updated.modelNames && updated.modelNames.length ? updated.modelNames : payload.modelNames
     }));
     await agentCatalogStore.loadCatalog();
-    message.success("基本信息已保存到数据库");
+    message.success(tr("toast.basicSaved"));
   }
 
   async function handleSkillImported(selectedAgent: ManagedAgent | null, skill: ImportedSkillResponse) {
     if (!selectedAgent) return;
     await loadAgentWorkspace(selectedAgent.agentUid);
-    message.success(`Skill 已导入：${skill.displayName || skill.skillKey}`);
+    message.success(tr("toast.skillImported", { name: skill.displayName || skill.skillKey }));
   }
 
   return {

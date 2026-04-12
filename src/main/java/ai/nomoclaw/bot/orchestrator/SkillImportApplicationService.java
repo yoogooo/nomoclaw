@@ -23,21 +23,11 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
@@ -58,6 +48,8 @@ public class SkillImportApplicationService {
     );
     private static final Pattern URL_PATTERN = Pattern.compile("https?://[^\\s\"'<>]+");
     private static final Pattern HREF_PATTERN = Pattern.compile("href\\s*=\\s*['\"]([^'\"]+)['\"]", Pattern.CASE_INSENSITIVE);
+    private static final String ARCHIVE_STRUCTURE_INVALID_MESSAGE =
+            "archive skill structure invalid: SKILL.md must be at archive root or single top-level directory root";
 
     private final SkillDefinitionRepository skillDefinitionRepository;
     private final AgentSkillRelationRepository agentSkillRelationRepository;
@@ -66,14 +58,12 @@ public class SkillImportApplicationService {
 
     public SkillImportApplicationService(SkillDefinitionRepository skillDefinitionRepository,
                                          AgentSkillRelationRepository agentSkillRelationRepository,
-                                         AgentDefinitionRepository agentDefinitionRepository) {
+                                         AgentDefinitionRepository agentDefinitionRepository,
+                                         HttpClient appHttpClient) {
         this.skillDefinitionRepository = skillDefinitionRepository;
         this.agentSkillRelationRepository = agentSkillRelationRepository;
         this.agentDefinitionRepository = agentDefinitionRepository;
-        this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(15))
-                .followRedirects(HttpClient.Redirect.NORMAL)
-                .build();
+        this.httpClient = appHttpClient;
     }
 
     public AgentSkillDto importSkillFromUrl(String agentUid, ImportSkillFromUrlCommand command) {
@@ -412,15 +402,25 @@ public class SkillImportApplicationService {
         if (Files.isRegularFile(extractedDir.resolve(SKILL_FILE))) {
             return extractedDir;
         }
-        List<Path> skillFiles = new ArrayList<>();
-        try (var walk = Files.walk(extractedDir)) {
-            walk.filter(path -> path.getFileName() != null && SKILL_FILE.equals(path.getFileName().toString()))
-                    .forEach(skillFiles::add);
+
+        List<Path> topLevelEntries;
+        try (var stream = Files.list(extractedDir)) {
+            topLevelEntries = stream
+                    .filter(path -> {
+                        String name = path.getFileName() == null ? "" : path.getFileName().toString();
+                        return !"__MACOSX".equals(name) && !".DS_Store".equals(name);
+                    })
+                    .toList();
         }
-        if (skillFiles.isEmpty()) {
-            throw new IllegalArgumentException("archive does not contain SKILL.md");
+        if (topLevelEntries.size() != 1 || !Files.isDirectory(topLevelEntries.get(0))) {
+            throw new IllegalArgumentException(ARCHIVE_STRUCTURE_INVALID_MESSAGE);
         }
-        return skillFiles.get(0).getParent();
+
+        Path singleTopLevelDir = topLevelEntries.get(0);
+        if (Files.isRegularFile(singleTopLevelDir.resolve(SKILL_FILE))) {
+            return singleTopLevelDir;
+        }
+        throw new IllegalArgumentException(ARCHIVE_STRUCTURE_INVALID_MESSAGE);
     }
 
     private void copyDirectory(Path sourceDir, Path targetDir) throws Exception {
@@ -469,9 +469,7 @@ public class SkillImportApplicationService {
         }
 
         String frontMatter = normalized.substring(4, end);
-        String name = null;
-        String description = null;
-        boolean collectingDescription = false;
+        FrontMatterParsingState state = new FrontMatterParsingState();
         List<String> descriptionLines = new ArrayList<>();
         try (Reader reader = new InputStreamReader(new ByteArrayInputStream(frontMatter.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8)) {
             StringBuilder lineBuffer = new StringBuilder();
@@ -480,40 +478,50 @@ public class SkillImportApplicationService {
                 if (read == '\n') {
                     String line = lineBuffer.toString().stripTrailing();
                     lineBuffer.setLength(0);
-                    if (line.trim().isEmpty() || line.trim().startsWith("#")) {
-                        continue;
-                    }
-                    if (line.startsWith(" ") || line.startsWith("\t")) {
-                        if (collectingDescription) {
-                            descriptionLines.add(line.trim());
-                        }
-                        continue;
-                    }
-                    collectingDescription = false;
-                    int colonIndex = line.indexOf(':');
-                    if (colonIndex < 0) {
-                        continue;
-                    }
-                    String key = line.substring(0, colonIndex).trim();
-                    String value = stripQuotes(line.substring(colonIndex + 1).trim());
-                    if ("name".equals(key)) {
-                        name = value;
-                    } else if ("description".equals(key)) {
-                        if ("|".equals(value) || ">".equals(value)) {
-                            collectingDescription = true;
-                        } else {
-                            description = value;
-                        }
-                    }
+                    applyFrontMatterLine(state, descriptionLines, line);
                 } else {
                     lineBuffer.append((char) read);
                 }
             }
+            if (!lineBuffer.isEmpty()) {
+                applyFrontMatterLine(state, descriptionLines, lineBuffer.toString().stripTrailing());
+            }
         }
         if (!descriptionLines.isEmpty()) {
-            description = String.join("\n", descriptionLines).trim();
+            state.description = String.join("\n", descriptionLines).trim();
         }
-        return new FrontMatter(name, description);
+        return new FrontMatter(state.name, state.description);
+    }
+
+    private void applyFrontMatterLine(FrontMatterParsingState state, List<String> descriptionLines, String line) {
+        String trimmed = line.trim();
+        if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+            return;
+        }
+        if (line.startsWith(" ") || line.startsWith("\t")) {
+            if (state.collectingDescription) {
+                descriptionLines.add(trimmed);
+            }
+            return;
+        }
+        state.collectingDescription = false;
+        int colonIndex = line.indexOf(':');
+        if (colonIndex < 0) {
+            return;
+        }
+        String key = line.substring(0, colonIndex).trim();
+        String value = stripQuotes(line.substring(colonIndex + 1).trim());
+        if ("name".equals(key)) {
+            state.name = value;
+            return;
+        }
+        if ("description".equals(key)) {
+            if ("|".equals(value) || ">".equals(value)) {
+                state.collectingDescription = true;
+                return;
+            }
+            state.description = value;
+        }
     }
 
     private List<URI> extractCandidateUrls(URI baseUri, String html) {
@@ -662,5 +670,11 @@ public class SkillImportApplicationService {
     }
 
     private record FrontMatter(String name, String description) {
+    }
+
+    private static class FrontMatterParsingState {
+        private String name;
+        private String description;
+        private boolean collectingDescription;
     }
 }

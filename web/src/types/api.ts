@@ -60,6 +60,13 @@ export interface AgentTip {
   updatedTime: string;
 }
 
+export interface AgentDocFile {
+  key: string;
+  fileName: string;
+  content: string;
+  updatedTime: string;
+}
+
 export interface SystemConfig {
   nomoclawRootDir: string;
   agentsRootDir: string;
@@ -70,22 +77,53 @@ export interface ChannelConfig {
   channels: {
     feishu: {
       enabled: boolean;
-      requireMention: boolean;
-      allowList: string[];
-      appId: string;
-      appSecret: string;
-      processingAckReactionEnabled: boolean;
-      processingAckReactionType: string;
+      bots: ChannelFeishuBotConfig[];
     };
     dingtalk: {
       enabled: boolean;
-      requireMention: boolean;
-      allowList: string[];
-      clientId: string;
-      clientSecret: string;
-      robotCode: string;
+      bots: ChannelDingTalkBotConfig[];
     };
   };
+}
+
+export interface ChannelFeishuBotConfig {
+  botId: string;
+  displayName: string;
+  enabled: boolean;
+  isDefault: boolean;
+  requireMention: boolean;
+  allowList: string[];
+  appId: string;
+  appSecret: string;
+  processingAckReactionEnabled: boolean;
+  processingAckReactionType: string;
+  defaultTarget: string;
+  defaultTargetDisplayName: string;
+  targetResolvedAt: string;
+}
+
+export interface ChannelDingTalkBotConfig {
+  botId: string;
+  displayName: string;
+  enabled: boolean;
+  isDefault: boolean;
+  requireMention: boolean;
+  allowList: string[];
+  clientId: string;
+  clientSecret: string;
+  robotCode: string;
+}
+
+export interface ChannelTargetOption {
+  label: string;
+  target: string;
+  kind: "group" | "user" | "webhook";
+  source: "platform" | "history";
+}
+
+export interface ChannelTargetSearchResponse {
+  items: ChannelTargetOption[];
+  error?: string | null;
 }
 
 export interface ModelProviderOption {
@@ -114,6 +152,17 @@ export interface ModelProvider {
 
 export interface ModelConfig {
   providers: ModelProvider[];
+}
+
+export interface TestModelProviderRequest {
+  providerId: string;
+  baseUrl: string;
+  apiKey: string;
+}
+
+export interface ModelProviderTestResult {
+  success: boolean;
+  message: string;
 }
 
 export interface UploadPolicy {
@@ -239,6 +288,7 @@ export interface CronSubscription {
   jobUid: string;
   channel: string;
   target: string;
+  botId: string;
   enabled: boolean;
   createdTime: string;
   updatedTime: string;
@@ -276,9 +326,11 @@ export interface UploadFilesResponse {
 }
 
 export interface AgentEvent {
+  id?: string;
   conversationUid?: string;
   messageUid?: string;
   stepUid?: string;
+  timestamp?: string;
   eventType: string;
   payload: Record<string, any>;
 }

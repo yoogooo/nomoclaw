@@ -7,6 +7,7 @@ import ai.nomoclaw.bot.orchestrator.ConversationAppService;
 import ai.nomoclaw.bot.orchestrator.MessageRunAppService;
 import ai.nomoclaw.bot.orchestrator.ModelConfigAppService;
 import ai.nomoclaw.bot.orchestrator.SystemAppService;
+import ai.nomoclaw.bot.scheduler.CronChannelTargetDirectoryService;
 import ai.nomoclaw.bot.scheduler.CronJobApplicationService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
@@ -45,6 +46,7 @@ public class AgentController {
     private final ModelConfigAppService modelConfigAppService;
     private final SystemAppService systemAppService;
     private final CronJobApplicationService cronJobApplicationService;
+    private final CronChannelTargetDirectoryService cronChannelTargetDirectoryService;
 
     public AgentController(ConversationAppService conversationAppService,
                            ConversationAttachmentAppService conversationAttachmentAppService,
@@ -53,7 +55,8 @@ public class AgentController {
                            ApprovalAppService approvalAppService,
                            ModelConfigAppService modelConfigAppService,
                            SystemAppService systemAppService,
-                           CronJobApplicationService cronJobApplicationService) {
+                           CronJobApplicationService cronJobApplicationService,
+                           CronChannelTargetDirectoryService cronChannelTargetDirectoryService) {
         this.conversationAppService = conversationAppService;
         this.conversationAttachmentAppService = conversationAttachmentAppService;
         this.agentCatalogAppService = agentCatalogAppService;
@@ -62,6 +65,7 @@ public class AgentController {
         this.modelConfigAppService = modelConfigAppService;
         this.systemAppService = systemAppService;
         this.cronJobApplicationService = cronJobApplicationService;
+        this.cronChannelTargetDirectoryService = cronChannelTargetDirectoryService;
     }
 
     @PostMapping("/conversations")
@@ -75,7 +79,7 @@ public class AgentController {
     }
 
     @GetMapping("/conversations")
-    public java.util.List<ConversationSummaryResponse> listConversations() {
+    public List<ConversationSummaryResponse> listConversations() {
         log.info("[AgentAPI] listConversations");
         return ApiDtoMapper.toConversationSummaries(conversationAppService.listConversations());
     }
@@ -96,13 +100,13 @@ public class AgentController {
     }
 
     @GetMapping("/agent-groups")
-    public java.util.List<AgentCatalogGroupResponse> listAgentGroups() {
+    public List<AgentCatalogGroupResponse> listAgentGroups() {
         log.info("[AgentAPI] listAgentGroups");
         return ApiDtoMapper.toAgentCatalogGroups(agentCatalogAppService.listAgentGroups());
     }
 
     @GetMapping("/agents/{agentUid}/skills")
-    public java.util.List<AgentSkillResponse> listAgentSkills(@PathVariable String agentUid) {
+    public List<AgentSkillResponse> listAgentSkills(@PathVariable String agentUid) {
         log.info("[AgentAPI] listAgentSkills agentUid={}", agentUid);
         return ApiDtoMapper.toAgentSkills(agentCatalogAppService.listAgentSkills(agentUid));
     }
@@ -111,6 +115,13 @@ public class AgentController {
     public AgentCatalogAgentResponse createAgent(@Valid @RequestBody CreateAgentRequest request) {
         log.info("[AgentAPI] createAgent agentName={} displayName={}", request.agentName(), request.displayName());
         return ApiDtoMapper.toAgentCatalogAgent(agentCatalogAppService.createAgent(ApiDtoMapper.toCommand(request)));
+    }
+
+    @DeleteMapping("/agents/{agentUid}")
+    public SimpleResponse deleteAgent(@PathVariable String agentUid) {
+        log.info("[AgentAPI] deleteAgent agentUid={}", agentUid);
+        agentCatalogAppService.deleteAgent(agentUid);
+        return new SimpleResponse("deleted");
     }
 
     @PatchMapping("/agents/{agentUid}/basic")
@@ -122,13 +133,13 @@ public class AgentController {
     }
 
     @GetMapping("/agents/{agentUid}/tools")
-    public java.util.List<AgentToolResponse> listAgentTools(@PathVariable String agentUid) {
+    public List<AgentToolResponse> listAgentTools(@PathVariable String agentUid) {
         log.info("[AgentAPI] listAgentTools agentUid={}", agentUid);
         return ApiDtoMapper.toAgentTools(agentCatalogAppService.listAgentTools(agentUid));
     }
 
     @GetMapping("/agents/{agentUid}/tips")
-    public java.util.List<AgentTipResponse> listAgentTips(@PathVariable String agentUid) {
+    public List<AgentTipResponse> listAgentTips(@PathVariable String agentUid) {
         log.info("[AgentAPI] listAgentTips agentUid={}", agentUid);
         return ApiDtoMapper.toAgentTips(agentCatalogAppService.listAgentTips(agentUid));
     }
@@ -171,6 +182,15 @@ public class AgentController {
         return ApiDtoMapper.toChannelConfig(systemAppService.getChannelConfig());
     }
 
+    @GetMapping("/system/channels/targets/search")
+    public ChannelTargetSearchResponse searchChannelTargets(@RequestParam String channel,
+                                                            @RequestParam(required = false, defaultValue = "") String keyword,
+                                                            @RequestParam(required = false, defaultValue = "") String botId,
+                                                            @RequestParam(required = false, defaultValue = "20") int limit) {
+        log.info("[AgentAPI] searchChannelTargets channel={} keyword={} botId={} limit={}", channel, keyword, botId, limit);
+        return ApiDtoMapper.toChannelTargetSearch(cronChannelTargetDirectoryService.search(channel, keyword, botId, limit));
+    }
+
     @GetMapping("/system/models")
     public ModelConfigResponse getModelConfig() {
         log.info("[AgentAPI] getModelConfig");
@@ -199,6 +219,18 @@ public class AgentController {
     public ModelConfigResponse loadLocalModels(@PathVariable String providerId) {
         log.info("[AgentAPI] loadLocalModels providerId={}", providerId);
         return ApiDtoMapper.toModelConfig(modelConfigAppService.loadLocalModels(providerId));
+    }
+
+    @PostMapping("/system/models/providers/test")
+    public ModelProviderTestResponse testModelProvider(@RequestBody(required = false) TestModelProviderRequest request) {
+        String providerId = request == null ? "" : request.providerId();
+        log.info("[AgentAPI] testModelProvider providerId={}", providerId);
+        ModelConfigAppService.ProbeResult result = modelConfigAppService.testProviderConnection(
+                providerId,
+                request == null ? "" : request.baseUrl(),
+                request == null ? "" : request.apiKey()
+        );
+        return new ModelProviderTestResponse(result.success(), result.message());
     }
 
     @PatchMapping("/agents/{agentUid}/skills/{skillKey}")
@@ -250,14 +282,32 @@ public class AgentController {
         return ApiDtoMapper.toAgentTool(agentCatalogAppService.updateAgentToolStatus(agentUid, toolKey, request.enabled()));
     }
 
+    @GetMapping("/agents/{agentUid}/docs")
+    public List<AgentDocResponse> listAgentDocs(@PathVariable String agentUid) {
+        log.info("[AgentAPI] listAgentDocs agentUid={}", agentUid);
+        return ApiDtoMapper.toAgentDocs(agentCatalogAppService.listAgentDocs(agentUid));
+    }
+
+    @PutMapping("/agents/{agentUid}/docs/{docKey}")
+    public AgentDocResponse updateAgentDoc(@PathVariable String agentUid,
+                                           @PathVariable String docKey,
+                                           @RequestBody(required = false) UpdateAgentDocRequest request) {
+        log.info("[AgentAPI] updateAgentDoc agentUid={} docKey={}", agentUid, docKey);
+        return ApiDtoMapper.toAgentDoc(agentCatalogAppService.updateAgentDoc(
+                agentUid,
+                docKey,
+                request == null ? "" : request.content()
+        ));
+    }
+
     @GetMapping("/conversations/{conversationUid}/messages")
-    public java.util.List<ConversationMessageResponse> listMessages(@PathVariable String conversationUid) {
+    public List<ConversationMessageResponse> listMessages(@PathVariable String conversationUid) {
         log.info("[AgentAPI] listMessages conversationUid={}", conversationUid);
         return ApiDtoMapper.toConversationMessages(conversationAppService.listMessages(conversationUid));
     }
 
     @GetMapping("/conversations/{conversationUid}/message-runs")
-    public java.util.List<ConversationMessageRunResponse> listMessageRuns(@PathVariable String conversationUid) {
+    public List<ConversationMessageRunResponse> listMessageRuns(@PathVariable String conversationUid) {
         log.info("[AgentAPI] listMessageRuns conversationUid={}", conversationUid);
         return ApiDtoMapper.toMessageRuns(conversationAppService.listMessageRuns(conversationUid));
     }
@@ -340,7 +390,7 @@ public class AgentController {
     }
 
     @GetMapping("/cron-jobs")
-    public java.util.List<CronJobResponse> listCronJobs() {
+    public List<CronJobResponse> listCronJobs() {
         log.info("[AgentAPI] listCronJobs");
         return ApiDtoMapper.toCronJobs(cronJobApplicationService.listCronJobs());
     }
@@ -369,7 +419,7 @@ public class AgentController {
     }
 
     @GetMapping("/cron-jobs/{jobUid}/results")
-    public java.util.List<CronJobExecutionResultResponse> listCronJobResults(@PathVariable String jobUid) {
+    public List<CronJobExecutionResultResponse> listCronJobResults(@PathVariable String jobUid) {
         log.info("[AgentAPI] listCronJobResults jobUid={}", jobUid);
         return ApiDtoMapper.toCronJobExecutionResults(cronJobApplicationService.listRecentResults(jobUid, 20));
     }
@@ -413,13 +463,13 @@ public class AgentController {
     }
 
     @GetMapping("/cron-jobs/{jobUid}/subscriptions")
-    public java.util.List<CronSubscriptionResponse> listCronSubscriptions(@PathVariable String jobUid) {
+    public List<CronSubscriptionResponse> listCronSubscriptions(@PathVariable String jobUid) {
         log.info("[AgentAPI] listCronSubscriptions jobUid={}", jobUid);
         return ApiDtoMapper.toCronSubscriptions(cronJobApplicationService.listCronSubscriptions(jobUid));
     }
 
     @PutMapping("/cron-jobs/{jobUid}/subscriptions")
-    public java.util.List<CronSubscriptionResponse> updateCronSubscriptions(@PathVariable String jobUid,
+    public List<CronSubscriptionResponse> updateCronSubscriptions(@PathVariable String jobUid,
                                                                             @RequestBody(required = false) UpdateCronSubscriptionsRequest request) {
         int requestedCount = request == null || request.subscriptions() == null ? 0 : request.subscriptions().size();
         log.info("[AgentAPI] updateCronSubscriptions jobUid={} requestedCount={}", jobUid, requestedCount);
@@ -433,7 +483,7 @@ public class AgentController {
         int requestedCount = request == null || request.jobUids() == null ? 0 : request.jobUids().size();
         log.info("[AgentAPI] batchDeleteCronJobs requestedCount={}", requestedCount);
         return ApiDtoMapper.toBatchDeleteResult(cronJobApplicationService.batchDeleteCronJobs(
-                request == null ? java.util.List.of() : request.jobUids()
+                request == null ? List.of() : request.jobUids()
         ));
     }
 

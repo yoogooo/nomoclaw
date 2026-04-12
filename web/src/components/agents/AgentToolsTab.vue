@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import { NSwitch } from "naive-ui";
 
 interface ToolItem {
@@ -15,6 +16,7 @@ defineProps<{
 const emit = defineEmits<{
   (e: "toggle", toolId: string, enabled: boolean): void;
 }>();
+const { t } = useI18n();
 </script>
 
 <template>
@@ -36,7 +38,7 @@ const emit = defineEmits<{
         <div class="tool-card-desc">{{ tool.description }}</div>
       </article>
     </div>
-    <div v-else class="pane-empty-tip">暂无工具</div>
+    <div v-else class="pane-empty-tip">{{ t("agents.tools.empty") }}</div>
   </div>
 </template>
 

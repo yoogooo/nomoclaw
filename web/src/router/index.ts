@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from "vue-router";
+import { createRouter, createWebHashHistory } from "vue-router";
 import ChatPage from "@/pages/ChatPage.vue";
 import CronPage from "@/pages/CronPage.vue";
 import AgentsPage from "@/pages/AgentsPage.vue";
@@ -9,12 +9,16 @@ import ForbiddenPage from "@/pages/ForbiddenPage.vue";
 import DesignSystemPage from "@/pages/design-system/DesignSystemPage.vue";
 
 export const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHashHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: "/",
       name: "chat",
       component: ChatPage
+    },
+    {
+      path: "/index.html",
+      redirect: "/"
     },
     {
       path: "/cron",
@@ -48,14 +52,12 @@ export const router = createRouter({
     {
       path: "/design-system/light",
       name: "design-system-light",
-      component: DesignSystemPage,
-      props: { mode: "light" }
+      component: DesignSystemPage
     },
     {
       path: "/design-system/dark",
       name: "design-system-dark",
-      component: DesignSystemPage,
-      props: { mode: "dark" }
+      component: DesignSystemPage
     },
     {
       path: "/forbidden",

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { Bot } from "lucide-vue-next";
 import { NButton, NForm, NFormItem, NInput } from "naive-ui";
 import type { AvatarIconOption, BasicFormModel, ManagedAgent } from "@/components/agents/agentManagementTypes";
@@ -19,6 +20,7 @@ const emit = defineEmits<{
   (e: "update:avatar", value: string): void;
   (e: "update:avatarColor", value: string): void;
 }>();
+const { t } = useI18n();
 
 const iconMap = computed(() =>
   props.avatarIconOptions.reduce<Record<string, AvatarIconOption["icon"]>>((acc, item) => {
@@ -37,18 +39,18 @@ function avatarIconOf(raw: unknown) {
   <div class="tab-body">
     <n-form label-placement="top" class="basic-form">
       <div class="ui-form-grid-single">
-        <n-form-item label="显示名称">
+        <n-form-item :label="t('agents.basic.displayName')">
           <n-input :value="basicForm.displayName" @update:value="emit('update:displayName', $event)" />
         </n-form-item>
         <n-form-item>
           <template #label>
-            <span class="ui-form-label-main">Agent 标识</span>
-            <span class="ui-form-label-note">（创建后不可修改，并作为目录名称使用）</span>
+            <span class="ui-form-label-main">{{ t("agents.basic.agentName") }}</span>
+            <span class="ui-form-label-note">{{ t("agents.basic.agentNameHint") }}</span>
           </template>
           <n-input :value="selectedAgent.agentName" disabled />
         </n-form-item>
       </div>
-      <n-form-item label="描述">
+      <n-form-item :label="t('agents.basic.description')">
         <n-input
           :value="basicForm.description"
           type="textarea"
@@ -56,16 +58,16 @@ function avatarIconOf(raw: unknown) {
           @update:value="emit('update:description', $event)"
         />
       </n-form-item>
-      <n-form-item label="Icon 选择">
+      <n-form-item :label="t('agents.basic.iconSelect')">
         <div class="ui-avatar-config">
           <div class="ui-avatar-preview-card">
             <div class="ui-avatar-preview-circle" :style="{ backgroundColor: basicForm.avatarColor }">
               <component :is="avatarIconOf(basicForm.avatar) || Bot" :size="20" />
             </div>
-            <div class="ui-avatar-preview-text">实时预览</div>
+            <div class="ui-avatar-preview-text">{{ t("agents.basic.preview") }}</div>
           </div>
           <div class="ui-avatar-selector-group">
-            <div class="ui-avatar-section-title">图标样式</div>
+            <div class="ui-avatar-section-title">{{ t("agents.basic.iconStyle") }}</div>
             <div class="ui-avatar-icon-grid">
               <button
                 v-for="item in avatarIconOptions"
@@ -78,7 +80,7 @@ function avatarIconOf(raw: unknown) {
                 <component :is="item.icon" :size="16" />
               </button>
             </div>
-            <div class="ui-avatar-section-title">主题色</div>
+            <div class="ui-avatar-section-title">{{ t("agents.basic.themeColor") }}</div>
             <div class="ui-avatar-color-grid">
               <button
                 v-for="color in avatarColorOptions"
@@ -95,8 +97,8 @@ function avatarIconOf(raw: unknown) {
       </n-form-item>
     </n-form>
     <div class="basic-actions-row">
-      <n-button size="small" type="primary" @click="emit('save')">保存</n-button>
-      <n-button size="small" type="error" secondary strong @click="emit('remove')">删除</n-button>
+      <n-button size="small" type="primary" @click="emit('save')">{{ t("common.save") }}</n-button>
+      <n-button size="small" type="error" secondary strong @click="emit('remove')">{{ t("common.delete") }}</n-button>
     </div>
   </div>
 </template>

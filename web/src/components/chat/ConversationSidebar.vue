@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick } from "vue";
+import { useI18n } from "vue-i18n";
 import { NDropdown } from "naive-ui";
 import type { DropdownOption } from "naive-ui";
 import { useAgentCatalogStore } from "@/stores/agentCatalog";
@@ -8,27 +9,44 @@ import { conversationSelectionLabel, formatFriendlyDateTime } from "@/utils/form
 
 const conversationStore = useConversationStore();
 const agentCatalogStore = useAgentCatalogStore();
+const { t, locale } = useI18n();
+
+function hasHanText(value: string) {
+  return /[\u4e00-\u9fff]/.test(value);
+}
+
+function normalizeLabelForLocale(label: string) {
+  if (locale.value !== "en-US" || !hasHanText(label)) {
+    return label;
+  }
+  if (agentCatalogStore.selectedEntryType === "group") {
+    return agentCatalogStore.selectedAgentGroupUid || label;
+  }
+  const selectedAgent = agentCatalogStore.allAgents.find((item) => item.agentUid === agentCatalogStore.selectedAgentUid);
+  return selectedAgent?.agentName || label;
+}
 
 const description = computed(() => {
-  const label = conversationSelectionLabel(
+  const rawLabel = conversationSelectionLabel(
     agentCatalogStore.groups,
     agentCatalogStore.selectedEntryType,
     agentCatalogStore.selectedAgentGroupUid,
     agentCatalogStore.selectedAgentUid
   );
+  const label = normalizeLabelForLocale(rawLabel);
   return agentCatalogStore.selectedEntryType === "group"
-    ? `正在查看 ${label} 下的全部对话。`
-    : `正在查看 ${label} 下的对话记录。`;
+    ? t("chat.sidebar.viewingGroup", { label })
+    : t("chat.sidebar.viewingAgent", { label });
 });
 
 function menuOptions(conversationUid: string, title: string): DropdownOption[] {
   return [
     {
       key: "rename",
-      label: "修改名称",
+      label: t("chat.sidebar.rename"),
       props: {
         onClick: () => {
-          const nextTitle = window.prompt("请输入新的对话名称", title || "");
+          const nextTitle = window.prompt(t("chat.sidebar.renamePrompt"), title || "");
           if (nextTitle && nextTitle.trim()) {
             void conversationStore.renameConversation(conversationUid, nextTitle.trim());
           }
@@ -37,7 +55,7 @@ function menuOptions(conversationUid: string, title: string): DropdownOption[] {
     },
     {
       key: "delete",
-      label: "删除",
+      label: t("chat.sidebar.delete"),
       props: {
         onClick: () => void conversationStore.confirmDeleteConversation(conversationUid, title)
       }
@@ -56,15 +74,16 @@ function createConversationAndFocusInput() {
 
 <template>
   <aside class="panel conversation-shell">
-    <div class="panel-header">
-      <div class="panel-title">历史对话</div>
+    <div class="panel-header conversation-header">
+      <div class="conversation-header-top">
+        <div class="panel-title">{{ t("chat.sidebar.history") }}</div>
+        <button class="create-conversation-button ui-pill-btn" @click="createConversationAndFocusInput()">
+          {{ t("chat.sidebar.createConversation") }}
+        </button>
+      </div>
       <div class="panel-subtitle">{{ description }}</div>
     </div>
     <div class="panel-body conversation-panel">
-      <button class="create-conversation-button ui-pill-btn" @click="createConversationAndFocusInput()">
-        创建新对话
-      </button>
-
       <div class="scroll-area conversation-list">
         <div v-if="conversationStore.filteredConversations.length">
           <div
@@ -74,8 +93,8 @@ function createConversationAndFocusInput() {
             :class="{ active: conversationStore.currentConversationUid === item.conversationUid }"
           >
             <button class="conversation-main" @click="conversationStore.selectConversation(item.conversationUid)">
-              <div class="conversation-title">{{ item.title || "未命名对话" }}</div>
-              <div class="conversation-time">更新于 {{ formatFriendlyDateTime(item.updatedTime) }}</div>
+              <div class="conversation-title">{{ item.title || t("chat.sidebar.unnamed") }}</div>
+              <div class="conversation-time">{{ t("chat.sidebar.updatedAt", { time: formatFriendlyDateTime(item.updatedTime) }) }}</div>
             </button>
             <div class="conversation-menu-wrap">
               <n-dropdown trigger="click" :options="menuOptions(item.conversationUid, item.title || '')">
@@ -84,7 +103,7 @@ function createConversationAndFocusInput() {
             </div>
           </div>
         </div>
-        <div v-else class="conversation-list-empty">暂无历史对话</div>
+        <div v-else class="conversation-list-empty">{{ t("chat.sidebar.noConversations") }}</div>
       </div>
     </div>
   </aside>
@@ -99,23 +118,33 @@ function createConversationAndFocusInput() {
   display: flex;
   min-height: 0;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: 0;
+}
+
+.conversation-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
 }
 
 .create-conversation-button {
-  width: 100%;
-  padding: var(--space-3) var(--space-4_5);
-  background: var(--color-bg-brand-soft);
-  color: var(--color-accent-brand);
-  font-size: var(--size-15);
+  flex: none;
+  white-space: nowrap;
+  padding: var(--space-1_5) var(--space-3);
+  border-color: var(--color-border-strong);
+  background: var(--color-bg-surface-soft);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease;
 }
 
 .create-conversation-button:hover {
-  background: var(--color-bg-brand-soft-hover);
-  border-color: var(--color-border-brand-hover);
-  box-shadow: var(--shadow-soft-sm);
+  border-color: var(--color-border-active);
+  background: var(--color-bg-soft-hover);
+  color: var(--color-text-primary);
 }
 
 .conversation-list {
@@ -170,7 +199,7 @@ function createConversationAndFocusInput() {
   white-space: nowrap;
   font-size: var(--font-size-md);
   line-height: 1.4;
-  font-weight: 700;
+  font-weight: 500;
   color: var(--color-text-primary);
 }
 
@@ -222,6 +251,11 @@ function createConversationAndFocusInput() {
 @media (max-width: var(--size-breakpoint-lg)) {
   .conversation-panel {
     gap: var(--space-3);
+  }
+
+  .create-conversation-button {
+    padding: var(--space-1) var(--space-2_5);
+    font-size: var(--font-size-2xs);
   }
 
   .conversation-list {

@@ -1,5 +1,6 @@
 import { computed, ref } from "vue";
 import { defineStore } from "pinia";
+import { tr } from "@/i18n";
 import type { ConversationMessageRun, ConversationRunStep } from "@/types/api";
 
 function normalizeRunSummary(run: ConversationMessageRun) {
@@ -21,19 +22,19 @@ function normalizeRunSummary(run: ConversationMessageRun) {
   run.totalSteps = steps.length;
 
   if (status === "completed") {
-    run.summary = `已完成 ${completedSteps}/${steps.length} 步`;
+    run.summary = tr("chat.runSummary.completed", { completedSteps, totalSteps: steps.length });
   } else if (status === "failed") {
-    run.summary = `执行失败，已完成 ${completedSteps}/${steps.length} 步`;
+    run.summary = tr("chat.runSummary.failed", { completedSteps, totalSteps: steps.length });
   } else if (status === "rejected") {
-    run.summary = `执行已拒绝，已完成 ${completedSteps}/${steps.length} 步`;
+    run.summary = tr("chat.runSummary.rejected", { completedSteps, totalSteps: steps.length });
   } else if (status === "canceled") {
-    run.summary = `已取消，已完成 ${completedSteps}/${steps.length} 步`;
+    run.summary = tr("chat.runSummary.canceled", { completedSteps, totalSteps: steps.length });
   } else if (status === "waiting_approval") {
-    run.summary = `等待确认，已完成 ${completedSteps}/${steps.length} 步`;
+    run.summary = tr("chat.runSummary.waitingApproval", { completedSteps, totalSteps: steps.length });
   } else if (status === "running") {
-    run.summary = `正在处理，已完成 ${completedSteps}/${steps.length} 步`;
+    run.summary = tr("chat.runSummary.running", { completedSteps, totalSteps: steps.length });
   } else {
-    run.summary = `已规划 ${steps.length} 步，等待开始`;
+    run.summary = tr("chat.runSummary.planned", { totalSteps: steps.length });
   }
 }
 
@@ -70,7 +71,7 @@ export const useConversationRunsStore = defineStore("conversationRuns", () => {
     const created: ConversationMessageRun = {
       messageUid,
       status: "planned",
-      summary: "正在准备执行步骤",
+      summary: tr("chat.runSummary.preparing"),
       completedSteps: 0,
       totalSteps: 0,
       updatedTime: new Date().toISOString(),
@@ -87,7 +88,7 @@ export const useConversationRunsStore = defineStore("conversationRuns", () => {
       roundIndex: Number(patch.roundIndex ?? 1),
       stepIndex: Number(patch.stepIndex ?? 1),
       status: patch.status || "planned",
-      displayTitle: patch.displayTitle || "正在处理任务步骤",
+      displayTitle: patch.displayTitle || tr("chat.runtime.processingStep"),
       displaySummary: patch.displaySummary || "",
       displayDetails: patch.displayDetails || "",
       updatedTime: patch.updatedTime || new Date().toISOString()

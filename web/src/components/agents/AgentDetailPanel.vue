@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import type { ManagedAgent } from "@/components/agents/agentManagementTypes";
 
 defineProps<{
   selectedAgent: ManagedAgent | null;
 }>();
+const { t } = useI18n();
 </script>
 
 <template>
@@ -12,8 +14,8 @@ defineProps<{
       <slot />
     </article>
     <div v-else class="surface-card">
-      <div class="page-title">Agent 详细信息</div>
-      <div class="ui-empty-muted">请先在左侧选择一个 Agent，或新建 Agent。</div>
+      <div class="page-title">{{ t("agents.detail.title") }}</div>
+      <div class="ui-empty-muted">{{ t("agents.detail.empty") }}</div>
     </div>
   </section>
 </template>

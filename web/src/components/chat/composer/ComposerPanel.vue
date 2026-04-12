@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, h, onBeforeUnmount, onMounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { Sparkles, X } from "lucide-vue-next";
 import { message as discreteMessage } from "@/discrete";
 import { useConversationStore } from "@/stores/conversation";
@@ -13,6 +14,7 @@ import ComposerToolbar from "./ComposerToolbar.vue";
 
 const conversationStore = useConversationStore();
 const jinnangStore = useJinnangStore();
+const { t } = useI18n();
 const showJinnangPicker = ref(false);
 const appliedJinnangId = ref("");
 const fileInputRef = ref<HTMLInputElement | null>(null);
@@ -29,10 +31,14 @@ const appliedJinnang = computed(() => jinnangStore.tips.find((item) => item.id =
 const uploadHint = computed(() => {
   const policy = conversationStore.currentUploadPolicy;
   if (!policy.enabled) {
-    return conversationStore.uploadDisabledReason || "当前模型不支持上传文件";
+    return conversationStore.uploadDisabledReason || t("chat.composer.uploadDisabled");
   }
-  const sameTypeHint = policy.singleMimeGroupOnly ? "同一条消息只能上传同一类型文件。" : "支持同一条消息上传多种类型文件。";
-  return `图片最多 ${policy.maxImagesPerMessage} 张，非图片文件最多 ${policy.maxFilesPerMessage} 个。${sameTypeHint}`;
+  const sameTypeHint = policy.singleMimeGroupOnly ? t("chat.composer.sameTypeOnlyHint") : t("chat.composer.mixedTypeHint");
+  return t("chat.composer.uploadLimitHint", {
+    maxImages: policy.maxImagesPerMessage,
+    maxFiles: policy.maxFilesPerMessage,
+    sameTypeHint
+  });
 });
 
 function onKeydown(event: KeyboardEvent) {
@@ -59,7 +65,7 @@ function removeAppliedJinnang() {
 
 function triggerFilePicker() {
   if (conversationStore.loading) {
-    discreteMessage.info("正在切换会话，请稍候再上传");
+    discreteMessage.info(t("chat.composer.switchingConversation"));
     return;
   }
   if (conversationStore.uploadDisabledReason) {
@@ -105,7 +111,7 @@ async function onDrop(event: DragEvent) {
   event.preventDefault();
   isDragActive.value = false;
   if (conversationStore.loading) {
-    discreteMessage.info("正在切换会话，请稍候再上传");
+    discreteMessage.info(t("chat.composer.switchingConversation"));
     return;
   }
   if (conversationStore.uploadDisabledReason) {
@@ -146,11 +152,20 @@ function onPreviewKeydown(event: KeyboardEvent) {
   }
 }
 
+function displayModelName(label: string) {
+  const raw = (label || "").trim();
+  if (!raw) {
+    return raw;
+  }
+  const markerIndex = raw.lastIndexOf("::");
+  return markerIndex >= 0 ? raw.slice(markerIndex + 2) : raw;
+}
+
 function renderModelLabel(option: any) {
   if (Array.isArray(option.children)) {
     return h("span", { style: "font-weight: 800;" }, option.label || "");
   }
-  return option.label || "";
+  return displayModelName(option.label || "");
 }
 
 function renderModelOption(params: any) {
@@ -181,17 +196,54 @@ onBeforeUnmount(() => {
   >
     <ComposerDropMask v-if="isDragActive">{{ uploadHint }}</ComposerDropMask>
 
-    <ComposerTextarea
-      :model-value="conversationStore.draftMessage"
-      @update:model-value="conversationStore.draftMessage = $event"
-      @keydown="onKeydown"
-    />
+    <div class="composer-input-shell">
+      <ComposerTextarea
+        :model-value="conversationStore.draftMessage"
+        @update:model-value="conversationStore.draftMessage = $event"
+        @keydown="onKeydown"
+      />
 
-    <ComposerAttachmentStrip
-      :attachments="conversationStore.draftAttachments"
-      @preview="openImagePreview"
-      @remove="conversationStore.removeDraftAttachment($event)"
-    />
+      <ComposerAttachmentStrip
+        :attachments="conversationStore.draftAttachments"
+        @preview="openImagePreview"
+        @remove="conversationStore.removeDraftAttachment($event)"
+      />
+
+      <JinnangPicker
+        v-if="showJinnangPicker"
+        :tips="jinnangStore.tips"
+        :selected-id="appliedJinnangId"
+        @pick="applyJinnangById($event)"
+        @close="showJinnangPicker = false"
+      />
+
+      <div v-if="appliedJinnang" class="applied-jinnang">
+        <Sparkles :size="14" class="applied-jinnang-icon" />
+        <span class="applied-jinnang-title">{{ appliedJinnang.title }}</span>
+        <button class="applied-jinnang-remove" type="button" @click="removeAppliedJinnang()" :aria-label="t('chat.composer.removeTip')">
+          <X :size="12" />
+        </button>
+      </div>
+
+      <div class="composer-toolbar-shell">
+        <ComposerToolbar
+          :selected-model-key="conversationStore.selectedModelKey"
+          :model-options="conversationStore.availableModelOptions"
+          :show-jinnang-picker="showJinnangPicker"
+          :upload-disabled="Boolean(conversationStore.uploadDisabledReason)"
+          :uploading-files="conversationStore.uploadingFiles"
+          :switching-context="conversationStore.loading"
+          :is-running-current-conversation="isRunningCurrentConversation"
+          :is-submit-disabled="isSubmitDisabled"
+          :render-label="renderModelLabel"
+          :render-option="renderModelOption"
+          @change-model="onModelChange"
+          @trigger-upload="triggerFilePicker"
+          @toggle-jinnang="toggleJinnangPicker"
+          @submit="conversationStore.sendMessage()"
+        />
+      </div>
+    </div>
 
     <ComposerPreviewOverlay
       v-if="previewImageUrl"
@@ -199,41 +251,8 @@ onBeforeUnmount(() => {
       @close="closeImagePreview"
     />
 
-    <JinnangPicker
-      v-if="showJinnangPicker"
-      :tips="jinnangStore.tips"
-      :selected-id="appliedJinnangId"
-      @pick="applyJinnangById($event)"
-      @close="showJinnangPicker = false"
-    />
-
-    <div v-if="appliedJinnang" class="applied-jinnang">
-      <Sparkles :size="14" class="applied-jinnang-icon" />
-      <span class="applied-jinnang-title">{{ appliedJinnang.title }}</span>
-      <button class="applied-jinnang-remove" type="button" @click="removeAppliedJinnang()" aria-label="删除锦囊">
-        <X :size="12" />
-      </button>
-    </div>
-
-    <ComposerToolbar
-      :selected-model-key="conversationStore.selectedModelKey"
-      :model-options="conversationStore.availableModelOptions"
-      :show-jinnang-picker="showJinnangPicker"
-      :upload-disabled="Boolean(conversationStore.uploadDisabledReason)"
-      :uploading-files="conversationStore.uploadingFiles"
-      :switching-context="conversationStore.loading"
-      :is-running-current-conversation="isRunningCurrentConversation"
-      :is-submit-disabled="isSubmitDisabled"
-      :render-label="renderModelLabel"
-      :render-option="renderModelOption"
-      @change-model="onModelChange"
-      @trigger-upload="triggerFilePicker"
-      @toggle-jinnang="toggleJinnangPicker"
-      @submit="conversationStore.sendMessage()"
-    />
-
     <div class="composer-upload-status">
-      <div class="composer-upload-hint">{{ conversationStore.uploadingFiles ? "文件上传中..." : uploadHint }}</div>
+      <div class="composer-upload-hint">{{ conversationStore.uploadingFiles ? t("chat.composer.uploadHintUploading") : uploadHint }}</div>
       <input ref="fileInputRef" class="composer-file-input" type="file" multiple @change="onFileChange" />
     </div>
   </div>
@@ -248,9 +267,9 @@ onBeforeUnmount(() => {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2_5);
   padding: var(--space-4_5) var(--space-6) var(--space-5_5);
-  border-top: var(--size-1) solid var(--color-border-panel);
+  border-top: 0;
 }
 
 .composer-wrap-dragging {
@@ -269,6 +288,23 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-pill);
   background: var(--color-bg-brand-soft);
   padding: var(--space-1_5) var(--space-2_5);
+}
+
+.composer-input-shell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: var(--size-1) solid var(--color-border-strong);
+  border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--color-bg-surface-mute) 84%, var(--color-bg-surface));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 6%, transparent);
+}
+
+.composer-toolbar-shell {
+  margin-top: 0;
+  padding-top: var(--space-1_5);
+  border-top: 0;
 }
 
 .applied-jinnang-remove {
@@ -333,9 +369,14 @@ onBeforeUnmount(() => {
     z-index: 70;
     padding: var(--space-3_5) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom));
     gap: var(--space-2_5);
-    border-top: var(--size-1) solid var(--color-border-strong);
+    border-top: 0;
     background: var(--color-bg-overlay-strong);
     backdrop-filter: blur(var(--size-8));
+  }
+
+  .composer-input-shell {
+    padding: var(--space-3);
+    border-radius: var(--radius-lg);
   }
 }
 </style>

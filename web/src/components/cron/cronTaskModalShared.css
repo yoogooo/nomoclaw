@@ -22,7 +22,7 @@
   padding: var(--size-18);
   border: var(--size-1) solid var(--color-border-panel);
   border-radius: var(--size-20);
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--color-bg-surface-soft);
 }
 
 .schedule-card {
@@ -76,7 +76,7 @@
   gap: var(--size-2);
   padding: var(--size-2);
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--color-bg-surface-soft) 80%, #e2e8f2);
+  background: color-mix(in srgb, var(--color-bg-surface-soft) 90%, var(--color-bg-surface));
 }
 
 .segmented-group-multi {
@@ -87,8 +87,8 @@
   min-height: var(--size-40);
   border: none;
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--color-bg-surface-soft) 84%, #edf2f8);
-  color: color-mix(in srgb, var(--color-text-secondary) 74%, #2b3f5f);
+  background: color-mix(in srgb, var(--color-bg-surface-soft) 82%, var(--color-bg-surface));
+  color: var(--color-text-secondary);
   font-size: var(--font-size-sm);
   font-weight: 400;
   cursor: pointer;
@@ -97,13 +97,13 @@
 
 .segmented-item:hover {
   color: var(--color-text-primary);
-  background: color-mix(in srgb, var(--color-bg-surface) 92%, white);
+  background: color-mix(in srgb, var(--color-bg-surface) 92%, var(--color-bg-surface-soft));
 }
 
 .segmented-item.active {
   color: var(--color-text-primary);
   background: var(--color-bg-surface);
-  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
+  box-shadow: inset 0 0 0 var(--size-1) var(--color-border-brand-soft);
 }
 
 .field-label {
@@ -143,7 +143,7 @@
   padding: 0 var(--size-14);
   border: var(--size-1) solid var(--color-border-panel);
   border-radius: var(--radius-m);
-  background: #fff;
+  background: var(--color-bg-surface);
   color: var(--color-text-primary);
   font: inherit;
 }
@@ -158,15 +158,15 @@
   min-height: var(--size-40);
   border: var(--size-1) solid var(--color-border-panel);
   border-radius: var(--radius-pill);
-  background: #fff;
+  background: var(--color-bg-surface);
   color: var(--color-text-cool-gray);
   font-size: var(--font-size-sm);
   cursor: pointer;
 }
 
 .weekday-pill.active {
-  border-color: #111827;
-  background: #111827;
+  border-color: var(--color-border-brand-hover);
+  background: var(--color-accent-brand);
   color: #fff;
 }
 
@@ -192,8 +192,8 @@
   margin-top: var(--space-3);
   padding: var(--space-3);
   border-radius: var(--size-14);
-  background: #0f172a;
-  color: #e2e8f0;
+  background: var(--color-bg-panel-soft);
+  color: var(--color-text-runtime);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: var(--font-size-sm);
   word-break: break-all;
@@ -221,7 +221,7 @@
   bottom: var(--space-1);
   left: var(--size-8);
   width: var(--size-1);
-  background: color-mix(in srgb, var(--color-border-panel) 78%, #cdd8ea);
+  background: var(--color-border-panel);
 }
 
 .preview-timeline-item {
@@ -237,14 +237,14 @@
 .preview-timeline-icon {
   justify-self: center;
   z-index: 1;
-  color: color-mix(in srgb, var(--color-text-cool-gray) 78%, #6b7a94);
-  background: #fff;
+  color: var(--color-text-cool-gray);
+  background: var(--color-bg-surface);
   border-radius: 999px;
   padding: 1px;
 }
 
 .preview-timeline-text {
-  color: color-mix(in srgb, var(--color-text-secondary) 82%, #5b6e8c);
+  color: var(--color-text-secondary);
   font-size: var(--font-size-sm);
   line-height: 1.6;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
@@ -258,9 +258,22 @@
 
 .preview-once-time {
   margin-top: var(--space-2);
-  color: color-mix(in srgb, var(--color-text-secondary) 82%, #5b6e8c);
+  color: var(--color-text-secondary);
   font-size: var(--font-size-sm);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.cron-create-modal :deep(.n-card-header) {
+  border-bottom: var(--size-1) solid var(--color-border-panel);
+}
+
+.cron-create-modal :deep(.n-card__content) {
+  background: var(--color-bg-surface);
+}
+
+.cron-create-modal :deep(.n-card__action) {
+  border-top: var(--size-1) solid var(--color-border-panel);
+  background: var(--color-bg-surface);
 }
 
 @media (max-width: 1280px) {

@@ -18,6 +18,7 @@ import ai.nomoclaw.bot.application.dto.CronJobExecutionResultDto;
 import ai.nomoclaw.bot.application.dto.CronJobReportDto;
 import ai.nomoclaw.bot.application.dto.MessageFileLinkDto;
 import ai.nomoclaw.bot.application.dto.SystemConfigDto;
+import ai.nomoclaw.bot.scheduler.CronChannelTargetDirectoryService;
 import ai.nomoclaw.bot.scheduler.CronSubscriptionRepository;
 
 import java.util.List;
@@ -113,6 +114,19 @@ public final class ApiDtoMapper {
         return dtos.stream().map(ApiDtoMapper::toAgentTip).toList();
     }
 
+    public static List<AgentDocResponse> toAgentDocs(List<AgentDocDto> dtos) {
+        return dtos.stream().map(ApiDtoMapper::toAgentDoc).toList();
+    }
+
+    public static AgentDocResponse toAgentDoc(AgentDocDto dto) {
+        return new AgentDocResponse(
+                dto.key(),
+                dto.fileName(),
+                dto.content(),
+                dto.updatedTime()
+        );
+    }
+
     public static AgentTipResponse toAgentTip(AgentTipDto dto) {
         return new AgentTipResponse(
                 dto.tipUid(),
@@ -204,20 +218,39 @@ public final class ApiDtoMapper {
                 new ChannelConfigResponse.Channels(
                         new ChannelConfigResponse.Feishu(
                                 dto.channels().feishu().enabled(),
-                                dto.channels().feishu().requireMention(),
-                                dto.channels().feishu().allowList(),
-                                dto.channels().feishu().appId(),
-                                dto.channels().feishu().appSecret(),
-                                dto.channels().feishu().processingAckReactionEnabled(),
-                                dto.channels().feishu().processingAckReactionType()
+                                dto.channels().feishu().bots().stream()
+                                        .map(bot -> new ChannelConfigResponse.FeishuBot(
+                                                bot.botId(),
+                                                bot.displayName(),
+                                                bot.enabled(),
+                                                bot.isDefault(),
+                                                bot.requireMention(),
+                                                bot.allowList(),
+                                                bot.appId(),
+                                                bot.appSecret(),
+                                                bot.processingAckReactionEnabled(),
+                                                bot.processingAckReactionType(),
+                                                bot.defaultTarget(),
+                                                bot.defaultTargetDisplayName(),
+                                                bot.targetResolvedAt()
+                                        ))
+                                        .toList()
                         ),
                         new ChannelConfigResponse.DingTalk(
                                 dto.channels().dingtalk().enabled(),
-                                dto.channels().dingtalk().requireMention(),
-                                dto.channels().dingtalk().allowList(),
-                                dto.channels().dingtalk().clientId(),
-                                dto.channels().dingtalk().clientSecret(),
-                                dto.channels().dingtalk().robotCode()
+                                dto.channels().dingtalk().bots().stream()
+                                        .map(bot -> new ChannelConfigResponse.DingTalkBot(
+                                                bot.botId(),
+                                                bot.displayName(),
+                                                bot.enabled(),
+                                                bot.isDefault(),
+                                                bot.requireMention(),
+                                                bot.allowList(),
+                                                bot.clientId(),
+                                                bot.clientSecret(),
+                                                bot.robotCode()
+                                        ))
+                                        .toList()
                         )
                 )
         );
@@ -372,12 +405,27 @@ public final class ApiDtoMapper {
         return dtos.stream().map(ApiDtoMapper::toCronSubscription).toList();
     }
 
+    public static ChannelTargetSearchResponse toChannelTargetSearch(CronChannelTargetDirectoryService.SearchResult result) {
+        return new ChannelTargetSearchResponse(
+                result.items().stream()
+                        .map(item -> new ChannelTargetSearchResponse.Item(
+                                item.label(),
+                                item.target(),
+                                item.kind(),
+                                item.source()
+                        ))
+                        .toList(),
+                result.error()
+        );
+    }
+
     public static CronSubscriptionResponse toCronSubscription(CronSubscriptionDto dto) {
         return new CronSubscriptionResponse(
                 dto.subscriptionUid(),
                 dto.jobUid(),
                 dto.channel(),
                 dto.target(),
+                dto.botId(),
                 dto.enabled(),
                 dto.createdTime(),
                 dto.updatedTime()
@@ -478,6 +526,7 @@ public final class ApiDtoMapper {
                 .map(item -> new CronSubscriptionRepository.CronSubscriptionUpsert(
                         item.channel(),
                         item.target(),
+                        item.botId(),
                         item.enabled()
                 ))
                 .toList();
@@ -494,20 +543,43 @@ public final class ApiDtoMapper {
                 new ChannelConfigDto.Channels(
                         new ChannelConfigDto.Feishu(
                                 request.channels().feishu().enabled(),
-                                request.channels().feishu().requireMention(),
-                                request.channels().feishu().allowList(),
-                                request.channels().feishu().appId(),
-                                request.channels().feishu().appSecret(),
-                                request.channels().feishu().processingAckReactionEnabled(),
-                                request.channels().feishu().processingAckReactionType()
+                                request.channels().feishu().bots() == null
+                                        ? List.of()
+                                        : request.channels().feishu().bots().stream()
+                                        .map(bot -> new ChannelConfigDto.FeishuBot(
+                                                bot.botId(),
+                                                bot.displayName(),
+                                                bot.enabled(),
+                                                bot.isDefault(),
+                                                bot.requireMention(),
+                                                bot.allowList(),
+                                                bot.appId(),
+                                                bot.appSecret(),
+                                                bot.processingAckReactionEnabled(),
+                                                bot.processingAckReactionType(),
+                                                bot.defaultTarget(),
+                                                bot.defaultTargetDisplayName(),
+                                                bot.targetResolvedAt()
+                                        ))
+                                        .toList()
                         ),
                         new ChannelConfigDto.DingTalk(
                                 request.channels().dingtalk().enabled(),
-                                request.channels().dingtalk().requireMention(),
-                                request.channels().dingtalk().allowList(),
-                                request.channels().dingtalk().clientId(),
-                                request.channels().dingtalk().clientSecret(),
-                                request.channels().dingtalk().robotCode()
+                                request.channels().dingtalk().bots() == null
+                                        ? List.of()
+                                        : request.channels().dingtalk().bots().stream()
+                                        .map(bot -> new ChannelConfigDto.DingTalkBot(
+                                                bot.botId(),
+                                                bot.displayName(),
+                                                bot.enabled(),
+                                                bot.isDefault(),
+                                                bot.requireMention(),
+                                                bot.allowList(),
+                                                bot.clientId(),
+                                                bot.clientSecret(),
+                                                bot.robotCode()
+                                        ))
+                                        .toList()
                         )
                 )
         );

@@ -20,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Component
 @Slf4j
@@ -97,13 +98,14 @@ public class SkillPromptLoader {
 
         List<AgentSkillRelationEntity> relations = agentSkillRelationRepository.listActiveByAgentUid(agent.getAgentUid());
         if (relations.isEmpty()) {
-            return listAvailableSkills(skillsRoot);
+            // No active relation means no skills enabled for this agent.
+            return List.of();
         }
 
         Map<String, SkillDefinitionEntity> definitionsByKey = skillDefinitionRepository.listActiveByKeys(
                         relations.stream().map(AgentSkillRelationEntity::getSkillKey).toList())
                 .stream()
-                .collect(java.util.stream.Collectors.toMap(
+                .collect(Collectors.toMap(
                         SkillDefinitionEntity::getSkillKey,
                         definition -> definition,
                         (left, right) -> left,

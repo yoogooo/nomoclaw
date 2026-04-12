@@ -7,6 +7,7 @@ import ai.nomoclaw.bot.channel.model.InboundEnvelope;
 import ai.nomoclaw.bot.channel.platform.AbstractWebhookChannel;
 import org.junit.jupiter.api.Test;
 
+import java.net.http.HttpClient;
 import java.time.Instant;
 import java.util.Map;
 
@@ -62,7 +63,7 @@ class ChannelPolicyTests {
     private static class TestWebhookChannel extends AbstractWebhookChannel {
 
         private TestWebhookChannel(ChannelType type, ChannelOrchestratorService orchestratorService, ChannelPolicy policy) {
-            super(type, orchestratorService, policy);
+            super(type, orchestratorService, policy, HttpClient.newHttpClient());
         }
 
         @Override

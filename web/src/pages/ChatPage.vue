@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { ChevronLeft } from "lucide-vue-next";
 import DirectoryRail from "@/components/chat/DirectoryRail.vue";
 import AgentSidebar from "@/components/chat/AgentSidebar.vue";
@@ -16,6 +17,7 @@ const agentCatalogStore = useAgentCatalogStore();
 const jinnangStore = useJinnangStore();
 const runtimeCollapsedStorageKey = "chat:runtime-collapsed";
 const runtimeCollapsed = ref(false);
+const { t } = useI18n();
 
 if (typeof window !== "undefined") {
   runtimeCollapsed.value = window.localStorage.getItem(runtimeCollapsedStorageKey) === "1";
@@ -57,7 +59,7 @@ watch(
       <MessagesPanel />
       <RuntimeLogPanel v-if="!runtimeCollapsed" :collapsed="runtimeCollapsed" @toggle="runtimeCollapsed = !runtimeCollapsed" />
     </div>
-    <button v-if="runtimeCollapsed" class="runtime-expand-toggle" title="展开日志" @click="runtimeCollapsed = false">
+    <button v-if="runtimeCollapsed" class="runtime-expand-toggle" :title="t('chat.runtime.expand')" @click="runtimeCollapsed = false">
       <ChevronLeft :size="16" />
     </button>
   </div>

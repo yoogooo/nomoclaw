@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { Lightbulb, Paperclip } from "lucide-vue-next";
+import { computed } from "vue";
+import { useI18n } from "vue-i18n";
+import { ArrowUp, Lightbulb, Paperclip, Square } from "lucide-vue-next";
 import { NSelect } from "naive-ui";
+import UiInstantTooltip from "@/components/UiInstantTooltip.vue";
 
-defineProps<{
+const props = defineProps<{
   selectedModelKey: string;
   modelOptions: any[];
   showJinnangPicker: boolean;
@@ -21,15 +24,28 @@ const emit = defineEmits<{
   (e: "toggle-jinnang"): void;
   (e: "submit"): void;
 }>();
+
+const { t } = useI18n();
+
+const selectedModelLabel = computed(() => {
+  const selected = props.modelOptions.find((option) => option?.value === props.selectedModelKey);
+  const label = selected?.label;
+  return typeof label === "string" && label.trim().length > 0 ? label.trim() : t("chat.composer.modelPlaceholder");
+});
+
+const modelSelectWidthCh = computed(() => {
+  const labelLength = selectedModelLabel.value.length;
+  return Math.min(Math.max(labelLength + 6, 14), 34);
+});
 </script>
 
 <template>
   <div class="composer-toolbar-row composer-toolbar-row-bottom">
-    <div class="composer-model-inline">
+    <div class="composer-model-inline" :style="{ '--model-select-width-ch': `${modelSelectWidthCh}ch` }">
       <n-select
         :value="selectedModelKey"
         :options="modelOptions"
-        placeholder="选择已配置模型"
+        :placeholder="t('chat.composer.modelPlaceholder')"
         :disabled="switchingContext"
         :render-label="renderLabel"
         :render-option="renderOption"
@@ -39,38 +55,44 @@ const emit = defineEmits<{
 
     <div class="composer-upload-inline">
       <div class="composer-tools">
-        <button
-          class="composer-tool-btn icon-only"
-          type="button"
-          title="上传文件"
-          aria-label="上传文件"
-          :disabled="uploadDisabled || uploadingFiles || switchingContext"
-          @click="emit('trigger-upload')"
-        >
-          <Paperclip :size="16" />
-        </button>
-        <button
-          class="composer-tool-btn icon-only"
-          :class="{ active: showJinnangPicker }"
-          type="button"
-          title="锦囊"
-          aria-label="锦囊"
-          @click="emit('toggle-jinnang')"
-        >
-          <Lightbulb :size="16" />
-        </button>
+        <UiInstantTooltip :content="t('chat.composer.upload')">
+          <button
+            class="composer-tool-btn icon-only"
+            type="button"
+            :aria-label="t('chat.composer.upload')"
+            :disabled="uploadDisabled || uploadingFiles || switchingContext"
+            @click="emit('trigger-upload')"
+          >
+            <Paperclip :size="16" />
+          </button>
+        </UiInstantTooltip>
+        <UiInstantTooltip :content="t('chat.composer.jinnang')">
+          <button
+            class="composer-tool-btn icon-only"
+            :class="{ active: showJinnangPicker }"
+            type="button"
+            :aria-label="t('chat.composer.jinnang')"
+            @click="emit('toggle-jinnang')"
+          >
+            <Lightbulb :size="16" />
+          </button>
+        </UiInstantTooltip>
       </div>
     </div>
 
     <div class="composer-meta">
-      <button
-        class="composer-submit"
-        :class="{ 'composer-submit-cancel': isRunningCurrentConversation }"
-        :disabled="isSubmitDisabled"
-        @click="emit('submit')"
-      >
-        {{ isRunningCurrentConversation ? "取消" : "发送" }}
-      </button>
+      <UiInstantTooltip :content="isRunningCurrentConversation ? t('chat.composer.stop') : t('chat.composer.send')">
+        <button
+          class="composer-submit"
+          :class="{ 'composer-submit-cancel': isRunningCurrentConversation }"
+          :disabled="isSubmitDisabled"
+          :aria-label="isRunningCurrentConversation ? t('chat.composer.stop') : t('chat.composer.send')"
+          @click="emit('submit')"
+        >
+          <Square v-if="isRunningCurrentConversation" :size="14" class="composer-stop-icon" />
+          <ArrowUp v-else :size="20" />
+        </button>
+      </UiInstantTooltip>
     </div>
   </div>
 </template>
@@ -79,17 +101,17 @@ const emit = defineEmits<{
 .composer-toolbar-row {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-3);
   flex-wrap: wrap;
 }
 
 .composer-toolbar-row-bottom {
-  margin-top: var(--space-1);
+  margin-top: 0;
 }
 
 .composer-model-inline {
-  width: min(100%, 250px);
-  flex: 0 1 250px;
+  width: clamp(11rem, var(--model-select-width-ch), 24rem);
+  flex: 0 1 auto;
 }
 
 .composer-upload-inline {
@@ -107,34 +129,35 @@ const emit = defineEmits<{
   margin-left: auto;
   display: flex;
   align-items: center;
+  gap: var(--space-2_5);
   flex: none;
 }
 
 .composer-tool-btn {
   padding: var(--size-7) var(--space-3);
-  border: var(--size-1) solid var(--color-border-strong);
+  border: 0;
   border-radius: var(--radius-pill);
-  background: var(--color-bg-surface-soft);
+  background: transparent;
   color: var(--color-text-subtle);
   font-size: var(--font-size-xs);
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.16s ease, color 0.16s ease, background-color 0.16s ease;
+  transition: color 0.16s ease, background-color 0.16s ease;
 }
 
 .composer-tool-btn.icon-only {
-  width: var(--size-34);
-  height: var(--size-34);
+  width: var(--size-32);
+  height: var(--size-32);
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  border-radius: var(--radius-pill);
 }
 
 .composer-tool-btn:hover:not(:disabled) {
-  border-color: var(--color-border-brand-soft-hover);
-  background: var(--color-bg-brand-soft-hover);
-  color: var(--color-text-brand);
+  background: var(--color-bg-surface-soft);
+  color: var(--color-text-primary);
 }
 
 .composer-tool-btn:disabled {
@@ -143,27 +166,27 @@ const emit = defineEmits<{
 }
 
 .composer-tool-btn.active {
-  border-color: var(--color-border-brand-hover);
   background: var(--color-bg-brand-soft);
   color: var(--color-text-brand);
 }
 
 .composer-submit {
-  min-width: var(--size-84);
-  padding: var(--space-3) var(--space-5_5);
+  width: var(--size-32);
+  height: var(--size-32);
+  padding: 0;
   border: 0;
   border-radius: var(--radius-pill);
-  background: var(--color-accent-brand);
-  color: var(--color-text-inverse);
-  font-size: var(--font-size-lg);
-  font-weight: 700;
+  background: color-mix(in srgb, var(--color-accent-brand) 88%, var(--color-bg-surface) 12%);
+  color: var(--color-button-primary-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  transition: box-shadow 0.18s ease, transform 0.18s ease, background-color 0.18s ease;
+  transition: box-shadow 0.18s ease, transform 0.18s ease, background-color 0.18s ease, opacity 0.18s ease;
 }
 
 .composer-submit:hover {
-  background: var(--color-accent-brand-hover);
-  box-shadow: var(--shadow-button-brand);
+  background: color-mix(in srgb, var(--color-accent-brand) 96%, var(--color-bg-surface) 4%);
 }
 
 .composer-submit:active {
@@ -171,19 +194,34 @@ const emit = defineEmits<{
 }
 
 .composer-submit-cancel {
-  background: var(--color-accent-danger);
+  background: var(--color-button-danger-bg);
+  color: var(--color-button-danger-text);
 }
 
 .composer-submit-cancel:hover {
-  background: var(--color-accent-danger-hover);
-  box-shadow: var(--shadow-button-danger);
+  background: var(--color-button-danger-bg-hover);
 }
 
 .composer-submit:disabled {
   background: var(--color-border-strong);
   color: var(--color-disabled-text);
   box-shadow: none;
+  opacity: 0.85;
   cursor: not-allowed;
+}
+
+.composer-stop-icon {
+  fill: currentColor;
+}
+
+.composer-model-inline :deep(.n-base-selection) {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.composer-model-inline :deep(.n-base-selection-label) {
+  color: var(--color-text-secondary);
 }
 
 @media (max-width: var(--size-breakpoint-md)) {
@@ -198,6 +236,7 @@ const emit = defineEmits<{
 
   .composer-meta {
     margin-left: 0;
+    justify-content: flex-end;
   }
 }
 </style>

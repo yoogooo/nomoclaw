@@ -2,7 +2,8 @@ import { computed, ref } from "vue";
 import { defineStore } from "pinia";
 import { cronApi, type CreateCronJobPayload } from "@/api/cronApi";
 import { fileApi } from "@/api/fileApi";
-import { dialog, message } from "@/discrete";
+import { dialog, message, warningDialogPreset } from "@/discrete";
+import { tr } from "@/i18n";
 import type { AgentCatalogGroup, CronJob, CronJobExecutionResult, CronSubscription } from "@/types/api";
 
 export const useCronJobsStore = defineStore("cronJobs", () => {
@@ -91,26 +92,26 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
   async function runJob(jobUid: string) {
     await cronApi.runCronJob(jobUid);
     await refresh(jobUid);
-    message.success("任务已触发执行");
+    message.success(tr("toast.taskTriggered"));
   }
 
   async function createJob(payload: CreateCronJobPayload) {
     const created = await cronApi.createCronJob(payload);
     await refresh(created.jobUid);
-    message.success("任务已创建");
+    message.success(tr("toast.taskCreated"));
     return created;
   }
 
   async function pauseJob(jobUid: string) {
     await cronApi.pauseCronJob(jobUid);
     await refresh(jobUid);
-    message.success("任务已暂停");
+    message.success(tr("toast.taskPaused"));
   }
 
   async function resumeJob(jobUid: string) {
     await cronApi.resumeCronJob(jobUid);
     await refresh(jobUid);
-    message.success("任务已恢复");
+    message.success(tr("toast.taskResumed"));
   }
 
   async function updateJob(jobUid: string, payload: {
@@ -123,22 +124,23 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
   }) {
     await cronApi.updateCronJob(jobUid, payload);
     await refresh(jobUid);
-    message.success("任务已更新");
+    message.success(tr("toast.taskUpdated"));
   }
 
   async function deleteJob(jobUid: string) {
     await cronApi.deleteCronJob(jobUid);
     const nextJobUid = jobs.value.find((job) => job.jobUid !== jobUid)?.jobUid || null;
     await refresh(nextJobUid);
-    message.success("任务已删除");
+    message.success(tr("toast.taskDeleted"));
   }
 
   function confirmDeleteJob(job: CronJob) {
     dialog.warning({
-      title: "删除定时任务",
-      content: `确认删除“${job.title || job.taskContent || "未命名任务"}”？`,
-      positiveText: "删除",
-      negativeText: "取消",
+      title: tr("dialogs.deleteCronTitle"),
+      content: tr("dialogs.deleteCronContent", { title: job.title || job.taskContent || tr("format.fallbackNoName") }),
+      ...warningDialogPreset(),
+      positiveText: tr("dialogs.confirmDelete"),
+      negativeText: tr("common.cancel"),
       onPositiveClick: async () => {
         await deleteJob(job.jobUid);
       }
@@ -151,24 +153,28 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
       return;
     }
 
-    const preview = selectedJobs.slice(0, 3).map((job) => `- ${job.title || job.taskContent || "未命名任务"}`).join("\n");
-    const suffix = selectedJobs.length > 3 ? `\n- 以及其他 ${selectedJobs.length - 3} 项` : "";
+    const preview = selectedJobs.slice(0, 3).map((job) => `- ${job.title || job.taskContent || tr("format.fallbackNoName")}`).join("\n");
+    const suffix = selectedJobs.length > 3 ? tr("cron.batchDeleteSuffix", { count: selectedJobs.length - 3 }) : "";
 
     dialog.warning({
-      title: "批量删除任务",
-      content: `确认删除选中的 ${selectedJobs.length} 个定时任务？\n\n${preview}${suffix}`,
-      positiveText: "删除",
-      negativeText: "取消",
+      title: tr("dialogs.deleteCronBatchTitle"),
+      content: tr("dialogs.deleteCronBatchContent", { count: selectedJobs.length, preview, suffix }),
+      ...warningDialogPreset(),
+      positiveText: tr("dialogs.confirmDelete"),
+      negativeText: tr("common.cancel"),
       onPositiveClick: async () => {
         const result = await cronApi.batchDeleteCronJobs(selectedJobs.map((job) => job.jobUid));
         const nextJobUid = jobs.value.find((job) => !selectedBulkJobUids.value.includes(job.jobUid))?.jobUid || null;
         clearBulkMode();
         await refresh(nextJobUid);
         if (!result.failedItems.length) {
-          message.success(`已删除 ${result.deletedJobUids.length} 个任务`);
+          message.success(tr("cron.batchDeleteSuccess", { count: result.deletedJobUids.length }));
           return;
         }
-        message.warning(`成功删除 ${result.deletedJobUids.length} 个任务，失败 ${result.failedItems.length} 个`);
+        message.warning(tr("cron.batchDeletePartial", {
+          success: result.deletedJobUids.length,
+          failed: result.failedItems.length
+        }));
       }
     });
   }
@@ -177,10 +183,10 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
     await fileApi.openFile(path);
   }
 
-  async function updateSubscriptions(jobUid: string, payload: Array<{ channel: string; target: string; enabled: boolean }>) {
+  async function updateSubscriptions(jobUid: string, payload: Array<{ channel: string; target: string; botId?: string; enabled: boolean }>) {
     const updated = await cronApi.updateCronSubscriptions(jobUid, { subscriptions: payload });
     currentSubscriptions.value = updated;
-    message.success("推送订阅已保存");
+    message.success(tr("toast.subscriptionsSaved"));
   }
 
   return {

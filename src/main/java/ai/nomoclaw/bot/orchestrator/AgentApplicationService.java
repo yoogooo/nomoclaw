@@ -7,6 +7,7 @@ import ai.nomoclaw.bot.application.dto.ConversationSummaryDto;
 import ai.nomoclaw.bot.application.dto.ConversationAttachmentDto;
 import ai.nomoclaw.bot.application.dto.AgentCatalogAgentDto;
 import ai.nomoclaw.bot.application.dto.AgentCatalogGroupDto;
+import ai.nomoclaw.bot.application.dto.AgentDocDto;
 import ai.nomoclaw.bot.application.dto.AgentSkillDto;
 import ai.nomoclaw.bot.application.dto.AgentTipDto;
 import ai.nomoclaw.bot.application.dto.AgentToolDto;
@@ -73,11 +74,17 @@ import tools.jackson.databind.node.ObjectNode;
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
+import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -85,10 +92,12 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 /**
  * Agent 领域的应用层总入口（历史上承担了较多职责）。
@@ -113,6 +122,15 @@ public class AgentApplicationService {
     private static final String CUSTOM_AGENT_GROUP_UID = "group_custom_agents";
     private static final String CUSTOM_AGENT_GROUP_NAME = "custom_agents";
     private static final int CONVERSATION_CONTEXT_LIMIT = 30;
+    private static final Map<String, String> AGENT_DOC_FILES = new LinkedHashMap<>();
+    static {
+        AGENT_DOC_FILES.put("soul", "SOUL.md");
+        AGENT_DOC_FILES.put("agent", "AGENT.md");
+        AGENT_DOC_FILES.put("memory", "MEMORY.md");
+        AGENT_DOC_FILES.put("tools", "TOOLS.md");
+        AGENT_DOC_FILES.put("identity", "IDENTITY.md");
+        AGENT_DOC_FILES.put("user", "USER.md");
+    }
 
     private final AgentStore store;
     private final Planner planner;
@@ -139,6 +157,7 @@ public class AgentApplicationService {
     private final ApplicationEventPublisher applicationEventPublisher;
     private final ConcurrentMap<String, Boolean> runningMessages = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, ExecutionState> executionStates = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, StringBuilder> streamingAnswerBuffers = new ConcurrentHashMap<>();
 
     public AgentApplicationService(AgentStore store,
                                    Planner planner,
@@ -228,13 +247,14 @@ public class AgentApplicationService {
                 .toList();
         List<AgentGroupMemberEntity> members = agentGroupMemberRepository.listActiveByGroupUids(groupUids);
         Map<String, List<AgentGroupMemberEntity>> membersByGroup = members.stream()
-                .collect(java.util.stream.Collectors.groupingBy(AgentGroupMemberEntity::getAgentGroupUid, LinkedHashMap::new, java.util.stream.Collectors.toList()));
+                .collect(Collectors.groupingBy(AgentGroupMemberEntity::getAgentGroupUid, LinkedHashMap::new, Collectors.toList()));
         List<String> agentUids = members.stream()
                 .map(AgentGroupMemberEntity::getAgentUid)
                 .distinct()
                 .toList();
         Map<String, AgentDefinitionEntity> agentsByUid = agentDefinitionRepository.listActiveByUids(agentUids).stream()
-                .collect(java.util.stream.Collectors.toMap(AgentDefinitionEntity::getAgentUid, agent -> agent, (left, right) -> left, LinkedHashMap::new));
+                .collect(Collectors.toMap(AgentDefinitionEntity::getAgentUid, agent -> agent, (left, right) -> left, LinkedHashMap::new));
+        agentsByUid.values().forEach(this::ensureWorkspaceDocsForExistingAgent);
 
         return groups.stream()
                 .map(group -> new AgentCatalogGroupDto(
@@ -247,7 +267,7 @@ public class AgentApplicationService {
                         group.getCollaborationMode(),
                         membersByGroup.getOrDefault(group.getAgentGroupUid(), List.of()).stream()
                                 .map(member -> toAgentCatalogItem(member, agentsByUid.get(member.getAgentUid())))
-                                .filter(java.util.Objects::nonNull)
+                                .filter(Objects::nonNull)
                                 .toList()
                 ))
                 .toList();
@@ -284,7 +304,7 @@ public class AgentApplicationService {
         List<SkillDefinitionEntity> skillDefinitions = skillDefinitionRepository.listAllActive();
         Map<String, AgentSkillRelationEntity> relationsBySkillKey = agentSkillRelationRepository.listByAgentUid(normalizedAgentUid)
                 .stream()
-                .collect(java.util.stream.Collectors.toMap(
+                .collect(Collectors.toMap(
                         AgentSkillRelationEntity::getSkillKey,
                         relation -> relation,
                         (left, right) -> left,
@@ -370,6 +390,8 @@ public class AgentApplicationService {
         member.setCreatedTime(now);
         member.setUpdatedTime(now);
         agentGroupMemberRepository.save(member);
+        initializeAgentToolRelations(agentUid, now);
+        initializeAgentWorkspaceDocs(agentName, displayName);
         return toAgentCatalogItem(member, agent);
     }
 
@@ -467,7 +489,7 @@ public class AgentApplicationService {
         List<ToolDefinitionEntity> toolDefinitions = toolDefinitionRepository.listAllActive();
         Map<String, AgentToolRelationEntity> relationsByToolKey = agentToolRelationRepository.listByAgentUid(normalizedAgentUid)
                 .stream()
-                .collect(java.util.stream.Collectors.toMap(
+                .collect(Collectors.toMap(
                         AgentToolRelationEntity::getToolKey,
                         relation -> relation,
                         (left, right) -> left,
@@ -529,6 +551,35 @@ public class AgentApplicationService {
         );
     }
 
+    public List<AgentDocDto> listAgentDocs(String agentUid) {
+        AgentDefinitionEntity agent = requireAgentByUid(agentUid);
+        ensureWorkspaceDocsForExistingAgent(agent);
+        Path workspace = NomoClawPaths.ensureAgentWorkspace(agent.getAgentName());
+        List<AgentDocDto> docs = new ArrayList<>();
+        for (Map.Entry<String, String> entry : AGENT_DOC_FILES.entrySet()) {
+            docs.add(readAgentDoc(workspace, entry.getKey(), entry.getValue()));
+        }
+        return docs;
+    }
+
+    public AgentDocDto updateAgentDoc(String agentUid, String docKey, String content) {
+        AgentDefinitionEntity agent = requireAgentByUid(agentUid);
+        ensureWorkspaceDocsForExistingAgent(agent);
+        String normalizedDocKey = docKey == null ? "" : docKey.trim().toLowerCase();
+        String fileName = AGENT_DOC_FILES.get(normalizedDocKey);
+        if (fileName == null) {
+            throw new IllegalArgumentException("unsupported doc key: " + normalizedDocKey);
+        }
+        Path workspace = NomoClawPaths.ensureAgentWorkspace(agent.getAgentName());
+        Path file = workspace.resolve(fileName).toAbsolutePath().normalize();
+        try {
+            Files.writeString(file, content == null ? "" : content, StandardCharsets.UTF_8);
+        } catch (IOException ex) {
+            throw new IllegalStateException("failed to save doc file: " + file, ex);
+        }
+        return readAgentDoc(workspace, normalizedDocKey, fileName);
+    }
+
     public List<AgentTipDto> listAgentTips(String agentUid) {
         return agentTipApplicationService.listAgentTips(agentUid);
     }
@@ -547,7 +598,7 @@ public class AgentApplicationService {
         return store.listMessagesByConversation(conversationUid).stream()
                 .filter(message -> "user".equals(message.role()))
                 .map(this::toMessageRunResponse)
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .toList();
     }
 
@@ -560,9 +611,63 @@ public class AgentApplicationService {
             executionStates.remove(message.messageUid());
             runningMessages.remove(message.messageUid());
         });
+        conversationAttachmentAppService.purgeConversationAttachments(conversationUid);
         store.deleteConversation(conversationUid);
         log.info("[Agent] conversation deleted conversationUid={} agentGroupUid={} agentUid={}",
                 conversationUid, conversation.agentGroupUid(), conversation.agentUid());
+    }
+
+    public void deleteAgent(String agentUid) {
+        String normalizedAgentUid = normalizeAgentUid(agentUid);
+        if (DEFAULT_AGENT_UID.equals(normalizedAgentUid)) {
+            throw new IllegalArgumentException("default agent cannot be deleted");
+        }
+        AgentDefinitionEntity agent = agentDefinitionRepository.findByUid(normalizedAgentUid);
+        if (agent == null) {
+            throw new IllegalArgumentException("agent not found: " + normalizedAgentUid);
+        }
+
+        List<String> conversationUids = store.listConversations().stream()
+                .filter(conversation -> normalizedAgentUid.equals(conversation.agentUid()))
+                .map(AgentConversation::conversationUid)
+                .toList();
+        for (String conversationUid : conversationUids) {
+            deleteConversation(conversationUid);
+        }
+
+        agentTipApplicationService.purgeAgentTips(normalizedAgentUid);
+        agentSkillRelationRepository.deleteByAgentUid(normalizedAgentUid);
+        agentToolRelationRepository.deleteByAgentUid(normalizedAgentUid);
+        agentGroupMemberRepository.deleteByAgentUid(normalizedAgentUid);
+        agentDefinitionRepository.deleteByAgentUid(normalizedAgentUid);
+        deleteDirectoryRecursively(NomoClawPaths.agentWorkspace(agent.getAgentName()));
+        log.info("[Agent] deleted agentUid={} agentName={} conversations={}",
+                normalizedAgentUid,
+                agent.getAgentName(),
+                conversationUids.size());
+    }
+
+    private void deleteDirectoryRecursively(Path rootPath) {
+        if (rootPath == null || !Files.exists(rootPath)) {
+            return;
+        }
+        try {
+            Files.walkFileTree(rootPath, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                    Files.deleteIfExists(file);
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                    Files.deleteIfExists(dir);
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        } catch (IOException ex) {
+            throw new IllegalStateException("failed to delete agent workspace: " + rootPath, ex);
+        }
     }
 
     public void updateConversationTitle(String conversationUid, String title) {
@@ -704,8 +809,12 @@ public class AgentApplicationService {
         cancellationRegistry.cancel(message.messageUid());
         executionStates.remove(message.messageUid());
         log.info("[Agent] message canceled conversationUid={} messageUid={}", conversationUid, message.messageUid());
-        publishEvent(AgentEventType.MESSAGE_CANCELED, conversationUid, message.messageUid(), null, basePayload("message canceled"));
+        ObjectNode payload = basePayload("message canceled");
+        String partialAnswer = streamingAnswerBuffers.getOrDefault(message.messageUid(), new StringBuilder()).toString().trim();
+        payload.put("answer", partialAnswer);
+        publishEvent(AgentEventType.MESSAGE_CANCELED, conversationUid, message.messageUid(), null, payload);
         publishChannelMessageCompletedEvent(message, MessageStatus.CANCELED, "任务已取消。");
+        streamingAnswerBuffers.remove(message.messageUid());
     }
 
     public SseEmitter subscribe(String conversationUid) {
@@ -759,6 +868,10 @@ public class AgentApplicationService {
                 if (roundSteps.isEmpty()) {
                     RoundPlanningResult planningResult = reasonNextAction(message, state);
                     if (planningResult.completed()) {
+                        if (cancellationRegistry.isCanceled(message.messageUid())) {
+                            cleanupRuntimeState(messageUid);
+                            return;
+                        }
                         completeMessage(message, planningResult.answer(), state.currentRound());
                         return;
                     }
@@ -819,12 +932,29 @@ public class AgentApplicationService {
         AgentDefinitionEntity executionAgent = resolveExecutionAgent(conversation);
         // For scheduled runs, hide cron_tool from the model to prevent recursive job creation.
         List<ToolSpecification> availableTools = availableToolsForConversation(conversation, executionAgent);
-        ChatResponse response = planner.reason(
+        streamingAnswerBuffers.remove(message.messageUid());
+        int roundIndex = state.currentRound();
+        StringBuilder streamedText = new StringBuilder();
+        Planner.StreamReasonResult streamedResult = planner.reasonStream(
                 state.memory(),
                 availableTools,
                 ToolChoice.AUTO,
-                buildPromptContext(conversation, executionAgent, message.conversationUid(), message.messageUid())
+                buildPromptContext(conversation, executionAgent, message.conversationUid(), message.messageUid()),
+                textDelta -> {
+                    if (textDelta == null || textDelta.isBlank()) {
+                        return;
+                    }
+                    streamedText.append(textDelta);
+                    if (cancellationRegistry.isCanceled(message.messageUid())) {
+                        return;
+                    }
+                    String accumulatedText = streamedText.toString();
+                    streamingAnswerBuffers.computeIfAbsent(message.messageUid(), ignored -> new StringBuilder())
+                            .append(textDelta);
+                    publishMessageDelta(message, roundIndex, textDelta, accumulatedText, false);
+                }
         );
+        ChatResponse response = streamedResult.response();
         recordRoundTokenUsage(message, response, state.currentRound());
         AiMessage aiMessage = response.aiMessage();
         if (aiMessage == null) {
@@ -836,7 +966,10 @@ public class AgentApplicationService {
         }
 
         if (!aiMessage.hasToolExecutionRequests()) {
-            String answer = nullToEmpty(aiMessage.text()).trim();
+            String answer = nullToEmpty(streamedResult.accumulatedText()).trim();
+            if (answer.isBlank()) {
+                answer = nullToEmpty(aiMessage.text()).trim();
+            }
             if (answer.isBlank()) {
                 Planner.SummaryResult summaryResult = planner.summarize(
                         state.memory(),
@@ -849,9 +982,13 @@ public class AgentApplicationService {
                 recordRoundTokenUsage(message, summaryResult.response(), state.currentRound());
                 answer = summaryResult.answer();
             }
+            if (streamedResult.streamed() && !answer.isBlank() && !cancellationRegistry.isCanceled(message.messageUid())) {
+                publishMessageDelta(message, roundIndex, "", answer, true);
+            }
             return RoundPlanningResult.completed(answer);
         }
 
+        streamingAnswerBuffers.remove(message.messageUid());
         List<PlanStep> steps = toPlanSteps(message.messageUid(), state.currentRound(), aiMessage.toolExecutionRequests());
         store.saveSteps(message.conversationUid(), message.messageUid(), steps);
         store.updateMessageStatus(message.messageUid(), MessageStatus.PLANNED);
@@ -1510,6 +1647,19 @@ public class AgentApplicationService {
         return payload;
     }
 
+    private void publishMessageDelta(AgentMessage message,
+                                     int roundIndex,
+                                     String textDelta,
+                                     String accumulatedText,
+                                     boolean done) {
+        ObjectNode payload = basePayload("message delta");
+        payload.put("textDelta", textDelta == null ? "" : textDelta);
+        payload.put("accumulatedText", accumulatedText == null ? "" : accumulatedText);
+        payload.put("roundIndex", roundIndex);
+        payload.put("done", done);
+        publishEvent(AgentEventType.MESSAGE_DELTA, message.conversationUid(), message.messageUid(), null, payload);
+    }
+
     private void publishEvent(AgentEventType type, String conversationUid, String messageUid, String stepUid, ObjectNode payload) {
         AgentEvent event = new AgentEvent(
                 UUID.randomUUID().toString(),
@@ -1953,6 +2103,7 @@ public class AgentApplicationService {
     private void cleanupRuntimeState(String messageUid) {
         executionStates.remove(messageUid);
         cancellationRegistry.clear(messageUid);
+        streamingAnswerBuffers.remove(messageUid);
     }
 
     private String emptyToNull(String value) {
@@ -2118,7 +2269,7 @@ public class AgentApplicationService {
     private int nextAgentSortIndex() {
         return agentDefinitionRepository.listAllActive().stream()
                 .map(AgentDefinitionEntity::getSortIndex)
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .max(Integer::compareTo)
                 .orElse(0) + 10;
     }
@@ -2150,6 +2301,83 @@ public class AgentApplicationService {
         group.setUpdatedTime(now);
         agentGroupDefinitionRepository.save(group);
         return group;
+    }
+
+    private void initializeAgentWorkspaceDocs(String agentName, String displayName) {
+        Path workspace = NomoClawPaths.ensureAgentWorkspace(agentName);
+        Map<String, String> defaults = new LinkedHashMap<>();
+        String name = (displayName == null || displayName.isBlank()) ? agentName : displayName.trim();
+        defaults.put("SOUL.md", "# SOUL\n\n你是 " + name + " 的内核人格，保持清晰、稳健、可执行。\n");
+        defaults.put("AGENT.md", "# AGENT\n\n## 目标\n- 在当前职责范围内完成任务\n\n## 输出约束\n- 先结论，后细节\n");
+        defaults.put("MEMORY.md", "# MEMORY\n\n- 记录长期偏好\n- 记录高价值上下文\n");
+        defaults.put("TOOLS.md", "# TOOLS\n\n- 列出允许调用的工具\n- 列出工具风险边界\n");
+        defaults.put("IDENTITY.md", "# IDENTITY\n\nname: " + name + "\nrole: 成员\n");
+        defaults.put("USER.md", "# USER\n\n- 记录该 Agent 服务对象的偏好、约束与上下文。\n");
+
+        for (Map.Entry<String, String> entry : defaults.entrySet()) {
+            Path file = workspace.resolve(entry.getKey());
+            if (Files.exists(file)) {
+                continue;
+            }
+            try {
+                Files.writeString(file, entry.getValue(), StandardCharsets.UTF_8);
+            } catch (IOException ex) {
+                throw new IllegalStateException("failed to initialize agent doc: " + file, ex);
+            }
+        }
+        Path legacyAgentsDoc = workspace.resolve("AGENTS.md");
+        try {
+            Files.deleteIfExists(legacyAgentsDoc);
+        } catch (IOException ex) {
+            throw new IllegalStateException("failed to cleanup legacy agent doc: " + legacyAgentsDoc, ex);
+        }
+    }
+
+    private void initializeAgentToolRelations(String agentUid, LocalDateTime now) {
+        List<ToolDefinitionEntity> tools = toolDefinitionRepository.listAllActive();
+        for (ToolDefinitionEntity tool : tools) {
+            AgentToolRelationEntity relation = new AgentToolRelationEntity();
+            relation.setRelationUid(UUID.randomUUID().toString());
+            relation.setAgentUid(agentUid);
+            relation.setToolKey(tool.getToolKey());
+            relation.setStatus("ACTIVE");
+            relation.setSortIndex(tool.getSortIndex() == null ? 0 : tool.getSortIndex());
+            relation.setConfigJson("{}");
+            relation.setCreatedTime(now);
+            relation.setUpdatedTime(now);
+            agentToolRelationRepository.save(relation);
+        }
+    }
+
+    private AgentDefinitionEntity requireAgentByUid(String agentUid) {
+        String normalizedAgentUid = normalizeAgentUid(agentUid);
+        AgentDefinitionEntity agent = agentDefinitionRepository.findByUid(normalizedAgentUid);
+        if (agent == null) {
+            throw new IllegalArgumentException("agent not found: " + normalizedAgentUid);
+        }
+        return agent;
+    }
+
+    private AgentDocDto readAgentDoc(Path workspace, String key, String fileName) {
+        Path file = workspace.resolve(fileName).toAbsolutePath().normalize();
+        String content;
+        LocalDateTime updatedTime;
+        try {
+            content = Files.exists(file) ? Files.readString(file, StandardCharsets.UTF_8) : "";
+            updatedTime = Files.exists(file)
+                    ? LocalDateTime.ofInstant(Files.getLastModifiedTime(file).toInstant(), ZoneId.systemDefault())
+                    : LocalDateTime.now();
+        } catch (IOException ex) {
+            throw new IllegalStateException("failed to read doc file: " + file, ex);
+        }
+        return new AgentDocDto(key, fileName, content, updatedTime);
+    }
+
+    private void ensureWorkspaceDocsForExistingAgent(AgentDefinitionEntity agent) {
+        if (agent == null) {
+            return;
+        }
+        initializeAgentWorkspaceDocs(agent.getAgentName(), agent.getDisplayName());
     }
 
     private List<String> readStringArray(String rawJson) {

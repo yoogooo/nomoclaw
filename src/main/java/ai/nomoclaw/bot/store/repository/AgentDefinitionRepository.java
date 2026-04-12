@@ -80,4 +80,13 @@ public class AgentDefinitionRepository extends CrudRepository<AgentDefinitionMap
                 .orderByAsc(AgentDefinitionEntity::getSortIndex, AgentDefinitionEntity::getDisplayName)
                 .list();
     }
+
+    public void deleteByAgentUid(String agentUid) {
+        if (agentUid == null || agentUid.isBlank()) {
+            return;
+        }
+        lambdaUpdate()
+                .eq(AgentDefinitionEntity::getAgentUid, agentUid)
+                .remove();
+    }
 }

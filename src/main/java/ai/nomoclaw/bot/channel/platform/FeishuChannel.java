@@ -28,18 +28,22 @@ import java.util.Map;
 public class FeishuChannel extends AbstractWebhookChannel implements Channel {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+    private final HttpClient httpClient;
     private final String appId;
     private final String appSecret;
     private volatile String tokenValue;
     private volatile Instant tokenExpireAt = Instant.EPOCH;
 
-    public FeishuChannel(ChannelOrchestratorService orchestratorService, AgentChannelsProperties properties) {
+    public FeishuChannel(ChannelOrchestratorService orchestratorService,
+                         AgentChannelsProperties properties,
+                         HttpClient appHttpClient) {
         super(
                 ChannelType.FEISHU,
                 orchestratorService,
-                new ChannelPolicy(properties.getFeishu().isRequireMention(), properties.getFeishu().allowSet())
+                new ChannelPolicy(properties.getFeishu().isRequireMention(), properties.getFeishu().allowSet()),
+                appHttpClient
         );
+        this.httpClient = appHttpClient;
         this.appId = properties.getFeishu().getAppId();
         this.appSecret = properties.getFeishu().getAppSecret();
     }

@@ -32,6 +32,7 @@ export interface UpdateCronSubscriptionsPayload {
   subscriptions: Array<{
     channel: string;
     target: string;
+    botId?: string;
     enabled: boolean;
   }>;
 }
