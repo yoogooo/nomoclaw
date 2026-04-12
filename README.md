@@ -102,6 +102,7 @@ pnpm build
 - 架构文档：[`docs/architecture/ARCHITECTURE.md`](./docs/architecture/ARCHITECTURE.md)
 - 前端架构：[`docs/architecture/FRONTEND.md`](./docs/architecture/FRONTEND.md)
 - 前端 API 设计：[`docs/architecture/FRONTEND-API.md`](./docs/architecture/FRONTEND-API.md)
+- 桌面端生命周期（Tauri）：[`docs/architecture/DESKTOP-TAURI-LIFECYCLE.md`](./docs/architecture/DESKTOP-TAURI-LIFECYCLE.md)
 
 运维与配置：
 - 核心配置：`src/main/resources/application.yml`

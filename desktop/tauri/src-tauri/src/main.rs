@@ -63,10 +63,12 @@ fn main() {
             app.manage(DesktopState::default());
 
             acquire_single_instance_lock(app.handle())?;
+            cleanup_known_orphan_java_processes();
             cleanup_stale_backend_group(app.handle());
 
             register_tray(app)?;
             install_window_behavior(app)?;
+            show_loading_window(app)?;
             if let Err(error) = bootstrap_backend(app.handle().clone()) {
                 eprintln!("backend bootstrap failed: {error:#}");
                 show_bootstrap_error_page(app, &format!("{error:#}"))?;
@@ -83,9 +85,17 @@ fn main() {
     };
 
     app.run(|app_handle, event| {
-        if let RunEvent::ExitRequested { api, .. } = event {
-            api.prevent_exit();
-            shutdown_and_exit(app_handle);
+        match event {
+            RunEvent::ExitRequested { api, .. } => {
+                api.prevent_exit();
+                shutdown_and_exit(app_handle);
+            }
+            RunEvent::Reopen { .. } => {
+                if !EXITING.load(Ordering::SeqCst) {
+                    let _ = show_main_window(app_handle);
+                }
+            }
+            _ => {}
         }
     });
 }
@@ -257,6 +267,16 @@ fn show_main_window<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
     Ok(())
 }
 
+fn show_loading_window<R: Runtime>(app: &tauri::App<R>) -> Result<()> {
+    let window = app
+        .get_webview_window(WINDOW_LABEL)
+        .context("missing main window")?;
+    window.show()?;
+    window.unminimize()?;
+    window.set_focus()?;
+    Ok(())
+}
+
 fn update_window_url<R: Runtime>(app: &AppHandle<R>, target_url: &str) -> Result<()> {
     let window = app
         .get_webview_window(WINDOW_LABEL)
@@ -296,6 +316,7 @@ fn start_backend_process<R: Runtime>(app: &AppHandle<R>, preferred_port: u16) ->
     let port = resolve_port(preferred_port)?;
     let (java_bin, jar_path) = resolve_runtime_paths(app)?;
     let log_path = ensure_log_file_path(app)?;
+    let parent_pid = std::process::id();
 
     let log_file = File::options()
         .create(true)
@@ -306,15 +327,32 @@ fn start_backend_process<R: Runtime>(app: &AppHandle<R>, preferred_port: u16) ->
         .try_clone()
         .with_context(|| format!("failed to clone log file: {}", log_path.display()))?;
 
-    let mut command = Command::new(&java_bin);
+    let java_bin_quoted = shell_quote(&java_bin.to_string_lossy());
+    let jar_path_quoted = shell_quote(&jar_path.to_string_lossy());
+    let script = format!(
+        "{java} \
+        -Dspring.profiles.active=h2 \
+        -Dnomoclaw.desktop.open-browser-on-startup=false \
+        -Dserver.shutdown=immediate \
+        -Dspring.lifecycle.timeout-per-shutdown-phase=2s \
+        -Dserver.port={port} \
+        -jar {jar} & \
+        JAVA_PID=$!; \
+        while /bin/kill -0 {parent_pid} 2>/dev/null; do sleep 0.5; done; \
+        /bin/kill -TERM \"$JAVA_PID\" 2>/dev/null || true; \
+        sleep 1; \
+        /bin/kill -KILL \"$JAVA_PID\" 2>/dev/null || true; \
+        wait \"$JAVA_PID\" 2>/dev/null || true",
+        java = java_bin_quoted,
+        jar = jar_path_quoted,
+        port = port,
+        parent_pid = parent_pid
+    );
+
+    let mut command = Command::new("/bin/sh");
     command
-        .arg("-Dspring.profiles.active=h2")
-        .arg("-Dnomoclaw.desktop.open-browser-on-startup=false")
-        .arg("-Dserver.shutdown=immediate")
-        .arg("-Dspring.lifecycle.timeout-per-shutdown-phase=2s")
-        .arg(format!("-Dserver.port={port}"))
-        .arg("-jar")
-        .arg(&jar_path)
+        .arg("-c")
+        .arg(script)
         .stdout(Stdio::from(log_file))
         .stderr(Stdio::from(log_file_err));
 
@@ -340,6 +378,10 @@ fn start_backend_process<R: Runtime>(app: &AppHandle<R>, preferred_port: u16) ->
         #[cfg(unix)]
         process_group_id,
     })
+}
+
+fn shell_quote(raw: &str) -> String {
+    format!("'{}'", raw.replace('\'', "'\"'\"'"))
 }
 
 fn resolve_runtime_paths<R: Runtime>(app: &AppHandle<R>) -> Result<(PathBuf, PathBuf)> {
@@ -550,6 +592,31 @@ fn cleanup_stale_backend_group<R: Runtime>(app: &AppHandle<R>) {
 #[cfg(not(unix))]
 fn cleanup_stale_backend_group<R: Runtime>(_app: &AppHandle<R>) {}
 
+#[cfg(unix)]
+fn cleanup_known_orphan_java_processes() {
+    for pattern in [
+        "/Applications/NomoClaw.app/Contents/Resources/resources/backend/nomoclaw.jar",
+        "resources/backend/nomoclaw.jar",
+        "backend/nomoclaw.jar",
+    ] {
+        if let Ok(output) = Command::new("/usr/bin/pgrep").arg("-f").arg(pattern).output() {
+            if output.status.success() {
+                let raw = String::from_utf8_lossy(&output.stdout);
+                for line in raw.lines() {
+                    if let Ok(pid) = line.trim().parse::<i32>() {
+                        if pid > 0 {
+                            terminate_pid_force(pid);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[cfg(not(unix))]
+fn cleanup_known_orphan_java_processes() {}
+
 fn terminate_child_gracefully(child: &mut Child) -> Result<()> {
     #[cfg(unix)]
     {
@@ -589,6 +656,19 @@ fn terminate_process_group(process_group_id: i32) {
     if process_group_has_members(process_group_id) {
         let _ = killpg(pgid, Signal::SIGKILL);
     }
+}
+
+#[cfg(unix)]
+fn terminate_pid_force(pid_raw: i32) {
+    use nix::sys::signal::{kill, Signal};
+    use nix::unistd::Pid;
+    if pid_raw <= 0 {
+        return;
+    }
+    let pid = Pid::from_raw(pid_raw);
+    let _ = kill(pid, Signal::SIGTERM);
+    thread::sleep(Duration::from_millis(200));
+    let _ = kill(pid, Signal::SIGKILL);
 }
 
 #[cfg(unix)]
