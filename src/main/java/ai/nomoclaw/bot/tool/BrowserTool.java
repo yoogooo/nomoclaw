@@ -226,6 +226,16 @@ public class BrowserTool implements Tool {
         }
     }
 
+    /**
+     * Create or repair a persistent Chromium context for the given profile.
+     *
+     * <p>Key behavior:
+     * - If local cache looks missing, report download progress and install chromium.
+     * - If launch fails with "Executable doesn't exist", force reinstall chromium and retry once.
+     *
+     * <p>This guards against partial cache states like:
+     * old chromium revisions still present, but current required revision removed manually.
+     */
     private synchronized BrowserContext createContext(String profileKey, ToolRequest request) {
         Path cacheRoot = resolvePlaywrightCacheRoot();
         long baselineBytes = cacheRoot == null ? 0L : safeDirectorySize(cacheRoot);
@@ -255,12 +265,50 @@ public class BrowserTool implements Tool {
             } catch (Exception ex) {
                 throw new IllegalStateException("failed to create browser profile dir: " + userDataDir, ex);
             }
-            BrowserContext context = playwright.chromium().launchPersistentContext(
-                    userDataDir,
-                    new BrowserType.LaunchPersistentContextOptions()
-                            .setHeadless(headless)
-                            .setAcceptDownloads(true)
-            );
+            BrowserContext context;
+            try {
+                context = playwright.chromium().launchPersistentContext(
+                        userDataDir,
+                        new BrowserType.LaunchPersistentContextOptions()
+                                .setHeadless(headless)
+                                .setAcceptDownloads(true)
+                );
+            } catch (Exception launchEx) {
+                if (!isMissingExecutable(launchEx)) {
+                    throw launchEx;
+                }
+                // Required chromium revision is missing/corrupted: reinstall runtime and retry launch.
+                log.info("[Tool][browser] chromium executable missing, reinstalling runtime");
+                long repairBaselineBytes = cacheRoot == null ? 0L : safeDirectorySize(cacheRoot);
+                long repairStartedAt = System.currentTimeMillis();
+                request.reportProgress(
+                        "browser.runtime.preparing",
+                        "browser.runtime.checking_dependencies",
+                        progressMetrics("checking", repairBaselineBytes, 0L, repairStartedAt)
+                );
+                DownloadMonitor repairMonitor = startDownloadMonitor(request, cacheRoot, repairBaselineBytes, repairStartedAt);
+                try {
+                    forceInstallChromium(request);
+                    context = playwright.chromium().launchPersistentContext(
+                            userDataDir,
+                            new BrowserType.LaunchPersistentContextOptions()
+                                    .setHeadless(headless)
+                                    .setAcceptDownloads(true)
+                    );
+                    long repairFinalBytes = cacheRoot == null ? repairBaselineBytes : safeDirectorySize(cacheRoot);
+                    long repairDownloadedBytes = Math.max(0L, repairFinalBytes - repairBaselineBytes);
+                    String repairDetails = repairDownloadedBytes > 0
+                            ? "browser.runtime.ready_with_cache_delta:" + formatBytes(repairDownloadedBytes)
+                            : "browser.runtime.ready";
+                    request.reportProgress(
+                            "browser.runtime.ready",
+                            repairDetails,
+                            progressMetrics("ready", repairFinalBytes, repairDownloadedBytes, repairStartedAt)
+                    );
+                } finally {
+                    stopDownloadMonitor(repairMonitor);
+                }
+            }
             long finalBytes = cacheRoot == null ? baselineBytes : safeDirectorySize(cacheRoot);
             long downloadedBytes = Math.max(0L, finalBytes - baselineBytes);
             String details = downloadedBytes > 0
@@ -291,13 +339,21 @@ public class BrowserTool implements Tool {
             return;
         }
         try {
+            forceInstallChromium(request);
+            chromiumInstallEnsured = true;
+        } catch (Exception ex) {
+            throw new IllegalStateException("failed to install chromium runtime", ex);
+        }
+    }
+
+    private synchronized void forceInstallChromium(ToolRequest request) {
+        try {
             request.reportProgress(
                     "browser.runtime.installing_chromium",
                     "browser.runtime.installing_chromium_only",
                     progressMetrics("checking", 0L, 0L, System.currentTimeMillis())
             );
             CLI.main(new String[]{"install", "chromium"});
-            chromiumInstallEnsured = true;
         } catch (Exception ex) {
             throw new IllegalStateException("failed to install chromium runtime", ex);
         }
@@ -530,6 +586,19 @@ public class BrowserTool implements Tool {
         while (current != null) {
             String message = current.getMessage();
             if (message != null && message.contains("Target page, context or browser has been closed")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    // Detects Playwright's canonical error text when required browser binary is absent.
+    private boolean isMissingExecutable(Exception ex) {
+        Throwable current = ex;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null && message.contains("Executable doesn't exist at")) {
                 return true;
             }
             current = current.getCause();
