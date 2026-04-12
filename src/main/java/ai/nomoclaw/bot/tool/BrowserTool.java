@@ -2,6 +2,7 @@ package ai.nomoclaw.bot.tool;
 
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
+import com.microsoft.playwright.CLI;
 import com.microsoft.playwright.Download;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
@@ -22,6 +23,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Locale;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -43,6 +45,7 @@ public class BrowserTool implements Tool {
     private final Map<String, Page> pageByConversation = new ConcurrentHashMap<>();
     private final AgentProperties agentProperties;
     private final MessageCancellationRegistry cancellationRegistry;
+    private volatile boolean chromiumInstallEnsured;
     private volatile Playwright playwright;
 
     public BrowserTool(AgentProperties agentProperties,
@@ -211,7 +214,10 @@ public class BrowserTool implements Tool {
         DownloadMonitor monitor = startDownloadMonitor(request, cacheRoot, baselineBytes, monitorStartedAt);
         try {
             if (playwright == null) {
-                playwright = Playwright.create();
+                ensureChromiumInstalled(request);
+                Map<String, String> env = new HashMap<>(System.getenv());
+                env.put("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "1");
+                playwright = Playwright.create(new Playwright.CreateOptions().setEnv(env));
             }
             boolean headless = agentProperties.getBrowser().isHeadless();
             Path userDataDir = profileDirectory(profileKey);
@@ -241,6 +247,42 @@ public class BrowserTool implements Tool {
             return context;
         } finally {
             stopDownloadMonitor(monitor);
+        }
+    }
+
+    private synchronized void ensureChromiumInstalled(ToolRequest request) {
+        if (chromiumInstallEnsured) {
+            return;
+        }
+        Path cacheRoot = resolvePlaywrightCacheRoot();
+        if (hasAnyChromiumCache(cacheRoot)) {
+            chromiumInstallEnsured = true;
+            return;
+        }
+        try {
+            request.reportProgress(
+                    "browser.runtime.installing_chromium",
+                    "browser.runtime.installing_chromium_only",
+                    progressMetrics("checking", 0L, 0L, System.currentTimeMillis())
+            );
+            CLI.main(new String[]{"install", "chromium"});
+            chromiumInstallEnsured = true;
+        } catch (Exception ex) {
+            throw new IllegalStateException("failed to install chromium runtime", ex);
+        }
+    }
+
+    private boolean hasAnyChromiumCache(Path cacheRoot) {
+        if (cacheRoot == null || !Files.isDirectory(cacheRoot)) {
+            return false;
+        }
+        try (var stream = Files.list(cacheRoot)) {
+            return stream
+                    .filter(Files::isDirectory)
+                    .map(path -> path.getFileName() == null ? "" : path.getFileName().toString())
+                    .anyMatch(name -> name.startsWith("chromium-"));
+        } catch (Exception ignored) {
+            return false;
         }
     }
 

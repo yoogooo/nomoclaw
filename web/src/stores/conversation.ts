@@ -261,21 +261,6 @@ export const useConversationStore = defineStore("conversation", () => {
     return `${value.toFixed(1)} ${units[unitIndex]}`;
   }
 
-  function formatElapsedFriendly(seconds: number) {
-    if (!Number.isFinite(seconds) || seconds <= 0) {
-      return tr("chat.runtime.browserRuntime.elapsedNow");
-    }
-    if (seconds < 60) {
-      return tr("chat.runtime.browserRuntime.elapsedSeconds", { seconds });
-    }
-    const minutes = Math.floor(seconds / 60);
-    const remainSeconds = seconds % 60;
-    if (remainSeconds === 0) {
-      return tr("chat.runtime.browserRuntime.elapsedMinutes", { minutes });
-    }
-    return tr("chat.runtime.browserRuntime.elapsedMinutesSeconds", { minutes, seconds: remainSeconds });
-  }
-
   function updateBrowserRuntimeOverlayFromStepEvent(event: AgentEvent) {
     const toolName = String(event.payload.toolName || "");
     if (toolName !== "browser_tool" && toolName !== "browser_control_tool") {
@@ -284,8 +269,6 @@ export const useConversationStore = defineStore("conversation", () => {
     const metrics = (event.payload.progressMetrics || {}) as Record<string, any>;
     const phase = String(metrics.phase || "");
     const downloadedBytes = Number(metrics.downloadedBytes || 0);
-    const elapsedMs = Number(metrics.elapsedMs || 0);
-    const elapsedSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
     const progressPercentRaw = Number(metrics.progressPercent || 0);
     const progressPercent = Number.isFinite(progressPercentRaw)
       ? Math.max(0, Math.min(100, Math.round(progressPercentRaw)))
@@ -293,12 +276,11 @@ export const useConversationStore = defineStore("conversation", () => {
     const title = phase === "checking"
       ? tr("chat.runtime.browserRuntime.checkingTitle")
       : tr("chat.runtime.browserRuntime.downloadingTitle");
-    const elapsedText = formatElapsedFriendly(elapsedSeconds);
     const details = phase === "checking"
       ? tr("chat.runtime.browserRuntime.checkingDesc")
       : downloadedBytes >= 1024 * 1024
-        ? tr("chat.runtime.browserRuntime.downloadingDescWithSize", { size: formatBytes(downloadedBytes), elapsed: elapsedText })
-        : tr("chat.runtime.browserRuntime.downloadingDescSimple", { elapsed: elapsedText });
+        ? tr("chat.runtime.browserRuntime.downloadingDescWithSize", { size: formatBytes(downloadedBytes) })
+        : tr("chat.runtime.browserRuntime.downloadingDescSimple");
     const hint = tr("chat.runtime.browserRuntime.oneTimeHint");
 
     if (phase === "checking" || phase === "downloading") {

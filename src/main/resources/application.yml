@@ -1,6 +1,9 @@
 spring:
   application:
     name: bot
+  mvc:
+    async:
+      request-timeout: -1
   profiles:
     default: local
   datasource:
