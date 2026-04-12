@@ -1,0 +1,36 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "NomoClaw",
+  "version": "0.1.0",
+  "identifier": "ai.nomoclaw.desktop",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "NomoClaw",
+        "width": 1440,
+        "height": 920,
+        "visible": false,
+        "resizable": true
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app", "dmg"],
+    "icon": [
+      "../../../build/macos/NomoClaw.icns",
+      "icons/icon.png"
+    ],
+    "resources": [
+      "resources/backend/nomoclaw.jar",
+      "resources/backend/runtime"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "13.0"
+    }
+  }
+}

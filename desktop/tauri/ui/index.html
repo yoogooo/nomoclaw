@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NomoClaw Desktop</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        color: #0f172a;
+        background: radial-gradient(circle at top right, #bfdbfe, #f8fafc 55%);
+      }
+      .card {
+        width: min(560px, calc(100vw - 48px));
+        border: 1px solid #cbd5e1;
+        border-radius: 16px;
+        padding: 24px;
+        background: rgba(255, 255, 255, 0.85);
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+      }
+      .title {
+        margin: 0 0 10px;
+        font-size: 24px;
+      }
+      .desc {
+        margin: 0;
+        color: #334155;
+        line-height: 1.6;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <h1 class="title">NomoClaw 正在启动</h1>
+      <p class="desc">桌面端正在连接本地后端服务，请稍候。如果长时间无响应，请检查后端日志或重新启动应用。</p>
+    </main>
+  </body>
+</html>

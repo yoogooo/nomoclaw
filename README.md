@@ -84,6 +84,14 @@ pnpm dev
 pnpm build
 ```
 
+桌面版（macOS, Tauri）：
+
+```bash
+./scripts/build-desktop-macos.sh
+```
+
+- 旧脚本 `scripts/build-dmg-apple-silicon.sh` / `scripts/build-dmg-macos-intel.sh` 进入 legacy 维护期，仅作为回滚路径
+
 ## 文档导航
 
 使用者：

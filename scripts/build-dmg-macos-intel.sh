@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Build a macOS Intel (x64) DMG from a Spring Boot fat jar.
+# [LEGACY] Build a macOS Intel (x64) DMG from a Spring Boot fat jar.
+# Preferred entrypoint: scripts/build-desktop-macos.sh
 # Supports:
 # - Native Intel Mac (x86_64)
 # - Apple Silicon Mac via Rosetta + x64 JDK 21

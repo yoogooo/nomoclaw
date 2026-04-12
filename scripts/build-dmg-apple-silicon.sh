@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Build a macOS DMG for Apple Silicon (arm64) from a Spring Boot fat jar.
+# [LEGACY] Build a macOS DMG for Apple Silicon (arm64) from a Spring Boot fat jar.
+# Preferred entrypoint: scripts/build-desktop-macos.sh
 # Usage:
 #   ./scripts/build-dmg-apple-silicon.sh
 # Optional env:

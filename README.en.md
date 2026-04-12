@@ -84,6 +84,14 @@ pnpm dev
 pnpm build
 ```
 
+Desktop (macOS, Tauri):
+
+```bash
+./scripts/build-desktop-macos.sh
+```
+
+- Legacy scripts `scripts/build-dmg-apple-silicon.sh` and `scripts/build-dmg-macos-intel.sh` are kept temporarily as rollback paths.
+
 ## Documentation Map
 
 For users:
