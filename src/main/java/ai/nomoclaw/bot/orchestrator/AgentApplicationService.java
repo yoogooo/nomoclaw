@@ -31,6 +31,7 @@ import ai.nomoclaw.bot.model.MessageStatus;
 import ai.nomoclaw.bot.model.PlanStep;
 import ai.nomoclaw.bot.model.RiskLevel;
 import ai.nomoclaw.bot.model.StepStatus;
+import ai.nomoclaw.bot.model.ToolProgress;
 import ai.nomoclaw.bot.model.ToolResult;
 import ai.nomoclaw.bot.planner.Planner;
 import ai.nomoclaw.bot.policy.RiskPolicy;
@@ -1089,7 +1090,7 @@ public class AgentApplicationService {
             publishEvent(AgentEventType.STEP_STARTED, message.conversationUid(), message.messageUid(), step.stepUid(),
                     startedPayload);
 
-            ToolResult result = safeExecuteTool(message, step);
+            ToolResult result = safeExecuteTool(message, step, roundIndex, currentAttempt);
             lastResult = result;
             StepReviewer.ReviewDecision decision = stepReviewer.review(step, result);
             lastDecisionMessage = decision.message();
@@ -1141,7 +1142,7 @@ public class AgentApplicationService {
      *
      * <p>后续可抽取为 ToolExecutionPolicyChain + ToolExecutionGateway。
      */
-    private ToolResult safeExecuteTool(AgentMessage message, PlanStep step) {
+    private ToolResult safeExecuteTool(AgentMessage message, PlanStep step, int roundIndex, int currentAttempt) {
         try {
             AgentConversation conversation = requireConversation(message.conversationUid());
             // Runtime guard: even if a stale plan contains cron_tool, do not create new cron jobs in cron-triggered runs.
@@ -1194,7 +1195,8 @@ public class AgentApplicationService {
                     agent == null ? "" : agent.getAgentName(),
                     agentWorkspacePath,
                     step,
-                    timeoutMs
+                    timeoutMs,
+                    progress -> publishStepProgress(message, step, roundIndex, currentAttempt, progress)
             );
         } catch (Exception ex) {
             log.error("[ToolExecutor] tool threw exception conversationUid={} messageUid={} stepUid={} tool={}",
@@ -1203,6 +1205,26 @@ public class AgentApplicationService {
             metrics.put("exception", ex.getClass().getSimpleName());
             return ToolResult.failure("TOOL_EXECUTION_ERROR", nullToEmpty(ex.getMessage()), metrics);
         }
+    }
+
+    private void publishStepProgress(AgentMessage message,
+                                     PlanStep step,
+                                     int roundIndex,
+                                     int currentAttempt,
+                                     ToolProgress progress) {
+        if (progress == null) {
+            return;
+        }
+        ObjectNode payload = stepPayload(step, "attempt " + currentAttempt + " progress");
+        String summary = hasMeaningfulText(progress.summary()) ? progress.summary().trim() : "正在执行";
+        String details = hasMeaningfulText(progress.details()) ? progress.details().trim() : summary;
+        applyUserFacingFields(payload, step, "running", summary, details);
+        payload.put("roundIndex", roundIndex);
+        payload.put("silentLog", true);
+        if (progress.metrics() != null && !progress.metrics().isNull()) {
+            payload.set("progressMetrics", progress.metrics());
+        }
+        publishEvent(AgentEventType.STEP_STARTED, message.conversationUid(), message.messageUid(), step.stepUid(), payload);
     }
 
     private boolean isCronChannel(String channel) {

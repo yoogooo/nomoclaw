@@ -118,6 +118,18 @@ const enUS = {
       subtitle: "Shows planning, approvals, step execution, failure reasons, and loop termination.",
       expand: "Expand log",
       collapse: "Collapse log",
+      browserRuntime: {
+        checkingTitle: "Preparing browser environment",
+        downloadingTitle: "Downloading browser runtime",
+        checkingDesc: "Checking dependencies…",
+        downloadingDescSimple: "Please wait, {elapsed}.",
+        downloadingDescWithSize: "Downloaded about {size}, {elapsed}.",
+        elapsedNow: "just started",
+        elapsedSeconds: "about {seconds} seconds in",
+        elapsedMinutes: "about {minutes} minutes in",
+        elapsedMinutesSeconds: "about {minutes}m {seconds}s in",
+        oneTimeHint: "Usually only once. Later runs reuse local cache."
+      },
       highRiskStep: "System is preparing a high-risk step",
       processingStep: "Processing task step",
       stepNeedApproval: "Step {index} requires manual approval before continuing.",

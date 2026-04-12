@@ -118,6 +118,18 @@ const zhCN = {
       subtitle: "统一展示计划生成、审批入口、步骤执行、失败原因和循环终止。",
       expand: "展开日志",
       collapse: "收起日志",
+      browserRuntime: {
+        checkingTitle: "正在准备浏览器环境",
+        downloadingTitle: "浏览器依赖下载中",
+        checkingDesc: "正在检查依赖，请稍候…",
+        downloadingDescSimple: "请稍候，{elapsed}。",
+        downloadingDescWithSize: "已下载约 {size}，{elapsed}。",
+        elapsedNow: "刚刚开始",
+        elapsedSeconds: "大约 {seconds} 秒了",
+        elapsedMinutes: "大约 {minutes} 分钟了",
+        elapsedMinutesSeconds: "大约 {minutes} 分 {seconds} 秒",
+        oneTimeHint: "仅首次下载，后续会复用本地缓存。"
+      },
       highRiskStep: "系统准备执行高风险步骤",
       processingStep: "正在处理任务步骤",
       stepNeedApproval: "步骤 {index} 需要人工确认后才能继续执行。",

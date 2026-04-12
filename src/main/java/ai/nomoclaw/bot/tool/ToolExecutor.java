@@ -1,14 +1,18 @@
 package ai.nomoclaw.bot.tool;
 
-import ai.nomoclaw.bot.workspace.NomoClawPaths;
 import ai.nomoclaw.bot.model.PlanStep;
+import ai.nomoclaw.bot.model.ToolProgress;
 import ai.nomoclaw.bot.model.ToolRequest;
 import ai.nomoclaw.bot.model.ToolResult;
 import ai.nomoclaw.bot.orchestrator.MessageCancellationRegistry;
 import ai.nomoclaw.bot.orchestrator.ToolSpecificationRegistry;
+import ai.nomoclaw.bot.workspace.NomoClawPaths;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.node.JsonNodeFactory;
+
+import java.nio.file.Path;
+import java.util.function.Consumer;
 
 @Component
 @Slf4j
@@ -32,7 +36,8 @@ public class ToolExecutor {
                               String agentName,
                               java.nio.file.Path agentWorkspacePath,
                               PlanStep step,
-                              long timeoutMs) {
+                              long timeoutMs,
+                              Consumer<ToolProgress> progressReporter) {
         if (cancellationRegistry.isCanceled(messageUid)) {
             return ToolResult.failure("CANCELLED", "message canceled", JsonNodeFactory.instance.objectNode());
         }
@@ -42,7 +47,7 @@ public class ToolExecutor {
         Tool tool = toolRegistry.getRequired(step.toolName());
         log.info("[ToolExecutor] dispatch tool={} conversationUid={} messageUid={} stepUid={} timeoutMs={}",
                 tool.name(), conversationUid, messageUid, step.stepUid(), timeoutMs);
-        java.nio.file.Path workspace = NomoClawPaths.ensureAgentWorkspace(agentWorkspacePath == null
+        Path workspace = NomoClawPaths.ensureAgentWorkspace(agentWorkspacePath == null
                 ? NomoClawPaths.agentWorkspace(agentName)
                 : agentWorkspacePath);
         ToolRequest request = new ToolRequest(
@@ -55,7 +60,8 @@ public class ToolExecutor {
                 NomoClawPaths.agentTmp(workspace),
                 NomoClawPaths.agentReport(workspace),
                 step.toolArgs(),
-                timeoutMs
+                timeoutMs,
+                progressReporter
         );
         return tool.execute(request);
     }

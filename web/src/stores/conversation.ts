@@ -31,6 +31,16 @@ interface ApprovalState {
   submittingAction: "approve" | "reject" | null;
 }
 
+interface BrowserRuntimeOverlayState {
+  visible: boolean;
+  stepUid: string | null;
+  title: string;
+  details: string;
+  hint: string;
+  downloadedBytes: number;
+  progressPercent: number;
+}
+
 const EMPTY_UPLOAD_POLICY: UploadPolicy = {
   enabled: false,
   allowedMimeGroups: [],
@@ -125,6 +135,15 @@ export const useConversationStore = defineStore("conversation", () => {
     submitting: false,
     submittingAction: null
   });
+  const browserRuntimeOverlay = ref<BrowserRuntimeOverlayState>({
+    visible: false,
+    stepUid: null,
+    title: "",
+    details: "",
+    hint: "",
+    downloadedBytes: 0,
+    progressPercent: 0
+  });
 
   let eventSource: EventSource | null = null;
   const streamingAssistantByParentUid = ref<Record<string, number>>({});
@@ -211,6 +230,92 @@ export const useConversationStore = defineStore("conversation", () => {
       submitting: false,
       submittingAction: null
     };
+  }
+
+  function clearBrowserRuntimeOverlay() {
+    browserRuntimeOverlay.value = {
+      visible: false,
+      stepUid: null,
+      title: "",
+      details: "",
+      hint: "",
+      downloadedBytes: 0,
+      progressPercent: 0
+    };
+  }
+
+  function formatBytes(bytes: number) {
+    if (!Number.isFinite(bytes) || bytes <= 0) {
+      return "0 B";
+    }
+    const units = ["B", "KiB", "MiB", "GiB"];
+    let value = bytes;
+    let unitIndex = 0;
+    while (value >= 1024 && unitIndex < units.length - 1) {
+      value /= 1024;
+      unitIndex += 1;
+    }
+    if (unitIndex === 0) {
+      return `${Math.floor(value)} ${units[unitIndex]}`;
+    }
+    return `${value.toFixed(1)} ${units[unitIndex]}`;
+  }
+
+  function formatElapsedFriendly(seconds: number) {
+    if (!Number.isFinite(seconds) || seconds <= 0) {
+      return tr("chat.runtime.browserRuntime.elapsedNow");
+    }
+    if (seconds < 60) {
+      return tr("chat.runtime.browserRuntime.elapsedSeconds", { seconds });
+    }
+    const minutes = Math.floor(seconds / 60);
+    const remainSeconds = seconds % 60;
+    if (remainSeconds === 0) {
+      return tr("chat.runtime.browserRuntime.elapsedMinutes", { minutes });
+    }
+    return tr("chat.runtime.browserRuntime.elapsedMinutesSeconds", { minutes, seconds: remainSeconds });
+  }
+
+  function updateBrowserRuntimeOverlayFromStepEvent(event: AgentEvent) {
+    const toolName = String(event.payload.toolName || "");
+    if (toolName !== "browser_tool" && toolName !== "browser_control_tool") {
+      return;
+    }
+    const metrics = (event.payload.progressMetrics || {}) as Record<string, any>;
+    const phase = String(metrics.phase || "");
+    const downloadedBytes = Number(metrics.downloadedBytes || 0);
+    const elapsedMs = Number(metrics.elapsedMs || 0);
+    const elapsedSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
+    const progressPercentRaw = Number(metrics.progressPercent || 0);
+    const progressPercent = Number.isFinite(progressPercentRaw)
+      ? Math.max(0, Math.min(100, Math.round(progressPercentRaw)))
+      : 0;
+    const title = phase === "checking"
+      ? tr("chat.runtime.browserRuntime.checkingTitle")
+      : tr("chat.runtime.browserRuntime.downloadingTitle");
+    const elapsedText = formatElapsedFriendly(elapsedSeconds);
+    const details = phase === "checking"
+      ? tr("chat.runtime.browserRuntime.checkingDesc")
+      : downloadedBytes >= 1024 * 1024
+        ? tr("chat.runtime.browserRuntime.downloadingDescWithSize", { size: formatBytes(downloadedBytes), elapsed: elapsedText })
+        : tr("chat.runtime.browserRuntime.downloadingDescSimple", { elapsed: elapsedText });
+    const hint = tr("chat.runtime.browserRuntime.oneTimeHint");
+
+    if (phase === "checking" || phase === "downloading") {
+      browserRuntimeOverlay.value = {
+        visible: true,
+        stepUid: event.stepUid || null,
+        title,
+        details,
+        hint,
+        downloadedBytes: Math.max(0, downloadedBytes),
+        progressPercent
+      };
+      return;
+    }
+    if (phase === "ready" && browserRuntimeOverlay.value.stepUid === (event.stepUid || null)) {
+      clearBrowserRuntimeOverlay();
+    }
   }
 
   function buildApprovalBodyFromStep(step: ConversationRunStep) {
@@ -314,6 +419,7 @@ export const useConversationStore = defineStore("conversation", () => {
     runtimeLogStore.clear();
     conversationRunsStore.clear();
     clearApproval();
+    clearBrowserRuntimeOverlay();
     clearStreamingAssistantDraft();
   }
 
@@ -826,21 +932,34 @@ export const useConversationStore = defineStore("conversation", () => {
       if (approval.value.stepUid && approval.value.stepUid === event.stepUid) {
         clearApproval();
       }
-      runtimeLogStore.append(tr("chat.runtime.stepStarted", { round: event.payload.roundIndex || 1, title: event.payload.title }));
+      updateBrowserRuntimeOverlayFromStepEvent(event);
+      const silentLog = Boolean(event.payload.silentLog);
+      if (!silentLog) {
+        runtimeLogStore.append(tr("chat.runtime.stepStarted", { round: event.payload.roundIndex || 1, title: event.payload.title }));
+      }
       handleRunStepEvent(event);
       return;
     }
     if (type === "STEP_FINISHED") {
+      if (browserRuntimeOverlay.value.stepUid && browserRuntimeOverlay.value.stepUid === (event.stepUid || null)) {
+        clearBrowserRuntimeOverlay();
+      }
       runtimeLogStore.append(tr("chat.runtime.stepFinished", { title: event.payload.title, output: event.payload.output || "" }));
       handleRunStepEvent(event);
       return;
     }
     if (type === "STEP_FAILED") {
+      if (browserRuntimeOverlay.value.stepUid && browserRuntimeOverlay.value.stepUid === (event.stepUid || null)) {
+        clearBrowserRuntimeOverlay();
+      }
       runtimeLogStore.append(tr("chat.runtime.stepFailed", { title: event.payload.title, errorMessage: event.payload.errorMessage || "" }));
       handleRunStepEvent(event);
       return;
     }
     if (type === "STEP_REJECTED") {
+      if (browserRuntimeOverlay.value.stepUid && browserRuntimeOverlay.value.stepUid === (event.stepUid || null)) {
+        clearBrowserRuntimeOverlay();
+      }
       runtimeLogStore.append(tr("chat.runtime.stepRejected", { title: event.payload.title }));
       handleRunStepEvent(event);
       clearApproval();
@@ -857,6 +976,7 @@ export const useConversationStore = defineStore("conversation", () => {
     }
     if (type === "MESSAGE_COMPLETED") {
       clearApproval();
+      clearBrowserRuntimeOverlay();
       if (event.messageUid) {
         clearStreamingAssistantDraft(event.messageUid);
       }
@@ -884,6 +1004,7 @@ export const useConversationStore = defineStore("conversation", () => {
     }
     if (type === "MESSAGE_CANCELED") {
       clearApproval();
+      clearBrowserRuntimeOverlay();
       if (event.messageUid) {
         clearStreamingAssistantDraft(event.messageUid);
       }
@@ -927,6 +1048,7 @@ export const useConversationStore = defineStore("conversation", () => {
     uploadingFiles,
     loading,
     approval,
+    browserRuntimeOverlay,
     modelConfig,
     availableModelOptions,
     currentModelOption,
