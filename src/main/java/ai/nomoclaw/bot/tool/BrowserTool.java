@@ -2,7 +2,6 @@ package ai.nomoclaw.bot.tool;
 
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
-import com.microsoft.playwright.CLI;
 import com.microsoft.playwright.Download;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
@@ -22,6 +21,7 @@ import tools.jackson.databind.node.ObjectNode;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.lang.reflect.Method;
 import java.util.Locale;
 import java.util.HashMap;
 import java.util.Map;
@@ -34,6 +34,15 @@ import java.util.concurrent.atomic.AtomicLong;
 
 @Component
 @Slf4j
+/**
+ * Browser tool backed by Playwright persistent context.
+ *
+ * <p>Important lifecycle note:
+ * do NOT call {@code com.microsoft.playwright.CLI.main(...)} from this JVM.
+ * In Playwright Java 1.58.0, {@code CLI.main} eventually calls {@code System.exit(code)},
+ * which terminates the whole Spring Boot backend process after install commands finish.
+ * Chromium installation must run in an isolated child process (see {@link #runPlaywrightCli(String...)}).
+ */
 public class BrowserTool implements Tool {
     private static final long DOWNLOAD_REPORT_INTERVAL_MS = 800L;
     private static final long DOWNLOAD_REPORT_MIN_DELTA_BYTES = 256L * 1024L;
@@ -75,8 +84,9 @@ public class BrowserTool implements Tool {
                     request.conversationUid(), request.messageUid(), request.stepUid(), action);
             return executeWithRecovery(request, profileKey, start);
         } catch (Exception ex) {
-            log.warn("[Tool][browser] failed stepUid={} err={}", request.stepUid(), ex.getMessage());
-            return ToolResult.failure("BROWSER_ERROR", ex.getMessage(), metric(start));
+            String errorMessage = buildErrorMessage(ex);
+            log.warn("[Tool][browser] failed stepUid={} err={}", request.stepUid(), errorMessage, ex);
+            return ToolResult.failure("BROWSER_ERROR", errorMessage, metric(start));
         }
     }
 
@@ -254,9 +264,19 @@ public class BrowserTool implements Tool {
         try {
             if (playwright == null) {
                 ensureChromiumInstalled(request);
-                Map<String, String> env = new HashMap<>(System.getenv());
-                env.put("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "1");
-                playwright = Playwright.create(new Playwright.CreateOptions().setEnv(env));
+                Map<String, String> env = buildPlaywrightEnv(cacheRoot);
+                try {
+                    playwright = Playwright.create(new Playwright.CreateOptions().setEnv(env));
+                } catch (Exception ex) {
+                    throw new IllegalStateException(
+                            "failed to create playwright driver"
+                                    + " env.PLAYWRIGHT_BROWSERS_PATH=" + env.get("PLAYWRIGHT_BROWSERS_PATH")
+                                    + " env.HOME=" + env.getOrDefault("HOME", "")
+                                    + " env.TMPDIR=" + env.getOrDefault("TMPDIR", "")
+                                    + " cause=" + buildErrorMessage(ex),
+                            ex
+                    );
+                }
             }
             boolean headless = agentProperties.getBrowser().isHeadless();
             Path userDataDir = profileDirectory(profileKey);
@@ -353,9 +373,32 @@ public class BrowserTool implements Tool {
                     "browser.runtime.installing_chromium_only",
                     progressMetrics("checking", 0L, 0L, System.currentTimeMillis())
             );
-            CLI.main(new String[]{"install", "chromium"});
+            runPlaywrightCli("install", "chromium");
         } catch (Exception ex) {
             throw new IllegalStateException("failed to install chromium runtime", ex);
+        }
+    }
+
+    /**
+     * Executes Playwright CLI in a child process to avoid CLI.main calling System.exit(...)
+     * and terminating the current backend JVM.
+     *
+     * <p>Verified against Playwright Java 1.58.0:
+     * {@code com.microsoft.playwright.CLI.main(...)} ends with {@code System.exit(exitCode)}.
+     */
+    @SuppressWarnings("unchecked")
+    private void runPlaywrightCli(String... args) throws Exception {
+        Class<?> driverClass = Class.forName("com.microsoft.playwright.impl.driver.Driver");
+        Method ensureDriverInstalled = driverClass.getMethod("ensureDriverInstalled", Map.class, Boolean.class);
+        Object driver = ensureDriverInstalled.invoke(null, Map.of(), Boolean.FALSE);
+        Method createProcessBuilder = driverClass.getMethod("createProcessBuilder");
+        ProcessBuilder pb = (ProcessBuilder) createProcessBuilder.invoke(driver);
+        pb.command().addAll(java.util.Arrays.asList(args));
+        pb.inheritIO();
+        Process process = pb.start();
+        int exitCode = process.waitFor();
+        if (exitCode != 0) {
+            throw new IllegalStateException("playwright cli failed with exit code " + exitCode);
         }
     }
 
@@ -456,6 +499,10 @@ public class BrowserTool implements Tool {
     }
 
     private Path resolvePlaywrightCacheRoot() {
+        String appScopedPath = System.getenv("NOMOCLAW_PLAYWRIGHT_BROWSERS_PATH");
+        if (appScopedPath != null && !appScopedPath.isBlank()) {
+            return Path.of(appScopedPath.trim());
+        }
         String customPath = System.getenv("PLAYWRIGHT_BROWSERS_PATH");
         if (customPath != null && !customPath.isBlank()) {
             if ("0".equals(customPath.trim())) {
@@ -465,16 +512,38 @@ public class BrowserTool implements Tool {
         }
         String osName = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         String userHome = System.getProperty("user.home", "");
-        if (userHome.isBlank()) {
-            return null;
+        if (osName.contains("mac") && !userHome.isBlank()) {
+            Path sharedMacCache = Path.of(userHome, "Library", "Caches", "ms-playwright");
+            if (Files.isDirectory(sharedMacCache)) {
+                return sharedMacCache;
+            }
         }
-        if (osName.contains("mac")) {
-            return Path.of(userHome, "Library", "Caches", "ms-playwright");
+        return NomoClawPaths.root().resolve("playwright-browsers").toAbsolutePath().normalize();
+    }
+
+    private Map<String, String> buildPlaywrightEnv(Path cacheRoot) {
+        Map<String, String> env = new HashMap<>(System.getenv());
+        env.put("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "1");
+        if (cacheRoot != null) {
+            try {
+                Files.createDirectories(cacheRoot);
+                env.put("PLAYWRIGHT_BROWSERS_PATH", cacheRoot.toString());
+            } catch (Exception ex) {
+                log.warn("[Tool][browser] failed to prepare playwright cache root {}", cacheRoot, ex);
+            }
         }
-        if (osName.contains("win")) {
-            return Path.of(userHome, "AppData", "Local", "ms-playwright");
+        String home = System.getProperty("user.home", "");
+        if (!home.isBlank()) {
+            env.putIfAbsent("HOME", home);
         }
-        return Path.of(userHome, ".cache", "ms-playwright");
+        Path tmpDir = NomoClawPaths.root().resolve("tmp").resolve("playwright-driver").toAbsolutePath().normalize();
+        try {
+            Files.createDirectories(tmpDir);
+            env.put("TMPDIR", tmpDir.toString());
+        } catch (Exception ex) {
+            log.warn("[Tool][browser] failed to prepare tmp dir {}", tmpDir, ex);
+        }
+        return env;
     }
 
     private long safeDirectorySize(Path root) {
@@ -512,6 +581,28 @@ public class BrowserTool implements Tool {
     }
 
     private record DownloadMonitor(ScheduledExecutorService scheduler) {
+    }
+
+    private String buildErrorMessage(Throwable ex) {
+        if (ex == null) {
+            return "unknown error";
+        }
+        String message = ex.getMessage();
+        Throwable root = ex;
+        while (root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+        }
+        String rootMessage = root.getMessage();
+        if (rootMessage == null || rootMessage.isBlank()) {
+            return message == null || message.isBlank() ? ex.getClass().getSimpleName() : message;
+        }
+        if (message == null || message.isBlank()) {
+            return root.getClass().getSimpleName() + ": " + rootMessage;
+        }
+        if (message.contains(rootMessage)) {
+            return message;
+        }
+        return message + " | rootCause=" + root.getClass().getSimpleName() + ": " + rootMessage;
     }
 
     private Page currentPage(String conversationUid, BrowserContext context) {

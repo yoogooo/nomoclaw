@@ -124,6 +124,7 @@ ensure_required_modules() {
     java.xml
     jdk.crypto.ec
     jdk.unsupported
+    jdk.zipfs
   )
   local m
   for m in "${required[@]}"; do
@@ -277,7 +278,7 @@ set -e
 
 if [[ $JDEPS_EXIT -ne 0 || -z "$MODULES" ]]; then
   log "jdeps auto-detection failed, using fallback modules"
-  MODULES="java.base,java.desktop,java.instrument,java.logging,java.management,java.naming,java.net.http,java.rmi,java.security.jgss,java.sql,java.xml,jdk.crypto.ec,jdk.unsupported"
+  MODULES="java.base,java.desktop,java.instrument,java.logging,java.management,java.naming,java.net.http,java.rmi,java.security.jgss,java.sql,java.xml,jdk.crypto.ec,jdk.unsupported,jdk.zipfs"
 fi
 MODULES="$(ensure_required_modules "$MODULES")"
 log "Using JDK modules: $MODULES"

@@ -213,7 +213,7 @@ build_runtime() {
   mkdir -p "$BUILD_DIR"
 
   # Conservative module set compatible with current backend dependencies.
-  modules="java.base,java.desktop,java.instrument,java.logging,java.management,java.naming,java.net.http,java.rmi,java.security.jgss,java.sql,java.xml,jdk.crypto.ec,jdk.unsupported"
+  modules="java.base,java.desktop,java.instrument,java.logging,java.management,java.naming,java.net.http,java.rmi,java.security.jgss,java.sql,java.xml,jdk.crypto.ec,jdk.unsupported,jdk.zipfs"
 
   log "Creating jlink runtime ($TARGET_ARCH)"
   run_arch jlink \
