@@ -83,6 +83,8 @@ const zhCN = {
       saveTipConfirm: "保存为锦囊？",
       savedAsTip: "已保存为锦囊",
       openFile: "打开 {name}",
+      expandMessage: "展开",
+      collapseMessage: "收起",
       processing: "处理进行中…",
       runTitle: "执行过程",
       noExtraDetails: "无附加详情"
@@ -123,7 +125,6 @@ const zhCN = {
         downloadingTitle: "浏览器依赖下载中",
         checkingDesc: "正在检查依赖，请稍候…",
         downloadingDescSimple: "请稍候，正在下载。",
-        downloadingDescWithSize: "已下载约 {size}。",
         elapsedNow: "刚刚开始",
         elapsedSeconds: "大约 {seconds} 秒了",
         elapsedMinutes: "大约 {minutes} 分钟了",

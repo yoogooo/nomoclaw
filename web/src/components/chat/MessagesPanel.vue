@@ -23,6 +23,8 @@ const { t } = useI18n();
 const copiedMessageMap = ref<Record<string, boolean>>({});
 const savingTipMap = ref<Record<string, boolean>>({});
 const savedTipMap = ref<Record<string, boolean>>({});
+const expandedUserMessageMap = ref<Record<string, boolean>>({});
+const userMessageCollapseLineLimit = 10;
 const savedTipMessageUidSet = computed(() => {
   const uidSet = new Set<string>();
   for (const tip of jinnangStore.tips) {
@@ -210,6 +212,28 @@ function isTipSaved(messageItem: ConversationMessage) {
   return !!messageUid && savedTipMessageUidSet.value.has(messageUid);
 }
 
+function userMessageLineCount(messageItem: ConversationMessage) {
+  const content = (messageItem.content || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  if (!content.trim()) return 0;
+  return content.split("\n").length;
+}
+
+function shouldShowUserMessageToggle(messageItem: ConversationMessage) {
+  return messageItem.role === "user" && userMessageLineCount(messageItem) > userMessageCollapseLineLimit;
+}
+
+function isUserMessageExpanded(messageItem: ConversationMessage) {
+  return Boolean(expandedUserMessageMap.value[messageActionKey(messageItem)]);
+}
+
+function toggleUserMessageExpanded(messageItem: ConversationMessage) {
+  const key = messageActionKey(messageItem);
+  expandedUserMessageMap.value = {
+    ...expandedUserMessageMap.value,
+    [key]: !expandedUserMessageMap.value[key]
+  };
+}
+
 function applyStarterPrompt(prompt: string) {
   conversationStore.draftMessage = prompt;
   window.requestAnimationFrame(() => {
@@ -255,7 +279,11 @@ function applyStarterPrompt(prompt: string) {
         >
           <div class="message-role">{{ message.role === "user" ? "YOU" : "ASSISTANT" }}</div>
           <div class="message-bubble" :class="{ user: message.role === 'user' }">
-            <div class="message-html" v-html="renderMarkdown(message.content)" />
+            <div
+              class="message-html"
+              :class="{ 'is-collapsed': shouldShowUserMessageToggle(message) && !isUserMessageExpanded(message) }"
+              v-html="renderMarkdown(message.content)"
+            />
             <div v-if="message.attachments?.length" class="message-attachments">
               <button
                 v-for="attachment in message.attachments"
@@ -291,6 +319,15 @@ function applyStarterPrompt(prompt: string) {
               </n-button>
             </n-flex>
           </div>
+          <button
+            v-if="shouldShowUserMessageToggle(message)"
+            class="message-expand-btn"
+            type="button"
+            :aria-expanded="isUserMessageExpanded(message)"
+            @click="toggleUserMessageExpanded(message)"
+          >
+            {{ isUserMessageExpanded(message) ? t("chat.messages.collapseMessage") : t("chat.messages.expandMessage") }}
+          </button>
           <div v-if="message.role !== 'user'" class="message-meta">
             <div class="message-time">{{ formatMessageTime(message.createdTime) }}</div>
             <div v-if="resolveMessageTokenUsage(message)" class="message-token-inline">
@@ -559,6 +596,32 @@ function applyStarterPrompt(prompt: string) {
 .message-bubble .message-html {
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.message-bubble .message-html.is-collapsed {
+  display: -webkit-box;
+  -webkit-line-clamp: 10;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.message-expand-btn {
+  margin-top: var(--space-1_5);
+  border: none;
+  background: transparent;
+  color: var(--color-text-brand-strong);
+  font-size: var(--font-size-xs);
+  line-height: 1.3;
+  cursor: pointer;
+  padding: 0;
+}
+
+.message-wrap.user .message-expand-btn {
+  align-self: flex-end;
+}
+
+.message-expand-btn:hover {
+  color: var(--color-text-brand);
 }
 
 .message-attachments {

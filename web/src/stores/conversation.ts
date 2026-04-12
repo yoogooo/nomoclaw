@@ -244,23 +244,6 @@ export const useConversationStore = defineStore("conversation", () => {
     };
   }
 
-  function formatBytes(bytes: number) {
-    if (!Number.isFinite(bytes) || bytes <= 0) {
-      return "0 B";
-    }
-    const units = ["B", "KiB", "MiB", "GiB"];
-    let value = bytes;
-    let unitIndex = 0;
-    while (value >= 1024 && unitIndex < units.length - 1) {
-      value /= 1024;
-      unitIndex += 1;
-    }
-    if (unitIndex === 0) {
-      return `${Math.floor(value)} ${units[unitIndex]}`;
-    }
-    return `${value.toFixed(1)} ${units[unitIndex]}`;
-  }
-
   function updateBrowserRuntimeOverlayFromStepEvent(event: AgentEvent) {
     const toolName = String(event.payload.toolName || "");
     if (toolName !== "browser_tool" && toolName !== "browser_control_tool") {
@@ -268,7 +251,6 @@ export const useConversationStore = defineStore("conversation", () => {
     }
     const metrics = (event.payload.progressMetrics || {}) as Record<string, any>;
     const phase = String(metrics.phase || "");
-    const downloadedBytes = Number(metrics.downloadedBytes || 0);
     const progressPercentRaw = Number(metrics.progressPercent || 0);
     const progressPercent = Number.isFinite(progressPercentRaw)
       ? Math.max(0, Math.min(100, Math.round(progressPercentRaw)))
@@ -278,9 +260,7 @@ export const useConversationStore = defineStore("conversation", () => {
       : tr("chat.runtime.browserRuntime.downloadingTitle");
     const details = phase === "checking"
       ? tr("chat.runtime.browserRuntime.checkingDesc")
-      : downloadedBytes >= 1024 * 1024
-        ? tr("chat.runtime.browserRuntime.downloadingDescWithSize", { size: formatBytes(downloadedBytes) })
-        : tr("chat.runtime.browserRuntime.downloadingDescSimple");
+      : tr("chat.runtime.browserRuntime.downloadingDescSimple");
     const hint = tr("chat.runtime.browserRuntime.oneTimeHint");
 
     if (phase === "checking" || phase === "downloading") {

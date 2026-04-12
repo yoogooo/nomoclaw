@@ -83,6 +83,8 @@ const enUS = {
       saveTipConfirm: "Save as tip?",
       savedAsTip: "Saved as tip",
       openFile: "Open {name}",
+      expandMessage: "Expand",
+      collapseMessage: "Collapse",
       processing: "Processing...",
       runTitle: "Execution",
       noExtraDetails: "No extra details"
@@ -123,7 +125,6 @@ const enUS = {
         downloadingTitle: "Downloading browser runtime",
         checkingDesc: "Checking dependencies…",
         downloadingDescSimple: "Please wait, downloading now.",
-        downloadingDescWithSize: "Downloaded about {size}.",
         elapsedNow: "just started",
         elapsedSeconds: "about {seconds} seconds in",
         elapsedMinutes: "about {minutes} minutes in",

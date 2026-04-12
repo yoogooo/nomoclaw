@@ -2,13 +2,16 @@ import { router } from "@/router";
 import { message } from "@/discrete";
 import { tr } from "@/i18n";
 
+const ERROR_TOAST_DEDUP_WINDOW_MS = 2500;
+const errorToastLastShownAt = new Map<string, number>();
+
 export async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
     response = await fetch(input, init);
   } catch (error) {
     const errorMessage = tr("http.networkError");
-    message.error(errorMessage);
+    showErrorToastDedup(errorMessage);
     throw new Error(errorMessage, { cause: error });
   }
 
@@ -24,7 +27,7 @@ export async function requestJson<T>(input: RequestInfo | URL, init?: RequestIni
         }
       });
     } else {
-      message.error(userFriendlyMessage);
+      showErrorToastDedup(userFriendlyMessage);
     }
     throw new Error(userFriendlyMessage);
   }
@@ -34,6 +37,28 @@ export async function requestJson<T>(input: RequestInfo | URL, init?: RequestIni
   }
 
   return response.json() as Promise<T>;
+}
+
+function showErrorToastDedup(text: string) {
+  const normalized = (text || "").trim();
+  if (!normalized) {
+    return;
+  }
+  const now = Date.now();
+  const lastShownAt = errorToastLastShownAt.get(normalized) || 0;
+  if (now - lastShownAt < ERROR_TOAST_DEDUP_WINDOW_MS) {
+    return;
+  }
+  errorToastLastShownAt.set(normalized, now);
+  if (errorToastLastShownAt.size > 32) {
+    // Keep map bounded.
+    for (const [key, ts] of errorToastLastShownAt) {
+      if (now - ts > ERROR_TOAST_DEDUP_WINDOW_MS * 4) {
+        errorToastLastShownAt.delete(key);
+      }
+    }
+  }
+  message.error(normalized);
 }
 
 function normalizeErrorMessage(text: string): string {
