@@ -32,10 +32,14 @@ SKIP_TESTS="${SKIP_TESTS:-true}"
 SKIP_WEB_BUILD="${SKIP_WEB_BUILD:-false}"
 MAVEN_PROFILE="${MAVEN_PROFILE:-prod-lite}"
 BUILD_TARGET_DMG="${BUILD_TARGET_DMG:-true}"
+DESKTOP_VERSION="${DESKTOP_VERSION:-}"
+DESKTOP_NAME_PREFIX="${DESKTOP_NAME_PREFIX:-NomoClaw Desktop}"
 
 ARCH_PREFIX=()
 JAVA_HOME_SELECTED=""
 RUST_TARGET=""
+DESKTOP_PRODUCT_NAME=""
+TAURI_CONFIG_OVERRIDE_PATH=""
 
 log() {
   printf '[build-desktop] %s\n' "$*" >&2
@@ -90,6 +94,18 @@ normalize_target_arch() {
   fi
 }
 
+setup_desktop_naming() {
+  if [[ -z "$DESKTOP_VERSION" ]]; then
+    DESKTOP_VERSION="$(date '+%Y.%-m.%-d')"
+  fi
+
+  if [[ ! "$DESKTOP_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    fail "Invalid DESKTOP_VERSION=$DESKTOP_VERSION (expected yyyy.M.d, e.g. 2026.4.12)"
+  fi
+
+  DESKTOP_PRODUCT_NAME="${DESKTOP_NAME_PREFIX}"
+}
+
 setup_arch_prefix() {
   local host_arch
   host_arch="$(uname -m)"
@@ -137,7 +153,10 @@ setup_rust_toolchain() {
   fi
   command -v rustup >/dev/null 2>&1 || fail "Missing command: rustup. Please reinstall Rust via rustup."
 
-  run_arch rustup target add "$RUST_TARGET" >/dev/null
+  # rustup binary is usually host-arch only (arm64 on Apple Silicon). Running it under
+  # `arch -x86_64` can fail with "Bad CPU type in executable".
+  # Adding a Rust target does not require process arch emulation.
+  rustup target add "$RUST_TARGET" >/dev/null
 }
 
 build_frontend_assets() {
@@ -255,6 +274,29 @@ prepare_tauri_resources() {
   [[ -x "$DESKTOP_RES_DIR/runtime/bin/java" ]] || fail "Embedded runtime copy failed"
 }
 
+build_tauri_config_override() {
+  require_cmd node
+
+  local base_config_path
+  base_config_path="$DESKTOP_TAURI_DIR/tauri.conf.json"
+  TAURI_CONFIG_OVERRIDE_PATH="$BUILD_DIR/tauri.conf.$TARGET_ARCH.generated.json"
+
+  node -e '
+const fs = require("fs");
+const [basePath, outPath, productName, version] = process.argv.slice(1);
+const cfg = JSON.parse(fs.readFileSync(basePath, "utf8"));
+cfg.productName = productName;
+cfg.version = version;
+if (cfg.app && Array.isArray(cfg.app.windows)) {
+  cfg.app.windows = cfg.app.windows.map((w) => ({
+    ...w,
+    title: productName
+  }));
+}
+fs.writeFileSync(outPath, JSON.stringify(cfg, null, 2) + "\n");
+' "$base_config_path" "$TAURI_CONFIG_OVERRIDE_PATH" "$DESKTOP_PRODUCT_NAME" "$DESKTOP_VERSION"
+}
+
 build_tauri_bundle() {
   require_cmd pnpm
   require_cmd cargo
@@ -271,8 +313,10 @@ build_tauri_bundle() {
     bundles_flag="--bundles app"
   fi
 
-  log "Building tauri bundle target=$RUST_TARGET"
-  (cd "$DESKTOP_DIR" && run_arch pnpm tauri build --target "$RUST_TARGET" $bundles_flag)
+  build_tauri_config_override
+
+  log "Building tauri bundle target=$RUST_TARGET productName=$DESKTOP_PRODUCT_NAME version=$DESKTOP_VERSION"
+  (cd "$DESKTOP_DIR" && run_arch pnpm tauri build --target "$RUST_TARGET" --config "$TAURI_CONFIG_OVERRIDE_PATH" $bundles_flag)
 
   log "Bundle output: $DESKTOP_TAURI_DIR/target/$RUST_TARGET/release/bundle"
 }
@@ -281,6 +325,7 @@ main() {
   [[ "$(uname -s)" == "Darwin" ]] || fail "This script only supports macOS"
 
   normalize_target_arch
+  setup_desktop_naming
   setup_arch_prefix
   setup_java_toolchain
   setup_rust_toolchain

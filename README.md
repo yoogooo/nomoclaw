@@ -2,6 +2,21 @@
 
 一个本地优先的多 Agent 助手平台：把对话、工具执行、审批和定时任务放进同一个工作流，让任务更稳定地落地。
 
+## 桌面版安装（推荐）
+
+- 以下安装包与打包命令仅适用于 macOS。
+- 直接下载对应平台的桌面安装包（`.dmg`），双击安装到 `Applications`。
+- 安装后可一键启动，无需手动配置额外环境。
+- 如需自行打包：
+
+```bash
+# Apple Silicon
+TARGET_ARCH=arm64 ./scripts/build-desktop-macos.sh
+
+# Intel x64
+TARGET_ARCH=x64 ./scripts/build-desktop-macos.sh
+```
+
 ## 核心能力
 
 - Chat 对话与实时事件流（SSE）

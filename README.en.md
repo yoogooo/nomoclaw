@@ -2,6 +2,21 @@
 
 A local-first multi-agent assistant platform that combines chat, tool execution, approvals, and scheduled jobs in one workflow.
 
+## Desktop Install (Recommended)
+
+- The installer and build commands below are for macOS only.
+- Download the desktop installer (`.dmg`) for your platform and install it to `Applications`.
+- One-click install and launch, with no extra environment setup required.
+- To build installers locally:
+
+```bash
+# Apple Silicon
+TARGET_ARCH=arm64 ./scripts/build-desktop-macos.sh
+
+# Intel x64
+TARGET_ARCH=x64 ./scripts/build-desktop-macos.sh
+```
+
 ## Core Features
 
 - Chat conversations with real-time SSE events
