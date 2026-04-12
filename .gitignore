@@ -70,5 +70,17 @@ web/.env.local
 web/node_modules/
 web/.pnpm-store/
 web/dist/
+desktop/tauri/node_modules/
+desktop/tauri/src-tauri/target/
+desktop/tauri/src-tauri/gen/
+desktop/tauri/src-tauri/resources/backend/*
+!desktop/tauri/src-tauri/resources/backend/.gitkeep
+
+### Rust ###
+**/target/
+**/.cargo/
+**/.rustup/
+**/*.rs.bk
+**/.rustc_info.json
 
 src/main/resources/static/nomoclaw
