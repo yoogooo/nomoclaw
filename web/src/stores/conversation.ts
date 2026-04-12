@@ -251,6 +251,10 @@ export const useConversationStore = defineStore("conversation", () => {
     }
     const metrics = (event.payload.progressMetrics || {}) as Record<string, any>;
     const phase = String(metrics.phase || "");
+    const downloadedBytesRaw = Number(metrics.downloadedBytes ?? metrics.cachedBytes ?? 0);
+    const downloadedBytes = Number.isFinite(downloadedBytesRaw)
+      ? Math.max(0, Math.round(downloadedBytesRaw))
+      : 0;
     const progressPercentRaw = Number(metrics.progressPercent || 0);
     const progressPercent = Number.isFinite(progressPercentRaw)
       ? Math.max(0, Math.min(100, Math.round(progressPercentRaw)))
