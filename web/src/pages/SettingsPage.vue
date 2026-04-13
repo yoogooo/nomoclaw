@@ -1,19 +1,30 @@
 <script setup lang="ts">
-import { NSelect, NSwitch } from "naive-ui";
+import { NButton, NSelect, NSwitch } from "naive-ui";
 import { useI18n } from "vue-i18n";
 import DirectoryRail from "@/components/chat/DirectoryRail.vue";
 import AppPageHeader from "@/components/layout/AppPageHeader.vue";
 import { useUiPreferencesStore } from "@/stores/uiPreferences";
+import { useUpdateManagerStore } from "@/stores/updateManager";
 import type { AppLocale } from "@/i18n";
-import { computed } from "vue";
+import { computed, onMounted } from "vue";
 
 const uiPreferencesStore = useUiPreferencesStore();
+const updateManagerStore = useUpdateManagerStore();
 uiPreferencesStore.init();
 const { t } = useI18n();
 const localeOptions = computed(() => [
   { label: t("settings.languageZhCN"), value: "zh-CN" },
   { label: t("settings.languageEnUS"), value: "en-US" }
 ]);
+const downloadPercentText = computed(() => {
+  const value = updateManagerStore.downloadProgress;
+  if (value === null || value === undefined) return "";
+  return `${Math.round(Math.min(Math.max(value, 0), 1) * 100)}%`;
+});
+
+onMounted(() => {
+  void updateManagerStore.init();
+});
 
 function onLocaleChange(value: AppLocale | null) {
   if (!value) return;
@@ -30,7 +41,42 @@ function onLocaleChange(value: AppLocale | null) {
           <AppPageHeader
             :title="t('settings.title')"
             :subtitle="t('settings.subtitle')"
-          />
+          >
+            <template #actions>
+              <div v-if="updateManagerStore.supported" class="settings-updater-actions">
+                <span v-if="updateManagerStore.latestVersion" class="settings-updater-version">
+                  {{ t("settings.updateVersion", { version: updateManagerStore.latestVersion }) }}
+                </span>
+                <span v-if="updateManagerStore.status === 'downloading'" class="settings-updater-progress">
+                  {{ t("settings.updateDownloading", { progress: downloadPercentText || "--" }) }}
+                </span>
+                <span v-if="updateManagerStore.status === 'error' && updateManagerStore.errorMessage" class="settings-updater-error">
+                  {{ t("settings.updateFailed") }}
+                </span>
+
+                <n-button
+                  v-if="updateManagerStore.status === 'downloaded'"
+                  type="primary"
+                  :loading="updateManagerStore.busy"
+                  @click="() => updateManagerStore.installDownloaded()"
+                >
+                  {{ t("settings.updateInstallNow") }}
+                </n-button>
+                <n-button
+                  v-else
+                  tertiary
+                  :loading="updateManagerStore.status === 'checking' || updateManagerStore.busy"
+                  @click="() => updateManagerStore.checkNow()"
+                >
+                  {{
+                    updateManagerStore.status === "error"
+                      ? t("settings.updateRetry")
+                      : t("settings.updateCheckNow")
+                  }}
+                </n-button>
+              </div>
+            </template>
+          </AppPageHeader>
           <div class="page-section-grid settings-grid">
           <section class="surface-card">
             <div class="surface-card-title">{{ t("settings.account") }}</div>
@@ -108,6 +154,23 @@ function onLocaleChange(value: AppLocale | null) {
   font-size: var(--text-body-size);
   font-weight: 400;
   line-height: 1.2;
+}
+
+.settings-updater-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.settings-updater-version,
+.settings-updater-progress,
+.settings-updater-error {
+  font-size: var(--text-caption-size);
+  color: var(--color-text-secondary);
+}
+
+.settings-updater-error {
+  color: var(--color-danger);
 }
 
 @media (max-width: var(--size-breakpoint-lg)) {

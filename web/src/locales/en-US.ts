@@ -37,7 +37,13 @@ const enUS = {
     languageEnUS: "English",
     runtimeLogVisibility: "Runtime Log",
     runtimeLogOn: "Visible",
-    runtimeLogOff: "Hidden"
+    runtimeLogOff: "Hidden",
+    updateCheckNow: "Check Updates",
+    updateRetry: "Retry",
+    updateInstallNow: "Install Update",
+    updateDownloading: "Downloading update {progress}",
+    updateVersion: "New version {version}",
+    updateFailed: "Update failed"
   },
   modelGate: {
     title: "Set up a model first",

@@ -20,7 +20,10 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["app", "dmg"],
+    "targets": [
+      "app",
+      "dmg"
+    ],
     "icon": [
       "../../../build/macos/NomoClaw.icns",
       "icons/icon.png"
@@ -31,6 +34,16 @@
     ],
     "macOS": {
       "minimumSystemVersion": "13.0"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "dialog": false,
+      "endpoints": [
+        "https://github.com/yoogooo/nomoclaw/releases/latest/download/latest.json"
+      ],
+      "pubkey": ""
     }
   }
 }

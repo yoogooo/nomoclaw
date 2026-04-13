@@ -15,12 +15,18 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 @Component
 @Slf4j
 public class CommandTool implements Tool {
+    private static final Set<String> READ_ONLY_COMMAND_HEADS = Set.of(
+            "du", "df", "ls", "find", "stat", "wc", "grep", "awk", "sed", "sort", "head", "tail", "cut", "uniq",
+            "ps", "top", "vm_stat", "iostat"
+    );
 
     private final MessageCancellationRegistry cancellationRegistry;
     private final ToolPermissionPolicyService toolPermissionPolicyService;
@@ -108,6 +114,10 @@ public class CommandTool implements Tool {
                     if (exitCode == 0) {
                         return ToolResult.success(output, artifacts, metric(start, exitCode, false));
                     }
+                    if (shouldAcceptNonZeroExit(command, exitCode, stdout, stderr)) {
+                        artifacts.put("nonZeroExitAccepted", true);
+                        return ToolResult.success(output, artifacts, metric(start, exitCode, false));
+                    }
                     return ToolResult.failure("NON_ZERO_EXIT", output, metric(start, exitCode, false));
                 }
             }
@@ -125,6 +135,36 @@ public class CommandTool implements Tool {
         } catch (IOException e) {
             return "";
         }
+    }
+
+    private boolean shouldAcceptNonZeroExit(String command, int exitCode, String stdout, String stderr) {
+        if (exitCode == 0) {
+            return false;
+        }
+        if (stdout == null || stdout.isBlank()) {
+            return false;
+        }
+        if (stderr != null && !stderr.isBlank()) {
+            return false;
+        }
+        String normalized = command == null ? "" : command.trim();
+        if (normalized.isBlank()) {
+            return false;
+        }
+        String[] pipelineSplit = normalized.split("[|;&]{1,2}", 2);
+        String firstSegment = pipelineSplit.length == 0 ? normalized : pipelineSplit[0].trim();
+        if (firstSegment.isBlank()) {
+            return false;
+        }
+        String[] tokens = firstSegment.split("\\s+");
+        if (tokens.length == 0) {
+            return false;
+        }
+        String head = tokens[0].toLowerCase(Locale.ROOT);
+        if ("sudo".equals(head) && tokens.length > 1) {
+            head = tokens[1].toLowerCase(Locale.ROOT);
+        }
+        return READ_ONLY_COMMAND_HEADS.contains(head);
     }
 
     private ObjectNode metric(long start, int exitCode, boolean timeout) {

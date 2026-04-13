@@ -16,6 +16,8 @@ set -euo pipefail
 #   SKIP_WEB_BUILD=true|false       (default: false)
 #   MAVEN_PROFILE=prod-lite         (default: prod-lite)
 #   BUILD_TARGET_DMG=true|false     (default: true)
+#   TAURI_BUILD_CI=true|false       (default: true)
+#   TAURI_UPDATER_PUBKEY=<pubkey>   (optional; when set, updater artifacts are generated)
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 WEB_DIR="$ROOT_DIR/web"
@@ -32,6 +34,8 @@ SKIP_TESTS="${SKIP_TESTS:-true}"
 SKIP_WEB_BUILD="${SKIP_WEB_BUILD:-false}"
 MAVEN_PROFILE="${MAVEN_PROFILE:-prod-lite}"
 BUILD_TARGET_DMG="${BUILD_TARGET_DMG:-true}"
+TAURI_BUILD_CI="${TAURI_BUILD_CI:-true}"
+TAURI_UPDATER_PUBKEY="${TAURI_UPDATER_PUBKEY:-}"
 DESKTOP_VERSION="${DESKTOP_VERSION:-}"
 DESKTOP_NAME_PREFIX="${DESKTOP_NAME_PREFIX:-NomoClaw}"
 
@@ -283,7 +287,7 @@ build_tauri_config_override() {
 
   node -e '
 const fs = require("fs");
-const [basePath, outPath, productName, version] = process.argv.slice(1);
+const [basePath, outPath, productName, version, updaterPubkey] = process.argv.slice(1);
 const cfg = JSON.parse(fs.readFileSync(basePath, "utf8"));
 cfg.productName = productName;
 cfg.version = version;
@@ -293,8 +297,13 @@ if (cfg.app && Array.isArray(cfg.app.windows)) {
     title: productName
   }));
 }
+cfg.bundle = cfg.bundle || {};
+cfg.bundle.createUpdaterArtifacts = Boolean(updaterPubkey);
+if (updaterPubkey && cfg.plugins && cfg.plugins.updater) {
+  cfg.plugins.updater.pubkey = updaterPubkey;
+}
 fs.writeFileSync(outPath, JSON.stringify(cfg, null, 2) + "\n");
-' "$base_config_path" "$TAURI_CONFIG_OVERRIDE_PATH" "$DESKTOP_PRODUCT_NAME" "$DESKTOP_VERSION"
+' "$base_config_path" "$TAURI_CONFIG_OVERRIDE_PATH" "$DESKTOP_PRODUCT_NAME" "$DESKTOP_VERSION" "$TAURI_UPDATER_PUBKEY"
 }
 
 build_tauri_bundle() {
@@ -315,8 +324,14 @@ build_tauri_bundle() {
 
   build_tauri_config_override
 
-  log "Building tauri bundle target=$RUST_TARGET productName=$DESKTOP_PRODUCT_NAME version=$DESKTOP_VERSION"
-  (cd "$DESKTOP_DIR" && run_arch pnpm tauri build --target "$RUST_TARGET" --config "$TAURI_CONFIG_OVERRIDE_PATH" $bundles_flag)
+  if [[ "$TAURI_BUILD_CI" == "true" ]]; then
+    log "Tauri build will run with CI=true"
+    log "Building tauri bundle target=$RUST_TARGET productName=$DESKTOP_PRODUCT_NAME version=$DESKTOP_VERSION"
+    (cd "$DESKTOP_DIR" && CI=true run_arch pnpm tauri build --target "$RUST_TARGET" --config "$TAURI_CONFIG_OVERRIDE_PATH" $bundles_flag)
+  else
+    log "Building tauri bundle target=$RUST_TARGET productName=$DESKTOP_PRODUCT_NAME version=$DESKTOP_VERSION"
+    (cd "$DESKTOP_DIR" && run_arch pnpm tauri build --target "$RUST_TARGET" --config "$TAURI_CONFIG_OVERRIDE_PATH" $bundles_flag)
+  fi
 
   log "Bundle output: $DESKTOP_TAURI_DIR/target/$RUST_TARGET/release/bundle"
 }

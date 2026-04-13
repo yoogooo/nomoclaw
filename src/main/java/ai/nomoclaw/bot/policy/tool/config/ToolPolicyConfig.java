@@ -14,7 +14,8 @@ public record ToolPolicyConfig(
                 List.of(),
                 List.of("(^|\\s)(sudo\\s+)?(rm|mv|chmod|chown|dd|mkfs|mount|umount|launchctl|systemctl|crontab|at|atrm|atq)(\\s|$)",
                         "(^|\\s)(tar\\s+.*-x|unzip\\s|sed\\s+-i|tee\\s)",
-                        "(>|>>)") ,
+                        // Avoid false positives like `2>/dev/null` in read-only commands.
+                        "(^|\\s)(>>?)(\\s|$)") ,
                 List.of()
         );
     }

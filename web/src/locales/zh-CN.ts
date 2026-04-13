@@ -37,7 +37,13 @@ const zhCN = {
     languageEnUS: "English",
     runtimeLogVisibility: "运行时日志",
     runtimeLogOn: "显示",
-    runtimeLogOff: "隐藏"
+    runtimeLogOff: "隐藏",
+    updateCheckNow: "检查更新",
+    updateRetry: "重试检查",
+    updateInstallNow: "立即更新",
+    updateDownloading: "更新下载中 {progress}",
+    updateVersion: "新版本 {version}",
+    updateFailed: "更新失败"
   },
   modelGate: {
     title: "先配置一个可用模型",

@@ -780,10 +780,16 @@ public class AgentApplicationService {
         String messageUid = store.findMessageIdByStep(stepUid)
                 .orElseThrow(() -> new IllegalArgumentException("message not found for step: " + stepUid));
         store.updateStepApproval(stepUid, ApprovalStatus.APPROVED, StepStatus.CREATED);
+        // Reset retry metadata so an approved step can be executed again immediately.
+        // Otherwise a previously failed step may remain "retry exhausted" and fail without re-running.
+        store.updateStepStatus(stepUid, StepStatus.CREATED, 0, null);
         log.info("[Agent] step approved conversationUid={} stepUid={} round={}", conversationUid, stepUid, step.roundIndex());
         AgentMessage message = store.findMessage(messageUid)
                 .orElseThrow(() -> new IllegalArgumentException("message not found: " + messageUid));
-        if (message.status() == MessageStatus.WAITING_APPROVAL) {
+        boolean hasPendingSteps = store.listSteps(messageUid, step.roundIndex()).stream()
+                .anyMatch(item -> item.status() != StepStatus.COMPLETED);
+        if (message.status() == MessageStatus.WAITING_APPROVAL
+                || (message.status() == MessageStatus.FAILED && hasPendingSteps)) {
             executeMessageAsync(message.messageUid());
         }
     }
@@ -1177,7 +1183,9 @@ public class AgentApplicationService {
                         metrics
                 );
             }
-            if (policyDecision.asks()) {
+            // If the step has already been approved by user, do not block it again here.
+            // The approval gate is handled in executeRound before step execution.
+            if (policyDecision.asks() && step.approvalStatus() != ApprovalStatus.APPROVED) {
                 ObjectNode metrics = JsonNodeFactory.instance.objectNode();
                 metrics.put("policyRequireApproval", true);
                 metrics.put("reasonCode", policyDecision.reasonCode().name());

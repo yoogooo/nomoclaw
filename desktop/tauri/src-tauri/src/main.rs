@@ -2,6 +2,7 @@
 
 use anyhow::{anyhow, Context, Result};
 use reqwest::blocking::Client;
+use serde::Serialize;
 use std::env;
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
@@ -16,7 +17,8 @@ use std::thread;
 use std::time::{Duration, Instant};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager, RunEvent, Runtime, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, Runtime, State, WindowEvent};
+use tauri_plugin_updater::{Update, UpdaterExt};
 
 const WINDOW_LABEL: &str = "main";
 const TRAY_MENU_SHOW: &str = "show_main";
@@ -25,9 +27,13 @@ const TRAY_MENU_QUIT: &str = "quit_app";
 
 const INSTANCE_LOCK_FILE: &str = "app.lock";
 const BACKEND_PGID_FILE: &str = "backend.pgid";
+const UPDATER_EVENT_STATE: &str = "updater://state";
+const UPDATE_CHECK_INTERVAL_SECONDS: u64 = 6 * 60 * 60;
 
 static EXITING: AtomicBool = AtomicBool::new(false);
 static BACKEND_RESTARTING: AtomicBool = AtomicBool::new(false);
+static UPDATER_CHECKING: AtomicBool = AtomicBool::new(false);
+static UPDATER_INSTALLING: AtomicBool = AtomicBool::new(false);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum BackendMode {
@@ -57,11 +63,87 @@ impl Default for DesktopState {
     }
 }
 
+#[derive(Clone)]
+struct UpdaterState {
+    runtime: Arc<Mutex<UpdaterRuntimeState>>,
+}
+
+impl Default for UpdaterState {
+    fn default() -> Self {
+        Self {
+            runtime: Arc::new(Mutex::new(UpdaterRuntimeState::default())),
+        }
+    }
+}
+
+struct UpdaterRuntimeState {
+    status: UpdaterStatus,
+    latest_version: Option<String>,
+    download_progress: Option<f64>,
+    error_message: Option<String>,
+    pending_update: Option<Update>,
+    pending_bytes: Option<Vec<u8>>,
+}
+
+impl Default for UpdaterRuntimeState {
+    fn default() -> Self {
+        Self {
+            status: UpdaterStatus::Idle,
+            latest_version: None,
+            download_progress: None,
+            error_message: None,
+            pending_update: None,
+            pending_bytes: None,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum UpdaterStatus {
+    Idle,
+    Checking,
+    Available,
+    Downloading,
+    Downloaded,
+    Installing,
+    Error,
+}
+
+impl UpdaterStatus {
+    fn as_str(self) -> &'static str {
+        match self {
+            UpdaterStatus::Idle => "idle",
+            UpdaterStatus::Checking => "checking",
+            UpdaterStatus::Available => "available",
+            UpdaterStatus::Downloading => "downloading",
+            UpdaterStatus::Downloaded => "downloaded",
+            UpdaterStatus::Installing => "installing",
+            UpdaterStatus::Error => "error",
+        }
+    }
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdaterStatePayload {
+    status: String,
+    latest_version: Option<String>,
+    download_progress: Option<f64>,
+    error_message: Option<String>,
+}
+
 fn main() {
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .invoke_handler(tauri::generate_handler![
+            updater_get_state,
+            updater_install_downloaded,
+            updater_check_now
+        ])
         .setup(|app| {
             app.manage(DesktopState::default());
+            app.manage(UpdaterState::default());
 
             acquire_single_instance_lock(app.handle())?;
             cleanup_known_orphan_java_processes();
@@ -75,6 +157,8 @@ fn main() {
                 show_bootstrap_error_page(app, &format!("{error:#}"))?;
             }
             install_backend_watchdog(app)?;
+            install_updater_watchdog(app)?;
+            request_updater_check(app.handle().clone(), "startup");
             Ok(())
         });
 
@@ -308,6 +392,254 @@ fn check_backend_ready_once(port: u16, timeout: Duration) -> bool {
     match client.get(health_url).send() {
         Ok(response) => response.status().is_success(),
         Err(_) => false,
+    }
+}
+
+fn updater_supported() -> bool {
+    cfg!(target_os = "macos")
+}
+
+fn snapshot_updater_state(state: &UpdaterRuntimeState) -> UpdaterStatePayload {
+    UpdaterStatePayload {
+        status: state.status.as_str().to_string(),
+        latest_version: state.latest_version.clone(),
+        download_progress: state.download_progress,
+        error_message: state.error_message.clone(),
+    }
+}
+
+fn emit_updater_state<R: Runtime>(app: &AppHandle<R>, payload: &UpdaterStatePayload) {
+    let _ = app.emit(UPDATER_EVENT_STATE, payload.clone());
+}
+
+fn set_updater_state<R: Runtime, F>(app: &AppHandle<R>, updater_state: &UpdaterState, mutator: F)
+where
+    F: FnOnce(&mut UpdaterRuntimeState),
+{
+    let payload = {
+        let mut guard = match updater_state.runtime.lock() {
+            Ok(guard) => guard,
+            Err(_) => return,
+        };
+        mutator(&mut guard);
+        snapshot_updater_state(&guard)
+    };
+    emit_updater_state(app, &payload);
+}
+
+fn request_updater_check<R: Runtime>(app: AppHandle<R>, reason: &'static str) {
+    if !updater_supported() || EXITING.load(Ordering::SeqCst) || UPDATER_INSTALLING.load(Ordering::SeqCst) {
+        return;
+    }
+    {
+        let updater_state = app.state::<UpdaterState>().inner().clone();
+        let skip_check = updater_state
+            .runtime
+            .lock()
+            .map(|guard| {
+                matches!(
+                    guard.status,
+                    UpdaterStatus::Checking | UpdaterStatus::Downloading | UpdaterStatus::Downloaded | UpdaterStatus::Installing
+                )
+            })
+            .unwrap_or(false);
+        if skip_check {
+            return;
+        }
+    }
+    if UPDATER_CHECKING
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return;
+    }
+
+    tauri::async_runtime::spawn(async move {
+        let updater_state = app.state::<UpdaterState>().inner().clone();
+        if let Err(error) = run_updater_check(app.clone(), updater_state).await {
+            eprintln!("updater check failed ({reason}): {error:#}");
+            let updater_state = app.state::<UpdaterState>();
+            set_updater_state(&app, updater_state.inner(), |state| {
+                state.status = UpdaterStatus::Error;
+                state.error_message = Some(error.to_string());
+                state.pending_update = None;
+                state.pending_bytes = None;
+            });
+        }
+        UPDATER_CHECKING.store(false, Ordering::SeqCst);
+    });
+}
+
+async fn run_updater_check<R: Runtime>(app: AppHandle<R>, updater_state: UpdaterState) -> Result<()> {
+    set_updater_state(&app, &updater_state, |state| {
+        state.status = UpdaterStatus::Checking;
+        state.download_progress = None;
+        state.error_message = None;
+        state.pending_update = None;
+        state.pending_bytes = None;
+    });
+
+    let update = app.updater()?.check().await?;
+    let Some(update) = update else {
+        set_updater_state(&app, &updater_state, |state| {
+            state.status = UpdaterStatus::Idle;
+            state.latest_version = None;
+            state.download_progress = None;
+            state.error_message = None;
+            state.pending_update = None;
+            state.pending_bytes = None;
+        });
+        return Ok(());
+    };
+
+    let latest_version = update.version.clone();
+    set_updater_state(&app, &updater_state, |state| {
+        state.status = UpdaterStatus::Available;
+        state.latest_version = Some(latest_version.clone());
+        state.download_progress = Some(0.0);
+        state.error_message = None;
+    });
+
+    let mut downloaded: usize = 0;
+    let mut total_size: Option<u64> = None;
+    let app_for_progress = app.clone();
+    let updater_state_for_progress = updater_state.clone();
+    let app_for_finish = app.clone();
+    let updater_state_for_finish = updater_state.clone();
+
+    let bytes = update
+        .download(
+            move |chunk_length, content_length| {
+                downloaded += chunk_length;
+                if total_size.is_none() {
+                    total_size = content_length;
+                }
+                let progress = total_size.and_then(|content_len| {
+                    if content_len == 0 {
+                        return None;
+                    }
+                    Some((downloaded as f64 / content_len as f64).min(1.0))
+                });
+                set_updater_state(&app_for_progress, &updater_state_for_progress, |state| {
+                    state.status = UpdaterStatus::Downloading;
+                    state.download_progress = progress;
+                    state.error_message = None;
+                });
+            },
+            move || {
+                set_updater_state(&app_for_finish, &updater_state_for_finish, |state| {
+                    state.status = UpdaterStatus::Downloading;
+                    state.download_progress = Some(1.0);
+                });
+            },
+        )
+        .await?;
+
+    set_updater_state(&app, &updater_state, move |state| {
+        state.status = UpdaterStatus::Downloaded;
+        state.latest_version = Some(latest_version);
+        state.download_progress = Some(1.0);
+        state.error_message = None;
+        state.pending_update = Some(update);
+        state.pending_bytes = Some(bytes);
+    });
+
+    Ok(())
+}
+
+fn install_updater_watchdog<R: Runtime>(app: &tauri::App<R>) -> Result<()> {
+    if !updater_supported() {
+        return Ok(());
+    }
+    let app_handle = app.handle().clone();
+    thread::Builder::new()
+        .name("updater-watchdog".to_string())
+        .spawn(move || loop {
+            if EXITING.load(Ordering::SeqCst) {
+                return;
+            }
+            thread::sleep(Duration::from_secs(UPDATE_CHECK_INTERVAL_SECONDS));
+            if EXITING.load(Ordering::SeqCst) {
+                return;
+            }
+            request_updater_check(app_handle.clone(), "interval");
+        })
+        .context("failed to spawn updater watchdog thread")?;
+    Ok(())
+}
+
+#[tauri::command]
+fn updater_get_state(updater_state: State<'_, UpdaterState>) -> std::result::Result<UpdaterStatePayload, String> {
+    let guard = updater_state
+        .runtime
+        .lock()
+        .map_err(|_| "failed to lock updater state".to_string())?;
+    Ok(snapshot_updater_state(&guard))
+}
+
+#[tauri::command]
+fn updater_check_now(app: AppHandle) -> std::result::Result<(), String> {
+    if !updater_supported() {
+        return Err("updater is only enabled on macOS".to_string());
+    }
+    request_updater_check(app, "manual");
+    Ok(())
+}
+
+#[tauri::command]
+async fn updater_install_downloaded(
+    app: AppHandle,
+    updater_state: State<'_, UpdaterState>,
+) -> std::result::Result<(), String> {
+    if !updater_supported() {
+        return Err("updater is only enabled on macOS".to_string());
+    }
+    if UPDATER_INSTALLING
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return Err("update installation is already running".to_string());
+    }
+
+    let (update, bytes) = {
+        let mut guard = updater_state
+            .runtime
+            .lock()
+            .map_err(|_| "failed to lock updater state".to_string())?;
+        let Some(update) = guard.pending_update.take() else {
+            UPDATER_INSTALLING.store(false, Ordering::SeqCst);
+            return Err("no downloaded update available".to_string());
+        };
+        let Some(bytes) = guard.pending_bytes.take() else {
+            UPDATER_INSTALLING.store(false, Ordering::SeqCst);
+            return Err("no downloaded update payload available".to_string());
+        };
+        guard.status = UpdaterStatus::Installing;
+        guard.error_message = None;
+        guard.download_progress = Some(1.0);
+        let payload = snapshot_updater_state(&guard);
+        drop(guard);
+        emit_updater_state(&app, &payload);
+        (update, bytes)
+    };
+
+    let install_result = update.install(bytes);
+    match install_result {
+        Ok(()) => {
+            UPDATER_INSTALLING.store(false, Ordering::SeqCst);
+            app.restart();
+        }
+        Err(error) => {
+            UPDATER_INSTALLING.store(false, Ordering::SeqCst);
+            set_updater_state(&app, updater_state.inner(), |state| {
+                state.status = UpdaterStatus::Error;
+                state.error_message = Some(error.to_string());
+                state.download_progress = None;
+                state.pending_update = None;
+                state.pending_bytes = None;
+            });
+            Err(error.to_string())
+        }
     }
 }
 
