@@ -696,6 +696,17 @@ function applyStarterPrompt(prompt: string) {
   margin-top: var(--space-1);
   padding-right: var(--space-1_5);
   text-align: right;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(calc(var(--size-1) * -1));
+  transition: opacity 0.14s ease, transform 0.14s ease, visibility 0.14s ease;
+}
+
+.message-wrap.user:hover .user-message-time,
+.message-wrap.user:focus-within .user-message-time {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
 }
 
 .message-meta {
@@ -730,6 +741,12 @@ function applyStarterPrompt(prompt: string) {
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
+    transform: none;
+  }
+
+  .user-message-time {
+    opacity: 1;
+    visibility: visible;
     transform: none;
   }
 }
