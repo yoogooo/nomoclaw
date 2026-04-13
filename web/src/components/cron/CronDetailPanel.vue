@@ -192,7 +192,6 @@ function openResultPreview(executedTime: string, content: string) {
       <template v-else>
         <n-flex justify="space-between" align="flex-start" class="detail-toolbar">
           <div>
-            <div class="detail-title">{{ displayCronJobTitle(cronJobsStore.currentJob) }}</div>
             <div class="detail-subtitle">
               <template v-if="shouldShowNextRun">
                 {{ fallbackAgentLabel(cronJobsStore.currentJob) }} · {{ t("cron.list.nextRunAt", { time: formatDateTime(cronJobsStore.currentJob.nextRunTime) }) }}
