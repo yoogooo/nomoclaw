@@ -17,13 +17,13 @@ TARGET_ARCH=arm64 ./scripts/build-desktop-macos.sh
 TARGET_ARCH=x64 ./scripts/build-desktop-macos.sh
 ```
 
-## Core Features
+## Functional Capabilities
 
-- Chat conversations with real-time SSE events
-- Agent management (profile, skills, tools, tips, doc files)
-- Cron scheduling and execution reports
-- Channel configuration (Feishu / DingTalk)
-- Model configuration and local model discovery
+- Traceable execution loop: planning, step execution, approvals, and final summary with replayable run states instead of a black-box chat flow.
+- Multi-agent operations workspace: manage roles, skills, tools, tips, and docs as long-lived execution assets.
+- Risk-controlled actions: policy gates for command/file operations with human approval for high-risk steps.
+- Automation that can be operated: built-in cron scheduling, execution reports, and channel delivery (Feishu / DingTalk).
+- Decoupled model layer: unified multi-provider model management with local model discovery for cost/quality switching.
 
 ## Typical Use Cases
 
@@ -31,12 +31,11 @@ TARGET_ARCH=x64 ./scripts/build-desktop-macos.sh
 - Knowledge reuse: save high-quality outputs as “tips” to speed up future tasks
 - Routine automation: collect information on schedule, generate reports, and push notifications to channels
 
-## Requirements
+## Runtime & Dev Requirements
 
-- JDK 21+
-- Node.js 20+
-- pnpm 10+
-- MySQL 8+
+- Desktop app (recommended): macOS, install from `.dmg` and run directly (no manual JDK/Node/MySQL setup).
+- Source deployment (backend): JDK 21+, MySQL 8+ (H2 file mode is available for dev/test).
+- Source deployment (frontend): Node.js 20+, pnpm 10+.
 
 ## Quick Start
 

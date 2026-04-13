@@ -15,6 +15,7 @@
 - `NOMOCLAW_DEV_ATTACH`：`1/true` 代表 attach（默认），`0/false` 代表 spawn
 - `NOMOCLAW_BACKEND_START_TIMEOUT_SECONDS`：后端健康检查超时，默认 `30`
 - `NOMOCLAW_BACKEND_HEALTH_INTERVAL_MS`：健康检查轮询间隔，默认 `500`
+- `NOMOCLAW_BACKEND_WATCH_INTERVAL_MS`：后端守护检查间隔，默认 `10000`
 - `NOMOCLAW_JAVA_BIN`：可选，显式指定 Java 可执行文件路径
 - `NOMOCLAW_DEV_JAR`：可选，spawn 开发模式显式指定 jar 路径
 
@@ -33,3 +34,9 @@ pnpm dev
 ```bash
 ./scripts/build-desktop-macos.sh
 ```
+
+如需启用自动更新发布签名，请在构建时注入：
+
+- `TAURI_SIGNING_PRIVATE_KEY`
+- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`（若私钥有密码）
+- `TAURI_UPDATER_PUBKEY`（对应公钥，会写入构建产物）
