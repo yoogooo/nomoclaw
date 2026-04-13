@@ -1,15 +1,21 @@
 <script setup lang="ts">
-import { computed, nextTick } from "vue";
+import { computed, nextTick, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { NDropdown } from "naive-ui";
-import type { DropdownOption } from "naive-ui";
+import { NButton, NCard, NDropdown, NInput, NModal } from "naive-ui";
+import type { DropdownOption, InputInst } from "naive-ui";
 import { useAgentCatalogStore } from "@/stores/agentCatalog";
 import { useConversationStore } from "@/stores/conversation";
+import { message as discreteMessage } from "@/discrete";
 import { conversationSelectionLabel, formatFriendlyDateTime } from "@/utils/format";
 
 const conversationStore = useConversationStore();
 const agentCatalogStore = useAgentCatalogStore();
 const { t, locale } = useI18n();
+const renameDialogVisible = ref(false);
+const renameConversationUid = ref("");
+const renameInput = ref("");
+const renameSubmitting = ref(false);
+const renameInputRef = ref<InputInst | null>(null);
 
 function hasHanText(value: string) {
   return /[\u4e00-\u9fff]/.test(value);
@@ -39,28 +45,63 @@ const description = computed(() => {
     : t("chat.sidebar.viewingAgent", { label });
 });
 
-function menuOptions(conversationUid: string, title: string): DropdownOption[] {
+type ConversationMenuKey = "rename" | "delete";
+
+function menuOptions(): DropdownOption[] {
   return [
     {
       key: "rename",
-      label: t("chat.sidebar.rename"),
-      props: {
-        onClick: () => {
-          const nextTitle = window.prompt(t("chat.sidebar.renamePrompt"), title || "");
-          if (nextTitle && nextTitle.trim()) {
-            void conversationStore.renameConversation(conversationUid, nextTitle.trim());
-          }
-        }
-      }
+      label: t("chat.sidebar.rename")
     },
     {
       key: "delete",
-      label: t("chat.sidebar.delete"),
-      props: {
-        onClick: () => void conversationStore.confirmDeleteConversation(conversationUid, title)
-      }
+      label: t("chat.sidebar.delete")
     }
   ];
+}
+
+function openRenameDialog(conversationUid: string, title: string) {
+  renameConversationUid.value = conversationUid;
+  renameInput.value = title || "";
+  renameDialogVisible.value = true;
+  void nextTick(() => renameInputRef.value?.focus());
+}
+
+function closeRenameDialog() {
+  renameDialogVisible.value = false;
+  renameConversationUid.value = "";
+  renameInput.value = "";
+  renameSubmitting.value = false;
+}
+
+async function confirmRenameConversation() {
+  const normalizedTitle = renameInput.value.trim();
+  if (!normalizedTitle) {
+    discreteMessage.warning(t("chat.sidebar.renamePrompt"));
+    return;
+  }
+  if (!renameConversationUid.value) {
+    closeRenameDialog();
+    return;
+  }
+  renameSubmitting.value = true;
+  try {
+    await conversationStore.renameConversation(renameConversationUid.value, normalizedTitle);
+    closeRenameDialog();
+  } finally {
+    renameSubmitting.value = false;
+  }
+}
+
+function handleMenuSelect(key: string | number, conversationUid: string, title: string) {
+  const action = String(key) as ConversationMenuKey;
+  if (action === "rename") {
+    openRenameDialog(conversationUid, title);
+    return;
+  }
+  if (action === "delete") {
+    void conversationStore.confirmDeleteConversation(conversationUid, title);
+  }
 }
 
 function createConversationAndFocusInput() {
@@ -97,7 +138,11 @@ function createConversationAndFocusInput() {
               <div class="conversation-time">{{ t("chat.sidebar.updatedAt", { time: formatFriendlyDateTime(item.updatedTime) }) }}</div>
             </button>
             <div class="conversation-menu-wrap">
-              <n-dropdown trigger="click" :options="menuOptions(item.conversationUid, item.title || '')">
+              <n-dropdown
+                trigger="click"
+                :options="menuOptions()"
+                @select="(key) => handleMenuSelect(key, item.conversationUid, item.title || '')"
+              >
                 <button class="history-menu-button">...</button>
               </n-dropdown>
             </div>
@@ -106,6 +151,23 @@ function createConversationAndFocusInput() {
         <div v-else class="conversation-list-empty">{{ t("chat.sidebar.noConversations") }}</div>
       </div>
     </div>
+    <n-modal v-model:show="renameDialogVisible" preset="card" :title="t('chat.sidebar.rename')" style="width: min(520px, 92vw)">
+      <div class="rename-dialog-body">
+        <n-input
+          ref="renameInputRef"
+          v-model:value="renameInput"
+          :placeholder="t('chat.sidebar.renamePrompt')"
+          maxlength="120"
+          @keydown.enter.prevent="confirmRenameConversation"
+        />
+      </div>
+      <template #footer>
+        <div class="rename-dialog-actions">
+          <n-button quaternary :disabled="renameSubmitting" @click="closeRenameDialog">{{ t("common.cancel") }}</n-button>
+          <n-button type="primary" :loading="renameSubmitting" @click="confirmRenameConversation">{{ t("common.confirm") }}</n-button>
+        </div>
+      </template>
+    </n-modal>
   </aside>
 </template>
 
@@ -233,6 +295,19 @@ function createConversationAndFocusInput() {
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.18s ease, color 0.18s ease;
+}
+
+.rename-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-1);
+}
+
+.rename-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
 }
 
 .conversation-row:hover .history-menu-button {
