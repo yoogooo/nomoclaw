@@ -17,7 +17,9 @@ use std::thread;
 use std::time::{Duration, Instant};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::webview::PageLoadEvent;
 use tauri::{AppHandle, Emitter, Manager, RunEvent, Runtime, State, WindowEvent};
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use tauri_plugin_updater::{Update, UpdaterExt};
 
 const WINDOW_LABEL: &str = "main";
@@ -32,8 +34,10 @@ const UPDATE_CHECK_INTERVAL_SECONDS: u64 = 6 * 60 * 60;
 
 static EXITING: AtomicBool = AtomicBool::new(false);
 static BACKEND_RESTARTING: AtomicBool = AtomicBool::new(false);
+static QUIT_CONFIRMING: AtomicBool = AtomicBool::new(false);
 static UPDATER_CHECKING: AtomicBool = AtomicBool::new(false);
 static UPDATER_INSTALLING: AtomicBool = AtomicBool::new(false);
+static SHOW_MAIN_ON_NEXT_FINISHED_LOAD: AtomicBool = AtomicBool::new(false);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum BackendMode {
@@ -134,6 +138,23 @@ struct UpdaterStatePayload {
 
 fn main() {
     let builder = tauri::Builder::default()
+        .on_page_load(|webview, payload| {
+            if webview.label() != WINDOW_LABEL {
+                return;
+            }
+            if payload.event() != PageLoadEvent::Finished {
+                return;
+            }
+            if !SHOW_MAIN_ON_NEXT_FINISHED_LOAD.swap(false, Ordering::SeqCst) {
+                return;
+            }
+            if EXITING.load(Ordering::SeqCst) {
+                return;
+            }
+
+            let app = webview.app_handle();
+            let _ = show_main_window(&app);
+        })
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
@@ -170,8 +191,11 @@ fn main() {
     app.run(|app_handle, event| {
         match event {
             RunEvent::ExitRequested { api, .. } => {
+                if EXITING.load(Ordering::SeqCst) {
+                    return;
+                }
                 api.prevent_exit();
-                shutdown_and_exit(app_handle);
+                request_quit_with_confirmation(app_handle);
             }
             RunEvent::Reopen { .. } => {
                 if !EXITING.load(Ordering::SeqCst) {
@@ -190,6 +214,38 @@ fn shutdown_and_exit<R: Runtime>(app: &AppHandle<R>) {
     let _ = stop_backend(app);
     release_single_instance_lock(app);
     app.exit(0);
+}
+
+fn request_quit_with_confirmation<R: Runtime>(app: &AppHandle<R>) {
+    if EXITING.load(Ordering::SeqCst) {
+        return;
+    }
+    if QUIT_CONFIRMING
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return;
+    }
+
+    let app_handle = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let should_quit = app_handle
+            .dialog()
+            .message("确认退出 NomoClaw 应用吗？")
+            .title("退出确认")
+            .kind(MessageDialogKind::Warning)
+            .buttons(MessageDialogButtons::OkCancelCustom(
+                "退出".to_string(),
+                "取消".to_string(),
+            ))
+            .blocking_show();
+
+        QUIT_CONFIRMING.store(false, Ordering::SeqCst);
+
+        if should_quit && !EXITING.load(Ordering::SeqCst) {
+            shutdown_and_exit(&app_handle);
+        }
+    });
 }
 
 fn bootstrap_backend<R: Runtime>(app: AppHandle<R>) -> Result<()> {
@@ -271,7 +327,7 @@ fn register_tray<R: Runtime>(app: &tauri::App<R>) -> Result<()> {
                 let app_handle = app.clone();
                 request_backend_restart(app_handle, "tray menu");
             }
-            TRAY_MENU_QUIT => shutdown_and_exit(app),
+            TRAY_MENU_QUIT => request_quit_with_confirmation(app),
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
@@ -723,30 +779,30 @@ fn show_main_window<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
 }
 
 fn show_loading_window<R: Runtime>(app: &tauri::App<R>) -> Result<()> {
-    let window = app
-        .get_webview_window(WINDOW_LABEL)
-        .context("missing main window")?;
-    window.show()?;
-    window.unminimize()?;
-    window.set_focus()?;
-    Ok(())
+  app
+    .get_webview_window(WINDOW_LABEL)
+    .context("missing main window")?;
+  SHOW_MAIN_ON_NEXT_FINISHED_LOAD.store(true, Ordering::SeqCst);
+  Ok(())
 }
 
 fn update_window_url<R: Runtime>(app: &AppHandle<R>, target_url: &str) -> Result<()> {
-    let window = app
-        .get_webview_window(WINDOW_LABEL)
-        .context("missing main window")?;
-    let safe_url = target_url.replace('\\', "\\\\").replace('"', "\\\"");
-    window.eval(&format!("window.location.replace(\"{safe_url}\");"))?;
-    window.show()?;
-    Ok(())
+  let window = app
+    .get_webview_window(WINDOW_LABEL)
+    .context("missing main window")?;
+  window.hide()?;
+  SHOW_MAIN_ON_NEXT_FINISHED_LOAD.store(true, Ordering::SeqCst);
+  let safe_url = target_url.replace('\\', "\\\\").replace('"', "\\\"");
+  window.eval(&format!("window.location.replace(\"{safe_url}\");"))?;
+  Ok(())
 }
 
 fn show_bootstrap_error_page<R: Runtime>(app: &AppHandle<R>, raw_error: &str) -> Result<()> {
-    let window = app
-        .get_webview_window(WINDOW_LABEL)
-        .context("missing main window")?;
-    let escaped = js_escape(raw_error);
+  let window = app
+    .get_webview_window(WINDOW_LABEL)
+    .context("missing main window")?;
+  SHOW_MAIN_ON_NEXT_FINISHED_LOAD.store(false, Ordering::SeqCst);
+  let escaped = js_escape(raw_error);
     let script = format!(
         "document.body.innerHTML = '<main style=\"font-family:-apple-system,BlinkMacSystemFont,\\'SF Pro Text\\',\\'PingFang SC\\',sans-serif;max-width:760px;margin:48px auto;padding:24px;border:1px solid #fecaca;border-radius:12px;background:#fff5f5;color:#7f1d1d;line-height:1.6\">\
         <h1 style=\"margin:0 0 8px;font-size:24px\">NomoClaw 启动失败</h1>\
