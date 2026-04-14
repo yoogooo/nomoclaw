@@ -3,6 +3,7 @@
 use anyhow::{anyhow, Context, Result};
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::env;
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
@@ -23,13 +24,17 @@ use tauri::{AppHandle, Emitter, Manager, RunEvent, Runtime, State, WindowEvent};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use tauri_plugin_updater::{Update, UpdaterExt};
 
+// ===== UI / tray constants =====
 const WINDOW_LABEL: &str = "main";
 const TRAY_MENU_SHOW: &str = "show_main";
 const TRAY_MENU_RESTART_APP: &str = "restart_app";
 const TRAY_MENU_QUIT: &str = "quit_app";
 const MACOS_TRAY_TEMPLATE_ICON_FILE: &str = "tray-macos-template.png";
 const FALLBACK_TRAY_TEMPLATE_ICON: Image<'_> = tauri::include_image!("./icons/tray-macos-template.png");
+const DESKTOP_I18N_FILE: &str = "i18n/desktop.json";
+const DESKTOP_I18N_FALLBACK_JSON: &str = include_str!("../resources/i18n/desktop.json");
 
+// ===== runtime / persistence constants =====
 const INSTANCE_LOCK_FILE: &str = "app.lock";
 const BACKEND_PGID_FILE: &str = "backend.pgid";
 const BOOTSTRAP_PREFS_FILE: &str = "bootstrap_prefs.json";
@@ -40,6 +45,7 @@ const DEFAULT_LOCALE: &str = "zh-CN";
 const UPDATER_EVENT_STATE: &str = "updater://state";
 const UPDATE_CHECK_INTERVAL_SECONDS: u64 = 6 * 60 * 60;
 
+// Process-level guards used by multiple async/workdog paths.
 static EXITING: AtomicBool = AtomicBool::new(false);
 static BACKEND_RESTARTING: AtomicBool = AtomicBool::new(false);
 static QUIT_CONFIRMING: AtomicBool = AtomicBool::new(false);
@@ -158,6 +164,25 @@ struct SaveBootstrapPrefsPayload {
     locale: String,
 }
 
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopCopy {
+    tray_show_main: String,
+    tray_restart_app: String,
+    tray_quit: String,
+    quit_message: String,
+    quit_title: String,
+    quit_confirm: String,
+    quit_cancel: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopI18nBundle {
+    fallback_locale: String,
+    locales: HashMap<String, DesktopCopy>,
+}
+
 impl Default for BootstrapPrefs {
     fn default() -> Self {
         Self {
@@ -181,6 +206,131 @@ impl BootstrapPrefs {
     }
 }
 
+// ===== desktop i18n (tray + native dialogs) =====
+// TODO(refactor): move desktop i18n loading + resolution to a dedicated module.
+fn desktop_copy_default_bundle() -> DesktopI18nBundle {
+    serde_json::from_str(DESKTOP_I18N_FALLBACK_JSON).unwrap_or_else(|error| {
+        eprintln!("failed to parse embedded desktop i18n fallback json: {error}");
+        let mut locales = HashMap::new();
+        locales.insert(
+            "zh-CN".to_string(),
+            DesktopCopy {
+                tray_show_main: "显示主窗口".to_string(),
+                tray_restart_app: "重启应用".to_string(),
+                tray_quit: "退出".to_string(),
+                quit_message: "确认退出 NomoClaw 应用吗？".to_string(),
+                quit_title: "退出确认".to_string(),
+                quit_confirm: "退出".to_string(),
+                quit_cancel: "取消".to_string(),
+            },
+        );
+        locales.insert(
+            "en-US".to_string(),
+            DesktopCopy {
+                tray_show_main: "Show Main Window".to_string(),
+                tray_restart_app: "Restart App".to_string(),
+                tray_quit: "Quit".to_string(),
+                quit_message: "Quit NomoClaw?".to_string(),
+                quit_title: "Confirm Quit".to_string(),
+                quit_confirm: "Quit".to_string(),
+                quit_cancel: "Cancel".to_string(),
+            },
+        );
+        DesktopI18nBundle {
+            fallback_locale: "zh-CN".to_string(),
+            locales,
+        }
+    })
+}
+
+fn desktop_copy_hardcoded_zh() -> DesktopCopy {
+    DesktopCopy {
+        tray_show_main: "显示主窗口".to_string(),
+        tray_restart_app: "重启应用".to_string(),
+        tray_quit: "退出".to_string(),
+        quit_message: "确认退出 NomoClaw 应用吗？".to_string(),
+        quit_title: "退出确认".to_string(),
+        quit_confirm: "退出".to_string(),
+        quit_cancel: "取消".to_string(),
+    }
+}
+
+fn read_desktop_i18n_bundle<R: Runtime>(app: &AppHandle<R>) -> DesktopI18nBundle {
+    let mut candidates = vec![PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("resources")
+        .join(DESKTOP_I18N_FILE)];
+
+    if let Ok(resource_dir) = app.path().resource_dir() {
+        candidates.push(resource_dir.join(DESKTOP_I18N_FILE));
+        candidates.push(resource_dir.join("resources").join(DESKTOP_I18N_FILE));
+    }
+
+    for candidate in candidates {
+        if !candidate.exists() {
+            continue;
+        }
+        match fs::read_to_string(&candidate) {
+            Ok(raw) => match serde_json::from_str::<DesktopI18nBundle>(&raw) {
+                Ok(bundle) => return bundle,
+                Err(error) => eprintln!("invalid desktop i18n json {}: {error}", candidate.display()),
+            },
+            Err(error) => eprintln!("failed to read desktop i18n file {}: {error}", candidate.display()),
+        }
+    }
+
+    desktop_copy_default_bundle()
+}
+
+fn resolve_desktop_copy(bundle: &DesktopI18nBundle, locale: &str) -> DesktopCopy {
+    let requested = locale.trim();
+    if let Some(copy) = bundle.locales.get(requested) {
+        return copy.clone();
+    }
+
+    let requested_lower = requested.to_ascii_lowercase();
+    if let Some((_, copy)) = bundle
+        .locales
+        .iter()
+        .find(|(key, _)| key.to_ascii_lowercase() == requested_lower)
+    {
+        return copy.clone();
+    }
+
+    let language = requested_lower.split('-').next().unwrap_or("");
+    if !language.is_empty() {
+        if let Some((_, copy)) = bundle.locales.iter().find(|(key, _)| {
+            key.to_ascii_lowercase()
+                .split('-')
+                .next()
+                .map(|part| part == language)
+                .unwrap_or(false)
+        }) {
+            return copy.clone();
+        }
+    }
+
+    if let Some(copy) = bundle.locales.get(bundle.fallback_locale.as_str()) {
+        return copy.clone();
+    }
+
+    bundle
+        .locales
+        .values()
+        .next()
+        .cloned()
+        .unwrap_or_else(desktop_copy_hardcoded_zh)
+}
+
+fn desktop_copy<R: Runtime>(app: &AppHandle<R>) -> DesktopCopy {
+    let locale = read_bootstrap_prefs(app)
+        .map(|prefs| prefs.locale)
+        .unwrap_or_else(|_| DEFAULT_LOCALE.to_string());
+    let bundle = read_desktop_i18n_bundle(app);
+    resolve_desktop_copy(&bundle, &locale)
+}
+
+// ===== application lifecycle =====
+// TODO(refactor): extract setup/run/exit orchestration into app_lifecycle.rs.
 fn main() {
     let builder = tauri::Builder::default()
         .on_page_load(|webview, payload| {
@@ -267,6 +417,8 @@ fn shutdown_and_exit<R: Runtime>(app: &AppHandle<R>) {
     app.exit(0);
 }
 
+// Restart path intentionally performs the same cleanup as normal exit so
+// lock/runtime state does not leak across relaunch.
 fn request_app_restart<R: Runtime>(app: &AppHandle<R>) {
     if EXITING.swap(true, Ordering::SeqCst) {
         return;
@@ -277,6 +429,7 @@ fn request_app_restart<R: Runtime>(app: &AppHandle<R>) {
     app.request_restart();
 }
 
+// Single confirmation entrypoint for all exit paths (tray/menu/Cmd+Q/Dock).
 fn request_quit_with_confirmation<R: Runtime>(app: &AppHandle<R>) {
     if EXITING.load(Ordering::SeqCst) {
         return;
@@ -289,15 +442,16 @@ fn request_quit_with_confirmation<R: Runtime>(app: &AppHandle<R>) {
     }
 
     let app_handle = app.clone();
+    let copy = desktop_copy(&app_handle);
     tauri::async_runtime::spawn(async move {
         let should_quit = app_handle
             .dialog()
-            .message("确认退出 NomoClaw 应用吗？")
-            .title("退出确认")
+            .message(copy.quit_message)
+            .title(copy.quit_title)
             .kind(MessageDialogKind::Warning)
             .buttons(MessageDialogButtons::OkCancelCustom(
-                "退出".to_string(),
-                "取消".to_string(),
+                copy.quit_confirm.to_string(),
+                copy.quit_cancel.to_string(),
             ))
             .blocking_show();
 
@@ -309,6 +463,7 @@ fn request_quit_with_confirmation<R: Runtime>(app: &AppHandle<R>) {
     });
 }
 
+// ===== backend bootstrap / tray / window behavior =====
 fn bootstrap_backend<R: Runtime>(app: AppHandle<R>) -> Result<()> {
     let dev_attach = is_dev_attach_mode();
     let preferred_port = env_u16("NOMOCLAW_BACKEND_PORT", 18080);
@@ -371,9 +526,10 @@ fn bootstrap_backend_async<R: Runtime>(app: AppHandle<R>) {
 }
 
 fn register_tray<R: Runtime>(app: &tauri::App<R>) -> Result<()> {
-    let show_item = MenuItem::with_id(app, TRAY_MENU_SHOW, "显示主窗口", true, None::<&str>)?;
-    let restart_item = MenuItem::with_id(app, TRAY_MENU_RESTART_APP, "重启应用", true, None::<&str>)?;
-    let quit_item = MenuItem::with_id(app, TRAY_MENU_QUIT, "退出", true, None::<&str>)?;
+    let copy = desktop_copy(app.handle());
+    let show_item = MenuItem::with_id(app, TRAY_MENU_SHOW, copy.tray_show_main, true, None::<&str>)?;
+    let restart_item = MenuItem::with_id(app, TRAY_MENU_RESTART_APP, copy.tray_restart_app, true, None::<&str>)?;
+    let quit_item = MenuItem::with_id(app, TRAY_MENU_QUIT, copy.tray_quit, true, None::<&str>)?;
 
     let menu = Menu::with_items(app, &[&show_item, &restart_item, &quit_item])?;
 
@@ -381,6 +537,8 @@ fn register_tray<R: Runtime>(app: &tauri::App<R>) -> Result<()> {
 
     #[cfg(target_os = "macos")]
     {
+        // macOS status bar icons should be template images so the system
+        // can auto-adapt contrast in light/dark menu bars.
         if !has_packaged_macos_tray_template_icon(app) {
             eprintln!(
                 "failed to load macOS tray template icon from resources; fallback to embedded icon: {}",
@@ -492,6 +650,7 @@ fn restart_backend<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
     Ok(())
 }
 
+// ===== backend watchdog =====
 fn request_backend_restart<R: Runtime>(app: AppHandle<R>, reason: &'static str) {
     if EXITING.load(Ordering::SeqCst) {
         return;
@@ -579,6 +738,7 @@ fn check_backend_ready_once(port: u16, timeout: Duration) -> bool {
     }
 }
 
+// ===== updater =====
 fn updater_supported() -> bool {
     cfg!(target_os = "macos")
 }
@@ -752,6 +912,7 @@ fn install_updater_watchdog<R: Runtime>(app: &tauri::App<R>) -> Result<()> {
     Ok(())
 }
 
+// ===== tauri command handlers =====
 #[tauri::command]
 fn save_bootstrap_prefs(app: AppHandle, payload: SaveBootstrapPrefsPayload) -> std::result::Result<(), String> {
     write_bootstrap_prefs(
@@ -839,6 +1000,7 @@ async fn updater_install_downloaded(
     }
 }
 
+// ===== window/content bootstrap =====
 fn stop_backend<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
     let state = app.state::<DesktopState>();
     let mut guard = state
@@ -928,6 +1090,8 @@ fn js_escape(input: &str) -> String {
         .replace('\r', "")
 }
 
+// ===== persisted bootstrap prefs =====
+// These prefs are used before web app hydration to style/localize the loading page.
 fn bootstrap_prefs_file_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf> {
     Ok(app_data_dir(app)?.join(BOOTSTRAP_PREFS_FILE))
 }
@@ -1005,6 +1169,8 @@ fn flush_bootstrap_prefs_from_window<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
+// ===== backend process + runtime discovery =====
+// TODO(refactor): split process-launch and filesystem-path resolution.
 fn start_backend_process<R: Runtime>(app: &AppHandle<R>, preferred_port: u16) -> Result<BackendRuntime> {
     let port = resolve_port(preferred_port)?;
     let (java_bin, jar_path) = resolve_runtime_paths(app)?;
@@ -1073,6 +1239,7 @@ fn start_backend_process<R: Runtime>(app: &AppHandle<R>, preferred_port: u16) ->
     })
 }
 
+// ===== environment / utility helpers =====
 fn shell_quote(raw: &str) -> String {
     format!("'{}'", raw.replace('\'', "'\"'\"'"))
 }
@@ -1210,6 +1377,8 @@ fn is_dev_attach_mode() -> bool {
     )
 }
 
+// ===== single-instance lock + process-group cleanup =====
+// TODO(refactor): isolate into lock_and_cleanup.rs with unit tests.
 fn acquire_single_instance_lock<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
     let lock_path = app_data_dir(app)?.join(INSTANCE_LOCK_FILE);
 

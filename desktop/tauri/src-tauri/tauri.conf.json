@@ -30,6 +30,7 @@
     ],
     "resources": [
       "icons/tray-macos-template.png",
+      "resources/i18n/desktop.json",
       "resources/backend/nomoclaw.jar",
       "resources/backend/runtime"
     ],
