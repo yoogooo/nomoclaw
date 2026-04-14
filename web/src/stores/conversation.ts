@@ -1024,6 +1024,7 @@ export const useConversationStore = defineStore("conversation", () => {
     currentUploadPolicy,
     uploadDisabledReason,
     init,
+    loadModelConfig,
     refreshConversations,
     startDraftConversation,
     selectConversation,

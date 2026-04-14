@@ -40,6 +40,8 @@ onMounted(() => {
   }
   if (!conversationStore.conversations.length) {
     void conversationStore.init();
+  } else {
+    void conversationStore.loadModelConfig();
   }
   if (agentCatalogStore.selectedAgentUid) {
     void jinnangStore.restoreTips(agentCatalogStore.selectedAgentUid);
