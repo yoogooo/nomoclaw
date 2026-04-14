@@ -26,6 +26,7 @@ use tauri_plugin_updater::{Update, UpdaterExt};
 
 // ===== UI / tray constants =====
 const WINDOW_LABEL: &str = "main";
+const TRAY_ICON_ID: &str = "main-tray";
 const TRAY_MENU_SHOW: &str = "show_main";
 const TRAY_MENU_RESTART_APP: &str = "restart_app";
 const TRAY_MENU_QUIT: &str = "quit_app";
@@ -527,13 +528,8 @@ fn bootstrap_backend_async<R: Runtime>(app: AppHandle<R>) {
 
 fn register_tray<R: Runtime>(app: &tauri::App<R>) -> Result<()> {
     let copy = desktop_copy(app.handle());
-    let show_item = MenuItem::with_id(app, TRAY_MENU_SHOW, copy.tray_show_main, true, None::<&str>)?;
-    let restart_item = MenuItem::with_id(app, TRAY_MENU_RESTART_APP, copy.tray_restart_app, true, None::<&str>)?;
-    let quit_item = MenuItem::with_id(app, TRAY_MENU_QUIT, copy.tray_quit, true, None::<&str>)?;
-
-    let menu = Menu::with_items(app, &[&show_item, &restart_item, &quit_item])?;
-
-    let mut tray_builder = TrayIconBuilder::new().menu(&menu).show_menu_on_left_click(false);
+    let menu = build_tray_menu(app, &copy)?;
+    let mut tray_builder = TrayIconBuilder::with_id(TRAY_ICON_ID).menu(&menu).show_menu_on_left_click(false);
 
     #[cfg(target_os = "macos")]
     {
@@ -571,6 +567,31 @@ fn register_tray<R: Runtime>(app: &tauri::App<R>) -> Result<()> {
         .build(app)?;
 
     Ok(())
+}
+
+fn build_tray_menu<R: Runtime, M: Manager<R>>(manager: &M, copy: &DesktopCopy) -> Result<Menu<R>> {
+    let show_item = MenuItem::with_id(manager, TRAY_MENU_SHOW, &copy.tray_show_main, true, None::<&str>)?;
+    let restart_item = MenuItem::with_id(manager, TRAY_MENU_RESTART_APP, &copy.tray_restart_app, true, None::<&str>)?;
+    let quit_item = MenuItem::with_id(manager, TRAY_MENU_QUIT, &copy.tray_quit, true, None::<&str>)?;
+    Menu::with_items(manager, &[&show_item, &restart_item, &quit_item]).map_err(Into::into)
+}
+
+fn refresh_tray_menu_for_locale<R: Runtime>(app: &AppHandle<R>, locale: &str) {
+    let Some(tray) = app.tray_by_id(TRAY_ICON_ID) else {
+        return;
+    };
+    let bundle = read_desktop_i18n_bundle(app);
+    let copy = resolve_desktop_copy(&bundle, locale);
+    match build_tray_menu(app, &copy) {
+        Ok(menu) => {
+            if let Err(error) = tray.set_menu(Some(menu)) {
+                eprintln!("failed to refresh tray menu locale={locale}: {error}");
+            }
+        }
+        Err(error) => {
+            eprintln!("failed to build tray menu locale={locale}: {error}");
+        }
+    }
 }
 
 #[cfg(target_os = "macos")]
@@ -915,14 +936,14 @@ fn install_updater_watchdog<R: Runtime>(app: &tauri::App<R>) -> Result<()> {
 // ===== tauri command handlers =====
 #[tauri::command]
 fn save_bootstrap_prefs(app: AppHandle, payload: SaveBootstrapPrefsPayload) -> std::result::Result<(), String> {
-    write_bootstrap_prefs(
-        &app,
-        BootstrapPrefs {
-            theme_mode: payload.theme_mode,
-            locale: payload.locale,
-        },
-    )
-    .map_err(|error| error.to_string())
+    let normalized = BootstrapPrefs {
+        theme_mode: payload.theme_mode,
+        locale: payload.locale,
+    }
+    .normalized();
+    write_bootstrap_prefs(&app, normalized.clone()).map_err(|error| error.to_string())?;
+    refresh_tray_menu_for_locale(&app, &normalized.locale);
+    Ok(())
 }
 
 #[tauri::command]
