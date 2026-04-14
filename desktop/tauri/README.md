@@ -43,4 +43,4 @@ pnpm dev
 
 说明：
 
-- 若未注入 `TAURI_UPDATER_PUBKEY`，桌面端会自动禁用内置 updater（不做在线更新检查/安装）。
+- `TAURI_UPDATER_PUBKEY` 主要用于签名验签链路配置；未注入时不再作为前端“检查更新”按钮的显隐开关。

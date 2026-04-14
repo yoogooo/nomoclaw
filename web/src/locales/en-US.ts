@@ -43,7 +43,8 @@ const enUS = {
     updateInstallNow: "Install Update",
     updateDownloading: "Downloading update {progress}",
     updateVersion: "New version {version}",
-    updateFailed: "Update failed"
+    updateFailed: "Update failed",
+    updateFailedWithReason: "Update failed: {reason}"
   },
   modelGate: {
     title: "Set up a model first",

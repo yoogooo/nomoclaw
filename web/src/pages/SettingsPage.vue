@@ -51,7 +51,7 @@ function onLocaleChange(value: AppLocale | null) {
                   {{ t("settings.updateDownloading", { progress: downloadPercentText || "--" }) }}
                 </span>
                 <span v-if="updateManagerStore.status === 'error' && updateManagerStore.errorMessage" class="settings-updater-error">
-                  {{ t("settings.updateFailed") }}
+                  {{ t("settings.updateFailedWithReason", { reason: updateManagerStore.errorMessage }) }}
                 </span>
 
                 <n-button

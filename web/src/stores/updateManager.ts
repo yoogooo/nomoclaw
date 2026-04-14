@@ -36,6 +36,16 @@ function normalizeState(payload: Partial<UpdaterStatePayload> | null | undefined
   };
 }
 
+function resolveErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "string" && error.trim()) return error;
+  if (error && typeof error === "object") {
+    const maybeMessage = (error as { message?: unknown }).message;
+    if (typeof maybeMessage === "string" && maybeMessage.trim()) return maybeMessage;
+  }
+  return "Unknown update error";
+}
+
 export const useUpdateManagerStore = defineStore("update-manager", () => {
   const state = ref<UpdaterStatePayload>({ ...DEFAULT_STATE });
   const supported = ref(false);
@@ -82,6 +92,12 @@ export const useUpdateManagerStore = defineStore("update-manager", () => {
     busy.value = true;
     try {
       await invokeApi<void>("updater_check_now");
+    } catch (error) {
+      state.value = {
+        ...state.value,
+        status: "error",
+        errorMessage: resolveErrorMessage(error)
+      };
     } finally {
       busy.value = false;
     }
@@ -92,6 +108,12 @@ export const useUpdateManagerStore = defineStore("update-manager", () => {
     busy.value = true;
     try {
       await invokeApi<void>("updater_install_downloaded");
+    } catch (error) {
+      state.value = {
+        ...state.value,
+        status: "error",
+        errorMessage: resolveErrorMessage(error)
+      };
     } finally {
       busy.value = false;
     }

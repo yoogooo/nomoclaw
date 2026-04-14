@@ -760,7 +760,7 @@ fn check_backend_ready_once(port: u16, timeout: Duration) -> bool {
 }
 
 // ===== updater =====
-fn updater_supported() -> bool {
+fn updater_supported<R: Runtime>(_app: &AppHandle<R>) -> bool {
     cfg!(target_os = "macos")
 }
 
@@ -793,7 +793,7 @@ where
 }
 
 fn request_updater_check<R: Runtime>(app: AppHandle<R>, reason: &'static str) {
-    if !updater_supported() || EXITING.load(Ordering::SeqCst) || UPDATER_INSTALLING.load(Ordering::SeqCst) {
+    if !updater_supported(&app) || EXITING.load(Ordering::SeqCst) || UPDATER_INSTALLING.load(Ordering::SeqCst) {
         return;
     }
     {
@@ -913,7 +913,7 @@ async fn run_updater_check<R: Runtime>(app: AppHandle<R>, updater_state: Updater
 }
 
 fn install_updater_watchdog<R: Runtime>(app: &tauri::App<R>) -> Result<()> {
-    if !updater_supported() {
+    if !updater_supported(&app.handle()) {
         return Ok(());
     }
     let app_handle = app.handle().clone();
@@ -957,7 +957,7 @@ fn updater_get_state(updater_state: State<'_, UpdaterState>) -> std::result::Res
 
 #[tauri::command]
 fn updater_check_now(app: AppHandle) -> std::result::Result<(), String> {
-    if !updater_supported() {
+    if !updater_supported(&app) {
         return Err("updater is only enabled on macOS".to_string());
     }
     request_updater_check(app, "manual");
@@ -969,7 +969,7 @@ async fn updater_install_downloaded(
     app: AppHandle,
     updater_state: State<'_, UpdaterState>,
 ) -> std::result::Result<(), String> {
-    if !updater_supported() {
+    if !updater_supported(&app) {
         return Err("updater is only enabled on macOS".to_string());
     }
     if UPDATER_INSTALLING

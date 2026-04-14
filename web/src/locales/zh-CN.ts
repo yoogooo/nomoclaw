@@ -43,7 +43,8 @@ const zhCN = {
     updateInstallNow: "立即更新",
     updateDownloading: "更新下载中 {progress}",
     updateVersion: "新版本 {version}",
-    updateFailed: "更新失败"
+    updateFailed: "更新失败",
+    updateFailedWithReason: "更新失败：{reason}"
   },
   modelGate: {
     title: "先配置一个可用模型",
