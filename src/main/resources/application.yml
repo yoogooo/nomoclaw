@@ -6,13 +6,6 @@ spring:
       request-timeout: -1
   profiles:
     default: local
-  datasource:
-    url: "${MYSQL_URL:jdbc:mysql://localhost:3306/bot?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}"
-    username: "${MYSQL_USER:}"
-    password: "${MYSQL_PASSWORD:}"
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    hikari:
-      initialization-fail-timeout: 0
   quartz:
     job-store-type: jdbc
     jdbc:
