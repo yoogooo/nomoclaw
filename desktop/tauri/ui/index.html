@@ -4,37 +4,37 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>NomoClaw Desktop</title>
+  <script src="./loader-i18n.js"></script>
 
   <script>
     (function () {
       const fallback = { themeMode: "dark", locale: "zh-CN" };
-      const SUPPORTED_LOCALES = ["zh-CN", "en-US"];
-      const LOADER_TEXTS = {
-        "zh-CN": {
-          label: "启动中",
-          tip: "提示：页面没更新？右键点一下刷新试试"
-        },
-        "en-US": {
-          label: "Booting Engine",
-          tip: "Tip: Right-click to refresh the page"
-        }
-      };
+      const loaderI18n = window.__NOMOCLAW_LOADER_I18N__;
 
       function normalizeThemeMode(value) {
         return String(value || "dark").toLowerCase() === "light" ? "light" : "dark";
       }
 
       function normalizeLocale(value) {
-        const raw = String(value || "zh-CN");
-        if (SUPPORTED_LOCALES.includes(raw)) return raw;
-        const lower = raw.toLowerCase();
-        if (lower.startsWith("en")) return "en-US";
-        if (lower.startsWith("zh")) return "zh-CN";
-        return "zh-CN";
+        if (loaderI18n && typeof loaderI18n.normalizeLocale === "function") {
+          return loaderI18n.normalizeLocale(value);
+        }
+        return String(value || "zh-CN").toLowerCase().startsWith("en") ? "en-US" : "zh-CN";
       }
 
       function resolveLoaderTexts(locale) {
-        return LOADER_TEXTS[locale] || LOADER_TEXTS["zh-CN"];
+        if (loaderI18n && typeof loaderI18n.resolveLoaderTexts === "function") {
+          return loaderI18n.resolveLoaderTexts(locale);
+        }
+        return locale === "en-US"
+          ? {
+              label: "Booting Engine",
+              tip: "Tip: Right-click to refresh the page"
+            }
+          : {
+              label: "启动中",
+              tip: "提示：页面没更新？右键点一下刷新试试"
+            };
       }
 
       function applyBootstrapPrefs(input, options) {
