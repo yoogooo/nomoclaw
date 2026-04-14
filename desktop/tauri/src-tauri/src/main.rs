@@ -817,8 +817,11 @@ fn resolve_runtime_paths<R: Runtime>(app: &AppHandle<R>) -> Result<(PathBuf, Pat
 
     let java_candidates = [
         resource_dir.join("backend/runtime/bin/java"),
+        resource_dir.join("backend/runtime/bin/java.exe"),
         resource_dir.join("resources/backend/runtime/bin/java"),
+        resource_dir.join("resources/backend/runtime/bin/java.exe"),
         resource_dir.join("runtime/bin/java"),
+        resource_dir.join("runtime/bin/java.exe"),
     ];
     let jar_candidates = [
         resource_dir.join("backend/nomoclaw.jar"),
