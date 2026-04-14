@@ -29,6 +29,7 @@
       "icons/icon.png"
     ],
     "resources": [
+      "icons/tray-macos-template.png",
       "resources/backend/nomoclaw.jar",
       "resources/backend/runtime"
     ],

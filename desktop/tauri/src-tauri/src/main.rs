@@ -15,6 +15,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
+use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::webview::PageLoadEvent;
@@ -24,8 +25,10 @@ use tauri_plugin_updater::{Update, UpdaterExt};
 
 const WINDOW_LABEL: &str = "main";
 const TRAY_MENU_SHOW: &str = "show_main";
-const TRAY_MENU_RESTART: &str = "restart_backend";
+const TRAY_MENU_RESTART_APP: &str = "restart_app";
 const TRAY_MENU_QUIT: &str = "quit_app";
+const MACOS_TRAY_TEMPLATE_ICON_FILE: &str = "tray-macos-template.png";
+const FALLBACK_TRAY_TEMPLATE_ICON: Image<'_> = tauri::include_image!("./icons/tray-macos-template.png");
 
 const INSTANCE_LOCK_FILE: &str = "app.lock";
 const BACKEND_PGID_FILE: &str = "backend.pgid";
@@ -233,8 +236,11 @@ fn main() {
 
     app.run(|app_handle, event| {
         match event {
-            RunEvent::ExitRequested { api, .. } => {
+            RunEvent::ExitRequested { code, api, .. } => {
                 if EXITING.load(Ordering::SeqCst) {
+                    return;
+                }
+                if matches!(code, Some(exit_code) if exit_code == tauri::RESTART_EXIT_CODE) {
                     return;
                 }
                 api.prevent_exit();
@@ -258,6 +264,16 @@ fn shutdown_and_exit<R: Runtime>(app: &AppHandle<R>) {
     let _ = stop_backend(app);
     release_single_instance_lock(app);
     app.exit(0);
+}
+
+fn request_app_restart<R: Runtime>(app: &AppHandle<R>) {
+    if EXITING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    flush_bootstrap_prefs_from_window(app);
+    let _ = stop_backend(app);
+    release_single_instance_lock(app);
+    app.request_restart();
 }
 
 fn request_quit_with_confirmation<R: Runtime>(app: &AppHandle<R>) {
@@ -355,22 +371,31 @@ fn bootstrap_backend_async<R: Runtime>(app: AppHandle<R>) {
 
 fn register_tray<R: Runtime>(app: &tauri::App<R>) -> Result<()> {
     let show_item = MenuItem::with_id(app, TRAY_MENU_SHOW, "显示主窗口", true, None::<&str>)?;
-    let restart_item = MenuItem::with_id(app, TRAY_MENU_RESTART, "重启后端", true, None::<&str>)?;
+    let restart_item = MenuItem::with_id(app, TRAY_MENU_RESTART_APP, "重启应用", true, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, TRAY_MENU_QUIT, "退出", true, None::<&str>)?;
 
     let menu = Menu::with_items(app, &[&show_item, &restart_item, &quit_item])?;
 
-    TrayIconBuilder::new()
-        .menu(&menu)
-        .show_menu_on_left_click(false)
+    let mut tray_builder = TrayIconBuilder::new().menu(&menu).show_menu_on_left_click(false);
+
+    #[cfg(target_os = "macos")]
+    {
+        if !has_packaged_macos_tray_template_icon(app) {
+            eprintln!(
+                "failed to load macOS tray template icon from resources; fallback to embedded icon: {}",
+                MACOS_TRAY_TEMPLATE_ICON_FILE
+            );
+        }
+        let icon = FALLBACK_TRAY_TEMPLATE_ICON.to_owned();
+        tray_builder = tray_builder.icon(icon).icon_as_template(true);
+    }
+
+    tray_builder
         .on_menu_event(|app, event| match event.id().as_ref() {
             TRAY_MENU_SHOW => {
                 let _ = show_main_window(app);
             }
-            TRAY_MENU_RESTART => {
-                let app_handle = app.clone();
-                request_backend_restart(app_handle, "tray menu");
-            }
+            TRAY_MENU_RESTART_APP => request_app_restart(app),
             TRAY_MENU_QUIT => request_quit_with_confirmation(app),
             _ => {}
         })
@@ -387,6 +412,28 @@ fn register_tray<R: Runtime>(app: &tauri::App<R>) -> Result<()> {
         .build(app)?;
 
     Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn has_packaged_macos_tray_template_icon<R: Runtime>(app: &tauri::App<R>) -> bool {
+    let mut candidates = vec![PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("icons")
+        .join(MACOS_TRAY_TEMPLATE_ICON_FILE)];
+    if let Ok(resource_dir) = app.path().resource_dir() {
+        candidates.push(resource_dir.join(MACOS_TRAY_TEMPLATE_ICON_FILE));
+        candidates.push(
+            resource_dir
+                .join("resources")
+                .join(MACOS_TRAY_TEMPLATE_ICON_FILE),
+        );
+    }
+
+    for candidate in candidates {
+        if candidate.exists() {
+            return true;
+        }
+    }
+    false
 }
 
 fn install_window_behavior<R: Runtime>(app: &tauri::App<R>) -> Result<()> {
