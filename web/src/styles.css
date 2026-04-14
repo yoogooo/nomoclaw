@@ -750,7 +750,7 @@ a {
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-4);
-  padding: var(--space-2) 0 var(--space-1);
+  padding: 0 0 var(--space-1);
 }
 
 .app-page-header-main {
