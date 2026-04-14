@@ -244,7 +244,6 @@ build_runtime() {
   jlink \
     --add-modules "$modules" \
     --compress=2 \
-    --strip-native-commands \
     --strip-debug \
     --no-header-files \
     --no-man-pages \
