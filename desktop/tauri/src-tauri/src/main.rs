@@ -246,6 +246,7 @@ fn main() {
                 api.prevent_exit();
                 request_quit_with_confirmation(app_handle);
             }
+            #[cfg(target_os = "macos")]
             RunEvent::Reopen { .. } => {
                 if !EXITING.load(Ordering::SeqCst) {
                     let _ = show_main_window(app_handle);

@@ -16,6 +16,7 @@ set -euo pipefail
 #   MAVEN_PROFILE=prod-lite           (default: prod-lite)
 #   TAURI_BUILD_CI=true|false         (default: true)
 #   TAURI_BUNDLES=msi|nsis|msi,nsis   (default: msi)
+#   SKIP_RUST_CHECK=true|false        (default: false)
 #   TAURI_UPDATER_PUBKEY=<pubkey>     (optional)
 #   DESKTOP_VERSION=2026.4.14         (default: today)
 #   DESKTOP_NAME_PREFIX=NomoClaw      (default: NomoClaw)
@@ -39,6 +40,7 @@ SKIP_WEB_BUILD="${SKIP_WEB_BUILD:-false}"
 MAVEN_PROFILE="${MAVEN_PROFILE:-prod-lite}"
 TAURI_BUILD_CI="${TAURI_BUILD_CI:-true}"
 TAURI_BUNDLES="${TAURI_BUNDLES:-msi}"
+SKIP_RUST_CHECK="${SKIP_RUST_CHECK:-false}"
 TAURI_UPDATER_PUBKEY="${TAURI_UPDATER_PUBKEY:-}"
 DESKTOP_VERSION="${DESKTOP_VERSION:-}"
 DESKTOP_NAME_PREFIX="${DESKTOP_NAME_PREFIX:-NomoClaw}"
@@ -117,6 +119,16 @@ setup_rust_toolchain() {
   require_cmd cargo
   require_cmd rustup
   rustup target add "$RUST_TARGET" >/dev/null
+}
+
+check_rust_target_build() {
+  if [[ "$(normalize_bool "$SKIP_RUST_CHECK")" == "true" ]]; then
+    log "Skipping Rust target pre-check (SKIP_RUST_CHECK=true)"
+    return
+  fi
+
+  log "Running Rust pre-check target=$RUST_TARGET"
+  (cd "$DESKTOP_TAURI_DIR" && cargo check --target "$RUST_TARGET")
 }
 
 build_frontend_assets() {
@@ -354,6 +366,7 @@ main() {
   require_cmd jlink
   setup_desktop_naming
   setup_rust_toolchain
+  check_rust_target_build
 
   mkdir -p "$BUILD_DIR" "$DIST_DIR"
 
