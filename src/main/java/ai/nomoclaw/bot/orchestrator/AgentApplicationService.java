@@ -121,8 +121,6 @@ public class AgentApplicationService {
 
     private static final String STOP_REASON_MAX_LOOP_REACHED = "MAX_LOOP_REACHED";
     private static final String DEFAULT_AGENT_UID = "agent_general_assistant";
-    private static final String CUSTOM_AGENT_GROUP_UID = "group_custom_agents";
-    private static final String CUSTOM_AGENT_GROUP_NAME = "custom_agents";
     private static final int CONVERSATION_CONTEXT_LIMIT = 30;
     private static final Map<String, String> AGENT_DOC_FILES = new LinkedHashMap<>();
     static {
@@ -379,19 +377,11 @@ public class AgentApplicationService {
         agent.setUpdatedTime(now);
         agentDefinitionRepository.save(agent);
 
-        AgentGroupDefinitionEntity group = ensureCustomAgentGroup(now, agentUid);
         AgentGroupMemberEntity member = new AgentGroupMemberEntity();
-        member.setMemberUid("member_" + UUID.randomUUID().toString().replace("-", ""));
-        member.setAgentGroupUid(group.getAgentGroupUid());
         member.setAgentUid(agentUid);
         member.setMemberRole("成员");
         member.setResponsibility("");
-        member.setSortIndex((int) agentGroupMemberRepository.countByGroupUid(group.getAgentGroupUid()) + 1);
         member.setIsPrimary(0);
-        member.setStatus("ACTIVE");
-        member.setCreatedTime(now);
-        member.setUpdatedTime(now);
-        agentGroupMemberRepository.save(member);
         initializeAgentToolRelations(agentUid, now);
         initializeAgentWorkspaceDocs(agentName, displayName);
         return toAgentCatalogItem(member, agent);
@@ -2367,35 +2357,6 @@ public class AgentApplicationService {
                 .filter(Objects::nonNull)
                 .max(Integer::compareTo)
                 .orElse(0) + 10;
-    }
-
-    private AgentGroupDefinitionEntity ensureCustomAgentGroup(LocalDateTime now, String ownerAgentUid) {
-        AgentGroupDefinitionEntity existing = agentGroupDefinitionRepository.findActiveByUid(CUSTOM_AGENT_GROUP_UID);
-        if (existing != null) {
-            return existing;
-        }
-        AgentGroupDefinitionEntity byName = agentGroupDefinitionRepository.findByName(CUSTOM_AGENT_GROUP_NAME);
-        if (byName != null) {
-            return byName;
-        }
-        AgentGroupDefinitionEntity group = new AgentGroupDefinitionEntity();
-        group.setAgentGroupUid(CUSTOM_AGENT_GROUP_UID);
-        group.setGroupName(CUSTOM_AGENT_GROUP_NAME);
-        group.setDisplayName("自定义 Agent");
-        group.setAvatar("🧩");
-        group.setDescription("用户在管理页中新建的自定义 Agent。");
-        group.setSceneTags("[\"custom\",\"user\"]");
-        group.setCollaborationMode("manual");
-        group.setMinAgentCount(1);
-        group.setMaxAgentCount(0);
-        group.setOwnerAgentUid(ownerAgentUid);
-        group.setSortIndex(999);
-        group.setStatus("ACTIVE");
-        group.setExtConfig("{}");
-        group.setCreatedTime(now);
-        group.setUpdatedTime(now);
-        agentGroupDefinitionRepository.save(group);
-        return group;
     }
 
     private void initializeAgentWorkspaceDocs(String agentName, String displayName) {
