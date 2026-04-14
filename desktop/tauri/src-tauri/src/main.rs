@@ -2,7 +2,7 @@
 
 use anyhow::{anyhow, Context, Result};
 use reqwest::blocking::Client;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
@@ -29,6 +29,11 @@ const TRAY_MENU_QUIT: &str = "quit_app";
 
 const INSTANCE_LOCK_FILE: &str = "app.lock";
 const BACKEND_PGID_FILE: &str = "backend.pgid";
+const BOOTSTRAP_PREFS_FILE: &str = "bootstrap_prefs.json";
+const BOOTSTRAP_THEME_STORAGE_KEY: &str = "ui:theme-mode";
+const BOOTSTRAP_LOCALE_STORAGE_KEY: &str = "ui:locale";
+const DEFAULT_THEME_MODE: &str = "dark";
+const DEFAULT_LOCALE: &str = "zh-CN";
 const UPDATER_EVENT_STATE: &str = "updater://state";
 const UPDATE_CHECK_INTERVAL_SECONDS: u64 = 6 * 60 * 60;
 
@@ -136,6 +141,43 @@ struct UpdaterStatePayload {
     error_message: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BootstrapPrefs {
+    theme_mode: String,
+    locale: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SaveBootstrapPrefsPayload {
+    theme_mode: String,
+    locale: String,
+}
+
+impl Default for BootstrapPrefs {
+    fn default() -> Self {
+        Self {
+            theme_mode: DEFAULT_THEME_MODE.to_string(),
+            locale: DEFAULT_LOCALE.to_string(),
+        }
+    }
+}
+
+impl BootstrapPrefs {
+    fn normalized(self) -> Self {
+        let theme_mode = match self.theme_mode.trim().to_ascii_lowercase().as_str() {
+            "light" => "light".to_string(),
+            _ => "dark".to_string(),
+        };
+        let locale = match self.locale.trim().to_ascii_lowercase().as_str() {
+            value if value.starts_with("en") => "en-US".to_string(),
+            _ => "zh-CN".to_string(),
+        };
+        Self { theme_mode, locale }
+    }
+}
+
 fn main() {
     let builder = tauri::Builder::default()
         .on_page_load(|webview, payload| {
@@ -158,6 +200,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
+            save_bootstrap_prefs,
             updater_get_state,
             updater_install_downloaded,
             updater_check_now
@@ -211,6 +254,7 @@ fn shutdown_and_exit<R: Runtime>(app: &AppHandle<R>) {
     if EXITING.swap(true, Ordering::SeqCst) {
         return;
     }
+    flush_bootstrap_prefs_from_window(app);
     let _ = stop_backend(app);
     release_single_instance_lock(app);
     app.exit(0);
@@ -661,6 +705,18 @@ fn install_updater_watchdog<R: Runtime>(app: &tauri::App<R>) -> Result<()> {
 }
 
 #[tauri::command]
+fn save_bootstrap_prefs(app: AppHandle, payload: SaveBootstrapPrefsPayload) -> std::result::Result<(), String> {
+    write_bootstrap_prefs(
+        &app,
+        BootstrapPrefs {
+            theme_mode: payload.theme_mode,
+            locale: payload.locale,
+        },
+    )
+    .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 fn updater_get_state(updater_state: State<'_, UpdaterState>) -> std::result::Result<UpdaterStatePayload, String> {
     let guard = updater_state
         .runtime
@@ -779,18 +835,19 @@ fn show_main_window<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
 }
 
 fn show_loading_window<R: Runtime>(app: &tauri::App<R>) -> Result<()> {
-  app
-    .get_webview_window(WINDOW_LABEL)
-    .context("missing main window")?;
-  SHOW_MAIN_ON_NEXT_FINISHED_LOAD.store(true, Ordering::SeqCst);
-  Ok(())
+    let window = app
+        .get_webview_window(WINDOW_LABEL)
+        .context("missing main window")?;
+    let prefs = read_bootstrap_prefs(app.handle()).unwrap_or_default();
+    let _ = inject_bootstrap_prefs(&window, &prefs);
+    SHOW_MAIN_ON_NEXT_FINISHED_LOAD.store(true, Ordering::SeqCst);
+    Ok(())
 }
 
 fn update_window_url<R: Runtime>(app: &AppHandle<R>, target_url: &str) -> Result<()> {
   let window = app
     .get_webview_window(WINDOW_LABEL)
     .context("missing main window")?;
-  window.hide()?;
   SHOW_MAIN_ON_NEXT_FINISHED_LOAD.store(true, Ordering::SeqCst);
   let safe_url = target_url.replace('\\', "\\\\").replace('"', "\\\"");
   window.eval(&format!("window.location.replace(\"{safe_url}\");"))?;
@@ -821,6 +878,83 @@ fn js_escape(input: &str) -> String {
         .replace('"', "\\\"")
         .replace('\n', "\\n")
         .replace('\r', "")
+}
+
+fn bootstrap_prefs_file_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf> {
+    Ok(app_data_dir(app)?.join(BOOTSTRAP_PREFS_FILE))
+}
+
+fn read_bootstrap_prefs<R: Runtime>(app: &AppHandle<R>) -> Result<BootstrapPrefs> {
+    let path = bootstrap_prefs_file_path(app)?;
+    if !path.exists() {
+        return Ok(BootstrapPrefs::default());
+    }
+
+    let raw = fs::read_to_string(&path)
+        .with_context(|| format!("failed to read bootstrap prefs: {}", path.display()))?;
+    let prefs: BootstrapPrefs = serde_json::from_str(&raw)
+        .with_context(|| format!("invalid bootstrap prefs json: {}", path.display()))?;
+    Ok(prefs.normalized())
+}
+
+fn write_bootstrap_prefs<R: Runtime>(app: &AppHandle<R>, prefs: BootstrapPrefs) -> Result<()> {
+    let path = bootstrap_prefs_file_path(app)?;
+    let normalized = prefs.normalized();
+    let payload = serde_json::to_string_pretty(&normalized)?;
+    fs::write(&path, format!("{payload}\n"))
+        .with_context(|| format!("failed to write bootstrap prefs: {}", path.display()))?;
+    Ok(())
+}
+
+fn inject_bootstrap_prefs<R: Runtime>(window: &tauri::WebviewWindow<R>, prefs: &BootstrapPrefs) -> Result<()> {
+    let theme_mode = js_escape(&prefs.theme_mode);
+    let locale = js_escape(&prefs.locale);
+    let script = format!(
+        "const prefs = {{ themeMode: \"{theme_mode}\", locale: \"{locale}\" }};\n\
+         window.__NOMOCLAW_BOOTSTRAP_PREFS__ = prefs;\n\
+         if (typeof window.__NOMOCLAW_APPLY_BOOTSTRAP_PREFS__ === \"function\") {{\n\
+           window.__NOMOCLAW_APPLY_BOOTSTRAP_PREFS__(prefs, {{ persistToStorage: true }});\n\
+         }} else {{\n\
+           try {{ localStorage.setItem(\"{BOOTSTRAP_THEME_STORAGE_KEY}\", \"{theme_mode}\"); localStorage.setItem(\"{BOOTSTRAP_LOCALE_STORAGE_KEY}\", \"{locale}\"); }} catch (e) {{}}\n\
+           document.documentElement.setAttribute(\"lang\", \"{locale}\");\n\
+           document.documentElement.setAttribute(\"data-theme\", \"{theme_mode}\");\n\
+         }}"
+    );
+    window.eval(&script)?;
+    Ok(())
+}
+
+fn flush_bootstrap_prefs_from_window<R: Runtime>(app: &AppHandle<R>) {
+    let Some(window) = app.get_webview_window(WINDOW_LABEL) else {
+        return;
+    };
+
+    let script = r#"
+        (function () {
+          try {
+            const storedTheme = localStorage.getItem("__THEME_STORAGE_KEY__");
+            const storedLocale = localStorage.getItem("__LOCALE_STORAGE_KEY__");
+            if (storedTheme === null && storedLocale === null) {
+              return;
+            }
+            const themeMode = String(storedTheme || "__DEFAULT_THEME_MODE__").toLowerCase() === "light" ? "light" : "dark";
+            const locale = String(storedLocale || "__DEFAULT_LOCALE__").toLowerCase().startsWith("en") ? "en-US" : "zh-CN";
+            if (window.__TAURI_INTERNALS__?.invoke) {
+              window.__TAURI_INTERNALS__.invoke("save_bootstrap_prefs", {
+                payload: { themeMode, locale }
+              });
+            }
+          } catch (_) {}
+        })();
+    "#
+    .replace("__THEME_STORAGE_KEY__", BOOTSTRAP_THEME_STORAGE_KEY)
+    .replace("__LOCALE_STORAGE_KEY__", BOOTSTRAP_LOCALE_STORAGE_KEY)
+    .replace("__DEFAULT_THEME_MODE__", DEFAULT_THEME_MODE)
+    .replace("__DEFAULT_LOCALE__", DEFAULT_LOCALE);
+
+    if window.eval(script).is_ok() {
+        thread::sleep(Duration::from_millis(120));
+    }
 }
 
 fn start_backend_process<R: Runtime>(app: &AppHandle<R>, preferred_port: u16) -> Result<BackendRuntime> {

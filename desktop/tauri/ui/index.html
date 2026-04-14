@@ -1,42 +1,274 @@
 <!doctype html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NomoClaw Desktop</title>
-    <style>
-      body {
-        margin: 0;
-        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif;
-        min-height: 100vh;
-        display: grid;
-        place-items: center;
-        color: #0f172a;
-        background: radial-gradient(circle at top right, #bfdbfe, #f8fafc 55%);
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NomoClaw Desktop</title>
+
+  <script>
+    (function () {
+      const fallback = { themeMode: "dark", locale: "zh-CN" };
+      const SUPPORTED_LOCALES = ["zh-CN", "en-US"];
+      const LOADER_TEXTS = {
+        "zh-CN": {
+          label: "启动中",
+          tip: "提示：页面没更新？右键点一下刷新试试"
+        },
+        "en-US": {
+          label: "Booting Engine",
+          tip: "Tip: Right-click to refresh the page"
+        }
+      };
+
+      function normalizeThemeMode(value) {
+        return String(value || "dark").toLowerCase() === "light" ? "light" : "dark";
       }
-      .card {
-        width: min(560px, calc(100vw - 48px));
-        border: 1px solid #cbd5e1;
-        border-radius: 16px;
-        padding: 24px;
-        background: rgba(255, 255, 255, 0.85);
-        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+
+      function normalizeLocale(value) {
+        const raw = String(value || "zh-CN");
+        if (SUPPORTED_LOCALES.includes(raw)) return raw;
+        const lower = raw.toLowerCase();
+        if (lower.startsWith("en")) return "en-US";
+        if (lower.startsWith("zh")) return "zh-CN";
+        return "zh-CN";
       }
-      .title {
-        margin: 0 0 10px;
-        font-size: 24px;
+
+      function resolveLoaderTexts(locale) {
+        return LOADER_TEXTS[locale] || LOADER_TEXTS["zh-CN"];
       }
-      .desc {
-        margin: 0;
-        color: #334155;
-        line-height: 1.6;
+
+      function applyBootstrapPrefs(input, options) {
+        const raw = Object.assign({}, fallback, input || {});
+        const normalized = {
+          themeMode: normalizeThemeMode(raw.themeMode),
+          locale: normalizeLocale(raw.locale)
+        };
+        const persistToStorage = options && options.persistToStorage !== false;
+
+        document.documentElement.setAttribute("lang", normalized.locale);
+        document.documentElement.setAttribute("data-theme", normalized.themeMode);
+        window.__NOMOCLAW_BOOTSTRAP_PREFS__ = normalized;
+
+        if (persistToStorage) {
+          try {
+            localStorage.setItem("ui:theme-mode", normalized.themeMode);
+            localStorage.setItem("ui:locale", normalized.locale);
+          } catch (_) {}
+        }
+
+        const texts = resolveLoaderTexts(normalized.locale);
+        const labelEl = document.getElementById("loaderLabel");
+        const tipEl = document.getElementById("loaderTip");
+        if (labelEl) labelEl.textContent = texts.label;
+        if (tipEl) tipEl.textContent = texts.tip;
+
+        return normalized;
       }
-    </style>
-  </head>
-  <body>
-    <main class="card">
-      <h1 class="title">NomoClaw 正在启动</h1>
-      <p class="desc">桌面端正在连接本地后端服务，请稍候。如果长时间无响应，请检查后端日志或重新启动应用。</p>
-    </main>
-  </body>
+
+      window.__NOMOCLAW_APPLY_BOOTSTRAP_PREFS__ = applyBootstrapPrefs;
+      const fromBridge = window.__NOMOCLAW_BOOTSTRAP_PREFS__ || null;
+      let fromStorage = null;
+      try {
+        fromStorage = {
+          themeMode: localStorage.getItem("ui:theme-mode") || undefined,
+          locale: localStorage.getItem("ui:locale") || undefined
+        };
+      } catch (_) {}
+
+      applyBootstrapPrefs(Object.assign({}, fromStorage || {}, fromBridge || {}), {
+        persistToStorage: false
+      });
+      document.addEventListener("DOMContentLoaded", function () {
+        applyBootstrapPrefs(window.__NOMOCLAW_BOOTSTRAP_PREFS__, {
+          persistToStorage: false
+        });
+      }, { once: true });
+    })();
+  </script>
+
+  <style>
+    :root { color-scheme: dark; }
+    :root[data-theme="light"] { color-scheme: light; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif;
+      min-height: 100vh;
+      display: grid;
+      overflow: hidden;
+      place-items: center;
+      color: #e5edf9;
+      background:
+        radial-gradient(1200px 640px at 10% -20%, rgba(59, 130, 246, 0.32), transparent 60%),
+        radial-gradient(900px 560px at 100% 100%, rgba(16, 185, 129, 0.2), transparent 62%),
+        #1f232a;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    :root[data-theme="light"] body {
+      color: #243142;
+      background:
+        radial-gradient(1200px 640px at 10% -20%, rgba(56, 189, 248, 0.22), transparent 60%),
+        radial-gradient(900px 560px at 100% 100%, rgba(16, 185, 129, 0.16), transparent 62%),
+        #e8edf3;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(
+        115deg,
+        transparent 20%,
+        rgba(255, 255, 255, 0.04) 45%,
+        rgba(255, 255, 255, 0.08) 50%,
+        rgba(255, 255, 255, 0.04) 55%,
+        transparent 70%
+      );
+      transform: translateX(-120%);
+      animation: shine 4.8s ease-in-out infinite;
+    }
+
+    .wrap {
+      position: relative;
+      text-align: center;
+      z-index: 1;
+    }
+
+    .loader-wrap {
+      position: relative;
+      z-index: 1;
+      width: 96px;
+      height: 96px;
+      margin: 0 auto;
+    }
+
+    .loader-core {
+      position: absolute;
+      inset: 50%;
+      width: 16px;
+      height: 16px;
+      margin-left: -8px;
+      margin-top: -8px;
+      border-radius: 999px;
+      background: radial-gradient(circle, #ffffff, #60a5fa);
+      box-shadow:
+        0 0 18px rgba(96, 165, 250, 0.9),
+        0 0 40px rgba(59, 130, 246, 0.4);
+      animation: corePulse 1.6s ease-in-out infinite;
+    }
+
+    .ring {
+      position: absolute;
+      inset: 0;
+      border-radius: 999px;
+    }
+
+    .ring::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 8px;
+      height: 8px;
+      margin-left: -4px;
+      margin-top: -4px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #93c5fd, #60a5fa);
+      box-shadow: 0 0 10px rgba(96, 165, 250, 0.9);
+    }
+
+    .ring-1 { animation: orbit 2.6s linear infinite; }
+    .ring-1::before { transform: translateY(-34px); }
+
+    .ring-2 { animation: orbitReverse 2.1s linear infinite; }
+    .ring-2::before {
+      background: linear-gradient(135deg, #6ee7b7, #34d399);
+      box-shadow: 0 0 10px rgba(52, 211, 153, 0.9);
+      transform: translateX(28px);
+    }
+
+    .ring-3 { animation: orbit 1.6s linear infinite; }
+    .ring-3::before {
+      background: linear-gradient(135deg, #e9d5ff, #c084fc);
+      box-shadow: 0 0 10px rgba(192, 132, 252, 0.85);
+      transform: translateY(20px);
+    }
+
+    .loader-label {
+      position: relative;
+      z-index: 1;
+      margin-top: 18px;
+      font-size: 16px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: rgba(203, 213, 225, 0.6);
+      text-align: center;
+    }
+
+    :root[data-theme="light"] .loader-label {
+      color: rgba(60, 78, 100, 0.62);
+    }
+
+    .tips {
+      position: fixed;
+      left: 50%;
+      bottom: 80px;
+      z-index: 1;
+      transform: translateX(-50%);
+      font-size: 14px;
+      color: rgba(203, 213, 225, 0.45);
+      text-align: center;
+      opacity: 0;
+      animation: fadeIn 1.2s ease forwards;
+      animation-delay: 0.6s;
+      white-space: nowrap;
+    }
+
+    :root[data-theme="light"] .tips {
+      color: rgba(67, 84, 104, 0.6);
+    }
+
+    @keyframes fadeIn {
+      to { opacity: 1; }
+    }
+
+    @keyframes shine {
+      0% { transform: translateX(-120%); }
+      55%,
+      100% { transform: translateX(140%); }
+    }
+
+    @keyframes orbit {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes orbitReverse {
+      from { transform: rotate(360deg); }
+      to { transform: rotate(0deg); }
+    }
+
+    @keyframes corePulse {
+      0%, 100% { transform: scale(0.9); }
+      50% { transform: scale(1.15); }
+    }
+  </style>
+</head>
+
+<body>
+<div class="wrap">
+  <div class="loader-wrap">
+    <div class="ring ring-1"></div>
+    <div class="ring ring-2"></div>
+    <div class="ring ring-3"></div>
+    <div class="loader-core"></div>
+  </div>
+
+  <p class="loader-label" id="loaderLabel">Booting Engine</p>
+</div>
+
+<div class="tips" id="loaderTip">Tip：页面没更新？右键点一下刷新试试</div>
+</body>
 </html>
