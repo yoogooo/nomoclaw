@@ -3,6 +3,7 @@ import { computed, nextTick, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { NButton, NCard, NDropdown, NInput, NModal } from "naive-ui";
 import type { DropdownOption, InputInst } from "naive-ui";
+import { RefreshCw } from "lucide-vue-next";
 import { useAgentCatalogStore } from "@/stores/agentCatalog";
 import { useConversationStore } from "@/stores/conversation";
 import { message as discreteMessage } from "@/discrete";
@@ -16,6 +17,7 @@ const renameConversationUid = ref("");
 const renameInput = ref("");
 const renameSubmitting = ref(false);
 const renameInputRef = ref<InputInst | null>(null);
+const refreshingHistory = ref(false);
 
 function hasHanText(value: string) {
   return /[\u4e00-\u9fff]/.test(value);
@@ -111,6 +113,21 @@ function createConversationAndFocusInput() {
     input?.focus();
   });
 }
+
+async function refreshHistoryConversations() {
+  if (refreshingHistory.value) {
+    return;
+  }
+  refreshingHistory.value = true;
+  try {
+    await conversationStore.refreshConversations();
+  } catch {
+    discreteMessage.error(t("toast.refreshFailed"));
+  } finally {
+    refreshingHistory.value = false;
+  }
+}
+
 </script>
 
 <template>
@@ -118,9 +135,19 @@ function createConversationAndFocusInput() {
     <div class="panel-header conversation-header">
       <div class="conversation-header-top">
         <div class="panel-title">{{ t("chat.sidebar.history") }}</div>
-        <button class="create-conversation-button ui-pill-btn" @click="createConversationAndFocusInput()">
-          {{ t("chat.sidebar.createConversation") }}
-        </button>
+        <div class="conversation-header-actions">
+          <button
+            class="refresh-conversation-button ui-pill-btn"
+            :title="t('chat.sidebar.refreshHistoryTooltip')"
+            :disabled="refreshingHistory"
+            @click="refreshHistoryConversations()"
+          >
+            <RefreshCw :size="14" :class="{ spinning: refreshingHistory }" />
+          </button>
+          <button class="create-conversation-button ui-pill-btn" @click="createConversationAndFocusInput()">
+            {{ t("chat.sidebar.createConversation") }}
+          </button>
+        </div>
       </div>
       <div class="panel-subtitle">{{ description }}</div>
     </div>
@@ -188,6 +215,37 @@ function createConversationAndFocusInput() {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
+}
+
+.conversation-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.refresh-conversation-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-32);
+  height: var(--size-32);
+  padding: 0;
+  border-color: var(--color-border-strong);
+  background: var(--color-bg-surface-soft);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease;
+}
+
+.refresh-conversation-button:hover:not(:disabled) {
+  border-color: var(--color-border-active);
+  background: var(--color-bg-soft-hover);
+  color: var(--color-text-primary);
+}
+
+.refresh-conversation-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .create-conversation-button {
@@ -321,6 +379,16 @@ function createConversationAndFocusInput() {
 
 .conversation-row.active .history-menu-button {
   color: var(--color-text-secondary);
+}
+
+.spinning {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: var(--size-breakpoint-lg)) {

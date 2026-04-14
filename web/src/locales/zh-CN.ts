@@ -63,6 +63,8 @@ const zhCN = {
       viewingGroup: "正在查看 {label} 下的全部对话。",
       viewingAgent: "正在查看 {label} 下的对话记录。",
       createConversation: "+ 新建对话",
+      refreshHistory: "刷新历史对话",
+      refreshHistoryTooltip: "刷新历史对话（右键页面任意位置：刷新整个页面）",
       noConversations: "暂无历史对话",
       unnamed: "未命名对话",
       updatedAt: "更新于 {time}",

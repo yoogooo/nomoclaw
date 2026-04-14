@@ -63,6 +63,8 @@ const enUS = {
       viewingGroup: "Viewing all conversations under {label}.",
       viewingAgent: "Viewing conversations under {label}.",
       createConversation: "+ New Chat",
+      refreshHistory: "Refresh Conversation History",
+      refreshHistoryTooltip: "Refresh history (right-click anywhere on page: reload whole page)",
       noConversations: "No conversation history",
       unnamed: "Untitled Conversation",
       updatedAt: "Updated at {time}",
