@@ -152,10 +152,7 @@ fn main() {
             register_tray(app)?;
             install_window_behavior(app)?;
             show_loading_window(app)?;
-            if let Err(error) = bootstrap_backend(app.handle().clone()) {
-                eprintln!("backend bootstrap failed: {error:#}");
-                show_bootstrap_error_page(app, &format!("{error:#}"))?;
-            }
+            bootstrap_backend_async(app.handle().clone());
             install_backend_watchdog(app)?;
             install_updater_watchdog(app)?;
             request_updater_check(app.handle().clone(), "startup");
@@ -210,18 +207,50 @@ fn bootstrap_backend<R: Runtime>(app: AppHandle<R>) -> Result<()> {
     } else {
         start_backend_process(&app, preferred_port)?
     };
-
-    wait_backend_ready(runtime.port)?;
-    update_window_url(&app, &backend_url(runtime.port))?;
+    let runtime_port = runtime.port;
 
     let state = app.state::<DesktopState>();
-    let mut guard = state
-        .runtime
-        .lock()
-        .map_err(|_| anyhow!("failed to lock runtime state"))?;
-    *guard = Some(runtime);
+    {
+        let mut guard = state
+            .runtime
+            .lock()
+            .map_err(|_| anyhow!("failed to lock runtime state"))?;
+        *guard = Some(runtime);
+    }
+
+    if let Err(error) = wait_backend_ready(runtime_port) {
+        let _ = stop_backend(&app);
+        return Err(error);
+    }
+
+    if EXITING.load(Ordering::SeqCst) {
+        return Ok(());
+    }
+
+    if let Err(error) = update_window_url(&app, &backend_url(runtime_port)) {
+        if !EXITING.load(Ordering::SeqCst) {
+            let _ = stop_backend(&app);
+        }
+        return Err(error);
+    }
 
     Ok(())
+}
+
+fn bootstrap_backend_async<R: Runtime>(app: AppHandle<R>) {
+    tauri::async_runtime::spawn(async move {
+        if EXITING.load(Ordering::SeqCst) {
+            return;
+        }
+
+        if let Err(error) = bootstrap_backend(app.clone()) {
+            eprintln!("backend bootstrap failed: {error:#}");
+            let _ = stop_backend(&app);
+            if !EXITING.load(Ordering::SeqCst) {
+                let _ = show_bootstrap_error_page(&app, &format!("{error:#}"));
+            }
+        }
+    });
 }
 
 fn register_tray<R: Runtime>(app: &tauri::App<R>) -> Result<()> {
@@ -296,14 +325,21 @@ fn restart_backend<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
     stop_backend(app)?;
     let preferred_port = env_u16("NOMOCLAW_BACKEND_PORT", 18080);
     let runtime = start_backend_process(app, preferred_port)?;
-    wait_backend_ready(runtime.port)?;
-    update_window_url(app, &backend_url(runtime.port))?;
+    let runtime_port = runtime.port;
 
-    let mut guard = state
-        .runtime
-        .lock()
-        .map_err(|_| anyhow!("failed to lock runtime state"))?;
-    *guard = Some(runtime);
+    {
+        let mut guard = state
+            .runtime
+            .lock()
+            .map_err(|_| anyhow!("failed to lock runtime state"))?;
+        *guard = Some(runtime);
+    }
+
+    if let Err(error) = wait_backend_ready(runtime_port) {
+        let _ = stop_backend(app);
+        return Err(error);
+    }
+    update_window_url(app, &backend_url(runtime_port))?;
 
     Ok(())
 }
@@ -706,7 +742,7 @@ fn update_window_url<R: Runtime>(app: &AppHandle<R>, target_url: &str) -> Result
     Ok(())
 }
 
-fn show_bootstrap_error_page<R: Runtime>(app: &tauri::App<R>, raw_error: &str) -> Result<()> {
+fn show_bootstrap_error_page<R: Runtime>(app: &AppHandle<R>, raw_error: &str) -> Result<()> {
     let window = app
         .get_webview_window(WINDOW_LABEL)
         .context("missing main window")?;
