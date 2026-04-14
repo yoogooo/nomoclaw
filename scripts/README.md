@@ -24,6 +24,16 @@
 - 示例:
   - `TARGET_ARCH=arm64 DESKTOP_VERSION=2026.4.14 ./scripts/build-desktop-macos.sh`
 
+常用平台命令:
+
+```bash
+# Apple Silicon (arm64)
+TARGET_ARCH=arm64 ./scripts/build-desktop-macos.sh
+
+# Intel (x64)
+TARGET_ARCH=x64 ./scripts/build-desktop-macos.sh
+```
+
 ### `build-desktop-windows-x64.sh`
 
 - 作用:

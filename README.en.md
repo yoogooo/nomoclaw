@@ -1,5 +1,9 @@
 # NomoClaw Bot
 
+[![GitHub Repo](https://img.shields.io/badge/GitHub-Repo-181717?logo=github)](https://github.com/yoogooo/nomoclaw) [![License](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE) [![Last Commit](https://img.shields.io/github/last-commit/yoogooo/nomoclaw)](https://github.com/yoogooo/nomoclaw/commits) [![Java](https://img.shields.io/badge/Java-21-007396?logo=openjdk)](https://openjdk.org/projects/jdk/21/) [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.x-6DB33F?logo=springboot)](https://spring.io/projects/spring-boot) [![Rust](https://img.shields.io/badge/Rust-1.8x-000000?logo=rust)](https://www.rust-lang.org/) [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript)](https://www.typescriptlang.org/) [![Vue](https://img.shields.io/badge/Vue-3-4FC08D?logo=vuedotjs)](https://vuejs.org/) [![Tauri](https://img.shields.io/badge/Tauri-2.x-24C8DB?logo=tauri)](https://tauri.app/)
+
+[中文文档](README.md) | [English Docs](README.en.md)
+
 A local-first multi-agent assistant platform that combines chat, tool execution, approvals, and scheduled jobs in one workflow.
 
 ## Desktop Install (Recommended)

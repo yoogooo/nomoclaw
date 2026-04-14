@@ -40,3 +40,7 @@ pnpm dev
 - `TAURI_SIGNING_PRIVATE_KEY`
 - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`（若私钥有密码）
 - `TAURI_UPDATER_PUBKEY`（对应公钥，会写入构建产物）
+
+说明：
+
+- 若未注入 `TAURI_UPDATER_PUBKEY`，桌面端会自动禁用内置 updater（不做在线更新检查/安装）。
