@@ -16,6 +16,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
+#[cfg(target_os = "macos")]
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -30,13 +31,16 @@ const TRAY_ICON_ID: &str = "main-tray";
 const TRAY_MENU_SHOW: &str = "show_main";
 const TRAY_MENU_RESTART_APP: &str = "restart_app";
 const TRAY_MENU_QUIT: &str = "quit_app";
+#[cfg(target_os = "macos")]
 const MACOS_TRAY_TEMPLATE_ICON_FILE: &str = "tray-macos-template.png";
+#[cfg(target_os = "macos")]
 const FALLBACK_TRAY_TEMPLATE_ICON: Image<'_> = tauri::include_image!("./icons/tray-macos-template.png");
 const DESKTOP_I18N_FILE: &str = "i18n/desktop.json";
 const DESKTOP_I18N_FALLBACK_JSON: &str = include_str!("../resources/i18n/desktop.json");
 
 // ===== runtime / persistence constants =====
 const INSTANCE_LOCK_FILE: &str = "app.lock";
+#[cfg(unix)]
 const BACKEND_PGID_FILE: &str = "backend.pgid";
 const BOOTSTRAP_PREFS_FILE: &str = "bootstrap_prefs.json";
 const BOOTSTRAP_THEME_STORAGE_KEY: &str = "ui:theme-mode";
@@ -1196,7 +1200,6 @@ fn start_backend_process<R: Runtime>(app: &AppHandle<R>, preferred_port: u16) ->
     let port = resolve_port(preferred_port)?;
     let (java_bin, jar_path) = resolve_runtime_paths(app)?;
     let log_path = ensure_log_file_path(app)?;
-    let parent_pid = std::process::id();
 
     let log_file = File::options()
         .create(true)
@@ -1207,57 +1210,85 @@ fn start_backend_process<R: Runtime>(app: &AppHandle<R>, preferred_port: u16) ->
         .try_clone()
         .with_context(|| format!("failed to clone log file: {}", log_path.display()))?;
 
-    let java_bin_quoted = shell_quote(&java_bin.to_string_lossy());
-    let jar_path_quoted = shell_quote(&jar_path.to_string_lossy());
-    let script = format!(
-        "{java} \
-        -Dspring.profiles.active=h2 \
-        -Dnomoclaw.desktop.open-browser-on-startup=false \
-        -Dserver.shutdown=immediate \
-        -Dspring.lifecycle.timeout-per-shutdown-phase=2s \
-        -Dserver.port={port} \
-        -jar {jar} & \
-        JAVA_PID=$!; \
-        while /bin/kill -0 {parent_pid} 2>/dev/null; do sleep 0.5; done; \
-        /bin/kill -TERM \"$JAVA_PID\" 2>/dev/null || true; \
-        sleep 1; \
-        /bin/kill -KILL \"$JAVA_PID\" 2>/dev/null || true; \
-        wait \"$JAVA_PID\" 2>/dev/null || true",
-        java = java_bin_quoted,
-        jar = jar_path_quoted,
-        port = port,
-        parent_pid = parent_pid
-    );
-
-    let mut command = Command::new("/bin/sh");
-    command
-        .arg("-c")
-        .arg(script)
-        .stdout(Stdio::from(log_file))
-        .stderr(Stdio::from(log_file_err));
+    #[cfg(unix)]
+    let parent_pid = std::process::id();
 
     #[cfg(unix)]
     {
-        command.process_group(0);
+        let java_bin_quoted = shell_quote(&java_bin.to_string_lossy());
+        let jar_path_quoted = shell_quote(&jar_path.to_string_lossy());
+        let script = format!(
+            "{java} \
+            -Dspring.profiles.active=h2 \
+            -Dnomoclaw.desktop.open-browser-on-startup=false \
+            -Dserver.shutdown=immediate \
+            -Dspring.lifecycle.timeout-per-shutdown-phase=2s \
+            -Dserver.port={port} \
+            -jar {jar} & \
+            JAVA_PID=$!; \
+            while /bin/kill -0 {parent_pid} 2>/dev/null; do sleep 0.5; done; \
+            /bin/kill -TERM \"$JAVA_PID\" 2>/dev/null || true; \
+            sleep 1; \
+            /bin/kill -KILL \"$JAVA_PID\" 2>/dev/null || true; \
+            wait \"$JAVA_PID\" 2>/dev/null || true",
+            java = java_bin_quoted,
+            jar = jar_path_quoted,
+            port = port,
+            parent_pid = parent_pid
+        );
+
+        let mut command = Command::new("/bin/sh");
+        command
+            .arg("-c")
+            .arg(script)
+            .stdout(Stdio::from(log_file))
+            .stderr(Stdio::from(log_file_err));
+
+        #[cfg(unix)]
+        {
+            command.process_group(0);
+        }
+
+        let child = command
+            .spawn()
+            .with_context(|| format!("failed to spawn backend with java={}", java_bin.display()))?;
+
+        #[cfg(unix)]
+        let process_group_id = Some(child.id() as i32);
+
+        #[cfg(unix)]
+        persist_backend_pgid(app, child.id() as i32);
+
+        Ok(BackendRuntime {
+            mode: BackendMode::Spawn,
+            port,
+            child: Some(child),
+            #[cfg(unix)]
+            process_group_id,
+        })
     }
 
-    let child = command
-        .spawn()
-        .with_context(|| format!("failed to spawn backend with java={}", java_bin.display()))?;
+    #[cfg(windows)]
+    {
+        let child = Command::new(&java_bin)
+            .arg("-Dspring.profiles.active=h2")
+            .arg("-Dnomoclaw.desktop.open-browser-on-startup=false")
+            .arg("-Dserver.shutdown=immediate")
+            .arg("-Dspring.lifecycle.timeout-per-shutdown-phase=2s")
+            .arg(format!("-Dserver.port={port}"))
+            .arg("-jar")
+            .arg(&jar_path)
+            .stdout(Stdio::from(log_file))
+            .stderr(Stdio::from(log_file_err))
+            .spawn()
+            .with_context(|| format!("failed to spawn backend with java={}", java_bin.display()))?;
 
-    #[cfg(unix)]
-    let process_group_id = Some(child.id() as i32);
-
-    #[cfg(unix)]
-    persist_backend_pgid(app, child.id() as i32);
-
-    Ok(BackendRuntime {
-        mode: BackendMode::Spawn,
-        port,
-        child: Some(child),
-        #[cfg(unix)]
-        process_group_id,
-    })
+        Ok(BackendRuntime {
+            mode: BackendMode::Spawn,
+            port,
+            child: Some(child),
+        })
+    }
 }
 
 // ===== environment / utility helpers =====
