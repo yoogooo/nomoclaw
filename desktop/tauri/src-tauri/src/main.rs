@@ -15,7 +15,7 @@ use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -1457,7 +1457,11 @@ fn app_data_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf> {
 }
 
 fn backend_url(port: u16) -> String {
-    format!("http://127.0.0.1:{port}/nomoclaw/#/")
+    let cache_buster = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or(0);
+    format!("http://127.0.0.1:{port}/nomoclaw/?v={cache_buster}#/")
 }
 
 fn env_u16(key: &str, default_value: u16) -> u16 {
