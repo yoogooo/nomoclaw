@@ -309,6 +309,10 @@ prepare_tauri_resources() {
   cp "$jar_path" "$DESKTOP_RES_DIR/nomoclaw.jar"
   cp -R "$runtime_dir" "$DESKTOP_RES_DIR/runtime"
 
+  jar tf "$DESKTOP_RES_DIR/nomoclaw.jar" | grep -q '^BOOT-INF/' \
+    || fail "Embedded jar validation failed: missing BOOT-INF in $DESKTOP_RES_DIR/nomoclaw.jar"
+  jar tf "$DESKTOP_RES_DIR/nomoclaw.jar" | grep -q '^org/springframework/boot/loader/launch/JarLauncher.class$' \
+    || fail "Embedded jar validation failed: missing JarLauncher in $DESKTOP_RES_DIR/nomoclaw.jar"
   [[ -f "$DESKTOP_RES_DIR/nomoclaw.jar" ]] || fail "Embedded jar copy failed"
   [[ -x "$DESKTOP_RES_DIR/runtime/bin/java.exe" ]] || fail "Embedded runtime copy failed"
 }

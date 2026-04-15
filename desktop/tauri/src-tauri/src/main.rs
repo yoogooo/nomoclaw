@@ -1205,11 +1205,20 @@ fn start_backend_process<R: Runtime>(app: &AppHandle<R>, preferred_port: u16) ->
     let (java_bin, jar_path) = resolve_runtime_paths(app)?;
     let log_path = ensure_log_file_path(app)?;
 
-    let log_file = File::options()
+    let mut log_file = File::options()
         .create(true)
         .append(true)
         .open(&log_path)
         .with_context(|| format!("failed to open log file: {}", log_path.display()))?;
+    let jar_size = fs::metadata(&jar_path).map(|meta| meta.len()).unwrap_or(0);
+    let _ = writeln!(
+        &mut log_file,
+        "[desktop] launch backend java={} jar={} jar_size={} port={}",
+        java_bin.display(),
+        jar_path.display(),
+        jar_size,
+        port
+    );
     let log_file_err = log_file
         .try_clone()
         .with_context(|| format!("failed to clone log file: {}", log_path.display()))?;
