@@ -16,7 +16,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
-#[cfg(target_os = "macos")]
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -35,6 +34,8 @@ const TRAY_MENU_QUIT: &str = "quit_app";
 const MACOS_TRAY_TEMPLATE_ICON_FILE: &str = "tray-macos-template.png";
 #[cfg(target_os = "macos")]
 const FALLBACK_TRAY_TEMPLATE_ICON: Image<'_> = tauri::include_image!("./icons/tray-macos-template.png");
+#[cfg(not(target_os = "macos"))]
+const FALLBACK_TRAY_ICON: Image<'_> = tauri::include_image!("./icons/icon.png");
 const DESKTOP_I18N_FILE: &str = "i18n/desktop.json";
 const DESKTOP_I18N_FALLBACK_JSON: &str = include_str!("../resources/i18n/desktop.json");
 
@@ -533,10 +534,10 @@ fn bootstrap_backend_async<R: Runtime>(app: AppHandle<R>) {
 fn register_tray<R: Runtime>(app: &tauri::App<R>) -> Result<()> {
     let copy = desktop_copy(app.handle());
     let menu = build_tray_menu(app, &copy)?;
-    let mut tray_builder = TrayIconBuilder::with_id(TRAY_ICON_ID).menu(&menu).show_menu_on_left_click(false);
+    let tray_builder = TrayIconBuilder::with_id(TRAY_ICON_ID).menu(&menu).show_menu_on_left_click(false);
 
     #[cfg(target_os = "macos")]
-    {
+    let tray_builder = {
         // macOS status bar icons should be template images so the system
         // can auto-adapt contrast in light/dark menu bars.
         if !has_packaged_macos_tray_template_icon(app) {
@@ -546,8 +547,11 @@ fn register_tray<R: Runtime>(app: &tauri::App<R>) -> Result<()> {
             );
         }
         let icon = FALLBACK_TRAY_TEMPLATE_ICON.to_owned();
-        tray_builder = tray_builder.icon(icon).icon_as_template(true);
-    }
+        tray_builder.icon(icon).icon_as_template(true)
+    };
+
+    #[cfg(not(target_os = "macos"))]
+    let tray_builder = tray_builder.icon(FALLBACK_TRAY_ICON.to_owned());
 
     tray_builder
         .on_menu_event(|app, event| match event.id().as_ref() {
@@ -1292,6 +1296,7 @@ fn start_backend_process<R: Runtime>(app: &AppHandle<R>, preferred_port: u16) ->
 }
 
 // ===== environment / utility helpers =====
+#[cfg(unix)]
 fn shell_quote(raw: &str) -> String {
     format!("'{}'", raw.replace('\'', "'\"'\"'"))
 }
@@ -1449,8 +1454,8 @@ fn acquire_single_instance_lock<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
         Ok(_) => Ok(()),
         Err(_) => {
             if let Ok(raw) = fs::read_to_string(&lock_path) {
+                #[cfg(unix)]
                 if let Ok(pid) = raw.trim().parse::<i32>() {
-                    #[cfg(unix)]
                     if process_exists(pid) {
                         return Err(anyhow!("another NomoClaw instance is already running (pid={pid})"));
                     }
