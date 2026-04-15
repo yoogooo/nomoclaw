@@ -208,7 +208,7 @@ build_frontend_assets() {
   fi
 
   log "Building web frontend"
-  VITE_BASE=/nomoclaw/ pnpm --dir "$WEB_DIR" build
+  VITE_BASE=nomoclaw pnpm --dir "$WEB_DIR" build
 
   [[ -d "$WEB_DIST_DIR" ]] || fail "web dist missing: $WEB_DIST_DIR"
   log "Syncing web dist to static resources"

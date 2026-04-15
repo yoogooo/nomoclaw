@@ -179,7 +179,9 @@ build_frontend_assets() {
   fi
 
   log "Building web frontend"
-  VITE_BASE=/nomoclaw/ pnpm --dir "$WEB_DIR" build
+  # Keep base path as a plain segment to avoid Git Bash/MSYS path conversion
+  # turning "/nomoclaw/" into "/Program Files/Git/nomoclaw/" on Windows.
+  VITE_BASE=nomoclaw pnpm --dir "$WEB_DIR" build
   [[ -d "$WEB_DIST_DIR" ]] || fail "web dist missing: $WEB_DIST_DIR"
 
   log "Syncing web dist to static resources"
