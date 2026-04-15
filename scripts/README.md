@@ -51,22 +51,22 @@ TARGET_ARCH=x64 ./scripts/build-desktop-macos.sh
   - `TAURI_BUNDLES=msi|nsis|msi,nsis`（默认 `msi`）
   - `SKIP_RUST_CHECK=true|false`（默认 `false`）
   - `TAURI_UPDATER_PUBKEY=<pubkey>`（可选）
-  - `DESKTOP_VERSION=yyyy.M.d`（默认当天日期）
+  - `DESKTOP_VERSION=x.y.z`（默认 `1.MDD.MINUTES_OF_DAY`，推荐手动指定如 `1.0.0`）
   - `DESKTOP_NAME_PREFIX=<name>`（默认 `NomoClaw`）
-  - `WINDOWS_ICON_FILE=build/windows/NomoClaw.ico`（可选）
+  - `WINDOWS_ICON_FILE=<path to .ico>`（可选；未指定时会自动探测 `desktop/tauri/src-tauri/icons/icon.ico`、`build/windows/NomoClaw.ico`）
 - 示例:
-  - `TAURI_BUNDLES=msi,nsis DESKTOP_VERSION=2026.4.14 ./scripts/build-desktop-windows-x64.sh`
+  - `TAURI_BUNDLES=msi,nsis DESKTOP_VERSION=1.0.0 ./scripts/build-desktop-windows-x64.sh`
 
 ## 历史脚本（Legacy）
 
 以下脚本仍可用，但建议优先迁移到上面的统一脚本。
 
-### `build-dmg-apple-silicon.sh`
+### `legacy/build-dmg-apple-silicon.sh`
 
 - 作用:
   - 仅用于 Apple Silicon（arm64）macOS 的 DMG 构建
 - 用法:
-  - `./scripts/build-dmg-apple-silicon.sh`
+  - `./scripts/legacy/build-dmg-apple-silicon.sh`
 - 可选参数:
   - `APP_NAME=<name>`（默认 `NomoClaw`）
   - `APP_VERSION=<version>`（默认自动生成并归一化）
@@ -78,13 +78,13 @@ TARGET_ARCH=x64 ./scripts/build-desktop-macos.sh
   - `SKIP_WEB_BUILD=true|false`（默认 `false`）
   - `MAC_UI_ELEMENT=true|false`（默认 `false`）
 
-### `build-dmg-macos-intel.sh`
+### `legacy/build-dmg-macos-intel.sh`
 
 - 作用:
   - macOS Intel（x64）DMG 构建
   - 支持 Apple Silicon 上通过 Rosetta + x64 JDK 21 构建
 - 用法:
-  - `./scripts/build-dmg-macos-intel.sh`
+  - `./scripts/legacy/build-dmg-macos-intel.sh`
 - 可选参数:
   - `APP_NAME=<name>`（默认 `NomoClaw`）
   - `APP_VERSION=<version>`（默认自动生成并归一化）
@@ -96,14 +96,14 @@ TARGET_ARCH=x64 ./scripts/build-desktop-macos.sh
   - `SKIP_WEB_BUILD=true|false`（默认 `false`）
   - `MAC_UI_ELEMENT=true|false`（默认 `false`）
 
-### `build-msi-windows-x64.sh`
+### `legacy/build-msi-windows-x64.sh`
 
 - 作用:
   - Windows x64 MSI 构建（非 Tauri 统一脚本，历史版本）
 - 运行环境:
   - 需在 Windows（Git Bash / MSYS / Cygwin）执行
 - 用法:
-  - `./scripts/build-msi-windows-x64.sh`
+  - `./scripts/legacy/build-msi-windows-x64.sh`
 - 可选参数:
   - `APP_NAME=<name>`（默认 `NomoClaw`）
   - `APP_VERSION=<version>`（默认自动生成并归一化）
