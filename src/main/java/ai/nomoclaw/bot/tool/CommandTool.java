@@ -6,6 +6,8 @@ import ai.nomoclaw.bot.orchestrator.MessageCancellationRegistry;
 import ai.nomoclaw.bot.policy.tool.ToolPermissionPolicyService;
 import ai.nomoclaw.bot.policy.tool.ToolPolicyContext;
 import ai.nomoclaw.bot.policy.tool.ToolPolicyDecisionResult;
+import ai.nomoclaw.bot.util.CommandShellResolver;
+import ai.nomoclaw.bot.util.CommandShellResolver.CommandShell;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.node.JsonNodeFactory;
@@ -30,6 +32,7 @@ public class CommandTool implements Tool {
 
     private final MessageCancellationRegistry cancellationRegistry;
     private final ToolPermissionPolicyService toolPermissionPolicyService;
+    private final CommandShell commandShell = CommandShellResolver.resolve();
 
     public CommandTool(MessageCancellationRegistry cancellationRegistry,
                        ToolPermissionPolicyService toolPermissionPolicyService) {
@@ -77,7 +80,7 @@ public class CommandTool implements Tool {
             return ToolResult.failure("INVALID_ARGS", "cwd is not a directory: " + workingDir, metric(start, -1, false));
         }
 
-        ProcessBuilder processBuilder = new ProcessBuilder("bash", "-lc", command);
+        ProcessBuilder processBuilder = new ProcessBuilder(commandShell.command(command));
         processBuilder.directory(workingDir.toFile());
 
         try {
@@ -99,6 +102,7 @@ public class CommandTool implements Tool {
                     ObjectNode artifacts = JsonNodeFactory.instance.objectNode();
                     artifacts.put("cwd", workingDir.toString());
                     artifacts.put("command", command);
+                    artifacts.put("shell", commandShell.displayName());
                     artifacts.put("stdout", ToolTextUtils.truncateTail(stdout));
                     artifacts.put("stderr", ToolTextUtils.truncateTail(stderr));
                     artifacts.put("exitCode", exitCode);

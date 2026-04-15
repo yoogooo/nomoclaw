@@ -1,6 +1,7 @@
 package ai.nomoclaw.bot.prompt;
 
 import ai.nomoclaw.bot.workspace.NomoClawPaths;
+import ai.nomoclaw.bot.util.CommandShellResolver;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.BufferedReader;
@@ -28,7 +29,7 @@ public final class PromptLoader {
             "TOOLS.md",
             "MEMORY.md"
     };
-    private static final String CURRENT_OS = detectCurrentOs();
+    private static final String CURRENT_OS_CONTEXT = detectCurrentOsContext();
 
     private PromptLoader() {
     }
@@ -97,7 +98,7 @@ public final class PromptLoader {
         ZoneId localZone = ZoneId.systemDefault();
         return """
                 ====================
-                - 当前操作系统: %s
+                - %s
                 - 工作目录: %s
                 - 当前 agent 工作区: %s
                 - 当前 agent 临时目录: %s
@@ -112,7 +113,7 @@ public final class PromptLoader {
                   6. 需要发送文件时，优先发送 report/ 下的文件
                 ====================
                 """.formatted(
-                CURRENT_OS,
+                CURRENT_OS_CONTEXT,
                 context.workingDirectory().toAbsolutePath().normalize(),
                 context.agentWorkspacePath() == null ? "" : context.agentWorkspacePath().toAbsolutePath().normalize(),
                 context.agentWorkspacePath() == null ? "" : NomoClawPaths.agentTmp(context.agentWorkspacePath()),
@@ -121,36 +122,42 @@ public final class PromptLoader {
         ).trim();
     }
 
-    private static String detectCurrentOs() {
+    private static String detectCurrentOsContext() {
         String osName = System.getProperty("os.name", "").trim();
         String osVersion = System.getProperty("os.version", "").trim();
         String osArch = System.getProperty("os.arch", "").trim();
-        if (osName.toLowerCase().contains("mac")) {
-            return detectMacOs(osName, osVersion, osArch);
+        OsInfo osInfo = osName.toLowerCase().contains("mac")
+                ? detectMacOs(osName, osVersion)
+                : new OsInfo(normalizeBlank(osName), osVersion);
+        String shell = CommandShellResolver.resolve().displayName();
+        StringBuilder builder = new StringBuilder("Current OS: ");
+        builder.append(osInfo.name());
+        if (!osInfo.version().isBlank()) {
+            builder.append(' ').append(osInfo.version());
         }
-        String architecture = readableArchitecture(osArch);
-        return architecture.isBlank()
-                ? (osName + " " + osVersion).trim()
-                : (osName + " (" + architecture + ") " + osVersion).trim();
+        if (!osArch.isBlank()) {
+            builder.append(" (").append(osArch).append(')');
+        }
+        builder.append(", Shell: ").append(shell);
+        return builder.toString().trim();
     }
 
-    private static String detectMacOs(String fallbackName, String fallbackVersion, String osArch) {
+    private static OsInfo detectMacOs(String fallbackName, String fallbackVersion) {
         Map<String, String> swVers = readKeyValueCommand("sw_vers");
         String productName = swVers.getOrDefault("ProductName", fallbackName.isBlank() ? "macOS" : fallbackName);
         String productVersion = swVers.getOrDefault("ProductVersion", fallbackVersion);
-        String architecture = readableArchitecture(osArch);
         String codeName = macOsCodeName(productVersion);
-        StringBuilder builder = new StringBuilder(productName);
-        if (!architecture.isBlank()) {
-            builder.append("（").append(architecture).append("）");
+        String displayName = codeName.isBlank()
+                ? productName
+                : productName + " " + codeName;
+        return new OsInfo(displayName, productVersion);
+    }
+
+    private record OsInfo(String name, String version) {
+        OsInfo {
+            name = normalizeBlank(name);
+            version = version == null ? "" : version.trim();
         }
-        if (!codeName.isBlank()) {
-            builder.append(codeName).append(' ');
-        } else {
-            builder.append(' ');
-        }
-        builder.append(productVersion);
-        return builder.toString().trim();
     }
 
     private static Map<String, String> readKeyValueCommand(String... command) {
@@ -176,15 +183,6 @@ public final class PromptLoader {
         return values;
     }
 
-    private static String readableArchitecture(String osArch) {
-        String normalized = osArch == null ? "" : osArch.trim().toLowerCase();
-        return switch (normalized) {
-            case "aarch64", "arm64" -> "Apple Silicon";
-            case "x86_64", "amd64" -> "Intel";
-            default -> osArch == null ? "" : osArch.trim();
-        };
-    }
-
     private static String macOsCodeName(String version) {
         if (version == null || version.isBlank()) {
             return "";
@@ -201,8 +199,8 @@ public final class PromptLoader {
         };
     }
 
-    private static String safe(String text) {
-        return text == null ? "" : text;
+    private static String normalizeBlank(String text) {
+        return text == null || text.isBlank() ? "Unknown" : text.trim();
     }
 
     private static String readPromptFile(Path path) {
