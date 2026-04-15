@@ -382,6 +382,26 @@ build_tauri_bundle() {
   fi
 }
 
+validate_staged_backend_runtime() {
+  local staged_backend_dir staged_java staged_jar
+  staged_backend_dir="$DESKTOP_TAURI_DIR/target/$RUST_TARGET/release/resources/backend"
+  staged_java="$staged_backend_dir/runtime/bin/java.exe"
+  staged_jar="$staged_backend_dir/nomoclaw.jar"
+
+  [[ -x "$staged_java" ]] || fail "Staged runtime missing: $staged_java"
+  [[ -f "$staged_jar" ]] || fail "Staged backend jar missing: $staged_jar"
+
+  jar tf "$staged_jar" | grep -q '^org/springframework/boot/loader/launch/JarLauncher.class$' \
+    || fail "Staged backend jar missing JarLauncher: $staged_jar"
+
+  "$staged_java" -Djarmode=tools -jar "$staged_jar" list-layers >/dev/null \
+    || fail "Staged backend jar failed runtime probe (-Djarmode=tools): $staged_jar"
+
+  if command -v sha256sum >/dev/null 2>&1; then
+    log "Staged backend jar sha256: $(sha256sum "$staged_jar" | awk '{print $1}')"
+  fi
+}
+
 collect_msi_artifact() {
   local bundle_dir latest_msi output_msi
   bundle_dir="$DESKTOP_TAURI_DIR/target/$RUST_TARGET/release/bundle/msi"
@@ -419,6 +439,7 @@ main() {
 
   prepare_tauri_resources "$main_jar" "$runtime_dir"
   build_tauri_bundle
+  validate_staged_backend_runtime
 
   if [[ ",$TAURI_BUNDLES," == *",msi,"* ]]; then
     collect_msi_artifact

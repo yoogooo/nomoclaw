@@ -10,6 +10,8 @@ use std::io::Write;
 use std::net::TcpListener;
 #[cfg(unix)]
 use std::os::unix::process::CommandExt;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -1203,6 +1205,10 @@ fn flush_bootstrap_prefs_from_window<R: Runtime>(app: &AppHandle<R>) {
 fn start_backend_process<R: Runtime>(app: &AppHandle<R>, preferred_port: u16) -> Result<BackendRuntime> {
     let port = resolve_port(preferred_port)?;
     let (java_bin, jar_path) = resolve_runtime_paths(app)?;
+    #[cfg(windows)]
+    let java_bin = windows_compatible_path(&java_bin);
+    #[cfg(windows)]
+    let jar_path = windows_compatible_path(&jar_path);
     let log_path = ensure_log_file_path(app)?;
 
     let mut log_file = File::options()
@@ -1299,6 +1305,7 @@ fn start_backend_process<R: Runtime>(app: &AppHandle<R>, preferred_port: u16) ->
             .arg(&jar_path)
             .stdout(Stdio::from(log_file))
             .stderr(Stdio::from(log_file_err))
+            .creation_flags(0x08000000)
             .spawn()
             .with_context(|| format!("failed to spawn backend with java={}", java_bin.display()))?;
 
@@ -1389,6 +1396,18 @@ fn is_boot_executable_jar(path: &Path) -> bool {
         .windows("org/springframework/boot/loader/launch/JarLauncher.class".len())
         .any(|window| window == b"org/springframework/boot/loader/launch/JarLauncher.class");
     has_boot_inf && has_launcher
+}
+
+#[cfg(windows)]
+fn windows_compatible_path(path: &Path) -> PathBuf {
+    let raw = path.as_os_str().to_string_lossy();
+    if let Some(stripped) = raw.strip_prefix(r"\\?\UNC\") {
+        return PathBuf::from(format!(r"\\{}", stripped));
+    }
+    if let Some(stripped) = raw.strip_prefix(r"\\?\") {
+        return PathBuf::from(stripped);
+    }
+    path.to_path_buf()
 }
 
 fn wait_backend_ready(port: u16) -> Result<()> {
