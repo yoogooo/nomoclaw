@@ -50,13 +50,16 @@ public class ConversationAttachmentAppService {
     private final AgentStore store;
     private final AgentMessageAttachmentRepository attachmentRepository;
     private final ModelConfigAppService modelConfigAppService;
+    private final ModelCatalogService modelCatalogService;
 
     public ConversationAttachmentAppService(AgentStore store,
                                             AgentMessageAttachmentRepository attachmentRepository,
-                                            ModelConfigAppService modelConfigAppService) {
+                                            ModelConfigAppService modelConfigAppService,
+                                            ModelCatalogService modelCatalogService) {
         this.store = store;
         this.attachmentRepository = attachmentRepository;
         this.modelConfigAppService = modelConfigAppService;
+        this.modelCatalogService = modelCatalogService;
     }
 
     public List<ConversationAttachmentDto> uploadFiles(String conversationUid,
@@ -231,8 +234,14 @@ public class ConversationAttachmentAppService {
             throw new IllegalArgumentException("current model does not allow file upload");
         }
         long totalBytes = incoming.stream().mapToLong(PendingAttachment::sizeBytes).sum();
-        if (totalBytes > MAX_REQUEST_SIZE_BYTES) {
-            throw new IllegalArgumentException("upload size exceeds 100MB");
+        long maxTotalBytes = sanitizeNonNegative(policy.maxTotalBytes());
+        long effectiveMaxTotalBytes = maxTotalBytes > 0 ? maxTotalBytes : MAX_REQUEST_SIZE_BYTES;
+        if (totalBytes > effectiveMaxTotalBytes) {
+            throw new IllegalArgumentException("upload size exceeds " + formatBytes(effectiveMaxTotalBytes));
+        }
+        long maxFileBytes = sanitizeNonNegative(policy.maxFileBytes());
+        if (maxFileBytes > 0 && incoming.stream().anyMatch(item -> item.sizeBytes() > maxFileBytes)) {
+            throw new IllegalArgumentException("file size exceeds " + formatBytes(maxFileBytes));
         }
         if (incoming.isEmpty()) {
             return;
@@ -241,11 +250,7 @@ public class ConversationAttachmentAppService {
         if (policy.singleMimeGroupOnly() && groups.size() > 1) {
             throw new IllegalArgumentException("all files in one message must share the same type");
         }
-        String firstGroup = incoming.get(0).mimeGroup();
-        if (!policy.allowedMimeGroups().isEmpty() && !policy.allowedMimeGroups().contains(firstGroup)) {
-            throw new IllegalArgumentException("current model does not allow this file type");
-        }
-        if (policy.singleMimeGroupOnly() && !policy.allowedMimeGroups().isEmpty() && groups.stream().anyMatch(group -> !policy.allowedMimeGroups().contains(group))) {
+        if (!policy.allowedMimeGroups().isEmpty() && groups.stream().anyMatch(group -> !policy.allowedMimeGroups().contains(group))) {
             throw new IllegalArgumentException("current model does not allow this file type");
         }
         long imageCount = incoming.stream().filter(item -> "image".equals(item.mimeGroup())).count();
@@ -287,13 +292,22 @@ public class ConversationAttachmentAppService {
             }
             for (ModelConfigDto.Model model : provider.models()) {
                 if (model.id().equals(trim(modelName))) {
-                    return model.uploadPolicy() == null
-                            ? new ModelConfigDto.UploadPolicy(false, List.of(), 0, 0, false, false)
-                            : model.uploadPolicy();
+                    ModelMetadata metadata = modelCatalogService.resolve(provider.id(), model.id());
+                    return metadata.uploadPolicy() == null
+                            ? new ModelConfigDto.UploadPolicy(false, List.of(), 0, 0, 0L, 0L, false, false)
+                            : metadata.uploadPolicy();
                 }
             }
         }
         throw new IllegalArgumentException("model not configured: " + modelProvider + "/" + modelName);
+    }
+
+    private String formatBytes(long bytes) {
+        long mb = bytes / (1024L * 1024L);
+        if (mb > 0) {
+            return mb + "MB";
+        }
+        return bytes + " bytes";
     }
 
     private Path ensureConversationUploadRoot(String conversationUid) {
@@ -369,6 +383,10 @@ public class ConversationAttachmentAppService {
 
     private int sanitizeNonNegative(Integer value) {
         return value == null || value < 0 ? 0 : value;
+    }
+
+    private long sanitizeNonNegative(Long value) {
+        return value == null || value < 0 ? 0L : value;
     }
 
     private String trim(String value) {

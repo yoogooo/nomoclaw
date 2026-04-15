@@ -135,6 +135,8 @@ export interface ModelProviderOption {
   maxInputTokens: number;
   maxOutputTokens: number;
   uploadPolicy?: UploadPolicy;
+  catalogMatched?: boolean;
+  catalogSource?: string;
 }
 
 export interface ModelProvider {
@@ -170,8 +172,18 @@ export interface UploadPolicy {
   allowedMimeGroups: string[];
   maxFilesPerMessage: number;
   maxImagesPerMessage: number;
+  maxFileBytes?: number;
+  maxTotalBytes?: number;
   singleMimeGroupOnly: boolean;
   allowMixedImageAndFile: boolean;
+}
+
+export interface ModelCatalogStatus {
+  catalogVersion: string;
+  generatedAt: string;
+  source: string;
+  stale: boolean;
+  message: string;
 }
 
 export interface AgentCatalogGroup {

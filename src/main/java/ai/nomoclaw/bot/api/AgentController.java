@@ -203,6 +203,18 @@ public class AgentController {
         return ApiDtoMapper.toModelConfig(modelConfigAppService.getAvailableModelConfig());
     }
 
+    @GetMapping("/system/models/catalog/status")
+    public ModelCatalogStatusResponse getModelCatalogStatus() {
+        log.info("[AgentAPI] getModelCatalogStatus");
+        return ApiDtoMapper.toModelCatalogStatus(modelConfigAppService.getCatalogStatus());
+    }
+
+    @PostMapping("/system/models/catalog/refresh")
+    public ModelCatalogStatusResponse refreshModelCatalog() {
+        log.info("[AgentAPI] refreshModelCatalog");
+        return ApiDtoMapper.toModelCatalogStatus(modelConfigAppService.refreshModelCatalog());
+    }
+
     @PutMapping("/system/channels")
     public ChannelConfigResponse updateChannelConfig(@RequestBody(required = false) UpdateChannelConfigRequest request) {
         log.info("[AgentAPI] updateChannelConfig");

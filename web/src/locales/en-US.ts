@@ -117,6 +117,8 @@ const enUS = {
       mixedTypeNotAllowed: "Images and other files cannot be mixed",
       maxImages: "At most {count} images can be uploaded",
       maxFiles: "At most {count} non-image files can be uploaded",
+      maxFileSize: "Each file must be no larger than {size}",
+      maxTotalSize: "Total attachments must be no larger than {size}",
       clearedByModelSwitch: "Draft attachments were cleared because the new model does not support them",
       sameTypeOnlyHint: "Only one file type can be uploaded per message.",
       mixedTypeHint: "Multiple file types are supported in one message.",
@@ -599,7 +601,8 @@ const enUS = {
       editConfig: "Edit Config",
       loadLocalModels: "Load Local Models",
       addModel: "Add Model",
-      testConnection: "Test Connection"
+      testConnection: "Test Connection",
+      refreshCatalog: "Update Catalog"
     },
     labels: {
       defaultModel: "Default Model",
@@ -617,7 +620,15 @@ const enUS = {
       allowMixedImageAndFile: "Allow mixed image and file",
       allowedFileTypes: "Allowed file types",
       maxFilesPerMessage: "Max non-image files",
-      maxImagesPerMessage: "Max images"
+      maxImagesPerMessage: "Max images",
+      catalogVersion: "Model catalog",
+      catalogSource: "Catalog source",
+      catalogGeneratedAt: "Generated",
+      catalogMatch: "Auto match",
+      catalogMatched: "Matched",
+      catalogUnknown: "Unknown",
+      uploadAutoDisabled: "Upload disabled",
+      uploadAutoSummary: "Types {types}, {maxImages} images, {maxFiles} non-image files"
     },
     editor: {
       defaultTitle: "Edit Model Provider",
@@ -639,7 +650,8 @@ const enUS = {
       localModelsLoaded: "Local Ollama models loaded",
       localModelsLoadFailed: "Failed to load local models",
       connectionTestSuccess: "Connection test succeeded",
-      connectionTestFailed: "Connection test failed"
+      connectionTestFailed: "Connection test failed",
+      catalogRefreshed: "Model catalog updated"
     }
   },
   pages: {

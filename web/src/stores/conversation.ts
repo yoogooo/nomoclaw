@@ -46,6 +46,8 @@ const EMPTY_UPLOAD_POLICY: UploadPolicy = {
   allowedMimeGroups: [],
   maxFilesPerMessage: 0,
   maxImagesPerMessage: 0,
+  maxFileBytes: 0,
+  maxTotalBytes: 0,
   singleMimeGroupOnly: false,
   allowMixedImageAndFile: false
 };
@@ -68,6 +70,8 @@ function normalizeUploadPolicy(policy?: UploadPolicy | null): UploadPolicy {
     allowedMimeGroups: Array.isArray(policy.allowedMimeGroups) ? policy.allowedMimeGroups.filter(Boolean) : [],
     maxFilesPerMessage: Math.max(0, Number(policy.maxFilesPerMessage || 0)),
     maxImagesPerMessage: Math.max(0, Number(policy.maxImagesPerMessage || 0)),
+    maxFileBytes: Math.max(0, Number(policy.maxFileBytes || 0)),
+    maxTotalBytes: Math.max(0, Number(policy.maxTotalBytes || 0)),
     singleMimeGroupOnly: Boolean(policy.singleMimeGroupOnly),
     allowMixedImageAndFile: Boolean(policy.allowMixedImageAndFile)
   };
@@ -498,6 +502,15 @@ export const useConversationStore = defineStore("conversation", () => {
     const imageCount = existingImageCount + incomingImageCount;
     const totalCount = existing.length + files.length;
     const nonImageCount = totalCount - imageCount;
+    const maxFileBytes = policy.maxFileBytes || 0;
+    if (maxFileBytes > 0 && files.some((file) => file.size > maxFileBytes)) {
+      throw new Error(tr("chat.composer.maxFileSize", { size: formatBytes(maxFileBytes) }));
+    }
+    const totalBytes = existing.reduce((sum, item) => sum + item.sizeBytes, 0) + files.reduce((sum, file) => sum + file.size, 0);
+    const maxTotalBytes = policy.maxTotalBytes || 0;
+    if (maxTotalBytes > 0 && totalBytes > maxTotalBytes) {
+      throw new Error(tr("chat.composer.maxTotalSize", { size: formatBytes(maxTotalBytes) }));
+    }
 
     if (imageCount > 0 && nonImageCount > 0 && !policy.allowMixedImageAndFile) {
       throw new Error(tr("chat.composer.mixedTypeNotAllowed"));
@@ -508,6 +521,11 @@ export const useConversationStore = defineStore("conversation", () => {
     if (nonImageCount > 0 && nonImageCount > policy.maxFilesPerMessage) {
       throw new Error(tr("chat.composer.maxFiles", { count: policy.maxFilesPerMessage }));
     }
+  }
+
+  function formatBytes(bytes: number) {
+    const mb = Math.floor(bytes / (1024 * 1024));
+    return mb > 0 ? `${mb}MB` : `${bytes}B`;
   }
 
   function clearDraftAttachments(reason?: string) {

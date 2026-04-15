@@ -9,6 +9,7 @@ import ai.nomoclaw.bot.application.command.UpdateAgentBasicInfoCommand;
 import ai.nomoclaw.bot.application.command.UpdateAgentTipCommand;
 import ai.nomoclaw.bot.application.command.UpdateCronJobCommand;
 import ai.nomoclaw.bot.application.dto.*;
+import ai.nomoclaw.bot.orchestrator.ModelCatalogStatusDto;
 import ai.nomoclaw.bot.application.dto.AgentSkillDto;
 import ai.nomoclaw.bot.application.dto.AgentTipDto;
 import ai.nomoclaw.bot.application.dto.BatchDeleteCronJobsDto;
@@ -278,7 +279,9 @@ public final class ApiDtoMapper {
                                                 model.contextWindow(),
                                                 model.maxInputTokens(),
                                                 model.maxOutputTokens(),
-                                                toUploadPolicy(model.uploadPolicy())
+                                                toUploadPolicy(model.uploadPolicy()),
+                                                model.catalogMatched(),
+                                                model.catalogSource()
                                         ))
                                         .toList()
                         ))
@@ -311,7 +314,9 @@ public final class ApiDtoMapper {
                                                 model.contextWindow(),
                                                 model.maxInputTokens(),
                                                 model.maxOutputTokens(),
-                                                toUploadPolicy(model.uploadPolicy())
+                                                toUploadPolicy(model.uploadPolicy()),
+                                                false,
+                                                "request"
                                         ))
                                         .toList()
                         ))
@@ -328,6 +333,8 @@ public final class ApiDtoMapper {
                 policy.allowedMimeGroups(),
                 policy.maxFilesPerMessage(),
                 policy.maxImagesPerMessage(),
+                policy.maxFileBytes(),
+                policy.maxTotalBytes(),
                 policy.singleMimeGroupOnly(),
                 policy.allowMixedImageAndFile()
         );
@@ -342,8 +349,20 @@ public final class ApiDtoMapper {
                 policy.allowedMimeGroups(),
                 policy.maxFilesPerMessage(),
                 policy.maxImagesPerMessage(),
+                policy.maxFileBytes(),
+                policy.maxTotalBytes(),
                 policy.singleMimeGroupOnly(),
                 policy.allowMixedImageAndFile()
+        );
+    }
+
+    public static ModelCatalogStatusResponse toModelCatalogStatus(ModelCatalogStatusDto dto) {
+        return new ModelCatalogStatusResponse(
+                dto.catalogVersion(),
+                dto.generatedAt(),
+                dto.source(),
+                dto.stale(),
+                dto.message()
         );
     }
 

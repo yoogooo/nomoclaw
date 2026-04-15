@@ -117,6 +117,8 @@ const zhCN = {
       mixedTypeNotAllowed: "图片和其他文件不能混合上传",
       maxImages: "当前模型最多上传 {count} 张图片",
       maxFiles: "当前模型最多上传 {count} 个非图片文件",
+      maxFileSize: "单个文件不能超过 {size}",
+      maxTotalSize: "本条消息附件总大小不能超过 {size}",
       clearedByModelSwitch: "已清空当前草稿附件，新模型不支持这些文件",
       sameTypeOnlyHint: "同一条消息只能上传同一类型文件。",
       mixedTypeHint: "支持同一条消息上传多种类型文件。",
@@ -599,7 +601,8 @@ const zhCN = {
       editConfig: "编辑配置",
       loadLocalModels: "加载本地模型",
       addModel: "新增模型",
-      testConnection: "测试连接"
+      testConnection: "测试连接",
+      refreshCatalog: "更新模型目录"
     },
     labels: {
       defaultModel: "默认模型",
@@ -617,7 +620,15 @@ const zhCN = {
       allowMixedImageAndFile: "允许图片与文件混传",
       allowedFileTypes: "允许的文件类型",
       maxFilesPerMessage: "非图片文件上限",
-      maxImagesPerMessage: "图片上限"
+      maxImagesPerMessage: "图片上限",
+      catalogVersion: "模型目录版本",
+      catalogSource: "目录来源",
+      catalogGeneratedAt: "生成时间",
+      catalogMatch: "自动识别",
+      catalogMatched: "已匹配",
+      catalogUnknown: "未识别",
+      uploadAutoDisabled: "不支持上传",
+      uploadAutoSummary: "类型 {types}，图片 {maxImages} 张，非图片文件 {maxFiles} 个"
     },
     editor: {
       defaultTitle: "编辑模型 Provider",
@@ -639,7 +650,8 @@ const zhCN = {
       localModelsLoaded: "已加载本地 Ollama 模型",
       localModelsLoadFailed: "加载本地模型失败",
       connectionTestSuccess: "连接测试成功",
-      connectionTestFailed: "连接测试失败"
+      connectionTestFailed: "连接测试失败",
+      catalogRefreshed: "模型目录已更新"
     }
   },
   pages: {

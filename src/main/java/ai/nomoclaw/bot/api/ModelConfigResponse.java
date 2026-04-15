@@ -28,7 +28,9 @@ public record ModelConfigResponse(
             Integer contextWindow,
             Integer maxInputTokens,
             Integer maxOutputTokens,
-            UploadPolicy uploadPolicy
+            UploadPolicy uploadPolicy,
+            boolean catalogMatched,
+            String catalogSource
     ) {
     }
 
@@ -37,6 +39,8 @@ public record ModelConfigResponse(
             List<String> allowedMimeGroups,
             Integer maxFilesPerMessage,
             Integer maxImagesPerMessage,
+            Long maxFileBytes,
+            Long maxTotalBytes,
             boolean singleMimeGroupOnly,
             boolean allowMixedImageAndFile
     ) {

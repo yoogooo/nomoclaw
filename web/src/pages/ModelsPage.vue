@@ -1,18 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, nextTick, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   NButton,
   NCard,
-  NDivider,
   NDrawer,
   NDrawerContent,
   NForm,
   NFormItem,
   NInput,
-  NInputNumber,
   NSelect,
-  NSwitch,
   NTag
 } from "naive-ui";
 import DirectoryRail from "@/components/chat/DirectoryRail.vue";
@@ -20,37 +17,25 @@ import AppPageHeader from "@/components/layout/AppPageHeader.vue";
 import { modelApi } from "@/api/modelApi";
 import { message } from "@/discrete";
 import { useModelGateStore } from "@/stores/modelGate";
-import type { ModelConfig, ModelProvider, ModelProviderOption } from "@/types/api";
+import type { ModelCatalogStatus, ModelConfig, ModelProvider, ModelProviderOption } from "@/types/api";
 
 type ProviderStatusType = "success" | "warning";
 const { t } = useI18n();
-
-const CAPABILITY_OPTIONS = [
-  { label: "Text", value: "text" },
-  { label: "Image", value: "image" },
-  { label: "Audio", value: "audio" },
-  { label: "Video", value: "video" }
-];
-
-const UPLOAD_MIME_GROUP_OPTIONS = [
-  { label: "Image", value: "image" },
-  { label: "PDF", value: "pdf" },
-  { label: "Text", value: "text" },
-  { label: "Audio", value: "audio" },
-  { label: "Video", value: "video" },
-  { label: "Application", value: "application" }
-];
 
 const loading = ref(false);
 const saving = ref(false);
 const loadingLocalModels = ref(false);
 const testingProviderConnection = ref(false);
+const refreshingCatalog = ref(false);
 const showEditor = ref(false);
 const editingProviderId = ref("");
 const modelGateStore = useModelGateStore();
 
 const config = reactive<ModelConfig>({ providers: [] });
 const draft = reactive<ModelConfig>({ providers: [] });
+const catalogStatus = ref<ModelCatalogStatus | null>(null);
+const modelIdInputRefs = ref<Array<{ focus: () => void } | null>>([]);
+const modelCardRefs = ref<Array<HTMLElement | null>>([]);
 
 const providerCards = computed(() =>
   config.providers.map((provider) => {
@@ -95,9 +80,13 @@ function normalizeModel(model: ModelProviderOption): ModelProviderOption {
       allowedMimeGroups: Array.isArray(model.uploadPolicy?.allowedMimeGroups) ? model.uploadPolicy?.allowedMimeGroups.filter(Boolean) : [],
       maxFilesPerMessage: Number.isFinite(model.uploadPolicy?.maxFilesPerMessage) ? model.uploadPolicy!.maxFilesPerMessage : 0,
       maxImagesPerMessage: Number.isFinite(model.uploadPolicy?.maxImagesPerMessage) ? model.uploadPolicy!.maxImagesPerMessage : 0,
+      maxFileBytes: Number.isFinite(model.uploadPolicy?.maxFileBytes) ? model.uploadPolicy!.maxFileBytes : 0,
+      maxTotalBytes: Number.isFinite(model.uploadPolicy?.maxTotalBytes) ? model.uploadPolicy!.maxTotalBytes : 0,
       singleMimeGroupOnly: Boolean(model.uploadPolicy?.singleMimeGroupOnly),
       allowMixedImageAndFile: Boolean(model.uploadPolicy?.allowMixedImageAndFile)
-    }
+    },
+    catalogMatched: Boolean(model.catalogMatched),
+    catalogSource: model.catalogSource ?? ""
   };
 }
 
@@ -119,8 +108,12 @@ function normalizeProvider(provider: ModelProvider): ModelProvider {
 async function loadConfig() {
   loading.value = true;
   try {
-    const data = await modelApi.getModelConfig();
+    const [data, status] = await Promise.all([
+      modelApi.getModelConfig(),
+      modelApi.getModelCatalogStatus()
+    ]);
     config.providers = data.providers.map(normalizeProvider);
+    catalogStatus.value = status;
   } finally {
     loading.value = false;
   }
@@ -136,13 +129,26 @@ async function refreshConfig() {
   }
 }
 
+async function refreshModelCatalog() {
+  refreshingCatalog.value = true;
+  try {
+    catalogStatus.value = await modelApi.refreshModelCatalog();
+    await loadConfig();
+    message.success(catalogStatus.value.message || t("models.toast.catalogRefreshed"));
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : t("toast.refreshFailed"));
+  } finally {
+    refreshingCatalog.value = false;
+  }
+}
+
 function openEditor(providerId: string) {
   editingProviderId.value = providerId;
   draft.providers = cloneConfig(config).providers.map(normalizeProvider);
   showEditor.value = true;
 }
 
-function addModel() {
+async function addModel() {
   const provider = editingProvider.value;
   if (!provider) {
     return;
@@ -150,7 +156,7 @@ function addModel() {
   provider.models.push({
     id: "",
     name: "",
-    capabilities: ["text"],
+    capabilities: [],
     reasoning: false,
     contextWindow: 0,
     maxInputTokens: 0,
@@ -160,10 +166,18 @@ function addModel() {
       allowedMimeGroups: [],
       maxFilesPerMessage: 0,
       maxImagesPerMessage: 0,
+      maxFileBytes: 0,
+      maxTotalBytes: 0,
       singleMimeGroupOnly: false,
       allowMixedImageAndFile: false
-    }
+    },
+    catalogMatched: false,
+    catalogSource: ""
   });
+  const nextIndex = provider.models.length - 1;
+  await nextTick();
+  modelCardRefs.value[nextIndex]?.scrollIntoView({ block: "center", behavior: "smooth" });
+  modelIdInputRefs.value[nextIndex]?.focus();
 }
 
 function removeModel(index: number) {
@@ -201,21 +215,25 @@ async function saveEditor() {
   saving.value = true;
   try {
     provider.models = provider.models.map((item) => ({
-      ...item,
       id: item.id.trim(),
       name: item.name.trim() || item.id.trim(),
-      capabilities: Array.from(new Set(item.capabilities.map((capability) => capability.trim().toLowerCase()).filter(Boolean))),
-      contextWindow: Math.max(0, item.contextWindow ?? 0),
-      maxInputTokens: Math.max(0, item.maxInputTokens ?? 0),
-      maxOutputTokens: Math.max(0, item.maxOutputTokens ?? 0),
+      capabilities: [],
+      reasoning: false,
+      contextWindow: 0,
+      maxInputTokens: 0,
+      maxOutputTokens: 0,
       uploadPolicy: {
-        enabled: Boolean(item.uploadPolicy?.enabled),
-        allowedMimeGroups: Array.from(new Set((item.uploadPolicy?.allowedMimeGroups ?? []).map((mimeGroup) => mimeGroup.trim().toLowerCase()).filter(Boolean))),
-        maxFilesPerMessage: Math.max(0, item.uploadPolicy?.maxFilesPerMessage ?? 0),
-        maxImagesPerMessage: Math.max(0, item.uploadPolicy?.maxImagesPerMessage ?? 0),
-        singleMimeGroupOnly: Boolean(item.uploadPolicy?.singleMimeGroupOnly),
-        allowMixedImageAndFile: Boolean(item.uploadPolicy?.allowMixedImageAndFile)
-      }
+        enabled: false,
+        allowedMimeGroups: [],
+        maxFilesPerMessage: 0,
+        maxImagesPerMessage: 0,
+        maxFileBytes: 0,
+        maxTotalBytes: 0,
+        singleMimeGroupOnly: false,
+        allowMixedImageAndFile: false
+      },
+      catalogMatched: false,
+      catalogSource: "request"
     }));
     provider.defaultModel = provider.defaultModel.trim();
     validateProvider(provider);
@@ -229,6 +247,29 @@ async function saveEditor() {
   } finally {
     saving.value = false;
   }
+}
+
+function modelCapabilityTags(model: ModelProviderOption) {
+  const tags: string[] = [];
+  if (model.capabilities?.includes("image")) tags.push("Image");
+  if (model.capabilities?.includes("pdf")) tags.push("PDF");
+  if (model.capabilities?.includes("audio")) tags.push("Audio");
+  if (model.capabilities?.includes("video")) tags.push("Video");
+  if (!tags.length) tags.push("Text");
+  return tags;
+}
+
+function uploadSummary(model: ModelProviderOption) {
+  const policy = model.uploadPolicy;
+  if (!policy?.enabled) {
+    return t("models.labels.uploadAutoDisabled");
+  }
+  const groups = policy.allowedMimeGroups.length ? policy.allowedMimeGroups.join(" / ") : "any";
+  return t("models.labels.uploadAutoSummary", {
+    types: groups,
+    maxImages: policy.maxImagesPerMessage,
+    maxFiles: policy.maxFilesPerMessage
+  });
 }
 
 async function testProviderConnection() {
@@ -292,9 +333,18 @@ onMounted(() => {
             :subtitle="t('pages.models.subtitle')"
           >
             <template #actions>
+              <n-button :loading="refreshingCatalog" @click="refreshModelCatalog">{{ t("models.actions.refreshCatalog") }}</n-button>
               <n-button :loading="loading" @click="refreshConfig">{{ t("common.refresh") }}</n-button>
             </template>
           </AppPageHeader>
+
+          <div v-if="catalogStatus" class="catalog-status">
+            <n-tag :type="catalogStatus.stale ? 'warning' : 'success'">
+              {{ t("models.labels.catalogVersion") }} {{ catalogStatus.catalogVersion || "-" }}
+            </n-tag>
+            <span>{{ t("models.labels.catalogSource") }}: {{ catalogStatus.source || "-" }}</span>
+            <span>{{ t("models.labels.catalogGeneratedAt") }}: {{ catalogStatus.generatedAt || "-" }}</span>
+          </div>
 
           <section class="provider-grid">
             <n-card
@@ -390,66 +440,47 @@ onMounted(() => {
         </div>
 
         <div class="model-stack">
-          <section v-for="(model, index) in editingProvider.models" :key="`${model.id || 'new'}-${index}`" class="model-card">
+          <section
+            v-for="(model, index) in editingProvider.models"
+            :key="index"
+            :ref="(el) => { modelCardRefs[index] = el as HTMLElement | null; }"
+            class="model-card"
+          >
             <div class="ui-card-head-between model-card-head">
               <div class="ui-title-strong">{{ t("models.labels.modelIndex", { index: index + 1 }) }}</div>
               <n-button size="tiny" tertiary type="error" @click="removeModel(index)">{{ t("common.delete") }}</n-button>
             </div>
             <n-form-item label="Model ID">
-              <n-input v-model:value="model.id" placeholder="gpt-5.4" />
+              <n-input
+                :ref="(el) => { modelIdInputRefs[index] = el as { focus: () => void } | null; }"
+                v-model:value="model.id"
+                placeholder="gpt-5.4"
+              />
             </n-form-item>
             <n-form-item :label="t('models.labels.displayName')">
               <n-input v-model:value="model.name" placeholder="GPT-5.4" />
             </n-form-item>
-            <n-form-item label="Capabilities">
-              <n-select v-model:value="model.capabilities" multiple filterable tag :options="CAPABILITY_OPTIONS" :placeholder="t('models.editor.capabilitiesPlaceholder')" />
-            </n-form-item>
-            <div class="model-flags">
-              <n-form-item label="Reasoning">
-                <n-switch v-model:value="model.reasoning" />
-              </n-form-item>
+            <div class="model-auto-meta">
+              <div class="model-auto-row">
+                <span>{{ t("models.labels.catalogMatch") }}</span>
+                <n-tag :type="model.catalogMatched ? 'success' : 'warning'" size="small">
+                  {{ model.catalogMatched ? t("models.labels.catalogMatched") : t("models.labels.catalogUnknown") }}
+                </n-tag>
+              </div>
+              <div class="model-tag-row">
+                <n-tag v-for="capability in modelCapabilityTags(model)" :key="capability" size="small">
+                  {{ capability }}
+                </n-tag>
+              </div>
+              <div class="model-auto-row">
+                <span>{{ t("models.labels.uploadPolicyTitle") }}</span>
+                <span>{{ uploadSummary(model) }}</span>
+              </div>
+              <div class="model-auto-row">
+                <span>{{ t("models.labels.catalogSource") }}</span>
+                <span>{{ model.catalogSource || "-" }}</span>
+              </div>
             </div>
-            <div class="model-metrics-row">
-              <n-form-item label="Context Window (K)">
-                <n-input-number v-model:value="model.contextWindow" :min="0" />
-              </n-form-item>
-              <n-form-item label="Max Input Tokens (K)">
-                <n-input-number v-model:value="model.maxInputTokens" :min="0" />
-              </n-form-item>
-              <n-form-item label="Max Output Tokens (K)">
-                <n-input-number v-model:value="model.maxOutputTokens" :min="0" />
-              </n-form-item>
-            </div>
-            <div class="ui-title-sm">{{ t("models.labels.uploadPolicyTitle") }}</div>
-            <div class="model-flags">
-              <n-form-item :label="t('models.labels.uploadEnabled')">
-                <n-switch v-model:value="model.uploadPolicy!.enabled" />
-              </n-form-item>
-              <n-form-item :label="t('models.labels.singleMimeGroupOnly')">
-                <n-switch v-model:value="model.uploadPolicy!.singleMimeGroupOnly" />
-              </n-form-item>
-              <n-form-item :label="t('models.labels.allowMixedImageAndFile')">
-                <n-switch v-model:value="model.uploadPolicy!.allowMixedImageAndFile" />
-              </n-form-item>
-            </div>
-            <n-form-item :label="t('models.labels.allowedFileTypes')">
-              <n-select
-                v-model:value="model.uploadPolicy!.allowedMimeGroups"
-                multiple
-                filterable
-                :options="UPLOAD_MIME_GROUP_OPTIONS"
-                :placeholder="t('models.editor.allowedFileTypesPlaceholder')"
-              />
-            </n-form-item>
-            <div class="model-metrics-row">
-              <n-form-item :label="t('models.labels.maxFilesPerMessage')">
-                <n-input-number v-model:value="model.uploadPolicy!.maxFilesPerMessage" :min="0" />
-              </n-form-item>
-              <n-form-item :label="t('models.labels.maxImagesPerMessage')">
-                <n-input-number v-model:value="model.uploadPolicy!.maxImagesPerMessage" :min="0" />
-              </n-form-item>
-            </div>
-            <n-divider />
           </section>
         </div>
       </n-form>
@@ -475,6 +506,15 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: var(--space-4);
+}
+
+.catalog-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--text-caption-size);
 }
 
 .provider-card {
@@ -521,10 +561,16 @@ onMounted(() => {
 }
 
 .models-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin: var(--space-4) 0;
+  padding: var(--space-2) 0;
+  background: var(--color-bg-surface);
+  border-bottom: var(--size-1) solid var(--color-border-soft);
 }
 
 .models-toolbar-actions {
@@ -562,6 +608,34 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-2_5);
+}
+
+.model-auto-meta {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: var(--size-1) solid var(--color-border-soft);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+}
+
+.model-auto-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: var(--color-text-secondary);
+  font-size: var(--text-caption-size);
+}
+
+.model-auto-row span:last-child {
+  text-align: right;
+  word-break: break-word;
+}
+
+.model-tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1_5);
 }
 
 .provider-form :deep(.n-form-item) {

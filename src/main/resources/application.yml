@@ -79,6 +79,8 @@ llm:
     model-name: MiniMax-M2.7
   model-config:
     encryption-key: "${LLM_MODEL_CONFIG_ENCRYPTION_KEY:}"
+  model-catalog:
+    remote-url: "${LLM_MODEL_CATALOG_REMOTE_URL:}"
 
 logging:
   level:
