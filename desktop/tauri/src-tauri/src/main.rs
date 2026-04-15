@@ -1526,8 +1526,8 @@ fn acquire_single_instance_lock<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
     match try_create() {
         Ok(_) => Ok(()),
         Err(_) => {
+            #[cfg(unix)]
             if let Ok(raw) = fs::read_to_string(&lock_path) {
-                #[cfg(unix)]
                 if let Ok(pid) = raw.trim().parse::<i32>() {
                     if process_exists(pid) {
                         return Err(anyhow!("another NomoClaw instance is already running (pid={pid})"));
