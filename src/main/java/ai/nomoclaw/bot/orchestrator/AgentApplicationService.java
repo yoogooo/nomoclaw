@@ -1,61 +1,27 @@
 package ai.nomoclaw.bot.orchestrator;
 
-import ai.nomoclaw.bot.application.dto.ConversationMessageDto;
-import ai.nomoclaw.bot.application.dto.ConversationMessageRunDto;
-import ai.nomoclaw.bot.application.dto.ConversationRunStepDto;
-import ai.nomoclaw.bot.application.dto.ConversationSummaryDto;
-import ai.nomoclaw.bot.application.dto.ConversationAttachmentDto;
-import ai.nomoclaw.bot.application.dto.AgentCatalogAgentDto;
-import ai.nomoclaw.bot.application.dto.AgentCatalogGroupDto;
-import ai.nomoclaw.bot.application.dto.AgentDocDto;
-import ai.nomoclaw.bot.application.dto.AgentSkillDto;
-import ai.nomoclaw.bot.application.dto.AgentTipDto;
-import ai.nomoclaw.bot.application.dto.AgentToolDto;
-import ai.nomoclaw.bot.application.dto.SystemConfigDto;
-import ai.nomoclaw.bot.application.dto.ModelConfigDto;
 import ai.nomoclaw.bot.application.command.CreateAgentCommand;
 import ai.nomoclaw.bot.application.command.CreateAgentTipCommand;
-import ai.nomoclaw.bot.application.dto.MessageFileLinkDto;
 import ai.nomoclaw.bot.application.command.UpdateAgentBasicInfoCommand;
+import ai.nomoclaw.bot.application.dto.*;
 import ai.nomoclaw.bot.channel.model.ChannelMessageCompletedEvent;
 import ai.nomoclaw.bot.config.AgentProperties;
-import ai.nomoclaw.bot.llm.config.LlmProperties;
-import ai.nomoclaw.bot.workspace.NomoClawPaths;
-import ai.nomoclaw.bot.prompt.PromptLoader;
 import ai.nomoclaw.bot.domain.AgentConversation;
 import ai.nomoclaw.bot.domain.AgentMessage;
-import ai.nomoclaw.bot.model.AgentEvent;
-import ai.nomoclaw.bot.model.AgentEventType;
-import ai.nomoclaw.bot.model.ApprovalStatus;
-import ai.nomoclaw.bot.model.MessageStatus;
-import ai.nomoclaw.bot.model.ModelProviderDefaults;
-import ai.nomoclaw.bot.model.PlanStep;
-import ai.nomoclaw.bot.model.RiskLevel;
-import ai.nomoclaw.bot.model.StepStatus;
-import ai.nomoclaw.bot.model.ToolProgress;
-import ai.nomoclaw.bot.model.ToolResult;
+import ai.nomoclaw.bot.llm.config.LlmProperties;
+import ai.nomoclaw.bot.model.*;
 import ai.nomoclaw.bot.planner.Planner;
 import ai.nomoclaw.bot.policy.RiskPolicy;
 import ai.nomoclaw.bot.policy.tool.ToolPolicyDecisionResult;
+import ai.nomoclaw.bot.prompt.PromptLoader;
 import ai.nomoclaw.bot.store.AgentStore;
-import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
-import ai.nomoclaw.bot.store.entity.AgentGroupDefinitionEntity;
-import ai.nomoclaw.bot.store.entity.AgentGroupMemberEntity;
-import ai.nomoclaw.bot.store.entity.AgentSkillRelationEntity;
-import ai.nomoclaw.bot.store.entity.AgentToolRelationEntity;
-import ai.nomoclaw.bot.store.entity.SkillDefinitionEntity;
-import ai.nomoclaw.bot.store.entity.ToolDefinitionEntity;
-import ai.nomoclaw.bot.store.repository.AgentDefinitionRepository;
-import ai.nomoclaw.bot.store.repository.AgentGroupDefinitionRepository;
-import ai.nomoclaw.bot.store.repository.AgentGroupMemberRepository;
-import ai.nomoclaw.bot.store.repository.AgentSkillRelationRepository;
-import ai.nomoclaw.bot.store.repository.AgentToolRelationRepository;
-import ai.nomoclaw.bot.store.repository.SkillDefinitionRepository;
-import ai.nomoclaw.bot.store.repository.ToolDefinitionRepository;
+import ai.nomoclaw.bot.store.entity.*;
+import ai.nomoclaw.bot.store.repository.*;
 import ai.nomoclaw.bot.tool.ToolExecutor;
 import ai.nomoclaw.bot.util.JsonUtil;
-import dev.langchain4j.agent.tool.ToolSpecification;
+import ai.nomoclaw.bot.workspace.NomoClawPaths;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
+import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
@@ -73,29 +39,21 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
+import java.io.IOException;
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
-import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.format.DateTimeParseException;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Consumer;
@@ -890,16 +848,17 @@ public class AgentApplicationService {
             handleLoopLimitReached(messageUid);
         } catch (Exception ex) {
             log.error("message execution failed messageUid={}", messageUid, ex);
-            store.findMessage(messageUid).ifPresent(message -> failMessage(message, toUserFriendlyFailureMessage(ex), ""));
+            store.findMessage(messageUid).ifPresent(message -> failMessage(message, toUserFriendlyFailureMessage(ex, message), ""));
         } finally {
             runningMessages.remove(messageUid);
         }
     }
 
-    private String toUserFriendlyFailureMessage(Throwable throwable) {
+    private String toUserFriendlyFailureMessage(Throwable throwable, AgentMessage agentMessage) {
         Throwable root = rootCauseOf(throwable);
         if (root instanceof ConnectException || root instanceof ClosedChannelException) {
-            return "模型服务连接失败，请检查模型服务是否已启动且地址配置正确（例如 Ollama 默认地址 http://127.0.0.1:11434）。";
+            String provider = agentMessage == null ? "" : nullToEmpty(agentMessage.provider()).trim();
+            return connectFailureHintByProvider(provider);
         }
         if (root instanceof SocketTimeoutException) {
             return "模型服务响应超时，请稍后重试或检查模型服务状态。";
@@ -912,6 +871,20 @@ public class AgentApplicationService {
             return "任务执行失败，请稍后重试。";
         }
         return message;
+    }
+
+    private String connectFailureHintByProvider(String provider) {
+        String normalized = provider == null ? "" : provider.trim().toLowerCase(Locale.ROOT);
+        if ("ollama".equals(normalized)) {
+            return "模型服务连接失败，请检查 Ollama 是否已启动，并确认地址配置正确（默认 http://127.0.0.1:11434）。";
+        }
+        if ("qwen".equals(normalized) || "dashscope".equals(normalized)) {
+            return "模型服务连接失败（Qwen/DashScope）。请检查外网连接、代理设置、API Key 及 API 地址配置是否正确。";
+        }
+        if ("openai".equals(normalized) || "gemini".equals(normalized) || "kimi".equals(normalized) || "minimax".equals(normalized)) {
+            return "模型服务连接失败。请检查外网连接、代理设置、API Key 及 API 地址配置是否正确。";
+        }
+        return "模型服务连接失败，请检查网络连通性以及模型服务地址配置。";
     }
 
     private Throwable rootCauseOf(Throwable throwable) {
