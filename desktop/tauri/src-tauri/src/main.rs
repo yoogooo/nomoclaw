@@ -10,7 +10,7 @@ use std::io::Write;
 use std::net::TcpListener;
 #[cfg(unix)]
 use std::os::unix::process::CommandExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -1225,6 +1225,9 @@ fn start_backend_process<R: Runtime>(app: &AppHandle<R>, preferred_port: u16) ->
             "{java} \
             -Dspring.profiles.active=h2 \
             -Dnomoclaw.desktop.open-browser-on-startup=false \
+            -Dfile.encoding=UTF-8 \
+            -Dsun.stdout.encoding=UTF-8 \
+            -Dsun.stderr.encoding=UTF-8 \
             -Dserver.shutdown=immediate \
             -Dspring.lifecycle.timeout-per-shutdown-phase=2s \
             -Dserver.port={port} \
@@ -1277,6 +1280,9 @@ fn start_backend_process<R: Runtime>(app: &AppHandle<R>, preferred_port: u16) ->
         let child = Command::new(&java_bin)
             .arg("-Dspring.profiles.active=h2")
             .arg("-Dnomoclaw.desktop.open-browser-on-startup=false")
+            .arg("-Dfile.encoding=UTF-8")
+            .arg("-Dsun.stdout.encoding=UTF-8")
+            .arg("-Dsun.stderr.encoding=UTF-8")
             .arg("-Dserver.shutdown=immediate")
             .arg("-Dspring.lifecycle.timeout-per-shutdown-phase=2s")
             .arg(format!("-Dserver.port={port}"))
@@ -1332,13 +1338,48 @@ fn resolve_runtime_paths<R: Runtime>(app: &AppHandle<R>) -> Result<(PathBuf, Pat
         .find(|path| path.exists())
         .cloned()
         .ok_or_else(|| anyhow!("embedded runtime not found"))?;
-    let jar_path = jar_candidates
-        .iter()
-        .find(|path| path.exists())
-        .cloned()
-        .ok_or_else(|| anyhow!("embedded backend jar not found"))?;
+
+    let mut seen_jars: Vec<PathBuf> = Vec::new();
+    let mut jar_path: Option<PathBuf> = None;
+    for candidate in jar_candidates {
+        if !candidate.exists() {
+            continue;
+        }
+        seen_jars.push(candidate.clone());
+        if is_boot_executable_jar(&candidate) {
+            jar_path = Some(candidate);
+            break;
+        }
+    }
+    let jar_path = jar_path.ok_or_else(|| {
+        if seen_jars.is_empty() {
+            anyhow!("embedded backend jar not found")
+        } else {
+            let candidates = seen_jars
+                .iter()
+                .map(|p| p.display().to_string())
+                .collect::<Vec<_>>()
+                .join("; ");
+            anyhow!(
+                "embedded backend jar found but invalid (missing BOOT-INF or JarLauncher): {candidates}"
+            )
+        }
+    })?;
 
     Ok((java_bin, jar_path))
+}
+
+fn is_boot_executable_jar(path: &Path) -> bool {
+    let Ok(content) = fs::read(path) else {
+        return false;
+    };
+    let has_boot_inf = content
+        .windows("BOOT-INF/".len())
+        .any(|window| window == b"BOOT-INF/");
+    let has_launcher = content
+        .windows("org/springframework/boot/loader/launch/JarLauncher.class".len())
+        .any(|window| window == b"org/springframework/boot/loader/launch/JarLauncher.class");
+    has_boot_inf && has_launcher
 }
 
 fn wait_backend_ready(port: u16) -> Result<()> {
