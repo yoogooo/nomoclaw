@@ -403,16 +403,24 @@ export const useConversationStore = defineStore("conversation", () => {
     };
   }
 
-  function syncRuntimeModelSelection() {
-    const latestUserMessage = [...messages.value]
+  function findLatestMessageModelSelection(sourceMessages: ConversationMessage[] = messages.value) {
+    const latestUserMessage = [...sourceMessages]
       .reverse()
       .find((item) => item.role === "user" && item.provider && item.modelName);
     const latestProvider = latestUserMessage
       ? configuredProviders.value.find((provider) => provider.id === latestUserMessage.provider)
       : null;
     if (latestUserMessage?.provider && latestUserMessage?.modelName && latestProvider?.models.some((model) => model.id === latestUserMessage.modelName)) {
-      selectedModelProvider.value = latestUserMessage.provider;
-      selectedModelName.value = latestUserMessage.modelName;
+      return { modelProvider: latestUserMessage.provider, modelName: latestUserMessage.modelName };
+    }
+    return null;
+  }
+
+  function syncRuntimeModelSelection() {
+    const latestMessageModel = findLatestMessageModelSelection();
+    if (latestMessageModel) {
+      selectedModelProvider.value = latestMessageModel.modelProvider;
+      selectedModelName.value = latestMessageModel.modelName;
       return;
     }
     const fallback = findAgentDefaultModel();
@@ -550,6 +558,7 @@ export const useConversationStore = defineStore("conversation", () => {
   }
 
   function startDraftConversation() {
+    const previousConversationModel = findLatestMessageModelSelection();
     currentConversationUid.value = null;
     runningConversationUid.value = null;
     messages.value = [];
@@ -557,6 +566,11 @@ export const useConversationStore = defineStore("conversation", () => {
     draftAttachments.value = [];
     resetRuntimePanels();
     disconnectEventSource();
+    if (previousConversationModel) {
+      selectedModelProvider.value = previousConversationModel.modelProvider;
+      selectedModelName.value = previousConversationModel.modelName;
+      return;
+    }
     syncRuntimeModelSelection();
   }
 
