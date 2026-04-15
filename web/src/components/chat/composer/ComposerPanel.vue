@@ -42,7 +42,7 @@ const uploadHint = computed(() => {
 });
 
 function onKeydown(event: KeyboardEvent) {
-  if (event.metaKey && event.key === "Enter") {
+  if (event.key === "Enter" && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && !event.isComposing) {
     event.preventDefault();
     void conversationStore.sendMessage();
   }
@@ -253,6 +253,7 @@ onBeforeUnmount(() => {
 
     <div class="composer-upload-status">
       <div class="composer-upload-hint">{{ conversationStore.uploadingFiles ? t("chat.composer.uploadHintUploading") : uploadHint }}</div>
+      <div class="composer-send-hint">{{ t("chat.composer.sendHint") }}</div>
       <input ref="fileInputRef" class="composer-file-input" type="file" multiple @change="onFileChange" />
     </div>
   </div>
@@ -342,12 +343,26 @@ onBeforeUnmount(() => {
 .composer-upload-status {
   display: flex;
   width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
 }
 
 .composer-upload-hint {
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: var(--text-caption-size);
   color: var(--color-text-muted);
   line-height: 1.5;
+}
+
+.composer-send-hint {
+  flex: none;
+  font-size: var(--text-caption-size);
+  color: var(--color-text-faint);
+  line-height: 1.5;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .composer-file-input {

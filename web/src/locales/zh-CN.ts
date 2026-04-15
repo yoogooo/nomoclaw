@@ -106,6 +106,7 @@ const zhCN = {
       upload: "上传文件",
       jinnang: "锦囊",
       send: "发送",
+      sendHint: "Enter 发送 · Shift + Enter 换行",
       stop: "取消",
       modelPlaceholder: "选择已配置模型",
       uploadHintUploading: "文件上传中...",

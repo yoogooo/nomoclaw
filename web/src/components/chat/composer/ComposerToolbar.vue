@@ -237,6 +237,7 @@ const modelSelectWidthCh = computed(() => {
   .composer-meta {
     margin-left: 0;
     justify-content: flex-end;
+    align-items: flex-end;
   }
 }
 </style>

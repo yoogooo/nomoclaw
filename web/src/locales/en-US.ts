@@ -106,6 +106,7 @@ const enUS = {
       upload: "Upload",
       jinnang: "Tips",
       send: "Send",
+      sendHint: "Enter to send · Shift + Enter for newline",
       stop: "Cancel",
       modelPlaceholder: "Select a configured model",
       uploadHintUploading: "Uploading files...",
