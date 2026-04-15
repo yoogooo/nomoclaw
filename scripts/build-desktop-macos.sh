@@ -18,6 +18,8 @@ set -euo pipefail
 #   BUILD_TARGET_DMG=true|false     (default: true)
 #   TAURI_BUILD_CI=true|false       (default: true)
 #   TAURI_UPDATER_PUBKEY=<pubkey>   (optional; when set, updater artifacts are generated)
+#   APP_VERSION=1.0.0               (default: 1.0.0)
+#   DESKTOP_VERSION=1.0.0           (alias of APP_VERSION, if set takes precedence)
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 WEB_DIR="$ROOT_DIR/web"
@@ -28,6 +30,7 @@ DESKTOP_RES_DIR="$DESKTOP_DIR/src-tauri/resources/backend"
 DESKTOP_TAURI_DIR="$DESKTOP_DIR/src-tauri"
 TARGET_DIR="$ROOT_DIR/target"
 BUILD_DIR="$ROOT_DIR/build/desktop"
+DIST_DIR="$ROOT_DIR/dist"
 
 TARGET_ARCH="${TARGET_ARCH:-auto}"
 SKIP_TESTS="${SKIP_TESTS:-true}"
@@ -36,7 +39,8 @@ MAVEN_PROFILE="${MAVEN_PROFILE:-prod-lite}"
 BUILD_TARGET_DMG="${BUILD_TARGET_DMG:-true}"
 TAURI_BUILD_CI="${TAURI_BUILD_CI:-true}"
 TAURI_UPDATER_PUBKEY="${TAURI_UPDATER_PUBKEY:-}"
-DESKTOP_VERSION="${DESKTOP_VERSION:-}"
+APP_VERSION="${APP_VERSION:-1.0.0}"
+DESKTOP_VERSION="${DESKTOP_VERSION:-${APP_VERSION}}"
 DESKTOP_NAME_PREFIX="${DESKTOP_NAME_PREFIX:-NomoClaw}"
 
 ARCH_PREFIX=()
@@ -44,6 +48,8 @@ JAVA_HOME_SELECTED=""
 RUST_TARGET=""
 DESKTOP_PRODUCT_NAME=""
 TAURI_CONFIG_OVERRIDE_PATH=""
+BUILD_NO=""
+FULL_VERSION=""
 
 log() {
   printf '[build-desktop] %s\n' "$*" >&2
@@ -100,14 +106,37 @@ normalize_target_arch() {
 
 setup_desktop_naming() {
   if [[ -z "$DESKTOP_VERSION" ]]; then
-    DESKTOP_VERSION="$(date '+%Y.%-m.%-d')"
+    DESKTOP_VERSION="1.0.0"
   fi
 
   if [[ ! "$DESKTOP_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    fail "Invalid DESKTOP_VERSION=$DESKTOP_VERSION (expected yyyy.M.d, e.g. 2026.4.12)"
+    fail "Invalid DESKTOP_VERSION=$DESKTOP_VERSION (expected x.y.z, e.g. 1.0.0)"
   fi
 
   DESKTOP_PRODUCT_NAME="${DESKTOP_NAME_PREFIX}"
+  [[ "$DESKTOP_PRODUCT_NAME" =~ ^[A-Z][A-Za-z0-9]*$ ]] \
+    || fail "Invalid DESKTOP_NAME_PREFIX=$DESKTOP_PRODUCT_NAME (expected PascalCase, letters/digits only)"
+}
+
+setup_version_metadata() {
+  local build_date hour minute second seconds_of_day
+  build_date="$(date +%y%m%d)"
+  hour="$(date +%H)"
+  minute="$(date +%M)"
+  second="$(date +%S)"
+  seconds_of_day=$((10#$hour * 3600 + 10#$minute * 60 + 10#$second))
+
+  BUILD_NO="${build_date}.${seconds_of_day}"
+  FULL_VERSION="${DESKTOP_VERSION}+${BUILD_NO}"
+}
+
+write_version_file() {
+  local version_file
+  version_file="$ROOT_DIR/build/version.txt"
+  mkdir -p "$(dirname "$version_file")"
+  printf '%s\n' "$FULL_VERSION" > "$version_file"
+  log "Build Version: $FULL_VERSION"
+  log "Version file: $version_file"
 }
 
 setup_arch_prefix() {
@@ -336,16 +365,37 @@ build_tauri_bundle() {
   log "Bundle output: $DESKTOP_TAURI_DIR/target/$RUST_TARGET/release/bundle"
 }
 
+collect_dmg_artifact() {
+  local bundle_dir latest_dmg output_dmg platform
+  bundle_dir="$DESKTOP_TAURI_DIR/target/$RUST_TARGET/release/bundle/dmg"
+  [[ -d "$bundle_dir" ]] || fail "DMG bundle directory not found: $bundle_dir"
+
+  latest_dmg="$(find "$bundle_dir" -maxdepth 1 -type f -name '*.dmg' | sort | tail -n 1)"
+  [[ -n "$latest_dmg" ]] || fail "No DMG found under: $bundle_dir"
+
+  mkdir -p "$DIST_DIR"
+  if [[ "$TARGET_ARCH" == "arm64" ]]; then
+    platform="macos-arm64"
+  else
+    platform="macos-x64"
+  fi
+  output_dmg="$DIST_DIR/${DESKTOP_PRODUCT_NAME}-${DESKTOP_VERSION}-${platform}.dmg"
+  cp -f "$latest_dmg" "$output_dmg"
+  log "DMG output: $output_dmg"
+}
+
 main() {
   [[ "$(uname -s)" == "Darwin" ]] || fail "This script only supports macOS"
 
   normalize_target_arch
   setup_desktop_naming
+  setup_version_metadata
+  write_version_file
   setup_arch_prefix
   setup_java_toolchain
   setup_rust_toolchain
 
-  mkdir -p "$BUILD_DIR"
+  mkdir -p "$BUILD_DIR" "$DIST_DIR"
 
   build_frontend_assets
   build_backend_jar
@@ -358,6 +408,11 @@ main() {
   prepare_tauri_resources "$main_jar" "$runtime_dir"
 
   build_tauri_bundle
+  if [[ "$BUILD_TARGET_DMG" == "true" ]]; then
+    collect_dmg_artifact
+  else
+    log "BUILD_TARGET_DMG=false; skipping dist DMG copy"
+  fi
   log "Desktop build complete"
 }
 

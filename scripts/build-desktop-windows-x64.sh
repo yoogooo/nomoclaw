@@ -18,7 +18,8 @@ set -euo pipefail
 #   TAURI_BUNDLES=msi|nsis|msi,nsis   (default: msi)
 #   SKIP_RUST_CHECK=true|false        (default: false)
 #   TAURI_UPDATER_PUBKEY=<pubkey>     (optional)
-#   DESKTOP_VERSION=2026.4.14         (default: today)
+#   APP_VERSION=1.0.0                 (default: 1.0.0)
+#   DESKTOP_VERSION=1.0.0             (alias of APP_VERSION, if set takes precedence)
 #   DESKTOP_NAME_PREFIX=NomoClaw      (default: NomoClaw)
 #   WINDOWS_ICON_FILE=build/windows/NomoClaw.ico (optional)
 
@@ -42,12 +43,15 @@ TAURI_BUILD_CI="${TAURI_BUILD_CI:-true}"
 TAURI_BUNDLES="${TAURI_BUNDLES:-msi}"
 SKIP_RUST_CHECK="${SKIP_RUST_CHECK:-false}"
 TAURI_UPDATER_PUBKEY="${TAURI_UPDATER_PUBKEY:-}"
-DESKTOP_VERSION="${DESKTOP_VERSION:-}"
+APP_VERSION="${APP_VERSION:-1.0.0}"
+DESKTOP_VERSION="${DESKTOP_VERSION:-${APP_VERSION}}"
 DESKTOP_NAME_PREFIX="${DESKTOP_NAME_PREFIX:-NomoClaw}"
 WINDOWS_ICON_FILE="${WINDOWS_ICON_FILE:-}"
 
 DESKTOP_PRODUCT_NAME=""
 TAURI_CONFIG_OVERRIDE_PATH=""
+BUILD_NO=""
+FULL_VERSION=""
 
 log() {
   printf '[build-desktop-win] %s\n' "$*" >&2
@@ -97,14 +101,43 @@ ensure_java21_x64() {
 }
 
 setup_desktop_naming() {
+  local v_major v_minor v_patch
   if [[ -z "$DESKTOP_VERSION" ]]; then
-    DESKTOP_VERSION="$(date '+%Y.%-m.%-d')"
+    DESKTOP_VERSION="1.0.0"
   fi
 
   [[ "$DESKTOP_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
-    || fail "Invalid DESKTOP_VERSION=$DESKTOP_VERSION (expected yyyy.M.d, e.g. 2026.4.14)"
+    || fail "Invalid DESKTOP_VERSION=$DESKTOP_VERSION (expected x.y.z, e.g. 1.0.0)"
 
   DESKTOP_PRODUCT_NAME="$DESKTOP_NAME_PREFIX"
+  [[ "$DESKTOP_PRODUCT_NAME" =~ ^[A-Z][A-Za-z0-9]*$ ]] \
+    || fail "Invalid DESKTOP_NAME_PREFIX=$DESKTOP_PRODUCT_NAME (expected PascalCase, letters/digits only)"
+
+  IFS='.' read -r v_major v_minor v_patch <<< "$DESKTOP_VERSION"
+  ((v_major >= 0 && v_major <= 255)) || fail "Invalid major=$v_major (MSI requires 0..255)"
+  ((v_minor >= 0 && v_minor <= 255)) || fail "Invalid minor=$v_minor (MSI requires 0..255)"
+  ((v_patch >= 0 && v_patch <= 65535)) || fail "Invalid patch=$v_patch (MSI requires 0..65535)"
+}
+
+setup_version_metadata() {
+  local build_date hour minute second seconds_of_day
+  build_date="$(date +%y%m%d)"
+  hour="$(date +%H)"
+  minute="$(date +%M)"
+  second="$(date +%S)"
+  seconds_of_day=$((10#$hour * 3600 + 10#$minute * 60 + 10#$second))
+
+  BUILD_NO="${build_date}.${seconds_of_day}"
+  FULL_VERSION="${DESKTOP_VERSION}+${BUILD_NO}"
+}
+
+write_version_file() {
+  local version_file
+  version_file="$ROOT_DIR/build/version.txt"
+  mkdir -p "$(dirname "$version_file")"
+  printf '%s\n' "$FULL_VERSION" > "$version_file"
+  log "Build Version: $FULL_VERSION"
+  log "Version file: $version_file"
 }
 
 setup_rust_toolchain() {
@@ -365,6 +398,8 @@ main() {
   require_cmd jdeps
   require_cmd jlink
   setup_desktop_naming
+  setup_version_metadata
+  write_version_file
   setup_rust_toolchain
   check_rust_target_build
 
