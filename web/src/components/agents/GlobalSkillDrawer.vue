@@ -105,6 +105,10 @@ const title = computed(() => props.skill?.name || "");
   gap: var(--space-2_5);
 }
 
+.skill-drawer-label {
+  margin-bottom: var(--space-2_5);
+}
+
 .skill-agent-row {
   display: flex;
   align-items: center;
