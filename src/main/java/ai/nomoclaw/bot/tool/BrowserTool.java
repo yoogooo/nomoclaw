@@ -510,9 +510,8 @@ public class BrowserTool implements Tool {
             }
             return Path.of(customPath.trim());
         }
-        String osName = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         String userHome = System.getProperty("user.home", "");
-        if (osName.contains("mac") && !userHome.isBlank()) {
+        if (PlatformSupport.isMac() && !userHome.isBlank()) {
             Path sharedMacCache = Path.of(userHome, "Library", "Caches", "ms-playwright");
             if (Files.isDirectory(sharedMacCache)) {
                 return sharedMacCache;

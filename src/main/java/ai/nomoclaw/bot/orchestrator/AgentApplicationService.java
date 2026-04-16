@@ -17,6 +17,7 @@ import ai.nomoclaw.bot.prompt.PromptLoader;
 import ai.nomoclaw.bot.store.AgentStore;
 import ai.nomoclaw.bot.store.entity.*;
 import ai.nomoclaw.bot.store.repository.*;
+import ai.nomoclaw.bot.tool.PlatformSupport;
 import ai.nomoclaw.bot.tool.ToolExecutor;
 import ai.nomoclaw.bot.util.JsonUtil;
 import ai.nomoclaw.bot.workspace.NomoClawPaths;
@@ -39,6 +40,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
+import java.awt.Desktop;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
@@ -715,8 +717,13 @@ public class AgentApplicationService {
             if (!Files.exists(file)) {
                 throw new IllegalArgumentException("file not found: " + file);
             }
-            new ProcessBuilder("open", file.toString()).start();
+            if (!Files.isRegularFile(file) && !Files.isDirectory(file)) {
+                throw new IllegalArgumentException("path is not an openable file or directory: " + file);
+            }
+            openPathInHostOs(file);
             log.info("[Agent] open file path={}", file);
+        } catch (IllegalArgumentException ex) {
+            throw ex;
         } catch (Exception ex) {
             throw new IllegalStateException("failed to open file: " + path, ex);
         }
@@ -1683,7 +1690,7 @@ public class AgentApplicationService {
         }
         Map<String, MessageFileLinkDto> files = new LinkedHashMap<>();
         for (AgentEvent event : store.listEventsByMessage(message.parentMessageUid())) {
-            if (event.eventType() != AgentEventType.STEP_FINISHED || event.payload() == null) {
+            if (event.eventType() != AgentEventType.STEP_FINISHED || event.payload() == null || !event.payload().path("success").asBoolean(false)) {
                 continue;
             }
             String path = event.payload().path("artifacts").path("path").asText("");
@@ -1691,10 +1698,32 @@ public class AgentApplicationService {
                 continue;
             }
             Path filePath = Path.of(path).toAbsolutePath().normalize();
+            if (!Files.isRegularFile(filePath)) {
+                continue;
+            }
             String key = filePath.toString();
             files.putIfAbsent(key, new MessageFileLinkDto(filePath.getFileName().toString(), key));
         }
         return List.copyOf(files.values());
+    }
+
+    private void openPathInHostOs(Path file) throws IOException {
+        if (Desktop.isDesktopSupported()) {
+            Desktop desktop = Desktop.getDesktop();
+            if (desktop.isSupported(Desktop.Action.OPEN)) {
+                desktop.open(file.toFile());
+                return;
+            }
+        }
+        ProcessBuilder processBuilder;
+        if (PlatformSupport.isMac()) {
+            processBuilder = new ProcessBuilder("open", file.toString());
+        } else if (PlatformSupport.isWindows()) {
+            processBuilder = new ProcessBuilder("cmd", "/c", "start", "", file.toString());
+        } else {
+            processBuilder = new ProcessBuilder("xdg-open", file.toString());
+        }
+        processBuilder.start();
     }
 
     /**
