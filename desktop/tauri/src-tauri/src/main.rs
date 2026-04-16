@@ -15,7 +15,7 @@ use std::os::unix::process::CommandExt;
 use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -56,7 +56,9 @@ const UPDATE_CHECK_INTERVAL_SECONDS: u64 = 6 * 60 * 60;
 
 // Process-level guards used by multiple async/workdog paths.
 static EXITING: AtomicBool = AtomicBool::new(false);
+static BACKEND_STARTING: AtomicBool = AtomicBool::new(false);
 static BACKEND_RESTARTING: AtomicBool = AtomicBool::new(false);
+static BACKEND_WATCH_FAIL_STREAK: AtomicU32 = AtomicU32::new(0);
 static QUIT_CONFIRMING: AtomicBool = AtomicBool::new(false);
 static UPDATER_CHECKING: AtomicBool = AtomicBool::new(false);
 static UPDATER_INSTALLING: AtomicBool = AtomicBool::new(false);
@@ -474,6 +476,7 @@ fn request_quit_with_confirmation<R: Runtime>(app: &AppHandle<R>) {
 
 // ===== backend bootstrap / tray / window behavior =====
 fn bootstrap_backend<R: Runtime>(app: AppHandle<R>) -> Result<()> {
+    let _startup_guard = BackendStartupGuard::enter();
     let dev_attach = is_dev_attach_mode();
     let preferred_port = env_u16("NOMOCLAW_BACKEND_PORT", 18080);
 
@@ -644,6 +647,7 @@ fn install_window_behavior<R: Runtime>(app: &tauri::App<R>) -> Result<()> {
 }
 
 fn restart_backend<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
+    let _startup_guard = BackendStartupGuard::enter();
     let state = app.state::<DesktopState>();
     let existing_mode = {
         let guard = state
@@ -693,6 +697,7 @@ fn request_backend_restart<R: Runtime>(app: AppHandle<R>, reason: &'static str) 
     {
         return;
     }
+    BACKEND_WATCH_FAIL_STREAK.store(0, Ordering::SeqCst);
 
     tauri::async_runtime::spawn(async move {
         if let Err(error) = restart_backend(&app) {
@@ -705,6 +710,8 @@ fn request_backend_restart<R: Runtime>(app: AppHandle<R>, reason: &'static str) 
 fn install_backend_watchdog<R: Runtime>(app: &tauri::App<R>) -> Result<()> {
     let app_handle = app.handle().clone();
     let interval = Duration::from_millis(env_u64("NOMOCLAW_BACKEND_WATCH_INTERVAL_MS", 10_000).max(500));
+    let fail_threshold = env_u32("NOMOCLAW_BACKEND_WATCH_FAIL_THRESHOLD", 3).max(1);
+    let health_timeout = Duration::from_millis(env_u64("NOMOCLAW_BACKEND_WATCH_HEALTH_TIMEOUT_MS", 800).max(100));
     thread::Builder::new()
         .name("backend-watchdog".to_string())
         .spawn(move || loop {
@@ -715,7 +722,7 @@ fn install_backend_watchdog<R: Runtime>(app: &tauri::App<R>) -> Result<()> {
             if EXITING.load(Ordering::SeqCst) {
                 return;
             }
-            if backend_needs_restart(&app_handle) {
+            if backend_needs_restart(&app_handle, health_timeout, fail_threshold) {
                 request_backend_restart(app_handle.clone(), "watchdog");
             }
         })
@@ -723,30 +730,54 @@ fn install_backend_watchdog<R: Runtime>(app: &tauri::App<R>) -> Result<()> {
     Ok(())
 }
 
-fn backend_needs_restart<R: Runtime>(app: &AppHandle<R>) -> bool {
+fn backend_needs_restart<R: Runtime>(app: &AppHandle<R>, health_timeout: Duration, fail_threshold: u32) -> bool {
+    let is_starting = BACKEND_STARTING.load(Ordering::SeqCst);
+    let is_restarting = BACKEND_RESTARTING.load(Ordering::SeqCst);
+    if is_starting || is_restarting {
+        BACKEND_WATCH_FAIL_STREAK.store(0, Ordering::SeqCst);
+        return false;
+    }
+
     let port = {
         let state = app.state::<DesktopState>();
         let mut guard = match state.runtime.lock() {
             Ok(guard) => guard,
-            Err(_) => return false,
+            Err(_) => {
+                BACKEND_WATCH_FAIL_STREAK.store(0, Ordering::SeqCst);
+                return false;
+            }
         };
 
         let Some(runtime) = guard.as_mut() else {
+            BACKEND_WATCH_FAIL_STREAK.store(0, Ordering::SeqCst);
             return false;
         };
         if runtime.mode != BackendMode::Spawn {
+            BACKEND_WATCH_FAIL_STREAK.store(0, Ordering::SeqCst);
             return false;
         }
 
         if let Some(child) = runtime.child.as_mut() {
             match child.try_wait() {
                 Ok(Some(status)) => {
-                    eprintln!("backend process exited: {status}");
+                    eprintln!(
+                        "backend watchdog restart trigger reason=process_exited status={status} starting={} restarting={} fail_streak={}",
+                        is_starting,
+                        is_restarting,
+                        BACKEND_WATCH_FAIL_STREAK.load(Ordering::SeqCst)
+                    );
+                    BACKEND_WATCH_FAIL_STREAK.store(0, Ordering::SeqCst);
                     return true;
                 }
                 Ok(None) => {}
                 Err(error) => {
-                    eprintln!("failed to query backend process status: {error:#}");
+                    eprintln!(
+                        "backend watchdog restart trigger reason=process_status_error error={error:#} starting={} restarting={} fail_streak={}",
+                        is_starting,
+                        is_restarting,
+                        BACKEND_WATCH_FAIL_STREAK.load(Ordering::SeqCst)
+                    );
+                    BACKEND_WATCH_FAIL_STREAK.store(0, Ordering::SeqCst);
                     return true;
                 }
             }
@@ -755,7 +786,36 @@ fn backend_needs_restart<R: Runtime>(app: &AppHandle<R>) -> bool {
         runtime.port
     };
 
-    !check_backend_ready_once(port, Duration::from_millis(800))
+    let is_healthy = check_backend_ready_once(port, health_timeout);
+    let previous_failures = BACKEND_WATCH_FAIL_STREAK.load(Ordering::SeqCst);
+    let (should_restart, next_failures) =
+        evaluate_watchdog_health_debounce(is_starting, is_restarting, is_healthy, previous_failures, fail_threshold);
+
+    if next_failures != previous_failures {
+        BACKEND_WATCH_FAIL_STREAK.store(next_failures, Ordering::SeqCst);
+    }
+
+    if !is_healthy && !should_restart {
+        eprintln!(
+            "backend watchdog health check failed but debounced fail_streak={} threshold={} timeout_ms={}",
+            next_failures,
+            fail_threshold,
+            health_timeout.as_millis()
+        );
+    }
+
+    if should_restart {
+        eprintln!(
+            "backend watchdog restart trigger reason=health_check failures={} threshold={} starting={} restarting={} timeout_ms={}",
+            next_failures,
+            fail_threshold,
+            is_starting,
+            is_restarting,
+            health_timeout.as_millis()
+        );
+    }
+
+    should_restart
 }
 
 fn check_backend_ready_once(port: u16, timeout: Duration) -> bool {
@@ -768,6 +828,22 @@ fn check_backend_ready_once(port: u16, timeout: Duration) -> bool {
         Ok(response) => response.status().is_success(),
         Err(_) => false,
     }
+}
+
+fn evaluate_watchdog_health_debounce(
+    is_starting: bool,
+    is_restarting: bool,
+    is_healthy: bool,
+    previous_failures: u32,
+    fail_threshold: u32,
+) -> (bool, u32) {
+    if is_starting || is_restarting || is_healthy {
+        return (false, 0);
+    }
+
+    let threshold = fail_threshold.max(1);
+    let next_failures = previous_failures.saturating_add(1);
+    (next_failures >= threshold, next_failures)
 }
 
 // ===== updater =====
@@ -1034,6 +1110,8 @@ async fn updater_install_downloaded(
 
 // ===== window/content bootstrap =====
 fn stop_backend<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
+    BACKEND_STARTING.store(false, Ordering::SeqCst);
+    BACKEND_WATCH_FAIL_STREAK.store(0, Ordering::SeqCst);
     let state = app.state::<DesktopState>();
     let mut guard = state
         .runtime
@@ -1534,11 +1612,67 @@ fn env_u16(key: &str, default_value: u16) -> u16 {
         .unwrap_or(default_value)
 }
 
+fn env_u32(key: &str, default_value: u32) -> u32 {
+    env::var(key)
+        .ok()
+        .and_then(|value| value.trim().parse::<u32>().ok())
+        .unwrap_or(default_value)
+}
+
 fn env_u64(key: &str, default_value: u64) -> u64 {
     env::var(key)
         .ok()
         .and_then(|raw| raw.parse::<u64>().ok())
         .unwrap_or(default_value)
+}
+
+struct BackendStartupGuard;
+
+impl BackendStartupGuard {
+    fn enter() -> Self {
+        BACKEND_STARTING.store(true, Ordering::SeqCst);
+        BACKEND_WATCH_FAIL_STREAK.store(0, Ordering::SeqCst);
+        Self
+    }
+}
+
+impl Drop for BackendStartupGuard {
+    fn drop(&mut self) {
+        BACKEND_STARTING.store(false, Ordering::SeqCst);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::evaluate_watchdog_health_debounce;
+
+    #[test]
+    fn watchdog_never_restarts_while_starting() {
+        let (should_restart, next_failures) = evaluate_watchdog_health_debounce(true, false, false, 2, 3);
+        assert!(!should_restart);
+        assert_eq!(next_failures, 0);
+    }
+
+    #[test]
+    fn watchdog_single_failure_does_not_restart() {
+        let (should_restart, next_failures) = evaluate_watchdog_health_debounce(false, false, false, 0, 3);
+        assert!(!should_restart);
+        assert_eq!(next_failures, 1);
+    }
+
+    #[test]
+    fn watchdog_restarts_after_threshold_failures() {
+        let (should_restart, next_failures) = evaluate_watchdog_health_debounce(false, false, false, 2, 3);
+        assert!(should_restart);
+        assert_eq!(next_failures, 3);
+    }
+
+    #[test]
+    fn watchdog_resets_failures_after_recovery() {
+        let (should_restart, next_failures) = evaluate_watchdog_health_debounce(false, false, true, 2, 3);
+        assert!(!should_restart);
+        assert_eq!(next_failures, 0);
+    }
 }
 
 fn is_dev_attach_mode() -> bool {
