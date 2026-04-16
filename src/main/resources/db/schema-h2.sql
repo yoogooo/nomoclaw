@@ -340,13 +340,6 @@ CREATE TABLE IF NOT EXISTS agent_cron_job (
     INDEX idx_agent_cron_job_next_run (status, next_run_time)
 );
 
-INSERT INTO agent_group_definition (
-    agent_group_uid, group_name, display_name, avatar, description, scene_tags,
-    collaboration_mode, min_agent_count, max_agent_count, owner_agent_uid, sort_index, status, ext_config, created_time, updated_time
-) VALUES
-    ('group_short_drama', 'short_drama_team', '短剧项目组', '🎭', '面向短剧策划、测试、舆情与营销的一体化协作群组。', '["short-drama","creative","operations"]',
-     'pipeline', 2, 12, 'agent_general_assistant', 10, 'ACTIVE', '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-
 INSERT INTO agent_definition (
     agent_uid, agent_name, display_name, avatar, description, capability_tags, prompt_profile,
     model_provider_id, model_id, sort_index, is_group_entry, status, ext_config, created_time, updated_time
@@ -374,11 +367,6 @@ INSERT INTO skill_definition (
     skill_key, display_name, description, skill_path, status, sort_index, config_json, created_time, updated_time
 ) VALUES
     ('pdf', 'pdf', 'Use this skill whenever the task involves reading or generating PDFs.', 'skills/pdf', 'ACTIVE', 10, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-
-INSERT INTO agent_group_member (
-    member_uid, agent_group_uid, agent_uid, member_role, responsibility, sort_index, is_primary, status, created_time, updated_time
-) VALUES
-    ('member_short_drama_general', 'group_short_drama', 'agent_general_assistant', 'owner', '统筹项目组整体规划、协调执行与最终交付。', 10, 1, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO agent_tool_relation (
     relation_uid, agent_uid, tool_key, status, sort_index, config_json, created_time, updated_time

@@ -391,13 +391,6 @@ CREATE TABLE IF NOT EXISTS agent_cron_job (
   COLLATE=utf8mb4_0900_ai_ci
   COMMENT='Agent 定时任务表';
 
-INSERT INTO agent_group_definition (
-    agent_group_uid, group_name, display_name, avatar, description, scene_tags,
-    collaboration_mode, min_agent_count, max_agent_count, owner_agent_uid, sort_index, status, ext_config, created_time, updated_time
-) VALUES
-    ('group_short_drama', 'short_drama_team', '短剧项目组', '🎭', '面向短剧策划、测试、舆情与营销的一体化协作群组。', JSON_ARRAY('short-drama', 'creative', 'operations'),
-     'pipeline', 2, 12, 'agent_general_assistant', 10, 'ACTIVE', JSON_OBJECT(), NOW(3), NOW(3));
-
 INSERT INTO agent_definition (
     agent_uid, agent_name, display_name, avatar, description, capability_tags, prompt_profile,
     model_provider_id, model_id, sort_index, is_group_entry, status, ext_config, created_time, updated_time
@@ -409,11 +402,7 @@ INSERT INTO agent_definition (
     ('agent_public_opinion', 'public_opinion_monitor', '舆情监测', '📡', '负责舆情跟踪、热点观察与风险提示。', JSON_ARRAY('monitoring', 'trend', 'risk'),
      'opinion-specialist', '', '', 30, 0, 'ACTIVE', JSON_OBJECT(), NOW(3), NOW(3)),
     ('agent_marketing_assistant', 'marketing_assistant', '营销助理', '📣', '负责传播文案、活动建议与投放辅助。', JSON_ARRAY('marketing', 'campaign', 'copywriting'),
-     'marketing-specialist', '', '', 40, 0, 'ACTIVE', JSON_OBJECT(), NOW(3), NOW(3)),
-    ('agent_screenwriter', 'screenwriter', '短剧编剧', '✍️', '负责短剧剧情设定、人物弧线与分场创作。', JSON_ARRAY('screenwriting', 'story', 'character'),
-     'screenwriter-specialist', '', '', 50, 0, 'ACTIVE', JSON_OBJECT(), NOW(3), NOW(3)),
-    ('agent_director', 'director', '短剧导演', '🎬', '负责镜头节奏、视听表达与导演层决策。', JSON_ARRAY('direction', 'visual', 'production'),
-     'director-specialist', '', '', 60, 0, 'ACTIVE', JSON_OBJECT(), NOW(3), NOW(3));
+     'marketing-specialist', '', '', 40, 0, 'ACTIVE', JSON_OBJECT(), NOW(3), NOW(3));
 
 INSERT INTO tool_definition (
     tool_key, display_name, description, risk_level, status, sort_index, config_json, created_time, updated_time
@@ -435,16 +424,6 @@ INSERT INTO skill_definition (
     skill_key, display_name, description, skill_path, status, sort_index, config_json, created_time, updated_time
 ) VALUES
     ('pdf', 'pdf', 'Use this skill whenever the task involves reading or generating PDFs.', 'skills/pdf', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3));
-
-INSERT INTO agent_group_member (
-    member_uid, agent_group_uid, agent_uid, member_role, responsibility, sort_index, is_primary, status, created_time, updated_time
-) VALUES
-    ('member_short_drama_general', 'group_short_drama', 'agent_general_assistant', 'owner', '统筹项目组整体规划、协调执行与最终交付。', 10, 1, 'ACTIVE', NOW(3), NOW(3)),
-    ('member_short_drama_test', 'group_short_drama', 'agent_test_expert', 'reviewer', '负责测试方案设计、缺陷校验与质量反馈。', 20, 0, 'ACTIVE', NOW(3), NOW(3)),
-    ('member_short_drama_public', 'group_short_drama', 'agent_public_opinion', 'analyst', '负责舆情监测、风险发现与热点观察。', 30, 0, 'ACTIVE', NOW(3), NOW(3)),
-    ('member_short_drama_marketing', 'group_short_drama', 'agent_marketing_assistant', 'strategist', '负责营销传播建议与活动辅助。', 40, 0, 'ACTIVE', NOW(3), NOW(3)),
-    ('member_short_drama_screenwriter', 'group_short_drama', 'agent_screenwriter', 'creator', '负责短剧剧本、人物与桥段创作。', 50, 0, 'ACTIVE', NOW(3), NOW(3)),
-    ('member_short_drama_director', 'group_short_drama', 'agent_director', 'director', '负责镜头、节奏与导演侧统筹。', 60, 0, 'ACTIVE', NOW(3), NOW(3));
 
 INSERT INTO agent_tool_relation (
     relation_uid, agent_uid, tool_key, status, sort_index, config_json, created_time, updated_time
@@ -475,15 +454,7 @@ INSERT INTO agent_tool_relation (
     ('rel_market_browser', 'agent_marketing_assistant', 'browser_tool', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
     ('rel_market_search', 'agent_marketing_assistant', 'file_search_tool', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
     ('rel_market_time', 'agent_marketing_assistant', 'current_time_tool', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_market_memory', 'agent_marketing_assistant', 'memory_search_tool', 'ACTIVE', 50, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_writer_command', 'agent_screenwriter', 'command_tool', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_writer_file', 'agent_screenwriter', 'file_io_tool', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_writer_time', 'agent_screenwriter', 'current_time_tool', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_writer_memory', 'agent_screenwriter', 'memory_search_tool', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_director_command', 'agent_director', 'command_tool', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_director_browser', 'agent_director', 'browser_tool', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_director_shot', 'agent_director', 'desktop_screenshot_tool', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_director_time', 'agent_director', 'current_time_tool', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3));
+    ('rel_market_memory', 'agent_marketing_assistant', 'memory_search_tool', 'ACTIVE', 50, JSON_OBJECT(), NOW(3), NOW(3));
 
 INSERT INTO agent_skill_relation (
     relation_uid, agent_uid, skill_key, status, sort_index, config_json, created_time, updated_time
@@ -491,9 +462,7 @@ INSERT INTO agent_skill_relation (
     ('rel_general_pdf', 'agent_general_assistant', 'pdf', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
     ('rel_test_pdf', 'agent_test_expert', 'pdf', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
     ('rel_public_pdf', 'agent_public_opinion', 'pdf', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_market_pdf', 'agent_marketing_assistant', 'pdf', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_writer_pdf', 'agent_screenwriter', 'pdf', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_director_pdf', 'agent_director', 'pdf', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3));
+    ('rel_market_pdf', 'agent_marketing_assistant', 'pdf', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3));
 
 INSERT INTO agent_tip (
     tip_uid, agent_uid, title, summary, source_content, source_conversation_uid, source_message_uid,
