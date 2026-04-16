@@ -10,16 +10,23 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import ai.nomoclaw.bot.util.LocalizedMessages;
 
 @RestControllerAdvice
 @Slf4j
 public class AgentExceptionHandler {
 
-    @Value("${spring.servlet.multipart.max-file-size:20MB}")
+    @Value("${spring.servlet.multipart.max-file-size:2MB}")
     private String maxFileSize;
 
     @Value("${spring.servlet.multipart.max-request-size:40MB}")
     private String maxRequestSize;
+
+    private final LocalizedMessages localizedMessages;
+
+    public AgentExceptionHandler(LocalizedMessages localizedMessages) {
+        this.localizedMessages = localizedMessages;
+    }
 
     @ExceptionHandler(IllegalArgumentException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
@@ -39,7 +46,8 @@ public class AgentExceptionHandler {
     @ResponseStatus(HttpStatus.PAYLOAD_TOO_LARGE)
     public SimpleResponse handleUploadTooLarge(MaxUploadSizeExceededException ex) {
         log.warn("[AgentAPI][413] upload too large: {}", ex.getMessage());
-        return new SimpleResponse("上传内容过大：单文件上限 " + maxFileSize + "，总请求上限 " + maxRequestSize + "。");
+        String localizedMessage = localizedMessages.get("api.error.uploadTooLarge", maxFileSize, maxRequestSize);
+        return new SimpleResponse(localizedMessage);
     }
 
     @ExceptionHandler(AsyncRequestNotUsableException.class)

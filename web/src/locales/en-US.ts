@@ -381,7 +381,7 @@ const enUS = {
   http: {
     networkError: "Cannot reach backend service (it may not be started). Start the service and try again.",
     withReason: "{base} Reason: {reason}",
-    400: "Invalid request parameters. Please review your input and retry.",
+    400: "The request could not be processed. Please try again.",
     401: "Session expired. Please sign in again.",
     403: "You do not have permission for this action.",
     404: "Requested resource does not exist or has been removed.",

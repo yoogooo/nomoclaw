@@ -92,7 +92,7 @@ function buildUserFriendlyMessage(status: number, reason: string): string {
   const normalizedReason = reason?.trim() || "";
   const withReason = (base: string) => (normalizedReason ? tr("http.withReason", { base, reason: normalizedReason }) : base);
   if (status === 400) {
-    return withReason(tr("http.400"));
+    return normalizedReason || tr("http.400");
   }
   if (status === 401) {
     return withReason(tr("http.401"));

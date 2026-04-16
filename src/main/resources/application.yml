@@ -51,6 +51,9 @@ agent:
     high-risk-enabled: true
   api:
     local-only-enabled: true
+    chat-upload:
+      max-file-size: 2MB
+      max-request-size: 100MB
 
 nomoclaw:
   root-dir: "${NOMOCLAW_ROOT_DIR:${user.home}/.nomoclaw}"

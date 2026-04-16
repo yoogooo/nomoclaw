@@ -5,6 +5,7 @@ import ai.nomoclaw.bot.application.dto.ModelConfigDto;
 import ai.nomoclaw.bot.store.AgentStore;
 import ai.nomoclaw.bot.store.entity.AgentMessageAttachmentEntity;
 import ai.nomoclaw.bot.store.repository.AgentMessageAttachmentRepository;
+import ai.nomoclaw.bot.util.LocalizedMessages;
 import ai.nomoclaw.bot.workspace.NomoClawPaths;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import dev.langchain4j.data.message.AudioContent;
@@ -13,7 +14,9 @@ import dev.langchain4j.data.message.ImageContent;
 import dev.langchain4j.data.message.PdfFileContent;
 import dev.langchain4j.data.message.TextContent;
 import dev.langchain4j.data.message.VideoContent;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.util.unit.DataSize;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -38,7 +41,6 @@ import java.util.stream.Collectors;
 @Service
 public class ConversationAttachmentAppService {
 
-    private static final long MAX_REQUEST_SIZE_BYTES = 100L * 1024 * 1024;
     private static final List<String> TEXT_MIME_TYPES = List.of(
             "application/json",
             "application/xml",
@@ -51,15 +53,24 @@ public class ConversationAttachmentAppService {
     private final AgentMessageAttachmentRepository attachmentRepository;
     private final ModelConfigAppService modelConfigAppService;
     private final ModelCatalogService modelCatalogService;
+    private final LocalizedMessages localizedMessages;
+    private final long maxChatUploadFileBytes;
+    private final long maxChatUploadRequestBytes;
 
     public ConversationAttachmentAppService(AgentStore store,
                                             AgentMessageAttachmentRepository attachmentRepository,
                                             ModelConfigAppService modelConfigAppService,
-                                            ModelCatalogService modelCatalogService) {
+                                            ModelCatalogService modelCatalogService,
+                                            LocalizedMessages localizedMessages,
+                                            @Value("${agent.api.chat-upload.max-file-size:2MB}") DataSize maxChatUploadFileSize,
+                                            @Value("${agent.api.chat-upload.max-request-size:100MB}") DataSize maxChatUploadRequestSize) {
         this.store = store;
         this.attachmentRepository = attachmentRepository;
         this.modelConfigAppService = modelConfigAppService;
         this.modelCatalogService = modelCatalogService;
+        this.localizedMessages = localizedMessages;
+        this.maxChatUploadFileBytes = maxChatUploadFileSize.toBytes();
+        this.maxChatUploadRequestBytes = maxChatUploadRequestSize.toBytes();
     }
 
     public List<ConversationAttachmentDto> uploadFiles(String conversationUid,
@@ -231,38 +242,39 @@ public class ConversationAttachmentAppService {
     private void validateAttachments(ModelConfigDto.UploadPolicy policy,
                                      List<PendingAttachment> incoming) {
         if (!policy.enabled()) {
-            throw new IllegalArgumentException("current model does not allow file upload");
+            throw new IllegalArgumentException(localizedMessages.get("api.error.uploadDisabled"));
         }
         long totalBytes = incoming.stream().mapToLong(PendingAttachment::sizeBytes).sum();
         long maxTotalBytes = sanitizeNonNegative(policy.maxTotalBytes());
-        long effectiveMaxTotalBytes = maxTotalBytes > 0 ? maxTotalBytes : MAX_REQUEST_SIZE_BYTES;
+        long effectiveMaxTotalBytes = maxTotalBytes > 0 ? maxTotalBytes : maxChatUploadRequestBytes;
         if (totalBytes > effectiveMaxTotalBytes) {
-            throw new IllegalArgumentException("upload size exceeds " + formatBytes(effectiveMaxTotalBytes));
+            throw new IllegalArgumentException(localizedMessages.get("api.error.uploadTotalSizeExceeded", formatBytes(effectiveMaxTotalBytes)));
         }
-        long maxFileBytes = sanitizeNonNegative(policy.maxFileBytes());
-        if (maxFileBytes > 0 && incoming.stream().anyMatch(item -> item.sizeBytes() > maxFileBytes)) {
-            throw new IllegalArgumentException("file size exceeds " + formatBytes(maxFileBytes));
+        long policyMaxFileBytes = sanitizeNonNegative(policy.maxFileBytes());
+        long effectiveMaxFileBytes = minPositive(policyMaxFileBytes, maxChatUploadFileBytes);
+        if (effectiveMaxFileBytes > 0 && incoming.stream().anyMatch(item -> item.sizeBytes() > effectiveMaxFileBytes)) {
+            throw new IllegalArgumentException(localizedMessages.get("api.error.uploadFileSizeExceeded", formatBytes(effectiveMaxFileBytes)));
         }
         if (incoming.isEmpty()) {
             return;
         }
         LinkedHashSet<String> groups = incoming.stream().map(PendingAttachment::mimeGroup).collect(Collectors.toCollection(LinkedHashSet::new));
         if (policy.singleMimeGroupOnly() && groups.size() > 1) {
-            throw new IllegalArgumentException("all files in one message must share the same type");
+            throw new IllegalArgumentException(localizedMessages.get("api.error.uploadSingleMimeGroupOnly"));
         }
         if (!policy.allowedMimeGroups().isEmpty() && groups.stream().anyMatch(group -> !policy.allowedMimeGroups().contains(group))) {
-            throw new IllegalArgumentException("current model does not allow this file type");
+            throw new IllegalArgumentException(localizedMessages.get("api.error.uploadMimeGroupNotAllowed"));
         }
         long imageCount = incoming.stream().filter(item -> "image".equals(item.mimeGroup())).count();
         long nonImageCount = incoming.size() - imageCount;
         if (imageCount > 0 && nonImageCount > 0 && !policy.allowMixedImageAndFile()) {
-            throw new IllegalArgumentException("image and non-image files cannot be mixed");
+            throw new IllegalArgumentException(localizedMessages.get("api.error.uploadMixedImageAndFileNotAllowed"));
         }
         if (imageCount > sanitizeNonNegative(policy.maxImagesPerMessage())) {
-            throw new IllegalArgumentException("too many images for current model");
+            throw new IllegalArgumentException(localizedMessages.get("api.error.uploadTooManyImages"));
         }
         if (nonImageCount > sanitizeNonNegative(policy.maxFilesPerMessage())) {
-            throw new IllegalArgumentException("too many files for current model");
+            throw new IllegalArgumentException(localizedMessages.get("api.error.uploadTooManyFiles"));
         }
     }
 
@@ -273,7 +285,7 @@ public class ConversationAttachmentAppService {
         String contentType = normalizeContentType(file.getContentType());
         String mimeGroup = classifyMimeGroup(contentType, originalName);
         if ("other".equals(mimeGroup)) {
-            throw new IllegalArgumentException("unsupported file type: " + originalName);
+            throw new IllegalArgumentException(localizedMessages.get("api.error.uploadUnsupportedFileType", originalName));
         }
         return new PendingAttachment(
                 originalName,
@@ -387,6 +399,16 @@ public class ConversationAttachmentAppService {
 
     private long sanitizeNonNegative(Long value) {
         return value == null || value < 0 ? 0L : value;
+    }
+
+    private long minPositive(long left, long right) {
+        if (left <= 0) {
+            return right;
+        }
+        if (right <= 0) {
+            return left;
+        }
+        return Math.min(left, right);
     }
 
     private String trim(String value) {
