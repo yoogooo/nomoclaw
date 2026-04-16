@@ -71,6 +71,10 @@ function triggerFilePicker() {
     discreteMessage.info(t("chat.composer.switchingConversation"));
     return;
   }
+  if (!conversationStore.hasAnyConfiguredModel) {
+    conversationStore.guideToModelSetup();
+    return;
+  }
   if (conversationStore.uploadDisabledReason) {
     discreteMessage.info(conversationStore.uploadDisabledReason);
     return;
@@ -117,23 +121,37 @@ async function onDrop(event: DragEvent) {
     discreteMessage.info(t("chat.composer.switchingConversation"));
     return;
   }
+  if (!conversationStore.hasAnyConfiguredModel) {
+    conversationStore.guideToModelSetup();
+    return;
+  }
   if (conversationStore.uploadDisabledReason) {
     discreteMessage.info(conversationStore.uploadDisabledReason);
     return;
   }
   const files = Array.from(event.dataTransfer?.files || []);
   if (files.length) {
-    await conversationStore.uploadFiles(files);
+    try {
+      await conversationStore.uploadFiles(files);
+    } catch {
+      // Errors are surfaced centrally by requestJson/toast; keep handler stable.
+    }
   }
 }
 
 async function onFileChange(event: Event) {
   const target = event.target as HTMLInputElement;
   const files = target.files;
-  if (files?.length) {
-    await conversationStore.uploadFiles(files);
+  try {
+    if (files?.length) {
+      await conversationStore.uploadFiles(files);
+    }
+  } catch {
+    // Errors are surfaced centrally by requestJson/toast; keep handler stable.
+  } finally {
+    // Always reset so selecting the same file again will trigger change.
+    target.value = "";
   }
-  target.value = "";
 }
 
 function onModelChange(value: string) {

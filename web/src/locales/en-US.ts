@@ -386,6 +386,7 @@ const enUS = {
     403: "You do not have permission for this action.",
     404: "Requested resource does not exist or has been removed.",
     409: "Resource state conflict. Operation cannot be completed now.",
+    413: "Upload payload is too large: single file limit {maxFileSize}, total request limit {maxRequestSize}.",
     422: "Submitted content failed validation. Please revise and retry.",
     429: "Too many requests. Please try again later.",
     500: "Service is temporarily unavailable. Please try again later.",

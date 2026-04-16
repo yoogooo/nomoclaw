@@ -8,6 +8,7 @@ import { dialog, message, warningDialogPreset } from "@/discrete";
 import { tr } from "@/i18n";
 import { useAgentCatalogStore } from "@/stores/agentCatalog";
 import { useConversationRunsStore } from "@/stores/conversationRuns";
+import { useModelGateStore } from "@/stores/modelGate";
 import { useRuntimeLogStore } from "@/stores/runtimeLog";
 import type {
   AgentEvent,
@@ -119,6 +120,7 @@ export const useConversationStore = defineStore("conversation", () => {
   const agentCatalogStore = useAgentCatalogStore();
   const runtimeLogStore = useRuntimeLogStore();
   const conversationRunsStore = useConversationRunsStore();
+  const modelGateStore = useModelGateStore();
 
   const conversations = ref<ConversationSummary[]>([]);
   const currentConversationUid = ref<string | null>(null);
@@ -187,6 +189,7 @@ export const useConversationStore = defineStore("conversation", () => {
       }))
       .filter((group) => group.children.length)
   );
+  const hasAnyConfiguredModel = computed(() => configuredProviders.value.length > 0);
 
   const currentModelOption = computed<ModelProviderOption | null>(() => {
     if (!selectedModelProvider.value || !selectedModelName.value) {
@@ -223,6 +226,18 @@ export const useConversationStore = defineStore("conversation", () => {
       return false;
     }
     return provider.models.some((model) => model.id === modelName);
+  }
+
+  function promptModelSetupGuide() {
+    modelGateStore.resetPrompt();
+    if (!modelGateStore.checking) {
+      void modelGateStore.refreshModelReadiness();
+    }
+  }
+
+  function guideToModelSetup() {
+    promptModelSetupGuide();
+    message.warning(tr("modelGate.status.missingModel"));
   }
 
   function clearApproval() {
@@ -674,6 +689,10 @@ export const useConversationStore = defineStore("conversation", () => {
     if (!files.length) {
       return;
     }
+    if (!hasAnyConfiguredModel.value) {
+      guideToModelSetup();
+      return;
+    }
     try {
       validateFilesAgainstPolicy(currentUploadPolicy.value, draftAttachments.value, files);
     } catch (error) {
@@ -717,6 +736,10 @@ export const useConversationStore = defineStore("conversation", () => {
       return;
     }
     if (!selectedModelProvider.value || !selectedModelName.value) {
+      if (!hasAnyConfiguredModel.value) {
+        guideToModelSetup();
+        return;
+      }
       message.error(tr("toast.chooseModelFirst"));
       return;
     }
@@ -727,6 +750,10 @@ export const useConversationStore = defineStore("conversation", () => {
     const effectiveProvider = hasConfiguredModel(lockedProvider, lockedModelName) ? lockedProvider : selectedModelProvider.value;
     const effectiveModelName = hasConfiguredModel(lockedProvider, lockedModelName) ? lockedModelName : selectedModelName.value;
     if (!effectiveProvider || !effectiveModelName) {
+      if (!hasAnyConfiguredModel.value) {
+        guideToModelSetup();
+        return;
+      }
       message.error(tr("toast.chooseModelFirst"));
       return;
     }
@@ -1055,6 +1082,8 @@ export const useConversationStore = defineStore("conversation", () => {
     selectedModelKey,
     currentUploadPolicy,
     uploadDisabledReason,
+    hasAnyConfiguredModel,
+    guideToModelSetup,
     init,
     loadModelConfig,
     refreshConversations,

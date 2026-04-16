@@ -106,6 +106,12 @@ function buildUserFriendlyMessage(status: number, reason: string): string {
   if (status === 409) {
     return withReason(tr("http.409"));
   }
+  if (status === 413) {
+    return tr("http.413", {
+      maxFileSize: "20MB",
+      maxRequestSize: "40MB"
+    });
+  }
   if (status === 422) {
     return withReason(tr("http.422"));
   }
