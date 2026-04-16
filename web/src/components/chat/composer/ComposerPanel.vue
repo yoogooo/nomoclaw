@@ -44,6 +44,9 @@ const uploadHint = computed(() => {
 function onKeydown(event: KeyboardEvent) {
   if (event.key === "Enter" && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && !event.isComposing) {
     event.preventDefault();
+    if (isRunningCurrentConversation.value) {
+      return;
+    }
     void conversationStore.sendMessage();
   }
 }
