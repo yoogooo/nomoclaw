@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { ArrowDown, ArrowUp, Check, Copy, Sparkles } from "lucide-vue-next";
 import { NButton, NCard, NCollapse, NCollapseItem, NFlex, NPopconfirm, NTag } from "naive-ui";
@@ -24,6 +24,8 @@ const copiedMessageMap = ref<Record<string, boolean>>({});
 const savingTipMap = ref<Record<string, boolean>>({});
 const savedTipMap = ref<Record<string, boolean>>({});
 const expandedUserMessageMap = ref<Record<string, boolean>>({});
+const messageListRef = ref<HTMLElement | null>(null);
+const shouldScrollToBottomOnNextRender = ref(true);
 const userMessageCollapseLineLimit = 10;
 const savedTipMessageUidSet = computed(() => {
   const uidSet = new Set<string>();
@@ -244,11 +246,54 @@ function applyStarterPrompt(prompt: string) {
     input.setSelectionRange(length, length);
   });
 }
+
+async function scrollToConversationBottom() {
+  await nextTick();
+  // Rich content such as tables and images can expand after the first paint,
+  // so keep nudging the scroll position for a few frames until layout settles.
+  const attemptScroll = (remainingFrames: number) => {
+    window.requestAnimationFrame(() => {
+      const element = messageListRef.value;
+      if (!element) return;
+      element.scrollTop = element.scrollHeight;
+      if (remainingFrames > 0) {
+        attemptScroll(remainingFrames - 1);
+      }
+    });
+  };
+  attemptScroll(6);
+}
+
+// Entering a conversation should always jump to the latest message immediately.
+watch(
+  () => conversationStore.currentConversationUid,
+  () => {
+    shouldScrollToBottomOnNextRender.value = true;
+    void scrollToConversationBottom();
+  }
+);
+
+// Message arrays are replaced after history loads, even when the message count
+// stays the same, so watch the list reference instead of only its length.
+watch(
+  () => conversationStore.messages,
+  () => {
+    if (!shouldScrollToBottomOnNextRender.value) return;
+    void scrollToConversationBottom();
+    shouldScrollToBottomOnNextRender.value = false;
+  },
+  { deep: false }
+);
+
+onMounted(() => {
+  void scrollToConversationBottom();
+  shouldScrollToBottomOnNextRender.value = false;
+});
 </script>
 
 <template>
   <section class="panel message-panel">
-    <div class="panel-body message-list scroll-area">
+    <div ref="messageListRef" class="panel-body message-list scroll-area">
       <div
         v-if="!conversationStore.messages.length && !isRunningCurrentConversation"
         class="conversation-empty-state"
