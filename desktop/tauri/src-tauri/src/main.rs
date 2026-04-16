@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use anyhow::{anyhow, Context, Result};
+use chrono::Local;
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -1124,7 +1125,7 @@ fn js_escape(input: &str) -> String {
 // ===== persisted bootstrap prefs =====
 // These prefs are used before web app hydration to style/localize the loading page.
 fn bootstrap_prefs_file_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf> {
-    Ok(app_data_dir(app)?.join(BOOTSTRAP_PREFS_FILE))
+    Ok(nomoclaw_root_dir(app)?.join(BOOTSTRAP_PREFS_FILE))
 }
 
 fn read_bootstrap_prefs<R: Runtime>(app: &AppHandle<R>) -> Result<BootstrapPrefs> {
@@ -1142,6 +1143,10 @@ fn read_bootstrap_prefs<R: Runtime>(app: &AppHandle<R>) -> Result<BootstrapPrefs
 
 fn write_bootstrap_prefs<R: Runtime>(app: &AppHandle<R>, prefs: BootstrapPrefs) -> Result<()> {
     let path = bootstrap_prefs_file_path(app)?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("failed to create bootstrap prefs dir: {}", parent.display()))?;
+    }
     let normalized = prefs.normalized();
     let payload = serde_json::to_string_pretty(&normalized)?;
     fs::write(&path, format!("{payload}\n"))
@@ -1456,22 +1461,61 @@ fn is_port_available(port: u16) -> bool {
 }
 
 fn ensure_log_file_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf> {
-    let app_data_dir = app
-        .path()
-        .app_data_dir()
-        .context("failed to resolve app data directory")?;
-    let logs_dir = app_data_dir.join("logs");
+    let logs_dir = nomoclaw_root_dir(app)?.join("logs");
     fs::create_dir_all(&logs_dir)
         .with_context(|| format!("failed to create logs directory: {}", logs_dir.display()))?;
-    Ok(logs_dir.join("backend.log"))
+    Ok(logs_dir.join(current_backend_log_file_name()))
 }
 
-fn app_data_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf> {
-    let dir = app
-        .path()
-        .app_data_dir()
-        .context("failed to resolve app data directory")?;
-    fs::create_dir_all(&dir).with_context(|| format!("failed to create app data dir: {}", dir.display()))?;
+fn current_backend_log_file_name() -> String {
+    format!("backend-{}.log", Local::now().format("%Y%m%d"))
+}
+
+fn nomoclaw_root_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf> {
+    if let Ok(configured) = env::var("NOMOCLAW_ROOT_DIR") {
+        let trimmed = configured.trim();
+        if !trimmed.is_empty() {
+            return Ok(PathBuf::from(trimmed));
+        }
+    }
+    let home_dir = resolve_home_dir(app)?;
+    Ok(home_dir.join(".nomoclaw"))
+}
+
+fn resolve_home_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf> {
+    if let Some(home) = env::var_os("HOME") {
+        let path = PathBuf::from(home);
+        if !path.as_os_str().is_empty() {
+            return Ok(path);
+        }
+    }
+    #[cfg(windows)]
+    {
+        if let Some(user_profile) = env::var_os("USERPROFILE") {
+            let path = PathBuf::from(user_profile);
+            if !path.as_os_str().is_empty() {
+                return Ok(path);
+            }
+        }
+        let home_drive = env::var_os("HOMEDRIVE");
+        let home_path = env::var_os("HOMEPATH");
+        if let (Some(drive), Some(path)) = (home_drive, home_path) {
+            let mut combined = PathBuf::from(drive);
+            combined.push(path);
+            if !combined.as_os_str().is_empty() {
+                return Ok(combined);
+            }
+        }
+    }
+    app.path()
+        .home_dir()
+        .context("failed to resolve home directory")
+}
+
+fn runtime_state_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf> {
+    let dir = nomoclaw_root_dir(app)?.join("runtime");
+    fs::create_dir_all(&dir)
+        .with_context(|| format!("failed to create runtime state dir: {}", dir.display()))?;
     Ok(dir)
 }
 
@@ -1510,7 +1554,7 @@ fn is_dev_attach_mode() -> bool {
 // ===== single-instance lock + process-group cleanup =====
 // TODO(refactor): isolate into lock_and_cleanup.rs with unit tests.
 fn acquire_single_instance_lock<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
-    let lock_path = app_data_dir(app)?.join(INSTANCE_LOCK_FILE);
+    let lock_path = runtime_state_dir(app)?.join(INSTANCE_LOCK_FILE);
 
     let try_create = || -> Result<()> {
         let mut file = OpenOptions::new()
@@ -1541,14 +1585,14 @@ fn acquire_single_instance_lock<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
 }
 
 fn release_single_instance_lock<R: Runtime>(app: &AppHandle<R>) {
-    if let Ok(lock_path) = app_data_dir(app).map(|dir| dir.join(INSTANCE_LOCK_FILE)) {
+    if let Ok(lock_path) = runtime_state_dir(app).map(|dir| dir.join(INSTANCE_LOCK_FILE)) {
         let _ = fs::remove_file(lock_path);
     }
 }
 
 #[cfg(unix)]
 fn backend_pgid_file_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf> {
-    Ok(app_data_dir(app)?.join(BACKEND_PGID_FILE))
+    Ok(runtime_state_dir(app)?.join(BACKEND_PGID_FILE))
 }
 
 #[cfg(unix)]
