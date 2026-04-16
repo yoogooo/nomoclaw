@@ -337,6 +337,8 @@ build_tauri_config_override() {
     fi
   elif [[ -f "$ROOT_DIR/build/windows/NomoClaw.ico" ]]; then
     icon_path="$ROOT_DIR/build/windows/NomoClaw.ico"
+  elif [[ -f "$DESKTOP_TAURI_DIR/icons/icon.ico" ]]; then
+    icon_path="$DESKTOP_TAURI_DIR/icons/icon.ico"
   fi
 
   node -e '

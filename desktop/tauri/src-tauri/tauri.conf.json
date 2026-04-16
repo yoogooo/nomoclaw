@@ -25,6 +25,7 @@
       "dmg"
     ],
     "icon": [
+      "icons/icon.ico",
       "../../../build/macos/NomoClaw.icns",
       "icons/icon.png"
     ],
