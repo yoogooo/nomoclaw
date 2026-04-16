@@ -3,7 +3,6 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { ChevronLeft } from "lucide-vue-next";
 import DirectoryRail from "@/components/chat/DirectoryRail.vue";
-import AgentSidebar from "@/components/chat/AgentSidebar.vue";
 import ConversationSidebar from "@/components/chat/ConversationSidebar.vue";
 import MessagesPanel from "@/components/chat/MessagesPanel.vue";
 import RuntimeLogPanel from "@/components/chat/RuntimeLogPanel.vue";
@@ -62,7 +61,6 @@ watch(
   <div class="page-frame chat-page">
     <div class="grid-chat" :class="{ 'runtime-collapsed': runtimeAreaCollapsed }">
       <DirectoryRail />
-      <AgentSidebar />
       <ConversationSidebar />
       <MessagesPanel />
       <RuntimeLogPanel v-if="showRuntimeLogPanel && !runtimeCollapsed" :collapsed="runtimeCollapsed" @toggle="runtimeCollapsed = !runtimeCollapsed" />

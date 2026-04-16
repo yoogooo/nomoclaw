@@ -31,7 +31,7 @@ export const useAgentCatalogStore = defineStore("agentCatalog", () => {
         agentGroupUid: string;
         agentUid: string;
       }>;
-      selectedEntryType.value = saved.entryType === "group" ? "group" : "agent";
+      selectedEntryType.value = "agent";
       selectedAgentGroupUid.value = saved.agentGroupUid || selectedAgentGroupUid.value;
       selectedAgentUid.value = saved.agentUid || selectedAgentUid.value;
     } catch {
@@ -47,11 +47,11 @@ export const useAgentCatalogStore = defineStore("agentCatalog", () => {
       return;
     }
 
-    const currentGroup = groups.value.find((item) => item.agentGroupUid === selectedAgentGroupUid.value);
     const currentAgent = groups.value.flatMap((item) => item.agents).find((item) => item.agentUid === selectedAgentUid.value);
-    const stillExists = selectedEntryType.value === "group" ? Boolean(currentGroup) : Boolean(currentAgent);
+    const stillExists = Boolean(currentAgent);
 
     if (stillExists) {
+      selectedEntryType.value = "agent";
       return;
     }
 
@@ -64,10 +64,7 @@ export const useAgentCatalogStore = defineStore("agentCatalog", () => {
   }
 
   function matchesConversation(conversation: ConversationSummary) {
-    if (selectedEntryType.value === "group") {
-      return conversation.agentGroupUid === selectedAgentGroupUid.value;
-    }
-    return conversation.agentUid === selectedAgentUid.value;
+    return Boolean(conversation.agentUid) && conversation.agentUid === selectedAgentUid.value;
   }
 
   async function loadCatalog() {
@@ -83,9 +80,10 @@ export const useAgentCatalogStore = defineStore("agentCatalog", () => {
   }
 
   function selectGroup(agentGroupUid: string) {
-    selectedEntryType.value = "group";
+    selectedEntryType.value = "agent";
     selectedAgentGroupUid.value = agentGroupUid;
-    selectedAgentUid.value = "";
+    const group = groups.value.find((item) => item.agentGroupUid === agentGroupUid);
+    selectedAgentUid.value = group?.agents[0]?.agentUid || selectedAgentUid.value;
     persistSelection();
   }
 

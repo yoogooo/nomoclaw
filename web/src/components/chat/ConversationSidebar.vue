@@ -1,13 +1,19 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { NButton, NCard, NDropdown, NInput, NModal } from "naive-ui";
-import type { DropdownOption, InputInst } from "naive-ui";
+import { NButton, NDropdown, NInput, NModal, NSelect, type DropdownOption, type InputInst, type SelectOption } from "naive-ui";
 import { RefreshCw } from "lucide-vue-next";
 import { useAgentCatalogStore } from "@/stores/agentCatalog";
 import { useConversationStore } from "@/stores/conversation";
 import { message as discreteMessage } from "@/discrete";
-import { conversationSelectionLabel, formatFriendlyDateTime } from "@/utils/format";
+import { formatFriendlyDateTime } from "@/utils/format";
+import { getSortLocale } from "@/i18n";
+
+type AgentSelectOption = SelectOption & {
+  value: string;
+  agentGroupUid: string;
+  rawName: string;
+};
 
 const conversationStore = useConversationStore();
 const agentCatalogStore = useAgentCatalogStore();
@@ -19,33 +25,38 @@ const renameSubmitting = ref(false);
 const renameInputRef = ref<InputInst | null>(null);
 const refreshingHistory = ref(false);
 
-function hasHanText(value: string) {
-  return /[\u4e00-\u9fff]/.test(value);
-}
+const agentOptions = computed<AgentSelectOption[]>(() =>
+  [...agentCatalogStore.allAgents]
+    .sort((left, right) => {
+      if (left.sortIndex !== right.sortIndex) {
+        return left.sortIndex - right.sortIndex;
+      }
+      return (left.displayName || left.agentName).localeCompare(right.displayName || right.agentName, getSortLocale());
+    })
+    .map((agent) => ({
+      label: agent.displayName || agent.agentName,
+      value: agent.agentUid,
+      agentGroupUid: agent.agentGroupUid,
+      rawName: agent.agentName
+    }))
+);
 
-function normalizeLabelForLocale(label: string) {
-  if (locale.value !== "en-US" || !hasHanText(label)) {
-    return label;
-  }
-  if (agentCatalogStore.selectedEntryType === "group") {
-    return agentCatalogStore.selectedAgentGroupUid || label;
-  }
-  const selectedAgent = agentCatalogStore.allAgents.find((item) => item.agentUid === agentCatalogStore.selectedAgentUid);
-  return selectedAgent?.agentName || label;
-}
+const selectedAgentUid = computed(() => agentCatalogStore.selectedAgentUid);
 
-const description = computed(() => {
-  const rawLabel = conversationSelectionLabel(
-    agentCatalogStore.groups,
-    agentCatalogStore.selectedEntryType,
-    agentCatalogStore.selectedAgentGroupUid,
-    agentCatalogStore.selectedAgentUid
-  );
-  const label = normalizeLabelForLocale(rawLabel);
-  return agentCatalogStore.selectedEntryType === "group"
-    ? t("chat.sidebar.viewingGroup", { label })
-    : t("chat.sidebar.viewingAgent", { label });
+const selectedAgentLabel = computed(() => {
+  const selected = agentOptions.value.find((item) => item.value === agentCatalogStore.selectedAgentUid);
+  if (!selected) {
+    return "";
+  }
+  const fallback = String(selected.label || "");
+  if (locale.value !== "en-US") {
+    return fallback;
+  }
+  const rawName = String(selected.rawName || "");
+  return rawName || fallback;
 });
+
+const description = computed(() => t("chat.sidebar.viewingAgent", { label: selectedAgentLabel.value || t("chat.sidebar.noAgentSelected") }));
 
 type ConversationMenuKey = "rename" | "delete";
 
@@ -128,6 +139,17 @@ async function refreshHistoryConversations() {
   }
 }
 
+function handleAgentChange(agentUid: string | number | null) {
+  if (!agentUid) {
+    return;
+  }
+  const selected = agentOptions.value.find((item) => item.value === String(agentUid));
+  if (!selected) {
+    return;
+  }
+  agentCatalogStore.selectAgent(selected.agentGroupUid, selected.value);
+  void conversationStore.applyAgentSelection();
+}
 </script>
 
 <template>
@@ -148,6 +170,17 @@ async function refreshHistoryConversations() {
             {{ t("chat.sidebar.createConversation") }}
           </button>
         </div>
+      </div>
+      <div class="agent-select-wrap">
+        <div class="agent-select-label">{{ t("chat.sidebar.agentSelector") }}</div>
+        <n-select
+          :value="selectedAgentUid"
+          :options="agentOptions"
+          filterable
+          size="small"
+          :placeholder="t('chat.sidebar.agentSelectorPlaceholder')"
+          @update:value="handleAgentChange"
+        />
       </div>
       <div class="panel-subtitle">{{ description }}</div>
     </div>
@@ -221,6 +254,19 @@ async function refreshHistoryConversations() {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+}
+
+.agent-select-wrap {
+  margin-top: var(--space-3_5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.agent-select-label {
+  font-size: var(--text-caption-size);
+  color: var(--color-text-secondary);
+  font-weight: 600;
 }
 
 .refresh-conversation-button {

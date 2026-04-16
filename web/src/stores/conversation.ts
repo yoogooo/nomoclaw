@@ -646,8 +646,8 @@ export const useConversationStore = defineStore("conversation", () => {
       return currentConversationUid.value;
     }
 
-    const createGroupUid = agentCatalogStore.selectedEntryType === "group" ? agentCatalogStore.selectedAgentGroupUid : "";
-    const createAgentUid = agentCatalogStore.selectedEntryType === "group" ? "" : agentCatalogStore.selectedAgentUid;
+    const createGroupUid = "";
+    const createAgentUid = agentCatalogStore.selectedAgentUid;
     const created = await conversationApi.createConversation(createGroupUid, createAgentUid);
     currentConversationUid.value = created.conversationUid;
     await refreshConversations(created.conversationUid);
