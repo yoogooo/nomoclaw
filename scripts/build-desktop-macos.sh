@@ -273,7 +273,7 @@ build_runtime() {
     --strip-debug \
     --no-header-files \
     --no-man-pages \
-    --compress=2 \
+    --compress=zip-6 \
     --output "$runtime_dir"
 
   if [[ -x "$runtime_dir/bin/java" ]]; then

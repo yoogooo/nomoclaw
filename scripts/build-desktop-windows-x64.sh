@@ -290,7 +290,7 @@ build_runtime() {
   log "Creating jlink runtime (x64)"
   jlink \
     --add-modules "$modules" \
-    --compress=2 \
+    --compress=zip-6 \
     --strip-debug \
     --no-header-files \
     --no-man-pages \

@@ -287,7 +287,7 @@ log "Creating runtime image"
 rm -rf "$RUNTIME_DIR"
 run_arch "$JLINK_BIN" \
   --add-modules "$MODULES" \
-  --compress=2 \
+  --compress=zip-6 \
   --strip-native-commands \
   --strip-debug \
   --no-header-files \
