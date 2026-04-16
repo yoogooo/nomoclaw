@@ -39,7 +39,7 @@ class ModelCatalogServiceTests {
         assertThat(metadata.matched()).isTrue();
         assertThat(metadata.inputModalities()).contains("text", "image");
         assertThat(metadata.uploadPolicy().enabled()).isTrue();
-        assertThat(metadata.uploadPolicy().maxImagesPerMessage()).isEqualTo(10);
+        assertThat(metadata.uploadPolicy().maxImagesPerMessage()).isEqualTo(1500);
     }
 
     @Test
@@ -47,7 +47,7 @@ class ModelCatalogServiceTests {
         NomoClawPaths.configureRoot(tempDir);
         ModelCatalogService service = new ModelCatalogService(HttpClient.newHttpClient(), "");
 
-        var alias = service.resolve("openai", "gpt-4o");
+        var alias = service.resolve("dashscope", "qwen3-max-2026-01-23");
         var global = service.resolve("aliyun-codingplan", "gpt-4o");
 
         assertThat(alias.matched()).isTrue();

@@ -1,19 +1,28 @@
 {
   "schemaVersion": 1,
-  "catalogVersion": "2026-04-15.1",
-  "generatedAt": "2026-04-15T00:00:00Z",
+  "catalogVersion": "2026-04-16.1",
+  "generatedAt": "2026-04-16T00:00:00Z",
   "models": [
     {
-      "providerIds": ["dashscope", "aliyun-codingplan"],
+      "providerIds": [
+        "dashscope",
+        "aliyun-codingplan"
+      ],
       "modelId": "qwen3-max",
       "displayName": "Qwen3 Max",
-      "aliases": ["qwen3-max-2026-01-23"],
-      "inputModalities": ["text"],
-      "outputModalities": ["text"],
+      "aliases": [
+        "qwen3-max-2026-01-23"
+      ],
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
       "reasoning": true,
-      "contextWindowTokens": 0,
-      "maxInputTokens": 0,
-      "maxOutputTokens": 0,
+      "contextWindowTokens": 262144,
+      "maxInputTokens": 258048,
+      "maxOutputTokens": 65536,
       "uploadPolicy": {
         "enabled": false,
         "allowedMimeGroups": [],
@@ -24,71 +33,108 @@
         "singleMimeGroupOnly": false,
         "allowMixedImageAndFile": false
       },
-      "sourceRefs": ["https://help.aliyun.com/zh/model-studio/"],
-      "lastVerifiedAt": "2026-04-15",
-      "confidence": "medium"
+      "sourceRefs": [
+        "https://help.aliyun.com/zh/model-studio/models"
+      ],
+      "lastVerifiedAt": "2026-04-16",
+      "confidence": "high"
     },
     {
-      "providerIds": ["dashscope", "aliyun-codingplan"],
+      "providerIds": [
+        "dashscope",
+        "aliyun-codingplan"
+      ],
       "modelId": "qwen3.5-plus",
       "displayName": "Qwen3.5 Plus",
       "aliases": [],
-      "inputModalities": ["text", "image", "pdf", "file"],
-      "outputModalities": ["text"],
+      "inputModalities": [
+        "text",
+        "image",
+        "video"
+      ],
+      "outputModalities": [
+        "text"
+      ],
       "reasoning": true,
-      "contextWindowTokens": 0,
-      "maxInputTokens": 0,
-      "maxOutputTokens": 0,
+      "contextWindowTokens": 1000000,
+      "maxInputTokens": 983616,
+      "maxOutputTokens": 65536,
       "uploadPolicy": {
         "enabled": true,
-        "allowedMimeGroups": ["image", "pdf", "text"],
+        "allowedMimeGroups": [
+          "image",
+          "video"
+        ],
         "maxFilesPerMessage": 1,
-        "maxImagesPerMessage": 5,
-        "maxFileBytes": 20971520,
+        "maxImagesPerMessage": 10,
+        "maxFileBytes": 0,
         "maxTotalBytes": 104857600,
         "singleMimeGroupOnly": true,
         "allowMixedImageAndFile": false
       },
-      "sourceRefs": ["https://help.aliyun.com/zh/model-studio/"],
-      "lastVerifiedAt": "2026-04-15",
-      "confidence": "medium"
+      "sourceRefs": [
+        "https://help.aliyun.com/zh/model-studio/models"
+      ],
+      "lastVerifiedAt": "2026-04-16",
+      "confidence": "high"
     },
     {
-      "providerIds": ["dashscope"],
+      "providerIds": [
+        "dashscope"
+      ],
       "modelId": "qwen3.6-plus",
       "displayName": "Qwen3.6 Plus",
       "aliases": [],
-      "inputModalities": ["text", "image"],
-      "outputModalities": ["text"],
+      "inputModalities": [
+        "text",
+        "image",
+        "video"
+      ],
+      "outputModalities": [
+        "text"
+      ],
       "reasoning": true,
-      "contextWindowTokens": 0,
-      "maxInputTokens": 0,
-      "maxOutputTokens": 0,
+      "contextWindowTokens": 1000000,
+      "maxInputTokens": 983616,
+      "maxOutputTokens": 65536,
       "uploadPolicy": {
         "enabled": true,
-        "allowedMimeGroups": ["image"],
-        "maxFilesPerMessage": 0,
-        "maxImagesPerMessage": 5,
-        "maxFileBytes": 20971520,
+        "allowedMimeGroups": [
+          "image",
+          "video"
+        ],
+        "maxFilesPerMessage": 1,
+        "maxImagesPerMessage": 10,
+        "maxFileBytes": 0,
         "maxTotalBytes": 104857600,
         "singleMimeGroupOnly": true,
         "allowMixedImageAndFile": false
       },
-      "sourceRefs": ["https://help.aliyun.com/zh/model-studio/"],
-      "lastVerifiedAt": "2026-04-15",
-      "confidence": "medium"
+      "sourceRefs": [
+        "https://help.aliyun.com/zh/model-studio/models"
+      ],
+      "lastVerifiedAt": "2026-04-16",
+      "confidence": "high"
     },
     {
-      "providerIds": ["aliyun-codingplan"],
+      "providerIds": [
+        "aliyun-codingplan"
+      ],
       "modelId": "qwen3-coder-next",
       "displayName": "Qwen3 Coder Next",
-      "aliases": ["qwen3-coder-plus"],
-      "inputModalities": ["text"],
-      "outputModalities": ["text"],
+      "aliases": [
+        "qwen3-coder-plus"
+      ],
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
       "reasoning": true,
-      "contextWindowTokens": 0,
-      "maxInputTokens": 0,
-      "maxOutputTokens": 0,
+      "contextWindowTokens": 262144,
+      "maxInputTokens": 204800,
+      "maxOutputTokens": 65536,
       "uploadPolicy": {
         "enabled": false,
         "allowedMimeGroups": [],
@@ -99,21 +145,31 @@
         "singleMimeGroupOnly": false,
         "allowMixedImageAndFile": false
       },
-      "sourceRefs": ["https://help.aliyun.com/zh/model-studio/"],
-      "lastVerifiedAt": "2026-04-15",
-      "confidence": "medium"
+      "sourceRefs": [
+        "https://help.aliyun.com/zh/model-studio/models"
+      ],
+      "lastVerifiedAt": "2026-04-16",
+      "confidence": "high"
     },
     {
-      "providerIds": ["aliyun-codingplan"],
+      "providerIds": [
+        "aliyun-codingplan"
+      ],
       "modelId": "glm-5",
       "displayName": "GLM-5",
-      "aliases": ["glm-4.7"],
-      "inputModalities": ["text"],
-      "outputModalities": ["text"],
+      "aliases": [
+        "glm-4.7"
+      ],
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
       "reasoning": true,
-      "contextWindowTokens": 0,
+      "contextWindowTokens": 204800,
       "maxInputTokens": 0,
-      "maxOutputTokens": 0,
+      "maxOutputTokens": 131072,
       "uploadPolicy": {
         "enabled": false,
         "allowedMimeGroups": [],
@@ -124,19 +180,33 @@
         "singleMimeGroupOnly": false,
         "allowMixedImageAndFile": false
       },
-      "sourceRefs": ["https://open.bigmodel.cn/dev/api"],
-      "lastVerifiedAt": "2026-04-15",
-      "confidence": "low"
+      "sourceRefs": [
+        "https://docs.bigmodel.cn/cn/coding-plan/using5-1",
+        "https://docs.bigmodel.cn/cn/guide/start/concept-param"
+      ],
+      "lastVerifiedAt": "2026-04-16",
+      "confidence": "high"
     },
     {
-      "providerIds": ["aliyun-codingplan", "minimax-cn"],
+      "providerIds": [
+        "aliyun-codingplan",
+        "minimax-cn"
+      ],
       "modelId": "MiniMax-M2.5",
       "displayName": "MiniMax M2.5",
-      "aliases": ["MiniMax-M2.5-highspeed", "MiniMax-M2.7", "MiniMax-M2.7-highspeed"],
-      "inputModalities": ["text"],
-      "outputModalities": ["text"],
+      "aliases": [
+        "MiniMax-M2.5-highspeed",
+        "MiniMax-M2.7",
+        "MiniMax-M2.7-highspeed"
+      ],
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
       "reasoning": true,
-      "contextWindowTokens": 0,
+      "contextWindowTokens": 204800,
       "maxInputTokens": 0,
       "maxOutputTokens": 0,
       "uploadPolicy": {
@@ -149,19 +219,69 @@
         "singleMimeGroupOnly": false,
         "allowMixedImageAndFile": false
       },
-      "sourceRefs": ["https://platform.minimaxi.com/document"],
-      "lastVerifiedAt": "2026-04-15",
-      "confidence": "medium"
+      "sourceRefs": [
+        "https://platform.minimaxi.com/docs/guides/text-generation",
+        "https://platform.minimaxi.com/docs/api-reference/api-overview"
+      ],
+      "lastVerifiedAt": "2026-04-16",
+      "confidence": "high"
     },
     {
-      "providerIds": ["kimi-cn", "aliyun-codingplan"],
+      "providerIds": [
+        "kimi-cn",
+        "aliyun-codingplan"
+      ],
       "modelId": "kimi-k2.5",
       "displayName": "Kimi K2.5",
-      "aliases": ["kimi-k2-0905-preview", "kimi-k2-0711-preview", "kimi-k2-turbo-preview", "kimi-k2-thinking", "kimi-k2-thinking-turbo"],
-      "inputModalities": ["text"],
-      "outputModalities": ["text"],
+      "aliases": [],
+      "inputModalities": [
+        "text",
+        "image",
+        "video"
+      ],
+      "outputModalities": [
+        "text"
+      ],
       "reasoning": true,
-      "contextWindowTokens": 0,
+      "contextWindowTokens": 262144,
+      "maxInputTokens": 0,
+      "maxOutputTokens": 0,
+      "uploadPolicy": {
+        "enabled": true,
+        "allowedMimeGroups": [
+          "image",
+          "video"
+        ],
+        "maxFilesPerMessage": 1,
+        "maxImagesPerMessage": 10,
+        "maxFileBytes": 0,
+        "maxTotalBytes": 104857600,
+        "singleMimeGroupOnly": true,
+        "allowMixedImageAndFile": false
+      },
+      "sourceRefs": [
+        "https://platform.kimi.ai/docs/guide/kimi-k2-5-quickstart",
+        "https://platform.kimi.ai/docs/models"
+      ],
+      "lastVerifiedAt": "2026-04-16",
+      "confidence": "high"
+    },
+    {
+      "providerIds": [
+        "kimi-cn",
+        "aliyun-codingplan"
+      ],
+      "modelId": "kimi-k2-0905-preview",
+      "displayName": "Kimi K2 0905 Preview",
+      "aliases": [],
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "reasoning": false,
+      "contextWindowTokens": 262144,
       "maxInputTokens": 0,
       "maxOutputTokens": 0,
       "uploadPolicy": {
@@ -174,109 +294,422 @@
         "singleMimeGroupOnly": false,
         "allowMixedImageAndFile": false
       },
-      "sourceRefs": ["https://platform.moonshot.ai/docs/"],
-      "lastVerifiedAt": "2026-04-15",
-      "confidence": "medium"
+      "sourceRefs": [
+        "https://platform.kimi.ai/docs/models",
+        "https://platform.kimi.ai/docs/pricing/chat"
+      ],
+      "lastVerifiedAt": "2026-04-16",
+      "confidence": "high"
     },
     {
-      "providerIds": ["openai"],
+      "providerIds": [
+        "kimi-cn",
+        "aliyun-codingplan"
+      ],
+      "modelId": "kimi-k2-0711-preview",
+      "displayName": "Kimi K2 0711 Preview",
+      "aliases": [],
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "reasoning": false,
+      "contextWindowTokens": 131072,
+      "maxInputTokens": 0,
+      "maxOutputTokens": 0,
+      "uploadPolicy": {
+        "enabled": false,
+        "allowedMimeGroups": [],
+        "maxFilesPerMessage": 0,
+        "maxImagesPerMessage": 0,
+        "maxFileBytes": 0,
+        "maxTotalBytes": 0,
+        "singleMimeGroupOnly": false,
+        "allowMixedImageAndFile": false
+      },
+      "sourceRefs": [
+        "https://platform.kimi.ai/docs/models",
+        "https://platform.kimi.ai/docs/pricing/chat"
+      ],
+      "lastVerifiedAt": "2026-04-16",
+      "confidence": "high"
+    },
+    {
+      "providerIds": [
+        "kimi-cn",
+        "aliyun-codingplan"
+      ],
+      "modelId": "kimi-k2-turbo-preview",
+      "displayName": "Kimi K2 Turbo Preview",
+      "aliases": [],
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "reasoning": false,
+      "contextWindowTokens": 262144,
+      "maxInputTokens": 0,
+      "maxOutputTokens": 0,
+      "uploadPolicy": {
+        "enabled": false,
+        "allowedMimeGroups": [],
+        "maxFilesPerMessage": 0,
+        "maxImagesPerMessage": 0,
+        "maxFileBytes": 0,
+        "maxTotalBytes": 0,
+        "singleMimeGroupOnly": false,
+        "allowMixedImageAndFile": false
+      },
+      "sourceRefs": [
+        "https://platform.kimi.ai/docs/models",
+        "https://platform.kimi.ai/docs/pricing/chat"
+      ],
+      "lastVerifiedAt": "2026-04-16",
+      "confidence": "high"
+    },
+    {
+      "providerIds": [
+        "kimi-cn",
+        "aliyun-codingplan"
+      ],
+      "modelId": "kimi-k2-thinking",
+      "displayName": "Kimi K2 Thinking",
+      "aliases": [],
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "reasoning": true,
+      "contextWindowTokens": 262144,
+      "maxInputTokens": 0,
+      "maxOutputTokens": 0,
+      "uploadPolicy": {
+        "enabled": false,
+        "allowedMimeGroups": [],
+        "maxFilesPerMessage": 0,
+        "maxImagesPerMessage": 0,
+        "maxFileBytes": 0,
+        "maxTotalBytes": 0,
+        "singleMimeGroupOnly": false,
+        "allowMixedImageAndFile": false
+      },
+      "sourceRefs": [
+        "https://platform.kimi.ai/docs/models",
+        "https://platform.kimi.ai/docs/pricing/chat"
+      ],
+      "lastVerifiedAt": "2026-04-16",
+      "confidence": "high"
+    },
+    {
+      "providerIds": [
+        "kimi-cn",
+        "aliyun-codingplan"
+      ],
+      "modelId": "kimi-k2-thinking-turbo",
+      "displayName": "Kimi K2 Thinking Turbo",
+      "aliases": [],
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "reasoning": true,
+      "contextWindowTokens": 262144,
+      "maxInputTokens": 0,
+      "maxOutputTokens": 0,
+      "uploadPolicy": {
+        "enabled": false,
+        "allowedMimeGroups": [],
+        "maxFilesPerMessage": 0,
+        "maxImagesPerMessage": 0,
+        "maxFileBytes": 0,
+        "maxTotalBytes": 0,
+        "singleMimeGroupOnly": false,
+        "allowMixedImageAndFile": false
+      },
+      "sourceRefs": [
+        "https://platform.kimi.ai/docs/models",
+        "https://platform.kimi.ai/docs/pricing/chat"
+      ],
+      "lastVerifiedAt": "2026-04-16",
+      "confidence": "high"
+    },
+    {
+      "providerIds": [
+        "openai"
+      ],
       "modelId": "gpt-5.4",
       "displayName": "GPT-5.4",
-      "aliases": ["gpt-5.3", "gpt-5.2"],
-      "inputModalities": ["text", "image", "file"],
-      "outputModalities": ["text"],
+      "aliases": [],
+      "inputModalities": [
+        "text",
+        "image"
+      ],
+      "outputModalities": [
+        "text"
+      ],
       "reasoning": true,
-      "contextWindowTokens": 0,
+      "contextWindowTokens": 1050000,
       "maxInputTokens": 0,
-      "maxOutputTokens": 0,
+      "maxOutputTokens": 128000,
       "uploadPolicy": {
         "enabled": true,
-        "allowedMimeGroups": ["image"],
+        "allowedMimeGroups": [
+          "image"
+        ],
         "maxFilesPerMessage": 0,
-        "maxImagesPerMessage": 10,
-        "maxFileBytes": 20971520,
-        "maxTotalBytes": 104857600,
+        "maxImagesPerMessage": 1500,
+        "maxFileBytes": 0,
+        "maxTotalBytes": 536870912,
         "singleMimeGroupOnly": true,
         "allowMixedImageAndFile": false
       },
-      "sourceRefs": ["https://platform.openai.com/docs/models"],
-      "lastVerifiedAt": "2026-04-15",
-      "confidence": "medium"
+      "sourceRefs": [
+        "https://platform.openai.com/docs/models/gpt-5.4",
+        "https://platform.openai.com/docs/guides/images-vision"
+      ],
+      "lastVerifiedAt": "2026-04-16",
+      "confidence": "high"
     },
     {
-      "providerIds": ["openai"],
+      "providerIds": [
+        "openai"
+      ],
+      "modelId": "gpt-5.2",
+      "displayName": "GPT-5.2",
+      "aliases": [],
+      "inputModalities": [
+        "text",
+        "image"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "reasoning": true,
+      "contextWindowTokens": 400000,
+      "maxInputTokens": 0,
+      "maxOutputTokens": 128000,
+      "uploadPolicy": {
+        "enabled": true,
+        "allowedMimeGroups": [
+          "image"
+        ],
+        "maxFilesPerMessage": 0,
+        "maxImagesPerMessage": 1500,
+        "maxFileBytes": 0,
+        "maxTotalBytes": 536870912,
+        "singleMimeGroupOnly": true,
+        "allowMixedImageAndFile": false
+      },
+      "sourceRefs": [
+        "https://platform.openai.com/docs/models/gpt-5.2",
+        "https://platform.openai.com/docs/guides/images-vision"
+      ],
+      "lastVerifiedAt": "2026-04-16",
+      "confidence": "high"
+    },
+    {
+      "providerIds": [
+        "openai"
+      ],
       "modelId": "gpt-4.1",
       "displayName": "GPT-4.1",
-      "aliases": ["gpt-4o"],
-      "inputModalities": ["text", "image", "file"],
-      "outputModalities": ["text"],
+      "aliases": [],
+      "inputModalities": [
+        "text",
+        "image"
+      ],
+      "outputModalities": [
+        "text"
+      ],
       "reasoning": false,
-      "contextWindowTokens": 0,
+      "contextWindowTokens": 1047576,
       "maxInputTokens": 0,
-      "maxOutputTokens": 0,
+      "maxOutputTokens": 32768,
       "uploadPolicy": {
         "enabled": true,
-        "allowedMimeGroups": ["image"],
+        "allowedMimeGroups": [
+          "image"
+        ],
         "maxFilesPerMessage": 0,
-        "maxImagesPerMessage": 10,
-        "maxFileBytes": 20971520,
-        "maxTotalBytes": 104857600,
+        "maxImagesPerMessage": 1500,
+        "maxFileBytes": 0,
+        "maxTotalBytes": 536870912,
         "singleMimeGroupOnly": true,
         "allowMixedImageAndFile": false
       },
-      "sourceRefs": ["https://platform.openai.com/docs/models"],
-      "lastVerifiedAt": "2026-04-15",
-      "confidence": "medium"
+      "sourceRefs": [
+        "https://platform.openai.com/docs/models/gpt-4.1",
+        "https://platform.openai.com/docs/guides/images-vision"
+      ],
+      "lastVerifiedAt": "2026-04-16",
+      "confidence": "high"
     },
     {
-      "providerIds": ["gemini"],
+      "providerIds": [
+        "openai"
+      ],
+      "modelId": "gpt-4o",
+      "displayName": "GPT-4o",
+      "aliases": [],
+      "inputModalities": [
+        "text",
+        "image"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "reasoning": false,
+      "contextWindowTokens": 128000,
+      "maxInputTokens": 0,
+      "maxOutputTokens": 16384,
+      "uploadPolicy": {
+        "enabled": true,
+        "allowedMimeGroups": [
+          "image"
+        ],
+        "maxFilesPerMessage": 0,
+        "maxImagesPerMessage": 1500,
+        "maxFileBytes": 0,
+        "maxTotalBytes": 536870912,
+        "singleMimeGroupOnly": true,
+        "allowMixedImageAndFile": false
+      },
+      "sourceRefs": [
+        "https://platform.openai.com/docs/models/gpt-4o",
+        "https://platform.openai.com/docs/guides/images-vision"
+      ],
+      "lastVerifiedAt": "2026-04-16",
+      "confidence": "high"
+    },
+    {
+      "providerIds": [
+        "gemini"
+      ],
       "modelId": "gemini-2.5-pro",
       "displayName": "Gemini 2.5 Pro",
       "aliases": [],
-      "inputModalities": ["text", "image", "audio", "video"],
-      "outputModalities": ["text"],
+      "inputModalities": [
+        "text",
+        "image",
+        "pdf",
+        "audio",
+        "video"
+      ],
+      "outputModalities": [
+        "text"
+      ],
       "reasoning": true,
-      "contextWindowTokens": 0,
-      "maxInputTokens": 0,
-      "maxOutputTokens": 0,
+      "contextWindowTokens": 1048576,
+      "maxInputTokens": 1048576,
+      "maxOutputTokens": 65536,
       "uploadPolicy": {
         "enabled": true,
-        "allowedMimeGroups": ["image", "audio", "video"],
+        "allowedMimeGroups": [
+          "image",
+          "pdf",
+          "audio",
+          "video"
+        ],
         "maxFilesPerMessage": 2,
         "maxImagesPerMessage": 10,
-        "maxFileBytes": 20971520,
+        "maxFileBytes": 0,
         "maxTotalBytes": 104857600,
         "singleMimeGroupOnly": false,
         "allowMixedImageAndFile": false
       },
-      "sourceRefs": ["https://ai.google.dev/api/models"],
-      "lastVerifiedAt": "2026-04-15",
-      "confidence": "medium"
+      "sourceRefs": [
+        "https://ai.google.dev/gemini-api/docs/models/gemini-2.5-pro"
+      ],
+      "lastVerifiedAt": "2026-04-16",
+      "confidence": "high"
     },
     {
-      "providerIds": ["gemini"],
+      "providerIds": [
+        "gemini"
+      ],
       "modelId": "gemini-2.5-flash",
       "displayName": "Gemini 2.5 Flash",
-      "aliases": ["gemini-2.0-flash"],
-      "inputModalities": ["text", "image", "audio", "video"],
-      "outputModalities": ["text"],
+      "aliases": [],
+      "inputModalities": [
+        "text",
+        "image",
+        "audio",
+        "video"
+      ],
+      "outputModalities": [
+        "text"
+      ],
       "reasoning": true,
-      "contextWindowTokens": 0,
-      "maxInputTokens": 0,
-      "maxOutputTokens": 0,
+      "contextWindowTokens": 1048576,
+      "maxInputTokens": 1048576,
+      "maxOutputTokens": 65536,
       "uploadPolicy": {
         "enabled": true,
-        "allowedMimeGroups": ["image", "audio", "video"],
+        "allowedMimeGroups": [
+          "image",
+          "audio",
+          "video"
+        ],
         "maxFilesPerMessage": 2,
         "maxImagesPerMessage": 10,
-        "maxFileBytes": 20971520,
+        "maxFileBytes": 0,
         "maxTotalBytes": 104857600,
         "singleMimeGroupOnly": false,
         "allowMixedImageAndFile": false
       },
-      "sourceRefs": ["https://ai.google.dev/api/models"],
-      "lastVerifiedAt": "2026-04-15",
-      "confidence": "medium"
+      "sourceRefs": [
+        "https://ai.google.dev/gemini-api/docs/models/gemini-2.5-flash"
+      ],
+      "lastVerifiedAt": "2026-04-16",
+      "confidence": "high"
+    },
+    {
+      "providerIds": [
+        "gemini"
+      ],
+      "modelId": "gemini-2.0-flash",
+      "displayName": "Gemini 2.0 Flash",
+      "aliases": [],
+      "inputModalities": [
+        "text",
+        "image",
+        "audio",
+        "video"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "reasoning": true,
+      "contextWindowTokens": 1048576,
+      "maxInputTokens": 1048576,
+      "maxOutputTokens": 8192,
+      "uploadPolicy": {
+        "enabled": true,
+        "allowedMimeGroups": [
+          "image",
+          "audio",
+          "video"
+        ],
+        "maxFilesPerMessage": 2,
+        "maxImagesPerMessage": 10,
+        "maxFileBytes": 0,
+        "maxTotalBytes": 104857600,
+        "singleMimeGroupOnly": false,
+        "allowMixedImageAndFile": false
+      },
+      "sourceRefs": [
+        "https://ai.google.dev/gemini-api/docs/models/gemini-2.0-flash"
+      ],
+      "lastVerifiedAt": "2026-04-16",
+      "confidence": "high"
     }
   ]
 }
