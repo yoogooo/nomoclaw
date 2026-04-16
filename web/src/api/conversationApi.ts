@@ -3,6 +3,8 @@ import type {
   AgentDocFile,
   AgentCatalogGroup,
   AgentSkill,
+  GlobalSkill,
+  GlobalSkillBindings,
   AgentTip,
   AgentTool,
   CreateSkillPayload,
@@ -44,6 +46,37 @@ export const conversationApi = {
   },
   listAgentGroups() {
     return requestJson<AgentCatalogGroup[]>("/api/agent-groups");
+  },
+  listSkills() {
+    return requestJson<GlobalSkill[]>("/api/skills");
+  },
+  getSkillBindings(skillKey: string) {
+    return requestJson<GlobalSkillBindings>(`/api/skills/${skillKey}/bindings`);
+  },
+  updateSkillBindings(skillKey: string, payload: {
+    enabled: boolean;
+    agentBindings: Array<{
+      agentUid: string;
+      enabled: boolean;
+    }>;
+  }) {
+    return requestJson<GlobalSkillBindings>(`/api/skills/${skillKey}/bindings`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+  },
+  updateSkillStatus(skillKey: string, enabled: boolean) {
+    return requestJson<GlobalSkill>(`/api/skills/${skillKey}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled })
+    });
+  },
+  deleteSkill(skillKey: string) {
+    return requestJson<SimpleResponse>(`/api/skills/${skillKey}`, {
+      method: "DELETE"
+    });
   },
   updateAgentBasicInfo(agentUid: string, payload: {
     displayName: string;

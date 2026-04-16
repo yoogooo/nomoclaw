@@ -1,6 +1,7 @@
 import type {
   AgentCatalogAgent,
   AgentSkill,
+  GlobalSkill,
   AgentTip as ApiAgentTip,
   AgentTool,
   ModelConfig
@@ -11,6 +12,7 @@ import type {
   DocKey,
   DocState,
   ManagedAgent,
+  ManagedGlobalSkill,
   ManagedSkill,
   ManagedTool
 } from "@/components/agents/agentManagementTypes";
@@ -137,6 +139,24 @@ export function mapApiSkill(skill: AgentSkill, options: AgentDomainOptions): Man
     description: skill.description || tr("agents.common.noDescription"),
     path: skill.skillPath ? normalizePath(skill.skillPath, options.nomoclawRootDir) : joinPath(options.skillsRootDir, key),
     enabled: skill.enabled
+  };
+}
+
+export function mapApiGlobalSkill(skill: GlobalSkill, options: AgentDomainOptions): ManagedGlobalSkill {
+  const key = skill.skillKey || skill.displayName;
+  return {
+    id: `skill_${key}`,
+    skillKey: key,
+    name: skill.displayName || key,
+    description: skill.description || tr("agents.common.noDescription"),
+    path: skill.skillPath ? normalizePath(skill.skillPath, options.nomoclawRootDir) : joinPath(options.skillsRootDir, key),
+    enabled: (skill.status || "").toUpperCase() === "ACTIVE",
+    status: skill.status || "UNKNOWN",
+    linkedAgents: (skill.linkedAgents || []).map((agent) => ({
+      agentUid: agent.agentUid,
+      agentName: agent.agentName,
+      displayName: agent.displayName
+    }))
   };
 }
 

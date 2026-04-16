@@ -1,15 +1,22 @@
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
-import { NDrawer, NDrawerContent, NTag } from "naive-ui";
-import type { ManagedSharedSkill, ManagedSkill } from "@/components/agents/agentManagementTypes";
+import { NButton, NDrawer, NDrawerContent, NTag } from "naive-ui";
+import type { ManagedGlobalSkill, ManagedSharedSkill, ManagedSkill } from "@/components/agents/agentManagementTypes";
 
-defineProps<{
+const props = withDefaults(defineProps<{
   show: boolean;
-  skill: ManagedSkill | ManagedSharedSkill | null;
-}>();
+  skill: ManagedSkill | ManagedSharedSkill | ManagedGlobalSkill | null;
+  showGlobalActions?: boolean;
+  actionLoading?: boolean;
+}>(), {
+  showGlobalActions: false,
+  actionLoading: false
+});
 
 const emit = defineEmits<{
   (e: "update:show", value: boolean): void;
+  (e: "toggle-global"): void;
+  (e: "delete"): void;
 }>();
 const { t } = useI18n();
 </script>
@@ -46,6 +53,16 @@ const { t } = useI18n();
           <div v-else class="skill-drawer-value ui-field-value">{{ t("agents.skillDrawer.noLinkedAgents") }}</div>
         </div>
       </div>
+      <template v-if="props.showGlobalActions" #footer>
+        <div class="skill-drawer-actions">
+          <n-button type="primary" secondary :loading="props.actionLoading" @click="emit('toggle-global')">
+            {{ skill.enabled ? t("agents.skills.disable") : t("agents.skills.enable") }}
+          </n-button>
+          <n-button type="error" secondary :loading="props.actionLoading" @click="emit('delete')">
+            {{ t("common.delete") }}
+          </n-button>
+        </div>
+      </template>
     </n-drawer-content>
   </n-drawer>
 </template>
@@ -60,5 +77,11 @@ const { t } = useI18n();
   flex-wrap: wrap;
   gap: var(--space-2);
   margin-top: var(--space-2);
+}
+
+.skill-drawer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
 }
 </style>

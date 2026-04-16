@@ -404,6 +404,10 @@ const enUS = {
     deleteAgentContent: "You are about to delete “{name}”. Continue?",
     deleteAgentRiskTitle: "This action cannot be undone",
     deleteAgentRiskContent: "Deletion will also remove this Agent's data and workspace files (conversations, steps, tips, attachments, workspace files). Continue?",
+    deleteSkillTitle: "Delete Skill",
+    deleteSkillContent: "Deleting “{name}” will detach it from all Agents and remove the local skill files. Continue?",
+    disableSkillImpactTitle: "Confirm Skill Disable Impact",
+    disableSkillImpactContent: "This Skill is currently enabled by {count} Agent(s). Disabling it globally will make it unavailable to those Agents. Save anyway?",
     confirmDelete: "Delete",
     confirmContinue: "Continue",
     confirmPermanentDelete: "Delete Permanently"
@@ -429,6 +433,10 @@ const enUS = {
     defaultAgentDeleteDenied: "Default Agent cannot be deleted",
     agentDeleted: "Agent deleted; related data and workspace files were cleaned up",
     skillImported: "Skill imported: {name}",
+    skillEnabled: "Skill enabled",
+    skillDisabled: "Skill disabled",
+    skillDeleted: "Skill deleted",
+    skillSaved: "Skill settings saved",
     approveSuccess: "Approved, task resumed",
     approveFailed: "Approve failed, please try again",
     rejectSuccess: "Current step rejected",
@@ -469,6 +477,8 @@ const enUS = {
     skills: {
       description: "Imported skills can be enabled in this Agent's system prompt as needed.",
       import: "Import Skill",
+      enable: "Enable",
+      disable: "Disable",
       empty: "No skills",
       unlinked: "Not linked to any Agent"
     },
@@ -495,7 +505,8 @@ const enUS = {
       description: "Description",
       path: "Full Path",
       linkedAgents: "Enabled By Agents",
-      noLinkedAgents: "Not enabled by any Agent"
+      noLinkedAgents: "Not enabled by any Agent",
+      agentBindings: "Agent Bindings"
     },
     import: {
       title: "Import Skill",

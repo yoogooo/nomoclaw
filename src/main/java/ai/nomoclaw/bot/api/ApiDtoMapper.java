@@ -8,6 +8,7 @@ import ai.nomoclaw.bot.application.command.ImportSkillFromUrlCommand;
 import ai.nomoclaw.bot.application.command.UpdateAgentBasicInfoCommand;
 import ai.nomoclaw.bot.application.command.UpdateAgentTipCommand;
 import ai.nomoclaw.bot.application.command.UpdateCronJobCommand;
+import ai.nomoclaw.bot.application.command.UpdateSkillBindingsCommand;
 import ai.nomoclaw.bot.application.dto.*;
 import ai.nomoclaw.bot.orchestrator.ModelCatalogStatusDto;
 import ai.nomoclaw.bot.application.dto.AgentSkillDto;
@@ -84,6 +85,52 @@ public final class ApiDtoMapper {
 
     public static List<AgentSkillResponse> toAgentSkills(List<AgentSkillDto> dtos) {
         return dtos.stream().map(ApiDtoMapper::toAgentSkill).toList();
+    }
+
+    public static List<GlobalSkillResponse> toGlobalSkills(List<GlobalSkillDto> dtos) {
+        return dtos.stream().map(ApiDtoMapper::toGlobalSkill).toList();
+    }
+
+    public static GlobalSkillResponse toGlobalSkill(GlobalSkillDto dto) {
+        return new GlobalSkillResponse(
+                dto.skillKey(),
+                dto.displayName(),
+                dto.description(),
+                dto.skillPath(),
+                dto.status(),
+                dto.updatedTime(),
+                dto.linkedAgents().stream().map(ApiDtoMapper::toGlobalSkillLinkedAgent).toList()
+        );
+    }
+
+    public static GlobalSkillLinkedAgentResponse toGlobalSkillLinkedAgent(SkillLinkedAgentDto dto) {
+        return new GlobalSkillLinkedAgentResponse(
+                dto.agentUid(),
+                dto.agentName(),
+                dto.displayName()
+        );
+    }
+
+    public static SkillBindingsResponse toSkillBindings(SkillBindingsDto dto) {
+        return new SkillBindingsResponse(
+                dto.skillKey(),
+                dto.displayName(),
+                dto.description(),
+                dto.skillPath(),
+                dto.status(),
+                dto.updatedTime(),
+                dto.enabledAgentCount(),
+                dto.agentBindings().stream().map(ApiDtoMapper::toSkillBindingAgent).toList()
+        );
+    }
+
+    public static SkillBindingAgentResponse toSkillBindingAgent(SkillBindingAgentDto dto) {
+        return new SkillBindingAgentResponse(
+                dto.agentUid(),
+                dto.agentName(),
+                dto.displayName(),
+                dto.enabled()
+        );
     }
 
     public static AgentSkillResponse toAgentSkill(AgentSkillDto dto) {
@@ -522,6 +569,21 @@ public final class ApiDtoMapper {
                 request == null ? null : request.description(),
                 request == null ? null : request.purpose(),
                 request != null && Boolean.TRUE.equals(request.attachToAgent())
+        );
+    }
+
+    public static UpdateSkillBindingsCommand toCommand(UpdateSkillBindingsRequest request) {
+        return new UpdateSkillBindingsCommand(
+                request != null && Boolean.TRUE.equals(request.enabled()),
+                request == null || request.agentBindings() == null
+                        ? List.of()
+                        : request.agentBindings().stream()
+                        .filter(item -> item != null)
+                        .map(item -> new UpdateSkillBindingsCommand.SkillBindingAgentCommand(
+                                item.agentUid(),
+                                Boolean.TRUE.equals(item.enabled())
+                        ))
+                        .toList()
         );
     }
 

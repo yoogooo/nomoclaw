@@ -5,6 +5,7 @@ import ai.nomoclaw.bot.store.entity.AgentSkillRelationEntity;
 import ai.nomoclaw.bot.store.mapper.AgentSkillRelationMapper;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 
 @Repository
@@ -31,6 +32,27 @@ public class AgentSkillRelationRepository extends CrudRepository<AgentSkillRelat
                 .list();
     }
 
+    public List<AgentSkillRelationEntity> listActiveBySkillKeys(Collection<String> skillKeys) {
+        if (skillKeys == null || skillKeys.isEmpty()) {
+            return List.of();
+        }
+        return lambdaQuery()
+                .in(AgentSkillRelationEntity::getSkillKey, skillKeys)
+                .eq(AgentSkillRelationEntity::getStatus, "ACTIVE")
+                .orderByAsc(AgentSkillRelationEntity::getSortIndex, AgentSkillRelationEntity::getId)
+                .list();
+    }
+
+    public List<AgentSkillRelationEntity> listBySkillKey(String skillKey) {
+        if (skillKey == null || skillKey.isBlank()) {
+            return List.of();
+        }
+        return lambdaQuery()
+                .eq(AgentSkillRelationEntity::getSkillKey, skillKey)
+                .orderByAsc(AgentSkillRelationEntity::getSortIndex, AgentSkillRelationEntity::getId)
+                .list();
+    }
+
     public AgentSkillRelationEntity findByAgentUidAndSkillKey(String agentUid, String skillKey) {
         if (agentUid == null || agentUid.isBlank() || skillKey == null || skillKey.isBlank()) {
             return null;
@@ -47,6 +69,15 @@ public class AgentSkillRelationRepository extends CrudRepository<AgentSkillRelat
         }
         lambdaUpdate()
                 .eq(AgentSkillRelationEntity::getAgentUid, agentUid)
+                .remove();
+    }
+
+    public void deleteBySkillKey(String skillKey) {
+        if (skillKey == null || skillKey.isBlank()) {
+            return;
+        }
+        lambdaUpdate()
+                .eq(AgentSkillRelationEntity::getSkillKey, skillKey)
                 .remove();
     }
 }

@@ -105,6 +105,18 @@ public class AgentController {
         return ApiDtoMapper.toAgentCatalogGroups(agentCatalogAppService.listAgentGroups());
     }
 
+    @GetMapping("/skills")
+    public List<GlobalSkillResponse> listSkills() {
+        log.info("[AgentAPI] listSkills");
+        return ApiDtoMapper.toGlobalSkills(agentCatalogAppService.listSkills());
+    }
+
+    @GetMapping("/skills/{skillKey}/bindings")
+    public SkillBindingsResponse getSkillBindings(@PathVariable String skillKey) {
+        log.info("[AgentAPI] getSkillBindings skillKey={}", skillKey);
+        return ApiDtoMapper.toSkillBindings(agentCatalogAppService.getSkillBindings(skillKey));
+    }
+
     @GetMapping("/agents/{agentUid}/skills")
     public List<AgentSkillResponse> listAgentSkills(@PathVariable String agentUid) {
         log.info("[AgentAPI] listAgentSkills agentUid={}", agentUid);
@@ -252,6 +264,30 @@ public class AgentController {
         log.info("[AgentAPI] updateAgentSkillStatus agentUid={} skillKey={} enabled={}",
                 agentUid, skillKey, request.enabled());
         return ApiDtoMapper.toAgentSkill(agentCatalogAppService.updateAgentSkillStatus(agentUid, skillKey, request.enabled()));
+    }
+
+    @PatchMapping("/skills/{skillKey}")
+    public GlobalSkillResponse updateSkillStatus(@PathVariable String skillKey,
+                                                 @Valid @RequestBody UpdateSkillStatusRequest request) {
+        log.info("[AgentAPI] updateSkillStatus skillKey={} enabled={}", skillKey, request.enabled());
+        return ApiDtoMapper.toGlobalSkill(agentCatalogAppService.updateSkillStatus(skillKey, request.enabled()));
+    }
+
+    @PutMapping("/skills/{skillKey}/bindings")
+    public SkillBindingsResponse updateSkillBindings(@PathVariable String skillKey,
+                                                     @Valid @RequestBody UpdateSkillBindingsRequest request) {
+        log.info("[AgentAPI] updateSkillBindings skillKey={} enabled={} agents={}",
+                skillKey,
+                request.enabled(),
+                request.agentBindings() == null ? 0 : request.agentBindings().size());
+        return ApiDtoMapper.toSkillBindings(agentCatalogAppService.updateSkillBindings(skillKey, ApiDtoMapper.toCommand(request)));
+    }
+
+    @DeleteMapping("/skills/{skillKey}")
+    public SimpleResponse deleteSkill(@PathVariable String skillKey) {
+        log.info("[AgentAPI] deleteSkill skillKey={}", skillKey);
+        agentCatalogAppService.deleteSkill(skillKey);
+        return new SimpleResponse("deleted");
     }
 
     @PostMapping("/agents/{agentUid}/skills/import-url")

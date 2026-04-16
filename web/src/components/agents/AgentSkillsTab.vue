@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
 import { NButton, NSwitch, NTag } from "naive-ui";
+import { SquarePen } from "lucide-vue-next";
 import type { SkillLinkedAgent } from "@/components/agents/agentManagementTypes";
 
 interface SkillItem {
@@ -21,6 +22,7 @@ withDefaults(defineProps<{
   showPath?: boolean;
   showDescriptionCopy?: boolean;
   showToolbar?: boolean;
+  showHoverEdit?: boolean;
 }>(), {
   importDisabled: false,
   importLabel: "",
@@ -28,7 +30,8 @@ withDefaults(defineProps<{
   showToggle: true,
   showPath: true,
   showDescriptionCopy: true,
-  showToolbar: true
+  showToolbar: true,
+  showHoverEdit: false
 });
 
 const emit = defineEmits<{
@@ -55,11 +58,34 @@ const { t } = useI18n();
       <article
         v-for="skill in skills"
         :key="skill.id"
-        class="ui-card-base ui-card-padding-md"
+        class="ui-card-base ui-card-padding-md skill-card"
         @click="emit('open', skill.id)"
       >
+        <n-button
+          v-if="showHoverEdit"
+          class="skill-card-edit-sheet"
+          size="small"
+          tertiary
+          type="primary"
+          @click.stop="emit('open', skill.id)"
+        >
+          <template #icon>
+            <SquarePen :size="14" />
+          </template>
+          {{ t("common.edit") }}
+        </n-button>
         <div class="ui-card-head-between">
-          <div class="skill-card-name ui-title-strong">{{ skill.name }}</div>
+          <div class="skill-card-head-main">
+            <div class="skill-card-name ui-title-strong">{{ skill.name }}</div>
+          </div>
+          <n-tag
+            class="skill-card-status-tag"
+            size="small"
+            round
+            :type="skill.enabled ? 'success' : 'default'"
+          >
+            {{ skill.enabled ? t("common.enabled") : t("common.disabled") }}
+          </n-tag>
           <n-switch
             v-if="showToggle"
             size="small"
@@ -73,15 +99,12 @@ const { t } = useI18n();
           <n-tag
             v-for="agent in skill.linkedAgents"
             :key="agent.agentUid"
+            class="skill-card-agent-tag"
             size="small"
             round
-            type="success"
           >
             {{ agent.displayName || agent.agentName }}
           </n-tag>
-        </div>
-        <div v-else-if="showLinkedAgents" class="ui-caption-muted skill-card-linked-empty">
-          {{ t("agents.skills.unlinked") }}
         </div>
         <div v-if="showPath" class="ui-caption-muted ui-path-break skill-card-path">{{ skill.path }}</div>
       </article>
@@ -91,11 +114,61 @@ const { t } = useI18n();
 </template>
 
 <style scoped>
+.skill-card {
+  position: relative;
+  display: flex;
+  min-height: var(--size-180);
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.skill-card-edit-sheet {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
+  left: var(--space-3);
+  justify-content: center;
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-panel);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.22);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(calc(100% + var(--space-3)));
+  transition:
+    opacity 0.18s ease,
+    transform 0.22s ease;
+}
+
+.skill-card:hover .skill-card-edit-sheet,
+.skill-card:focus-within .skill-card-edit-sheet {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.skill-card-head-main {
+  min-width: 0;
+  padding-right: var(--space-8);
+  flex: 1;
+}
+
+.skill-card-name {
+  min-width: 0;
+}
+
+.skill-card-status-tag {
+  flex-shrink: 0;
+}
+
 .skill-card-desc {
   margin-top: var(--space-2);
   color: var(--color-text-secondary);
   line-height: 1.6;
   min-height: var(--size-42);
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 10;
 }
 
 .skill-card-path {
@@ -106,11 +179,14 @@ const { t } = useI18n();
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
-  margin-top: var(--space-3);
+  margin-top: auto;
+  padding-top: var(--space-3);
 }
 
-.skill-card-linked-empty {
-  margin-top: var(--space-3);
+.skill-card-agent-tag:deep(.n-tag) {
+  background: rgba(15, 23, 42, 0.92);
+  border-color: rgba(51, 65, 85, 0.9);
+  color: #e2e8f0;
 }
 
 .ui-toolbar-start {

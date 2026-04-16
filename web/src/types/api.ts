@@ -24,6 +24,40 @@ export interface AgentSkill {
   updatedTime: string;
 }
 
+export interface GlobalSkillLinkedAgent {
+  agentUid: string;
+  agentName: string;
+  displayName: string;
+}
+
+export interface GlobalSkill {
+  skillKey: string;
+  displayName: string;
+  description: string;
+  skillPath: string;
+  status: string;
+  updatedTime: string;
+  linkedAgents: GlobalSkillLinkedAgent[];
+}
+
+export interface GlobalSkillAgentBinding {
+  agentUid: string;
+  agentName: string;
+  displayName: string;
+  enabled: boolean;
+}
+
+export interface GlobalSkillBindings {
+  skillKey: string;
+  displayName: string;
+  description: string;
+  skillPath: string;
+  status: string;
+  updatedTime: string;
+  enabledAgentCount: number;
+  agentBindings: GlobalSkillAgentBinding[];
+}
+
 export interface ImportSkillFromUrlPayload {
   url: string;
   attachToAgent: boolean;

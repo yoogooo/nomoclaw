@@ -404,6 +404,10 @@ const zhCN = {
     deleteAgentContent: "你即将删除“{name}”，确认继续操作么？",
     deleteAgentRiskTitle: "删除后数据不可恢复",
     deleteAgentRiskContent: "删除后将同时清理该 Agent 的数据与工作目录文件（含会话、步骤、锦囊、附件、工作区文件）。此操作不可恢复，确认继续吗？",
+    deleteSkillTitle: "删除 Skill",
+    deleteSkillContent: "删除“{name}”后，将解除所有 Agent 关联并删除本地技能文件。此操作不可恢复，确认继续吗？",
+    disableSkillImpactTitle: "关闭 Skill 影响确认",
+    disableSkillImpactContent: "当前有 {count} 个 Agent 启用了该 Skill。全局关闭后，这些 Agent 将无法继续使用该 Skill。确认保存吗？",
     confirmDelete: "删除",
     confirmContinue: "继续",
     confirmPermanentDelete: "确认彻底删除"
@@ -429,6 +433,10 @@ const zhCN = {
     defaultAgentDeleteDenied: "默认 Agent 不支持删除",
     agentDeleted: "Agent 已删除，相关数据与工作目录已清理",
     skillImported: "Skill 已导入：{name}",
+    skillEnabled: "Skill 已启用",
+    skillDisabled: "Skill 已禁用",
+    skillDeleted: "Skill 已删除",
+    skillSaved: "Skill 配置已保存",
     approveSuccess: "已批准，任务继续执行",
     approveFailed: "批准失败，请重试",
     rejectSuccess: "已拒绝当前步骤",
@@ -469,6 +477,8 @@ const zhCN = {
     skills: {
       description: "导入后可在该 Agent 的系统提示词中按需启用 Skills。",
       import: "导入 Skill",
+      enable: "启用",
+      disable: "禁用",
       empty: "暂无技能",
       unlinked: "当前未关联任何 Agent"
     },
@@ -495,7 +505,8 @@ const zhCN = {
       description: "描述",
       path: "完整路径",
       linkedAgents: "已启用 Agent",
-      noLinkedAgents: "当前未被任何 Agent 启用"
+      noLinkedAgents: "当前未被任何 Agent 启用",
+      agentBindings: "Agent 绑定"
     },
     import: {
       title: "导入 Skill",
