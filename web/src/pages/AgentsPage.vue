@@ -344,6 +344,7 @@ watch([selectedAgentUid, detailTab], ([agentUid, tab]) => {
                 <n-tab-pane name="skills" :tab="t('pages.agents.tabSkills')">
                   <AgentSkillsTab
                     :skills="selectedAgent.managedSkills"
+                    :show-toolbar="false"
                     @import="importSkillVisible = true"
                     @open="openSkillDrawer"
                     @toggle="onToggleSkill"

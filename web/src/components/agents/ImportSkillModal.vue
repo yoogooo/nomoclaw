@@ -36,18 +36,8 @@ const supportedSources = [
   "https://skills.sh/",
   "https://clawhub.ai/",
   "https://skillsmp.com/",
-  "https://lobehub.com/",
-  "https://market.lobehub.com/",
   "https://github.com/",
   "https://modelscope.cn/skills/"
-];
-
-const urlExamples = [
-  "https://skills.sh/vercel-labs/skills/find-skills",
-  "https://lobehub.com/zh/skills/openclaw-skills-cli-developer",
-  "https://market.lobehub.com/api/v1/skills/openclaw-skills-cli-developer/download",
-  "https://github.com/anthropics/skills/tree/main/skills/skill-creator",
-  "https://modelscope.cn/skills/@anthropics/skill-creator"
 ];
 
 const canSubmit = computed(() => {
@@ -139,14 +129,10 @@ function handleFileChange(event: Event) {
 
       <n-tab-pane name="url" :tab="t('agents.import.tabUrl')">
         <div class="import-skill-panel">
-          <div class="ui-note-card">
+          <div class="ui-note-card import-source-card">
             <div class="ui-note-title">{{ t("agents.import.supportedSources") }}</div>
-            <ul class="ui-list-compact">
+            <ul class="ui-list-compact import-source-list">
               <li v-for="source in supportedSources" :key="source">{{ source }}</li>
-            </ul>
-            <div class="ui-note-title">{{ t("agents.import.urlExamples") }}</div>
-            <ul class="ui-list-compact">
-              <li v-for="example in urlExamples" :key="example">{{ example }}</li>
             </ul>
           </div>
 
@@ -211,6 +197,10 @@ function handleFileChange(event: Event) {
 
 .import-url-form {
   margin-top: var(--space-4);
+}
+
+.import-source-list {
+  margin-bottom: 0;
 }
 
 .import-hint-text {

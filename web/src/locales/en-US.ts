@@ -16,6 +16,7 @@ const enUS = {
     chat: "Chat Console",
     cron: "Scheduled Tasks",
     agents: "Agent Management",
+    skills: "Skill Management",
     channels: "Channel Management",
     models: "Model Management",
     settings: "Settings"
@@ -468,7 +469,8 @@ const enUS = {
     skills: {
       description: "Imported skills can be enabled in this Agent's system prompt as needed.",
       import: "Import Skill",
-      empty: "No skills"
+      empty: "No skills",
+      unlinked: "Not linked to any Agent"
     },
     tools: {
       empty: "No tools"
@@ -491,7 +493,9 @@ const enUS = {
       status: "Status",
       disabled: "Disabled",
       description: "Description",
-      path: "Full Path"
+      path: "Full Path",
+      linkedAgents: "Enabled By Agents",
+      noLinkedAgents: "Not enabled by any Agent"
     },
     import: {
       title: "Import Skill",
@@ -671,6 +675,10 @@ const enUS = {
       tabTools: "Tools",
       tabTips: "Tips",
       tabDocs: "Config Files"
+    },
+    skills: {
+      title: "Skill Management",
+      subtitle: "View global skills in one place and see which Agents have each skill enabled."
     },
     channels: {
       title: "Channel Management",

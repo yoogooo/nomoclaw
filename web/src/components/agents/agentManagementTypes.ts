@@ -32,6 +32,16 @@ export interface ManagedSkill {
   enabled: boolean;
 }
 
+export interface SkillLinkedAgent {
+  agentUid: string;
+  agentName: string;
+  displayName: string;
+}
+
+export interface ManagedSharedSkill extends ManagedSkill {
+  linkedAgents: SkillLinkedAgent[];
+}
+
 export interface ManagedTool {
   id: string;
   toolKey: string;

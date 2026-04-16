@@ -16,6 +16,7 @@ const zhCN = {
     chat: "对话控制台",
     cron: "定时任务管理",
     agents: "Agent 管理",
+    skills: "技能管理",
     channels: "Channel 管理",
     models: "模型管理",
     settings: "个人配置"
@@ -468,7 +469,8 @@ const zhCN = {
     skills: {
       description: "导入后可在该 Agent 的系统提示词中按需启用 Skills。",
       import: "导入 Skill",
-      empty: "暂无技能"
+      empty: "暂无技能",
+      unlinked: "当前未关联任何 Agent"
     },
     tools: {
       empty: "暂无工具"
@@ -491,7 +493,9 @@ const zhCN = {
       status: "状态",
       disabled: "已关闭",
       description: "描述",
-      path: "完整路径"
+      path: "完整路径",
+      linkedAgents: "已启用 Agent",
+      noLinkedAgents: "当前未被任何 Agent 启用"
     },
     import: {
       title: "导入 Skill",
@@ -671,6 +675,10 @@ const zhCN = {
       tabTools: "工具",
       tabTips: "锦囊",
       tabDocs: "配置文件"
+    },
+    skills: {
+      title: "技能管理",
+      subtitle: "统一查看全局 Skill，并查看分别被哪些 Agent 关联启用。"
     },
     channels: {
       title: "Channel 管理",
