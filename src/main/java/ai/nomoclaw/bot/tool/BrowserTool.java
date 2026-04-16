@@ -291,22 +291,28 @@ public class BrowserTool implements Tool {
             }
             boolean headless = agentProperties.getBrowser().isHeadless();
             Path userDataDir = profileDirectory(profileKey);
+            Path executablePath = requireInstalledChromiumExecutable(cacheRoot);
             try {
                 Files.createDirectories(userDataDir);
             } catch (Exception ex) {
                 throw new IllegalStateException("failed to create browser profile dir: " + userDataDir, ex);
             }
+            BrowserType.LaunchPersistentContextOptions launchOptions = buildLaunchOptions(
+                    headless,
+                    playwrightEnv,
+                    executablePath
+            );
+            log.info("[Tool][browser] launching chromium executable={} cacheRoot={} userDataDir={} headless={}",
+                    executablePath, cacheRoot, userDataDir, headless);
             BrowserContext context;
             try {
                 context = playwright.chromium().launchPersistentContext(
                         userDataDir,
-                        new BrowserType.LaunchPersistentContextOptions()
-                                .setHeadless(headless)
-                                .setAcceptDownloads(true)
+                        launchOptions
                 );
             } catch (Exception launchEx) {
                 if (!isMissingExecutable(launchEx)) {
-                    throw launchEx;
+                    throw enrichLaunchFailure(launchEx, cacheRoot, userDataDir, executablePath);
                 }
                 // Required chromium revision is missing/corrupted: reinstall runtime and retry launch.
                 log.info("[Tool][browser] chromium executable missing, reinstalling runtime");
@@ -320,11 +326,13 @@ public class BrowserTool implements Tool {
                 DownloadMonitor repairMonitor = startDownloadMonitor(request, cacheRoot, repairBaselineBytes, repairStartedAt);
                 try {
                     forceInstallChromium(request, cacheRoot, playwrightEnv);
+                    executablePath = requireInstalledChromiumExecutable(cacheRoot);
+                    launchOptions = buildLaunchOptions(headless, playwrightEnv, executablePath);
+                    log.info("[Tool][browser] relaunching chromium executable={} cacheRoot={} userDataDir={} headless={}",
+                            executablePath, cacheRoot, userDataDir, headless);
                     context = playwright.chromium().launchPersistentContext(
                             userDataDir,
-                            new BrowserType.LaunchPersistentContextOptions()
-                                    .setHeadless(headless)
-                                    .setAcceptDownloads(true)
+                            launchOptions
                     );
                     long repairFinalBytes = cacheRoot == null ? repairBaselineBytes : safeDirectorySize(cacheRoot);
                     long repairDownloadedBytes = Math.max(0L, repairFinalBytes - repairBaselineBytes);
@@ -336,6 +344,8 @@ public class BrowserTool implements Tool {
                             repairDetails,
                             progressMetrics("ready", repairFinalBytes, repairDownloadedBytes, repairStartedAt)
                     );
+                } catch (Exception relaunchEx) {
+                    throw enrichLaunchFailure(relaunchEx, cacheRoot, userDataDir, executablePath);
                 } finally {
                     stopDownloadMonitor(repairMonitor);
                 }
@@ -370,6 +380,7 @@ public class BrowserTool implements Tool {
         }
         try {
             forceInstallChromium(request, cacheRoot, playwrightEnv);
+            requireInstalledChromiumExecutable(cacheRoot);
             chromiumInstallEnsured = true;
         } catch (Exception ex) {
             throw new IllegalStateException("failed to install chromium runtime", ex);
@@ -389,6 +400,16 @@ public class BrowserTool implements Tool {
         } catch (Exception ex) {
             throw new IllegalStateException("failed to install chromium runtime", ex);
         }
+    }
+
+    private BrowserType.LaunchPersistentContextOptions buildLaunchOptions(boolean headless,
+                                                                          Map<String, String> playwrightEnv,
+                                                                          Path executablePath) {
+        return new BrowserType.LaunchPersistentContextOptions()
+                .setHeadless(headless)
+                .setAcceptDownloads(true)
+                .setEnv(playwrightEnv)
+                .setExecutablePath(executablePath);
     }
 
     /**
@@ -427,8 +448,20 @@ public class BrowserTool implements Tool {
      * directory alone and avoids treating partial downloads as complete installs.
      */
     private boolean hasInstalledChromiumExecutable(Path cacheRoot) {
+        return resolveInstalledChromiumExecutable(cacheRoot) != null;
+    }
+
+    private Path requireInstalledChromiumExecutable(Path cacheRoot) {
+        Path executable = resolveInstalledChromiumExecutable(cacheRoot);
+        if (executable != null) {
+            return executable;
+        }
+        throw new IllegalStateException("chromium executable not found under cache root: " + cacheRoot);
+    }
+
+    private Path resolveInstalledChromiumExecutable(Path cacheRoot) {
         if (cacheRoot == null || !Files.isDirectory(cacheRoot)) {
-            return false;
+            return null;
         }
         try (var stream = Files.list(cacheRoot)) {
             return stream
@@ -438,9 +471,11 @@ public class BrowserTool implements Tool {
                         return name.startsWith("chromium-");
                     })
                     .map(this::resolveChromiumExecutable)
-                    .anyMatch(this::isUsableExecutable);
+                    .filter(this::isUsableExecutable)
+                    .findFirst()
+                    .orElse(null);
         } catch (Exception ignored) {
-            return false;
+            return null;
         }
     }
 
@@ -471,6 +506,44 @@ public class BrowserTool implements Tool {
             return false;
         }
         return Files.isReadable(executable);
+    }
+
+    private IllegalStateException enrichLaunchFailure(Exception launchEx,
+                                                      Path cacheRoot,
+                                                      Path userDataDir,
+                                                      Path executablePath) {
+        StringBuilder message = new StringBuilder("failed to launch chromium");
+        message.append(" executable=").append(executablePath);
+        message.append(" cacheRoot=").append(cacheRoot);
+        message.append(" userDataDir=").append(userDataDir);
+        String detail = buildErrorMessage(launchEx);
+        if (detail != null && !detail.isBlank()) {
+            message.append(" cause=").append(detail);
+        }
+        if (isWindowsNativeBrowserCrash(launchEx)) {
+            message.append(" diagnosis=windows_native_browser_crash");
+            message.append(" likelyCause=profile_lock_or_permissions_or_corrupted_chromium_runtime");
+        }
+        return new IllegalStateException(message.toString(), launchEx);
+    }
+
+    private boolean isWindowsNativeBrowserCrash(Throwable ex) {
+        if (!PlatformSupport.isWindows()) {
+            return false;
+        }
+        Throwable current = ex;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null
+                    && (message.contains("CreateFile() Error: 5")
+                    || message.contains("exitCode=3221226356")
+                    || message.contains("0xc0000374")
+                    || message.contains("STATUS_HEAP_CORRUPTION"))) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private DownloadMonitor startDownloadMonitor(ToolRequest request, Path cacheRoot, long baselineBytes, long startedAtMs) {
