@@ -1,5 +1,6 @@
 package ai.nomoclaw.bot.tool;
 
+import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Download;
@@ -22,6 +23,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.lang.reflect.Method;
+import java.lang.ProcessBuilder.Redirect;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.HashMap;
 import java.util.Map;
@@ -52,8 +58,32 @@ public class BrowserTool implements Tool {
     private static final long DOWNLOAD_REPORT_MIN_DELTA_BYTES = 256L * 1024L;
     private static final long DOWNLOAD_REPORT_FORCE_INTERVAL_MS = 2200L;
     private static final long ESTIMATED_BROWSER_DOWNLOAD_BYTES = 520L * 1024L * 1024L;
+    private static final long WINDOWS_CDP_CONNECT_TIMEOUT_MS = 10_000L;
+    private static final long WINDOWS_CDP_CONNECT_RETRY_INTERVAL_MS = 200L;
+    private static final List<String> WINDOWS_CHROME_STABLE_ARGS = List.of(
+            "--disable-background-networking",
+            "--disable-background-timer-throttling",
+            "--disable-backgrounding-occluded-windows",
+            "--disable-breakpad",
+            "--disable-client-side-phishing-detection",
+            "--disable-component-extensions-with-background-pages",
+            "--disable-component-update",
+            "--disable-default-apps",
+            "--disable-dev-shm-usage",
+            "--disable-popup-blocking",
+            "--disable-prompt-on-repost",
+            "--disable-renderer-backgrounding",
+            "--disable-sync",
+            "--metrics-recording-only",
+            "--no-default-browser-check",
+            "--no-first-run",
+            "--password-store=basic",
+            "--use-mock-keychain"
+    );
 
     private final Map<String, BrowserContext> contextByProfile = new ConcurrentHashMap<>();
+    private final Map<String, Browser> browserByProfile = new ConcurrentHashMap<>();
+    private final Map<String, Process> processByProfile = new ConcurrentHashMap<>();
     private final Map<String, String> profileByConversation = new ConcurrentHashMap<>();
     private final Map<String, Page> pageByConversation = new ConcurrentHashMap<>();
     private final AgentProperties agentProperties;
@@ -217,6 +247,17 @@ public class BrowserTool implements Tool {
             }
         }
         contextByProfile.clear();
+        for (Browser browser : browserByProfile.values()) {
+            try {
+                browser.close();
+            } catch (Exception ignored) {
+            }
+        }
+        browserByProfile.clear();
+        for (Process process : processByProfile.values()) {
+            safelyDestroyProcess(process);
+        }
+        processByProfile.clear();
 
         if (playwright != null) {
             playwright.close();
@@ -297,25 +338,14 @@ public class BrowserTool implements Tool {
             } catch (Exception ex) {
                 throw new IllegalStateException("failed to create browser profile dir: " + userDataDir, ex);
             }
-            BrowserType.LaunchPersistentContextOptions launchOptions = buildLaunchOptions(
-                    headless,
-                    playwrightEnv,
-                    executablePath
-            );
-            log.info("[Tool][browser] launching chromium executable={} cacheRoot={} userDataDir={} headless={}",
-                    executablePath, cacheRoot, userDataDir, headless);
             BrowserContext context;
             try {
-                context = playwright.chromium().launchPersistentContext(
-                        userDataDir,
-                        launchOptions
-                );
+                context = createBrowserContext(cacheRoot, playwrightEnv, profileKey, headless, userDataDir, executablePath);
             } catch (Exception launchEx) {
                 if (!isMissingExecutable(launchEx)) {
-                    throw enrichLaunchFailure(launchEx, cacheRoot, userDataDir, executablePath);
+                    throw launchEx;
                 }
-                // Required chromium revision is missing/corrupted: reinstall runtime and retry launch.
-                log.info("[Tool][browser] chromium executable missing, reinstalling runtime");
+                log.info("[Tool][browser] chromium executable missing during launch, reinstalling runtime");
                 long repairBaselineBytes = cacheRoot == null ? 0L : safeDirectorySize(cacheRoot);
                 long repairStartedAt = System.currentTimeMillis();
                 request.reportProgress(
@@ -327,13 +357,7 @@ public class BrowserTool implements Tool {
                 try {
                     forceInstallChromium(request, cacheRoot, playwrightEnv);
                     executablePath = requireInstalledChromiumExecutable(cacheRoot);
-                    launchOptions = buildLaunchOptions(headless, playwrightEnv, executablePath);
-                    log.info("[Tool][browser] relaunching chromium executable={} cacheRoot={} userDataDir={} headless={}",
-                            executablePath, cacheRoot, userDataDir, headless);
-                    context = playwright.chromium().launchPersistentContext(
-                            userDataDir,
-                            launchOptions
-                    );
+                    context = createBrowserContext(cacheRoot, playwrightEnv, profileKey, headless, userDataDir, executablePath);
                     long repairFinalBytes = cacheRoot == null ? repairBaselineBytes : safeDirectorySize(cacheRoot);
                     long repairDownloadedBytes = Math.max(0L, repairFinalBytes - repairBaselineBytes);
                     String repairDetails = repairDownloadedBytes > 0
@@ -344,8 +368,6 @@ public class BrowserTool implements Tool {
                             repairDetails,
                             progressMetrics("ready", repairFinalBytes, repairDownloadedBytes, repairStartedAt)
                     );
-                } catch (Exception relaunchEx) {
-                    throw enrichLaunchFailure(relaunchEx, cacheRoot, userDataDir, executablePath);
                 } finally {
                     stopDownloadMonitor(repairMonitor);
                 }
@@ -362,8 +384,8 @@ public class BrowserTool implements Tool {
                         progressMetrics("ready", finalBytes, downloadedBytes, monitorStartedAt)
                 );
             }
-            log.info("[Tool][browser] persistent context created profile={} dir={} headless={}",
-                    profileKey, userDataDir, headless);
+            log.info("[Tool][browser] browser context created profile={} dir={} headless={} mode={}",
+                    profileKey, userDataDir, headless, PlatformSupport.isWindows() ? "windows_cdp" : "persistent");
             return context;
         } finally {
             stopDownloadMonitor(monitor);
@@ -410,6 +432,145 @@ public class BrowserTool implements Tool {
                 .setAcceptDownloads(true)
                 .setEnv(playwrightEnv)
                 .setExecutablePath(executablePath);
+    }
+
+    private BrowserContext createBrowserContext(Path cacheRoot,
+                                                Map<String, String> playwrightEnv,
+                                                String profileKey,
+                                                boolean headless,
+                                                Path userDataDir,
+                                                Path executablePath) {
+        if (PlatformSupport.isWindows()) {
+            return createWindowsContextOverCdp(cacheRoot, playwrightEnv, profileKey, headless, userDataDir, executablePath);
+        }
+        try {
+            BrowserContext context = playwright.chromium().launchPersistentContext(
+                    userDataDir,
+                    buildLaunchOptions(headless, playwrightEnv, executablePath)
+            );
+            Browser staleBrowser = browserByProfile.remove(profileKey);
+            if (staleBrowser != null) {
+                try {
+                    staleBrowser.close();
+                } catch (Exception ignored) {
+                }
+            }
+            safelyDestroyProcess(processByProfile.remove(profileKey));
+            return context;
+        } catch (Exception launchEx) {
+            throw enrichLaunchFailure("persistent", launchEx, cacheRoot, userDataDir, executablePath, null);
+        }
+    }
+
+    private BrowserContext createWindowsContextOverCdp(Path cacheRoot,
+                                                       Map<String, String> playwrightEnv,
+                                                       String profileKey,
+                                                       boolean headless,
+                                                       Path userDataDir,
+                                                       Path executablePath) {
+        int debugPort = reserveTcpPort();
+        String endpoint = "http://127.0.0.1:" + debugPort;
+        Process process = null;
+        try {
+            process = launchWindowsChromeProcess(executablePath, userDataDir, headless, debugPort, playwrightEnv);
+            waitForDebugPort(process, debugPort, executablePath, userDataDir);
+            log.info("[Tool][browser] connecting over CDP executable={} cacheRoot={} userDataDir={} debugPort={} headless={}",
+                    executablePath, cacheRoot, userDataDir, debugPort, headless);
+            Browser browser = playwright.chromium().connectOverCDP(
+                    endpoint,
+                    new BrowserType.ConnectOverCDPOptions()
+                            .setIsLocal(true)
+                            .setTimeout((double) WINDOWS_CDP_CONNECT_TIMEOUT_MS)
+            );
+            BrowserContext context = resolveConnectedContext(browser);
+            Browser staleBrowser = browserByProfile.put(profileKey, browser);
+            if (staleBrowser != null && staleBrowser != browser) {
+                try {
+                    staleBrowser.close();
+                } catch (Exception ignored) {
+                }
+            }
+            Process staleProcess = processByProfile.put(profileKey, process);
+            if (staleProcess != null && staleProcess != process) {
+                safelyDestroyProcess(staleProcess);
+            }
+            return context;
+        } catch (Exception ex) {
+            safelyDestroyProcess(process);
+            throw enrichLaunchFailure("windows_cdp", ex, cacheRoot, userDataDir, executablePath, debugPort);
+        }
+    }
+
+    private Process launchWindowsChromeProcess(Path executablePath,
+                                               Path userDataDir,
+                                               boolean headless,
+                                               int debugPort,
+                                               Map<String, String> playwrightEnv) throws Exception {
+        List<String> command = new ArrayList<>();
+        command.add(executablePath.toString());
+        command.add("--no-sandbox");
+        command.addAll(WINDOWS_CHROME_STABLE_ARGS);
+        command.add("--remote-debugging-address=127.0.0.1");
+        command.add("--remote-debugging-port=" + debugPort);
+        command.add("--user-data-dir=" + userDataDir);
+        if (headless) {
+            command.add("--headless=new");
+        }
+        command.add("about:blank");
+        ProcessBuilder pb = new ProcessBuilder(command);
+        if (playwrightEnv != null && !playwrightEnv.isEmpty()) {
+            pb.environment().putAll(playwrightEnv);
+        }
+        pb.redirectErrorStream(true);
+        pb.redirectOutput(Redirect.DISCARD);
+        log.info("[Tool][browser] launching chromium over CDP command={} executable={} userDataDir={} debugPort={}",
+                command, executablePath, userDataDir, debugPort);
+        return pb.start();
+    }
+
+    private void waitForDebugPort(Process process,
+                                  int debugPort,
+                                  Path executablePath,
+                                  Path userDataDir) throws Exception {
+        long deadline = System.currentTimeMillis() + WINDOWS_CDP_CONNECT_TIMEOUT_MS;
+        while (System.currentTimeMillis() < deadline) {
+            if (process != null && !process.isAlive()) {
+                throw new IllegalStateException("chrome process exited before CDP was ready"
+                        + " executable=" + executablePath
+                        + " userDataDir=" + userDataDir
+                        + " debugPort=" + debugPort
+                        + " exitCode=" + process.exitValue());
+            }
+            try (var socket = new java.net.Socket()) {
+                socket.connect(new InetSocketAddress("127.0.0.1", debugPort), (int) WINDOWS_CDP_CONNECT_RETRY_INTERVAL_MS);
+                return;
+            } catch (Exception ignored) {
+            }
+            Thread.sleep(WINDOWS_CDP_CONNECT_RETRY_INTERVAL_MS);
+        }
+        throw new IllegalStateException("timed out waiting for chrome debug port"
+                + " executable=" + executablePath
+                + " userDataDir=" + userDataDir
+                + " debugPort=" + debugPort);
+    }
+
+    private BrowserContext resolveConnectedContext(Browser browser) {
+        if (browser == null) {
+            throw new IllegalStateException("CDP browser connection returned null");
+        }
+        for (int attempt = 0; attempt < 10; attempt++) {
+            List<BrowserContext> contexts = browser.contexts();
+            if (!contexts.isEmpty()) {
+                return contexts.get(0);
+            }
+            try {
+                Thread.sleep(100L);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("interrupted while waiting for browser context", ex);
+            }
+        }
+        throw new IllegalStateException("no browser context available after CDP connection");
     }
 
     /**
@@ -508,14 +669,20 @@ public class BrowserTool implements Tool {
         return Files.isReadable(executable);
     }
 
-    private IllegalStateException enrichLaunchFailure(Exception launchEx,
+    private IllegalStateException enrichLaunchFailure(String mode,
+                                                      Exception launchEx,
                                                       Path cacheRoot,
                                                       Path userDataDir,
-                                                      Path executablePath) {
+                                                      Path executablePath,
+                                                      Integer debugPort) {
         StringBuilder message = new StringBuilder("failed to launch chromium");
+        message.append(" mode=").append(mode);
         message.append(" executable=").append(executablePath);
         message.append(" cacheRoot=").append(cacheRoot);
         message.append(" userDataDir=").append(userDataDir);
+        if (debugPort != null) {
+            message.append(" debugPort=").append(debugPort);
+        }
         String detail = buildErrorMessage(launchEx);
         if (detail != null && !detail.isBlank()) {
             message.append(" cause=").append(detail);
@@ -811,7 +978,38 @@ public class BrowserTool implements Tool {
                 safelyCloseContext(stale);
             }
         }
+        Browser staleBrowser = browserByProfile.remove(profileKey);
+        if (staleBrowser != null) {
+            try {
+                staleBrowser.close();
+            } catch (Exception ignored) {
+            }
+        }
+        safelyDestroyProcess(processByProfile.remove(profileKey));
         resetPagesForProfile(profileKey);
+    }
+
+    private int reserveTcpPort() {
+        try (ServerSocket serverSocket = new ServerSocket()) {
+            serverSocket.setReuseAddress(true);
+            serverSocket.bind(new InetSocketAddress("127.0.0.1", 0));
+            return serverSocket.getLocalPort();
+        } catch (Exception ex) {
+            throw new IllegalStateException("failed to reserve local debug port", ex);
+        }
+    }
+
+    private void safelyDestroyProcess(Process process) {
+        if (process == null) {
+            return;
+        }
+        try {
+            process.destroy();
+            if (!process.waitFor(2, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     private boolean isTargetClosed(Exception ex) {
