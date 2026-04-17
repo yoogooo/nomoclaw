@@ -6,14 +6,6 @@
     "darwin-aarch64": {
       "signature": "",
       "url": "https://github.com/yoogooo/nomoclaw/releases/download/untagged-2c93df223c04676d29b8/NomoClaw-0.1.1-macos-arm64.dmg"
-    },
-    "darwin-x86_64": {
-      "signature": "",
-      "url": ""
-    },
-    "windows-x86_64": {
-      "signature": "",
-      "url": ""
     }
   }
 }
