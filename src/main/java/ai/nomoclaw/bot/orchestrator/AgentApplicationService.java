@@ -203,19 +203,42 @@ public class AgentApplicationService {
 
     public List<AgentCatalogGroupDto> listAgentGroups() {
         List<AgentGroupDefinitionEntity> groups = agentGroupDefinitionRepository.listActive();
-        List<String> groupUids = groups.stream()
-                .map(AgentGroupDefinitionEntity::getAgentGroupUid)
-                .toList();
+        if (groups == null || groups.isEmpty()) {
+            return List.of();
+        }
+        List<String> groupUids = groups.stream().map(AgentGroupDefinitionEntity::getAgentGroupUid).toList();
         List<AgentGroupMemberEntity> members = agentGroupMemberRepository.listActiveByGroupUids(groupUids);
-        Map<String, List<AgentGroupMemberEntity>> membersByGroup = members.stream()
-                .collect(Collectors.groupingBy(AgentGroupMemberEntity::getAgentGroupUid, LinkedHashMap::new, Collectors.toList()));
-        List<String> agentUids = members.stream()
-                .map(AgentGroupMemberEntity::getAgentUid)
-                .distinct()
-                .toList();
-        Map<String, AgentDefinitionEntity> agentsByUid = agentDefinitionRepository.listActiveByUids(agentUids).stream()
-                .collect(Collectors.toMap(AgentDefinitionEntity::getAgentUid, agent -> agent, (left, right) -> left, LinkedHashMap::new));
-        agentsByUid.values().forEach(this::ensureWorkspaceDocsForExistingAgent);
+        List<AgentDefinitionEntity> allAgents = agentDefinitionRepository.listAllActive();
+        allAgents.forEach(this::ensureWorkspaceDocsForExistingAgent);
+
+        String fallbackGroupUid = groups.get(0).getAgentGroupUid();
+        Map<String, AgentGroupMemberEntity> preferredMemberByAgent = new LinkedHashMap<>();
+        Map<String, String> assignedGroupByAgent = new LinkedHashMap<>();
+        for (AgentGroupMemberEntity member : members) {
+            if (member == null || member.getAgentUid() == null || member.getAgentUid().isBlank()) {
+                continue;
+            }
+            preferredMemberByAgent.putIfAbsent(member.getAgentUid(), member);
+            String groupUid = member.getAgentGroupUid();
+            if (groupUid != null && !groupUid.isBlank()) {
+                assignedGroupByAgent.putIfAbsent(member.getAgentUid(), groupUid);
+            }
+        }
+
+        Map<String, List<AgentCatalogAgentDto>> agentsByGroup = new LinkedHashMap<>();
+        for (AgentGroupDefinitionEntity group : groups) {
+            agentsByGroup.put(group.getAgentGroupUid(), new ArrayList<>());
+        }
+        for (AgentDefinitionEntity agent : allAgents) {
+            String agentUid = agent.getAgentUid();
+            String assignedGroupUid = assignedGroupByAgent.getOrDefault(agentUid, fallbackGroupUid);
+            AgentGroupMemberEntity member = preferredMemberByAgent.get(agentUid);
+            AgentCatalogAgentDto item = toAgentCatalogItem(withDefaultMember(member, assignedGroupUid, agentUid), agent);
+            if (item == null) {
+                continue;
+            }
+            agentsByGroup.computeIfAbsent(assignedGroupUid, ignored -> new ArrayList<>()).add(item);
+        }
 
         return groups.stream()
                 .map(group -> new AgentCatalogGroupDto(
@@ -226,10 +249,7 @@ public class AgentApplicationService {
                         group.getDescription(),
                         readStringArray(group.getSceneTags()),
                         group.getCollaborationMode(),
-                        membersByGroup.getOrDefault(group.getAgentGroupUid(), List.of()).stream()
-                                .map(member -> toAgentCatalogItem(member, agentsByUid.get(member.getAgentUid())))
-                                .filter(Objects::nonNull)
-                                .toList()
+                        agentsByGroup.getOrDefault(group.getAgentGroupUid(), List.of())
                 ))
                 .toList();
     }
@@ -2282,6 +2302,19 @@ public class AgentApplicationService {
                 member.getResponsibility(),
                 member.getIsPrimary() != null && member.getIsPrimary() == 1
         );
+    }
+
+    private AgentGroupMemberEntity withDefaultMember(AgentGroupMemberEntity member, String groupUid, String agentUid) {
+        if (member != null) {
+            return member;
+        }
+        AgentGroupMemberEntity fallback = new AgentGroupMemberEntity();
+        fallback.setAgentGroupUid(groupUid == null ? "" : groupUid);
+        fallback.setAgentUid(agentUid == null ? "" : agentUid);
+        fallback.setMemberRole("成员");
+        fallback.setResponsibility("");
+        fallback.setIsPrimary(0);
+        return fallback;
     }
 
     private ObjectNode readExtConfigObject(String extConfigRaw) {
