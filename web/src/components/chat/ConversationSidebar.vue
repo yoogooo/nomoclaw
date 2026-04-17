@@ -12,12 +12,11 @@ import { getSortLocale } from "@/i18n";
 type AgentSelectOption = SelectOption & {
   value: string;
   agentGroupUid: string;
-  rawName: string;
 };
 
 const conversationStore = useConversationStore();
 const agentCatalogStore = useAgentCatalogStore();
-const { t, locale } = useI18n();
+const { t } = useI18n();
 const renameDialogVisible = ref(false);
 const renameConversationUid = ref("");
 const renameInput = ref("");
@@ -36,27 +35,11 @@ const agentOptions = computed<AgentSelectOption[]>(() =>
     .map((agent) => ({
       label: agent.displayName || agent.agentName,
       value: agent.agentUid,
-      agentGroupUid: agent.agentGroupUid,
-      rawName: agent.agentName
+      agentGroupUid: agent.agentGroupUid
     }))
 );
 
 const selectedAgentUid = computed(() => agentCatalogStore.selectedAgentUid);
-
-const selectedAgentLabel = computed(() => {
-  const selected = agentOptions.value.find((item) => item.value === agentCatalogStore.selectedAgentUid);
-  if (!selected) {
-    return "";
-  }
-  const fallback = String(selected.label || "");
-  if (locale.value !== "en-US") {
-    return fallback;
-  }
-  const rawName = String(selected.rawName || "");
-  return rawName || fallback;
-});
-
-const description = computed(() => t("chat.sidebar.viewingAgent", { label: selectedAgentLabel.value || t("chat.sidebar.noAgentSelected") }));
 
 type ConversationMenuKey = "rename" | "delete";
 
@@ -182,7 +165,6 @@ function handleAgentChange(agentUid: string | number | null) {
           @update:value="handleAgentChange"
         />
       </div>
-      <div class="panel-subtitle">{{ description }}</div>
     </div>
     <div class="panel-body conversation-panel">
       <div class="scroll-area conversation-list">
@@ -375,7 +357,7 @@ function handleAgentChange(agentUid: string | number | null) {
 
 .conversation-time {
   margin-top: var(--space-2);
-  font-size: var(--text-body-size);
+  font-size: var(--text-caption-size);
   color: var(--text-muted);
 }
 

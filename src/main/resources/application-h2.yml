@@ -5,7 +5,7 @@ llm:
 
 spring:
   datasource:
-    url: "jdbc:h2:file:${NOMOCLAW_ROOT_DIR:${user.home}/.nomoclaw}/data/nomoclaw;MODE=MySQL;DATABASE_TO_LOWER=TRUE;AUTO_SERVER=TRUE"
+    url: "jdbc:h2:file:${NOMOCLAW_ROOT_DIR:${user.home}/.nomoclaw}/data/nomoclaw;MODE=MySQL;DATABASE_TO_LOWER=TRUE;AUTO_SERVER=${nomoclaw.h2.auto-server:${NOMOCLAW_H2_AUTO_SERVER:FALSE}}"
     driver-class-name: org.h2.Driver
     username: sa
     password: ""

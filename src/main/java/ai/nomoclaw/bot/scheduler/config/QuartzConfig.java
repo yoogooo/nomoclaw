@@ -44,7 +44,8 @@ public class QuartzConfig {
         }
         factoryBean.setQuartzProperties(properties);
         factoryBean.setWaitForJobsToCompleteOnShutdown(true);
-        factoryBean.setStartupDelay(2);
+        int startupDelaySeconds = Math.max(environment.getProperty("spring.quartz.startup-delay-seconds", Integer.class, 2), 0);
+        factoryBean.setStartupDelay(startupDelaySeconds);
         return factoryBean;
     }
 
