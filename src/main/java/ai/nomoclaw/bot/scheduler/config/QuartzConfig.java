@@ -2,6 +2,7 @@ package ai.nomoclaw.bot.scheduler.config;
 
 import org.quartz.spi.TriggerFiredBundle;
 import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
@@ -15,6 +16,7 @@ import java.util.Properties;
 public class QuartzConfig {
 
     @Bean
+    @Lazy
     public SpringBeanJobFactory quartzJobFactory(AutowireCapableBeanFactory beanFactory) {
         return new SpringBeanJobFactory() {
             @Override
@@ -27,6 +29,7 @@ public class QuartzConfig {
     }
 
     @Bean
+    @Lazy
     public SchedulerFactoryBean schedulerFactoryBean(DataSource dataSource,
                                                      SpringBeanJobFactory quartzJobFactory,
                                                      Environment environment) {
