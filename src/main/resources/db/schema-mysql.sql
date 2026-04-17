@@ -200,6 +200,7 @@ CREATE TABLE IF NOT EXISTS agent_conversation (
     agent_uid VARCHAR(64) NOT NULL DEFAULT '' COMMENT '归属 Agent 业务ID',
     channel VARCHAR(32) NOT NULL DEFAULT 'web' COMMENT '会话来源渠道：web/feishu/dingtalk/noop',
     title VARCHAR(255) NOT NULL DEFAULT '' COMMENT '对话标题',
+    pinned TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否置顶',
     input_tokens INT NOT NULL DEFAULT 0 COMMENT '对话累计输入 token 数',
     output_tokens INT NOT NULL DEFAULT 0 COMMENT '对话累计输出 token 数',
     total_tokens INT NOT NULL DEFAULT 0 COMMENT '对话累计总 token 数',

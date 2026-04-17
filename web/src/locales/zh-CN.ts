@@ -73,6 +73,9 @@ const zhCN = {
       noConversations: "暂无历史对话",
       unnamed: "未命名对话",
       updatedAt: "更新于 {time}",
+      pin: "置顶",
+      unpin: "取消置顶",
+      pinned: "已置顶",
       rename: "修改名称",
       renamePrompt: "请输入新的对话名称",
       delete: "删除"

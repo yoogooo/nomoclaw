@@ -633,6 +633,11 @@ export const useConversationStore = defineStore("conversation", () => {
     }
   }
 
+  async function updateConversationPin(conversationUid: string, pinned: boolean) {
+    await conversationApi.updateConversationPin(conversationUid, pinned);
+    await refreshConversations(conversationUid);
+  }
+
   async function deleteConversation(conversationUid: string) {
     await conversationApi.deleteConversation(conversationUid);
     if (conversationUid === currentConversationUid.value) {
@@ -1099,6 +1104,7 @@ export const useConversationStore = defineStore("conversation", () => {
     rejectStep,
     openFile,
     renameConversation,
+    updateConversationPin,
     confirmDeleteConversation
   };
 });

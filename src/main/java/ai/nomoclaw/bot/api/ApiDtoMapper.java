@@ -42,6 +42,7 @@ public final class ApiDtoMapper {
                 dto.agentGroupUid(),
                 dto.agentUid(),
                 dto.title(),
+                dto.pinned(),
                 dto.createdTime(),
                 dto.updatedTime()
         );

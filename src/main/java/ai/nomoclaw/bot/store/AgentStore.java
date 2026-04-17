@@ -29,6 +29,8 @@ public interface AgentStore {
 
     void updateConversationTitle(String conversationUid, String title);
 
+    void updateConversationPinned(String conversationUid, boolean pinned);
+
     default AgentMessage createUserMessage(String messageUid,
                                            String conversationUid,
                                            String content,

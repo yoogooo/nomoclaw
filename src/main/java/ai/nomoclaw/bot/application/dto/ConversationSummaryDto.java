@@ -7,6 +7,7 @@ public record ConversationSummaryDto(
         String agentGroupUid,
         String agentUid,
         String title,
+        boolean pinned,
         Instant createdTime,
         Instant updatedTime
 ) {

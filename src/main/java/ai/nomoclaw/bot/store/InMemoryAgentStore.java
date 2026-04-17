@@ -38,6 +38,7 @@ public class InMemoryAgentStore implements AgentStore {
                 agentUid,
                 channel == null || channel.isBlank() ? "web" : channel,
                 "",
+                false,
                 0,
                 0,
                 0,
@@ -51,7 +52,11 @@ public class InMemoryAgentStore implements AgentStore {
     @Override
     public List<AgentConversation> listConversations() {
         return conversations.values().stream()
-                .sorted(Comparator.comparing(AgentConversation::updatedAt).reversed())
+                .sorted(
+                        Comparator.comparing(AgentConversation::pinned).reversed()
+                                .thenComparing(AgentConversation::updatedAt, Comparator.reverseOrder())
+                                .thenComparing(AgentConversation::createdAt, Comparator.reverseOrder())
+                )
                 .toList();
     }
 
@@ -90,6 +95,7 @@ public class InMemoryAgentStore implements AgentStore {
                 oldConversation.agentUid(),
                 oldConversation.channel(),
                 oldConversation.title(),
+                oldConversation.pinned(),
                 oldConversation.inputTokens(),
                 oldConversation.outputTokens(),
                 oldConversation.totalTokens(),
@@ -106,11 +112,29 @@ public class InMemoryAgentStore implements AgentStore {
                 oldConversation.agentUid(),
                 oldConversation.channel(),
                 title,
+                oldConversation.pinned(),
                 oldConversation.inputTokens(),
                 oldConversation.outputTokens(),
                 oldConversation.totalTokens(),
                 oldConversation.createdAt(),
                 Instant.now()
+        ));
+    }
+
+    @Override
+    public void updateConversationPinned(String conversationUid, boolean pinned) {
+        conversations.computeIfPresent(conversationUid, (id, oldConversation) -> new AgentConversation(
+                oldConversation.conversationUid(),
+                oldConversation.agentGroupUid(),
+                oldConversation.agentUid(),
+                oldConversation.channel(),
+                oldConversation.title(),
+                pinned,
+                oldConversation.inputTokens(),
+                oldConversation.outputTokens(),
+                oldConversation.totalTokens(),
+                oldConversation.createdAt(),
+                oldConversation.updatedAt()
         ));
     }
 
@@ -224,6 +248,7 @@ public class InMemoryAgentStore implements AgentStore {
                 oldConversation.agentUid(),
                 oldConversation.channel(),
                 oldConversation.title(),
+                oldConversation.pinned(),
                 oldConversation.inputTokens() + input,
                 oldConversation.outputTokens() + output,
                 oldConversation.totalTokens() + total,

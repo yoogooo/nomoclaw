@@ -194,6 +194,7 @@ public class AgentApplicationService {
                         conversation.agentGroupUid(),
                         conversation.agentUid(),
                         conversation.title(),
+                        conversation.pinned(),
                         conversation.createdAt(),
                         conversation.updatedAt()
                 ))
@@ -632,6 +633,14 @@ public class AgentApplicationService {
         store.updateConversationTitle(conversationUid, normalizedTitle);
         log.info("[Agent] conversation title updated conversationUid={} title={} agentGroupUid={} agentUid={}",
                 conversationUid, normalizedTitle, conversation.agentGroupUid(), conversation.agentUid());
+    }
+
+    public void updateConversationPinned(String conversationUid, boolean pinned) {
+        AgentConversation conversation = store.findConversation(conversationUid)
+                .orElseThrow(() -> new IllegalArgumentException("conversation not found: " + conversationUid));
+        store.updateConversationPinned(conversationUid, pinned);
+        log.info("[Agent] conversation pin updated conversationUid={} pinned={} agentGroupUid={} agentUid={}",
+                conversationUid, pinned, conversation.agentGroupUid(), conversation.agentUid());
     }
 
     public String submitMessage(String conversationUid, String message) {

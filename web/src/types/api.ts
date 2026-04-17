@@ -236,6 +236,7 @@ export interface ConversationSummary {
   agentGroupUid: string;
   agentUid: string;
   title: string;
+  pinned: boolean;
   createdTime: string;
   updatedTime: string;
 }

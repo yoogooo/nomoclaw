@@ -16,6 +16,7 @@ public class AgentConversationEntity {
     private String agentUid;
     private String channel;
     private String title;
+    private Boolean pinned;
     private Integer inputTokens;
     private Integer outputTokens;
     private Integer totalTokens;
@@ -68,6 +69,14 @@ public class AgentConversationEntity {
 
     public void setChannel(String channel) {
         this.channel = channel;
+    }
+
+    public Boolean getPinned() {
+        return pinned;
+    }
+
+    public void setPinned(Boolean pinned) {
+        this.pinned = pinned;
     }
 
     public Integer getInputTokens() {

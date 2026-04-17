@@ -8,6 +8,7 @@ public record AgentConversation(
         String agentUid,
         String channel,
         String title,
+        boolean pinned,
         int inputTokens,
         int outputTokens,
         int totalTokens,

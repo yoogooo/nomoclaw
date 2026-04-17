@@ -99,6 +99,14 @@ public class AgentController {
         return new SimpleResponse("updated");
     }
 
+    @PatchMapping("/conversations/{conversationUid}/pin")
+    public SimpleResponse updateConversationPinned(@PathVariable String conversationUid,
+                                                   @Valid @RequestBody UpdateConversationPinnedRequest request) {
+        log.info("[AgentAPI] updateConversationPinned conversationUid={} pinned={}", conversationUid, request.pinned());
+        conversationAppService.updateConversationPinned(conversationUid, Boolean.TRUE.equals(request.pinned()));
+        return new SimpleResponse("updated");
+    }
+
     @GetMapping("/agent-groups")
     public List<AgentCatalogGroupResponse> listAgentGroups() {
         log.info("[AgentAPI] listAgentGroups");

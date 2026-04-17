@@ -176,6 +176,7 @@ CREATE TABLE IF NOT EXISTS agent_conversation (
     agent_uid VARCHAR(64) NOT NULL DEFAULT '',
     channel VARCHAR(32) NOT NULL DEFAULT 'web',
     title VARCHAR(255) NOT NULL DEFAULT '',
+    pinned BOOLEAN NOT NULL DEFAULT FALSE,
     input_tokens INT NOT NULL DEFAULT 0,
     output_tokens INT NOT NULL DEFAULT 0,
     total_tokens INT NOT NULL DEFAULT 0,

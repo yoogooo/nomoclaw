@@ -61,13 +61,14 @@ public class MybatisPlusAgentStore implements AgentStore {
         entity.setAgentUid(agentUid);
         entity.setChannel(channel == null || channel.isBlank() ? "web" : channel.trim());
         entity.setTitle("");
+        entity.setPinned(false);
         entity.setInputTokens(0);
         entity.setOutputTokens(0);
         entity.setTotalTokens(0);
         entity.setCreatedTime(toLocalDateTime(now));
         entity.setUpdatedTime(toLocalDateTime(now));
         conversationRepository.save(entity);
-        return new AgentConversation(conversationUid, agentGroupUid, agentUid, entity.getChannel(), "", 0, 0, 0, now, now);
+        return new AgentConversation(conversationUid, agentGroupUid, agentUid, entity.getChannel(), "", false, 0, 0, 0, now, now);
     }
 
     @Override
@@ -105,6 +106,13 @@ public class MybatisPlusAgentStore implements AgentStore {
                 .eq(AgentConversationEntity::getConversationUid, conversationUid)
                 .set(AgentConversationEntity::getTitle, title)
                 .set(AgentConversationEntity::getUpdatedTime, LocalDateTime.now()));
+    }
+
+    @Override
+    public void updateConversationPinned(String conversationUid, boolean pinned) {
+        conversationRepository.update(new LambdaUpdateWrapper<AgentConversationEntity>()
+                .eq(AgentConversationEntity::getConversationUid, conversationUid)
+                .set(AgentConversationEntity::getPinned, pinned));
     }
 
     @Override
@@ -336,6 +344,7 @@ public class MybatisPlusAgentStore implements AgentStore {
                 entity.getAgentUid(),
                 entity.getChannel() == null || entity.getChannel().isBlank() ? "web" : entity.getChannel(),
                 entity.getTitle(),
+                Boolean.TRUE.equals(entity.getPinned()),
                 entity.getInputTokens() == null ? 0 : entity.getInputTokens(),
                 entity.getOutputTokens() == null ? 0 : entity.getOutputTokens(),
                 entity.getTotalTokens() == null ? 0 : entity.getTotalTokens(),

@@ -2,7 +2,7 @@
 import { computed, nextTick, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { NButton, NDropdown, NInput, NModal, NSelect, type DropdownOption, type InputInst, type SelectOption } from "naive-ui";
-import { RefreshCw } from "lucide-vue-next";
+import { Pin, RefreshCw } from "lucide-vue-next";
 import { useAgentCatalogStore } from "@/stores/agentCatalog";
 import { useConversationStore } from "@/stores/conversation";
 import { message as discreteMessage } from "@/discrete";
@@ -41,10 +41,14 @@ const agentOptions = computed<AgentSelectOption[]>(() =>
 
 const selectedAgentUid = computed(() => agentCatalogStore.selectedAgentUid);
 
-type ConversationMenuKey = "rename" | "delete";
+type ConversationMenuKey = "rename" | "delete" | "togglePin";
 
-function menuOptions(): DropdownOption[] {
+function menuOptions(pinned: boolean): DropdownOption[] {
   return [
+    {
+      key: "togglePin",
+      label: pinned ? t("chat.sidebar.unpin") : t("chat.sidebar.pin")
+    },
     {
       key: "rename",
       label: t("chat.sidebar.rename")
@@ -89,8 +93,12 @@ async function confirmRenameConversation() {
   }
 }
 
-function handleMenuSelect(key: string | number, conversationUid: string, title: string) {
+function handleMenuSelect(key: string | number, conversationUid: string, title: string, pinned: boolean) {
   const action = String(key) as ConversationMenuKey;
+  if (action === "togglePin") {
+    void conversationStore.updateConversationPin(conversationUid, !pinned);
+    return;
+  }
   if (action === "rename") {
     openRenameDialog(conversationUid, title);
     return;
@@ -176,14 +184,19 @@ function handleAgentChange(agentUid: string | number | null) {
             :class="{ active: conversationStore.currentConversationUid === item.conversationUid }"
           >
             <button class="conversation-main" @click="conversationStore.selectConversation(item.conversationUid)">
-              <div class="conversation-title">{{ item.title || t("chat.sidebar.unnamed") }}</div>
+              <div class="conversation-title">
+                <span v-if="item.pinned" class="conversation-pinned-icon" :title="t('chat.sidebar.pinned')">
+                  <Pin :size="12" />
+                </span>
+                <span class="conversation-title-text">{{ item.title || t("chat.sidebar.unnamed") }}</span>
+              </div>
               <div class="conversation-time">{{ t("chat.sidebar.updatedAt", { time: formatFriendlyDateTime(item.updatedTime) }) }}</div>
             </button>
             <div class="conversation-menu-wrap">
               <n-dropdown
                 trigger="click"
-                :options="menuOptions()"
-                @select="(key) => handleMenuSelect(key, item.conversationUid, item.title || '')"
+                :options="menuOptions(Boolean(item.pinned))"
+                @select="(key) => handleMenuSelect(key, item.conversationUid, item.title || '', Boolean(item.pinned))"
               >
                 <button class="history-menu-button">...</button>
               </n-dropdown>
@@ -342,13 +355,29 @@ function handleAgentChange(agentUid: string | number | null) {
 }
 
 .conversation-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1_5);
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-size: var(--text-body-size);
   line-height: 1.4;
   font-weight: 500;
   color: var(--color-text-primary);
+}
+
+.conversation-title-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversation-pinned-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  flex: none;
 }
 
 .conversation-row.active .conversation-title {

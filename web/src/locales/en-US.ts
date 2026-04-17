@@ -73,6 +73,9 @@ const enUS = {
       noConversations: "No conversation history",
       unnamed: "Untitled Conversation",
       updatedAt: "Updated at {time}",
+      pin: "Pin",
+      unpin: "Unpin",
+      pinned: "Pinned",
       rename: "Rename",
       renamePrompt: "Enter a new conversation name",
       delete: "Delete"

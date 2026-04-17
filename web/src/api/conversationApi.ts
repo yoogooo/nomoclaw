@@ -44,6 +44,13 @@ export const conversationApi = {
       body: JSON.stringify({ title })
     });
   },
+  updateConversationPin(conversationUid: string, pinned: boolean) {
+    return requestJson<SimpleResponse>(`/api/conversations/${conversationUid}/pin`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pinned })
+    });
+  },
   listAgentGroups() {
     return requestJson<AgentCatalogGroup[]>("/api/agent-groups");
   },
