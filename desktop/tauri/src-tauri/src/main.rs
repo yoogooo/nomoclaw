@@ -848,7 +848,7 @@ fn evaluate_watchdog_health_debounce(
 
 // ===== updater =====
 fn updater_supported<R: Runtime>(_app: &AppHandle<R>) -> bool {
-    cfg!(target_os = "macos")
+    cfg!(target_os = "macos") || cfg!(target_os = "windows")
 }
 
 fn snapshot_updater_state(state: &UpdaterRuntimeState) -> UpdaterStatePayload {
@@ -1045,7 +1045,7 @@ fn updater_get_state(updater_state: State<'_, UpdaterState>) -> std::result::Res
 #[tauri::command]
 fn updater_check_now(app: AppHandle) -> std::result::Result<(), String> {
     if !updater_supported(&app) {
-        return Err("updater is only enabled on macOS".to_string());
+        return Err("updater is only enabled on macOS and Windows".to_string());
     }
     request_updater_check(app, "manual");
     Ok(())
@@ -1057,7 +1057,7 @@ async fn updater_install_downloaded(
     updater_state: State<'_, UpdaterState>,
 ) -> std::result::Result<(), String> {
     if !updater_supported(&app) {
-        return Err("updater is only enabled on macOS".to_string());
+        return Err("updater is only enabled on macOS and Windows".to_string());
     }
     if UPDATER_INSTALLING
         .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)

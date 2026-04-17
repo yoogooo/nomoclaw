@@ -17,7 +17,7 @@ set -euo pipefail
 #   TAURI_BUILD_CI=true|false         (default: true)
 #   TAURI_BUNDLES=msi|nsis|msi,nsis   (default: msi)
 #   SKIP_RUST_CHECK=true|false        (default: false)
-#   TAURI_UPDATER_PUBKEY=<pubkey>     (optional)
+#   TAURI_UPDATER_PUBKEY=<pubkey>     (optional; updater verification key embedded into app)
 #   APP_VERSION=1.0.0                 (default: 1.0.0)
 #   DESKTOP_VERSION=1.0.0             (alias of APP_VERSION, if set takes precedence)
 #   DESKTOP_NAME_PREFIX=NomoClaw      (default: NomoClaw)

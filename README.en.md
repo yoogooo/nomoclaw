@@ -70,6 +70,32 @@ pnpm dev
 
 Default: `http://127.0.0.1:5173`
 
+## One-Command Docker Startup (Frontend + Backend)
+
+For users who want a quick local run with minimal setup. This setup uses H2 file mode by default, so MySQL is not required.
+
+1. (Optional) Create a `.env` file at repo root and set variables you need (for example `DASHSCOPE_API_KEY`, `LLM_MODEL_CONFIG_ENCRYPTION_KEY`).
+2. Start both services:
+
+```bash
+docker compose up --build -d
+```
+
+3. Open:
+- Frontend: `http://127.0.0.1:5173`
+- Backend API: `http://127.0.0.1:8080`
+
+4. Stop:
+
+```bash
+docker compose down
+```
+
+Notes:
+- Backend data is persisted in Docker volume `nomoclaw_data`
+- Frontend uses Nginx and proxies `/api` to the backend container
+- To reset data: `docker compose down -v`
+
 ### Run with H2 (file mode, dev/test)
 
 ```bash

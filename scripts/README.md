@@ -18,7 +18,7 @@
   - `MAVEN_PROFILE=prod-lite`（默认 `prod-lite`）
   - `BUILD_TARGET_DMG=true|false`（默认 `true`）
   - `TAURI_BUILD_CI=true|false`（默认 `true`）
-  - `TAURI_UPDATER_PUBKEY=<pubkey>`（可选）
+  - `TAURI_UPDATER_PUBKEY=<pubkey>`（可选；用于 updater 验签）
   - `DESKTOP_VERSION=yyyy.M.d`（默认当天日期）
   - `DESKTOP_NAME_PREFIX=<name>`（默认 `NomoClaw`）
 - 示例:
@@ -50,7 +50,7 @@ TARGET_ARCH=x64 ./scripts/build-desktop-macos.sh
   - `TAURI_BUILD_CI=true|false`（默认 `true`）
   - `TAURI_BUNDLES=msi|nsis|msi,nsis`（默认 `msi`）
   - `SKIP_RUST_CHECK=true|false`（默认 `false`）
-  - `TAURI_UPDATER_PUBKEY=<pubkey>`（可选）
+  - `TAURI_UPDATER_PUBKEY=<pubkey>`（可选；用于 updater 验签）
   - `DESKTOP_VERSION=x.y.z`（默认 `1.MDD.MINUTES_OF_DAY`，推荐手动指定如 `1.0.0`）
   - `DESKTOP_NAME_PREFIX=<name>`（默认 `NomoClaw`）
   - `WINDOWS_ICON_FILE=<path to .ico>`（可选；未指定时会自动探测 `desktop/tauri/src-tauri/icons/icon.ico`、`build/windows/NomoClaw.ico`）
@@ -122,3 +122,37 @@ TARGET_ARCH=x64 ./scripts/build-desktop-macos.sh
   - macOS 用 `build-desktop-macos.sh`
   - Windows 用 `build-desktop-windows-x64.sh`
 - Legacy 脚本适合兼容旧流程，不建议继续扩展新能力。
+
+## 更新元数据校验
+
+- 脚本：`./scripts/validate-updater-json.sh`
+- 默认校验文件：`releases/latest/download/latest.json`
+- 可选参数：
+  - `--file <path>` 指定文件
+  - `--check-urls` 额外校验平台下载地址可达性
+  - `--require-signature` 启用签名必填校验（默认不强制）
+
+示例：
+
+```bash
+./scripts/validate-updater-json.sh --check-urls
+```
+
+## 更新元数据写入工具
+
+- 脚本：`./scripts/update-latest-json.sh`
+- 作用：按参数写入 `releases/latest/download/latest.json`，并默认触发校验。
+- 说明：三个 `--*-signature` 参数为可选；如果你启用签名链路，再填写对应签名。
+- 典型用法：
+
+```bash
+./scripts/update-latest-json.sh \
+  --version 1.2.3 \
+  --darwin-arm64-url "https://example.com/NomoClaw-1.2.3-macos-arm64.app.tar.gz" \
+  --darwin-arm64-signature "<sig-arm64>" \
+  --darwin-x64-url "https://example.com/NomoClaw-1.2.3-macos-x64.app.tar.gz" \
+  --darwin-x64-signature "<sig-x64>" \
+  --windows-x64-url "https://example.com/NomoClaw-1.2.3-windows-x64.msi.zip" \
+  --windows-x64-signature "<sig-win>" \
+  --check-urls
+```

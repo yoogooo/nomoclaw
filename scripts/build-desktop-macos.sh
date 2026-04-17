@@ -17,7 +17,7 @@ set -euo pipefail
 #   MAVEN_PROFILE=prod-lite         (default: prod-lite)
 #   BUILD_TARGET_DMG=true|false     (default: true)
 #   TAURI_BUILD_CI=true|false       (default: true)
-#   TAURI_UPDATER_PUBKEY=<pubkey>   (optional; when set, updater artifacts are generated)
+#   TAURI_UPDATER_PUBKEY=<pubkey>   (optional; updater verification key embedded into app)
 #   APP_VERSION=1.0.0               (default: 1.0.0)
 #   DESKTOP_VERSION=1.0.0           (alias of APP_VERSION, if set takes precedence)
 
@@ -316,7 +316,7 @@ build_tauri_config_override() {
 
   node -e '
 const fs = require("fs");
-const [basePath, outPath, productName, version, updaterPubkey] = process.argv.slice(1);
+const [basePath, outPath, productName, version, updaterPubkey, targetArch] = process.argv.slice(1);
 const cfg = JSON.parse(fs.readFileSync(basePath, "utf8"));
 cfg.productName = productName;
 cfg.version = version;
@@ -327,12 +327,15 @@ if (cfg.app && Array.isArray(cfg.app.windows)) {
   }));
 }
 cfg.bundle = cfg.bundle || {};
+cfg.bundle.macOS = cfg.bundle.macOS || {};
+// Intel builds target 10.15+, Apple Silicon builds target 11.0+.
+cfg.bundle.macOS.minimumSystemVersion = targetArch === "x64" ? "10.15" : "11.0";
 cfg.bundle.createUpdaterArtifacts = Boolean(updaterPubkey);
 if (updaterPubkey && cfg.plugins && cfg.plugins.updater) {
   cfg.plugins.updater.pubkey = updaterPubkey;
 }
 fs.writeFileSync(outPath, JSON.stringify(cfg, null, 2) + "\n");
-' "$base_config_path" "$TAURI_CONFIG_OVERRIDE_PATH" "$DESKTOP_PRODUCT_NAME" "$DESKTOP_VERSION" "$TAURI_UPDATER_PUBKEY"
+' "$base_config_path" "$TAURI_CONFIG_OVERRIDE_PATH" "$DESKTOP_PRODUCT_NAME" "$DESKTOP_VERSION" "$TAURI_UPDATER_PUBKEY" "$TARGET_ARCH"
 }
 
 build_tauri_bundle() {

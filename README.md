@@ -70,6 +70,32 @@ pnpm dev
 
 默认：`http://127.0.0.1:5173`
 
+## Docker 一键启动（前后端）
+
+适合希望“拉代码后直接跑起来”的场景，默认使用 H2 file 模式，不依赖 MySQL。
+
+1. （可选）在项目根目录创建 `.env`，写入你需要的变量（如 `DASHSCOPE_API_KEY`、`LLM_MODEL_CONFIG_ENCRYPTION_KEY`）。
+2. 启动前后端：
+
+```bash
+docker compose up --build -d
+```
+
+3. 打开：
+- 前端：`http://127.0.0.1:5173`
+- 后端 API：`http://127.0.0.1:8080`
+
+4. 停止：
+
+```bash
+docker compose down
+```
+
+说明：
+- 后端数据持久化到 Docker volume：`nomoclaw_data`
+- 前端容器通过 Nginx 反向代理 `/api` 到后端容器
+- 如需清空数据并重置：`docker compose down -v`
+
 ### 使用 H2（file 模式，开发/测试）
 
 ```bash
