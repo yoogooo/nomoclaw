@@ -338,14 +338,6 @@ onMounted(() => {
             </template>
           </AppPageHeader>
 
-          <div v-if="catalogStatus" class="catalog-status">
-            <n-tag :type="catalogStatus.stale ? 'warning' : 'success'">
-              {{ t("models.labels.catalogVersion") }} {{ catalogStatus.catalogVersion || "-" }}
-            </n-tag>
-            <span>{{ t("models.labels.catalogSource") }}: {{ catalogStatus.source || "-" }}</span>
-            <span>{{ t("models.labels.catalogGeneratedAt") }}: {{ catalogStatus.generatedAt || "-" }}</span>
-          </div>
-
           <section class="provider-grid">
             <n-card
               v-for="provider in providerCards"

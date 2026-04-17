@@ -44,7 +44,7 @@
       "active": true,
       "dialog": false,
       "endpoints": [
-        "https://github.com/yoogooo/nomoclaw/releases/latest/download/latest.json"
+        "https://raw.githubusercontent.com/yoogooo/nomoclaw/refs/heads/dev/releases/latest/download/latest.json"
       ],
       "pubkey": ""
     }

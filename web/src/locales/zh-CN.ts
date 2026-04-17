@@ -699,7 +699,7 @@ const zhCN = {
     },
     channels: {
       title: "Channel 管理",
-      subtitle: "点击卡片编辑通道信息，保存后写入 ~/.nomoclaw/nomoclaw.json。"
+      subtitle: "点击卡片编辑通道信息。"
     },
     models: {
       title: "模型管理",

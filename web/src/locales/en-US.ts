@@ -699,7 +699,7 @@ const enUS = {
     },
     channels: {
       title: "Channel Management",
-      subtitle: "Edit channel settings and save to ~/.nomoclaw/nomoclaw.json."
+      subtitle: "Edit channel settings."
     },
     models: {
       title: "Model Management",
