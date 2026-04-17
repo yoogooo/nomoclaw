@@ -13,7 +13,10 @@ import org.springframework.scheduling.annotation.EnableAsync;
 @SpringBootApplication
 @EnableAsync
 @ConfigurationPropertiesScan(basePackages = {"ai.nomoclaw.bot"})
-@MapperScan({"ai.nomoclaw.bot.**.mapper"})
+@MapperScan({
+		"ai.nomoclaw.bot.store.mapper",
+		"ai.nomoclaw.bot.channel.store.mapper"
+})
 public class NomoClawApplication {
 	private static final Logger log = LoggerFactory.getLogger(NomoClawApplication.class);
 	private static final long PROCESS_BOOT_NANOS = System.nanoTime();

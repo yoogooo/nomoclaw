@@ -28,6 +28,10 @@ spring:
     #       mode: always
     #       schema-locations: classpath:db/schema-mysql.sql
 
+mybatis-plus:
+  global-config:
+    banner: false
+
 server:
   address: 127.0.0.1
   tomcat:
