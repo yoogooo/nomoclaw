@@ -1,0 +1,12 @@
+services:
+  backend:
+    extends:
+      file: ./docker/compose.yml
+      service: backend
+  frontend:
+    extends:
+      file: ./docker/compose.yml
+      service: frontend
+
+volumes:
+  nomoclaw_data:

@@ -1,0 +1,30 @@
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: Dockerfile.backend
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: h2
+      SERVER_ADDRESS: 0.0.0.0
+      AGENT_API_LOCAL_ONLY_ENABLED: "false"
+      NOMOCLAW_ROOT_DIR: /data/nomoclaw
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      LLM_MODEL_CONFIG_ENCRYPTION_KEY: ${LLM_MODEL_CONFIG_ENCRYPTION_KEY:-}
+    volumes:
+      - nomoclaw_data:/data/nomoclaw
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: Dockerfile.frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+volumes:
+  nomoclaw_data:
