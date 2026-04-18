@@ -83,7 +83,7 @@ try {
   process.exit(1);
 }
 
-const requiredPlatforms = ["darwin-aarch64", "darwin-x86_64", "windows-x86_64"];
+const knownPlatforms = ["darwin-aarch64", "darwin-x86_64", "windows-x86_64"];
 const semver = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
 function assert(condition, message) {
@@ -108,18 +108,29 @@ assert(nonEmptyString(root.pub_date), "pub_date must be a non-empty string");
 assert(root.platforms && typeof root.platforms === "object", "platforms must be an object");
 
 const urls = [];
-for (const key of requiredPlatforms) {
+let enabledPlatformCount = 0;
+for (const key of knownPlatforms) {
   const platform = root.platforms[key];
-  assert(platform && typeof platform === "object", `platforms.${key} must exist`);
-  assert(nonEmptyString(platform.url), `platforms.${key}.url must be non-empty`);
-  assert(notPlaceholder(platform.url), `platforms.${key}.url cannot be placeholder text`);
-  assert(/^https?:\/\//i.test(platform.url.trim()), `platforms.${key}.url must start with http:// or https://`);
-  if (requireSignature) {
-    assert(nonEmptyString(platform.signature), `platforms.${key}.signature must be non-empty`);
-    assert(notPlaceholder(platform.signature), `platforms.${key}.signature cannot be placeholder text`);
+  if (!platform || typeof platform !== "object") {
+    continue;
   }
-  urls.push(platform.url.trim());
+  const rawUrl = typeof platform.url === "string" ? platform.url.trim() : "";
+  if (!rawUrl) {
+    // Empty URL means this platform is disabled for this release.
+    continue;
+  }
+  enabledPlatformCount += 1;
+  assert(notPlaceholder(rawUrl), `platforms.${key}.url cannot be placeholder text`);
+  assert(/^https?:\/\//i.test(rawUrl), `platforms.${key}.url must start with http:// or https://`);
+  if (requireSignature) {
+    const rawSig = typeof platform.signature === "string" ? platform.signature.trim() : "";
+    assert(rawSig.length > 0, `platforms.${key}.signature must be non-empty`);
+    assert(notPlaceholder(rawSig), `platforms.${key}.signature cannot be placeholder text`);
+  }
+  urls.push(rawUrl);
 }
+
+assert(enabledPlatformCount > 0, "at least one platform with non-empty url is required");
 
 fs.writeFileSync(urlsPath, urls.join("\n") + "\n", "utf8");
 console.error("[validate-updater-json] metadata validation passed");

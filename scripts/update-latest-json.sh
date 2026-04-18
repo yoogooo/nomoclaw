@@ -42,20 +42,20 @@ usage() {
 Usage:
   ./scripts/update-latest-json.sh \
     --version <x.y.z> \
-    --darwin-arm64-url <url> [--darwin-arm64-signature <sig>] \
-    --darwin-x64-url <url> [--darwin-x64-signature <sig>] \
-    --windows-x64-url <url> [--windows-x64-signature <sig>] \
+    [--darwin-arm64-url <url> --darwin-arm64-signature <sig>] \
+    [--darwin-x64-url <url> --darwin-x64-signature <sig>] \
+    [--windows-x64-url <url> --windows-x64-signature <sig>] \
     [--notes <text>] [--pub-date <ISO8601>] [--file <path>] [--check-urls] [--skip-validate]
 
 Options:
   --version <x.y.z>                  Release version.
   --notes <text>                     Optional release notes text.
   --pub-date <ISO8601>               Optional publish date; default is current UTC timestamp.
-  --darwin-arm64-url <url>           macOS arm64 asset URL.
+  --darwin-arm64-url <url>           Optional macOS arm64 asset URL.
   --darwin-arm64-signature <sig>     Optional macOS arm64 signature text.
-  --darwin-x64-url <url>             macOS x64 asset URL.
+  --darwin-x64-url <url>             Optional macOS x64 asset URL.
   --darwin-x64-signature <sig>       Optional macOS x64 signature text.
-  --windows-x64-url <url>            Windows x64 asset URL.
+  --windows-x64-url <url>            Optional Windows x64 asset URL.
   --windows-x64-signature <sig>      Optional Windows x64 signature text.
   --file <path>                      Output JSON path (default: releases/latest/download/latest.json).
   --check-urls                       Also check URL reachability during validation.
@@ -135,10 +135,6 @@ while [[ $# -gt 0 ]]; do
 done
 
 require_non_empty "--version" "$VERSION"
-require_non_empty "--darwin-arm64-url" "$DARWIN_ARM64_URL"
-require_non_empty "--darwin-x64-url" "$DARWIN_X64_URL"
-require_non_empty "--windows-x64-url" "$WINDOWS_X64_URL"
-
 if [[ -z "${PUB_DATE//[[:space:]]/}" ]]; then
   PUB_DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 fi
@@ -163,24 +159,39 @@ const [
   windowsX64Sig
 ] = process.argv.slice(2);
 
+function nonEmpty(value) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+const platforms = {};
+if (nonEmpty(darwinArm64Url)) {
+  platforms["darwin-aarch64"] = {
+    signature: (darwinArm64Sig || "").trim(),
+    url: darwinArm64Url.trim()
+  };
+}
+if (nonEmpty(darwinX64Url)) {
+  platforms["darwin-x86_64"] = {
+    signature: (darwinX64Sig || "").trim(),
+    url: darwinX64Url.trim()
+  };
+}
+if (nonEmpty(windowsX64Url)) {
+  platforms["windows-x86_64"] = {
+    signature: (windowsX64Sig || "").trim(),
+    url: windowsX64Url.trim()
+  };
+}
+if (Object.keys(platforms).length === 0) {
+  console.error("[update-latest-json] ERROR: at least one platform URL must be provided");
+  process.exit(1);
+}
+
 const payload = {
   version: version.trim(),
   notes: notes || "",
   pub_date: pubDate.trim(),
-  platforms: {
-    "darwin-aarch64": {
-      signature: darwinArm64Sig.trim(),
-      url: darwinArm64Url.trim()
-    },
-    "darwin-x86_64": {
-      signature: darwinX64Sig.trim(),
-      url: darwinX64Url.trim()
-    },
-    "windows-x86_64": {
-      signature: windowsX64Sig.trim(),
-      url: windowsX64Url.trim()
-    }
-  }
+  platforms
 };
 
 fs.writeFileSync(targetFile, JSON.stringify(payload, null, 2) + "\n", "utf8");
