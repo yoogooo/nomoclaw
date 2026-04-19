@@ -28,9 +28,15 @@ public class PermissionSettingsStore {
 
     private static final ObjectMapper MAPPER = JsonUtil.mapper();
     private static final int SCHEMA_VERSION = 2;
+    private static final String USER_PERMISSION_SETTINGS_FILE = "permission-settings.json";
+    private static final String LEGACY_USER_SETTINGS_FILE = "settings.json";
 
     public List<PermissionRule> loadUserRules() {
-        ObjectNode root = readJson(userSettingsPath());
+        Path selected = preferredUserSettingsReadPath();
+        ObjectNode root = readJson(selected);
+        if (selected.equals(legacyUserSettingsPath()) && Files.exists(selected)) {
+            log.info("[Permission] loaded legacy user settings file path={}, please migrate to {}", selected, userSettingsPath());
+        }
         List<PermissionRule> rules = parseRules(root.path("permission").path("userSettings").path("rules"), PermissionSource.USER_SETTINGS);
         if (!rules.isEmpty()) {
             return rules;
@@ -45,7 +51,7 @@ public class PermissionSettingsStore {
 
     public synchronized void saveUserRules(List<PermissionRule> rules) {
         Path path = userSettingsPath();
-        ObjectNode root = readJson(path);
+        ObjectNode root = readJson(preferredUserSettingsReadPath());
         ObjectNode permission = ensureObject(root, "permission");
         permission.put("schemaVersion", SCHEMA_VERSION);
         ObjectNode userSettings = ensureObject(permission, "userSettings");
@@ -64,7 +70,11 @@ public class PermissionSettingsStore {
     }
 
     public Path userSettingsPath() {
-        return NomoClawPaths.root().resolve("settings.json").toAbsolutePath().normalize();
+        return NomoClawPaths.root().resolve(USER_PERMISSION_SETTINGS_FILE).toAbsolutePath().normalize();
+    }
+
+    public Path legacyUserSettingsPath() {
+        return NomoClawPaths.root().resolve(LEGACY_USER_SETTINGS_FILE).toAbsolutePath().normalize();
     }
 
     public Path agentSettingsPath(String agentName) {
@@ -296,5 +306,17 @@ public class PermissionSettingsStore {
         } catch (Exception ex) {
             throw new IllegalStateException("failed to write permission settings: " + path, ex);
         }
+    }
+
+    private Path preferredUserSettingsReadPath() {
+        Path current = userSettingsPath();
+        if (Files.exists(current)) {
+            return current;
+        }
+        Path legacy = legacyUserSettingsPath();
+        if (Files.exists(legacy)) {
+            return legacy;
+        }
+        return current;
     }
 }

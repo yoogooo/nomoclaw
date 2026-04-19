@@ -2,6 +2,8 @@ package ai.nomoclaw.bot.policy.tool;
 
 public enum ToolPolicyReasonCode {
     NONE,
+    HARD_GUARD_SENSITIVE_PATH_READ_DENY,
+    HARD_GUARD_SENSITIVE_PATH_READ_ASK,
     HARD_GUARD_PROTECTED_PATH_ASK,
     HARD_GUARD_SYSTEM_PATH_DENY,
     RULE_DENY_MATCHED,

@@ -14,6 +14,17 @@ import java.util.Set;
 public class HardGuardService {
 
     private static final Set<String> PROTECTED_NAMES = Set.of(".git", ".nomoclaw", ".vscode");
+    private static final Set<String> SENSITIVE_DIR_NAMES = Set.of(
+            ".ssh", ".gnupg", ".aws", ".kube"
+    );
+    private static final Set<String> SENSITIVE_FILE_NAMES = Set.of(
+            ".env", ".env.local", ".env.production", ".env.development",
+            "id_rsa", "id_ed25519", "id_dsa", "id_ecdsa",
+            "authorized_keys", "credentials", "config.json"
+    );
+    private static final Set<String> SENSITIVE_FILE_SUFFIXES = Set.of(
+            ".pem", ".key", ".p12", ".pfx", ".keystore"
+    );
     private static final Set<String> UNIX_SYSTEM_ROOTS = Set.of(
             "/etc", "/usr", "/bin", "/sbin", "/var", "/System", "/Library", "/private", "/opt", "/boot", "/dev", "/proc"
     );
@@ -27,7 +38,7 @@ public class HardGuardService {
     );
 
     public PermissionDecision evaluate(PermissionContextDetails details) {
-        if (details == null || !details.writeIntent()) {
+        if (details == null) {
             return null;
         }
 
@@ -40,6 +51,20 @@ public class HardGuardService {
                 continue;
             }
             for (Path candidate : candidates(path)) {
+                if (details.readIntent() && isSensitiveReadPath(candidate)) {
+                    return new PermissionDecision(
+                            PermissionEffect.ASK,
+                            ToolPolicyReasonCode.HARD_GUARD_SENSITIVE_PATH_READ_ASK,
+                            "检测到敏感信息路径读取，可能导致密钥或凭据泄露，请手动确认。",
+                            null,
+                            "hardguard-sensitive-read",
+                            candidate.toString(),
+                            true
+                    );
+                }
+                if (!details.writeIntent()) {
+                    continue;
+                }
                 if (isSystemPath(candidate)) {
                     return new PermissionDecision(
                             PermissionEffect.DENY,
@@ -117,6 +142,50 @@ public class HardGuardService {
             }
         }
         return false;
+    }
+
+    private boolean isSensitiveReadPath(Path path) {
+        boolean insensitive = isWindows() || isMac();
+        String pathText = normalizeForCompare(path.toString(), insensitive);
+        String home = normalizeForCompare(System.getProperty("user.home", ""), insensitive);
+        if (!home.isBlank()) {
+            for (String dir : SENSITIVE_DIR_NAMES) {
+                String root = home + (home.endsWith("/") || home.endsWith("\\") ? "" : "/") + normalizeForCompare(dir, insensitive);
+                if (pathText.equals(root) || pathText.startsWith(root + "/") || pathText.startsWith(root + "\\")) {
+                    return true;
+                }
+            }
+        }
+
+        Path fileNamePath = path.getFileName();
+        String fileName = fileNamePath == null ? "" : normalizeForCompare(fileNamePath.toString(), insensitive);
+        if (fileName.isBlank()) {
+            return false;
+        }
+        if (SENSITIVE_FILE_NAMES.contains(fileName)) {
+            if ("config.json".equals(fileName)) {
+                return pathText.contains("/.docker/") || pathText.contains("\\.docker\\");
+            }
+            return true;
+        }
+        for (String suffix : SENSITIVE_FILE_SUFFIXES) {
+            String normalizedSuffix = normalizeForCompare(suffix, insensitive);
+            if (fileName.endsWith(normalizedSuffix)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String normalizeForCompare(String value, boolean insensitive) {
+        if (value == null) {
+            return "";
+        }
+        String out = value.replace("\\", "/").trim();
+        if (insensitive) {
+            out = out.toLowerCase(Locale.ROOT);
+        }
+        return out;
     }
 
     private boolean isSystemPath(Path path) {
