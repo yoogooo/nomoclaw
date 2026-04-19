@@ -13,7 +13,7 @@ set -euo pipefail
 # Optional env:
 #   SKIP_TESTS=true|false             (default: true)
 #   SKIP_WEB_BUILD=true|false         (default: false)
-#   MAVEN_PROFILE=prod-lite           (default: prod-lite)
+#   MAVEN_PROFILE=prod-lite           (default: prod-lite, 推荐桌面发版使用；该 profile 使用 H2 并精简 MySQL 相关依赖)
 #   TAURI_BUILD_CI=true|false         (default: true)
 #   TAURI_BUNDLES=msi|nsis|msi,nsis   (default: msi)
 #   SKIP_RUST_CHECK=true|false        (default: false)
@@ -192,6 +192,7 @@ build_frontend_assets() {
 
 build_backend_jar() {
   log "Building Spring Boot jar"
+  log "Using MAVEN_PROFILE=$MAVEN_PROFILE (desktop release recommends prod-lite: H2 + smaller jar)"
   cd "$ROOT_DIR"
 
   if [[ -x "$ROOT_DIR/mvnw" ]]; then

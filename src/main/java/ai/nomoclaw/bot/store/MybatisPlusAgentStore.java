@@ -6,17 +6,14 @@ import ai.nomoclaw.bot.domain.AgentConversation;
 import ai.nomoclaw.bot.model.AgentEvent;
 import ai.nomoclaw.bot.model.ApprovalStatus;
 import ai.nomoclaw.bot.model.AgentEventType;
-import ai.nomoclaw.bot.model.CommandExecutionRecord;
 import ai.nomoclaw.bot.model.MessageStatus;
 import ai.nomoclaw.bot.model.PlanStep;
 import ai.nomoclaw.bot.model.RiskLevel;
 import ai.nomoclaw.bot.model.StepStatus;
-import ai.nomoclaw.bot.store.entity.AgentCommandExecutionEntity;
 import ai.nomoclaw.bot.store.entity.AgentEventEntity;
 import ai.nomoclaw.bot.store.entity.AgentMessageEntity;
 import ai.nomoclaw.bot.store.entity.AgentConversationEntity;
 import ai.nomoclaw.bot.store.entity.AgentStepEntity;
-import ai.nomoclaw.bot.store.repository.AgentCommandExecutionRepository;
 import ai.nomoclaw.bot.store.repository.AgentEventRepository;
 import ai.nomoclaw.bot.store.repository.AgentMessageRepository;
 import ai.nomoclaw.bot.store.repository.AgentConversationRepository;
@@ -39,18 +36,15 @@ public class MybatisPlusAgentStore implements AgentStore {
     private final AgentMessageRepository messageRepository;
     private final AgentStepRepository stepRepository;
     private final AgentEventRepository eventRepository;
-    private final AgentCommandExecutionRepository commandExecutionRepository;
 
     public MybatisPlusAgentStore(AgentConversationRepository conversationRepository,
                                  AgentMessageRepository messageRepository,
                                  AgentStepRepository stepRepository,
-                                 AgentEventRepository eventRepository,
-                                 AgentCommandExecutionRepository commandExecutionRepository) {
+                                 AgentEventRepository eventRepository) {
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
         this.stepRepository = stepRepository;
         this.eventRepository = eventRepository;
-        this.commandExecutionRepository = commandExecutionRepository;
     }
 
     @Override
@@ -93,7 +87,6 @@ public class MybatisPlusAgentStore implements AgentStore {
 
     @Override
     public void deleteConversation(String conversationUid) {
-        commandExecutionRepository.deleteByConversationUid(conversationUid);
         eventRepository.deleteByConversationUid(conversationUid);
         stepRepository.deleteByConversationUid(conversationUid);
         messageRepository.deleteByConversationUid(conversationUid);
@@ -269,6 +262,7 @@ public class MybatisPlusAgentStore implements AgentStore {
             entity.setRetryCount(step.retryCount());
             entity.setApprovalStatus(step.approvalStatus().name());
             entity.setLastError(step.lastError());
+            entity.setOutputText(step.outputText());
             entity.setCreatedTime(now);
             entity.setUpdatedTime(now);
             stepRepository.save(entity);
@@ -306,13 +300,17 @@ public class MybatisPlusAgentStore implements AgentStore {
     }
 
     @Override
-    public void updateStepStatus(String stepUid, StepStatus status, int retryCount, String errorMessage) {
-        stepRepository.update(new LambdaUpdateWrapper<AgentStepEntity>()
+    public void updateStepStatus(String stepUid, StepStatus status, int retryCount, String errorMessage, String outputText) {
+        LambdaUpdateWrapper<AgentStepEntity> update = new LambdaUpdateWrapper<AgentStepEntity>()
                 .eq(AgentStepEntity::getStepUid, stepUid)
                 .set(AgentStepEntity::getStatus, status.name())
                 .set(AgentStepEntity::getRetryCount, retryCount)
                 .set(AgentStepEntity::getLastError, errorMessage)
-                .set(AgentStepEntity::getUpdatedTime, LocalDateTime.now()));
+                .set(AgentStepEntity::getUpdatedTime, LocalDateTime.now());
+        if (outputText != null) {
+            update.set(AgentStepEntity::getOutputText, outputText);
+        }
+        stepRepository.update(update);
     }
 
     @Override
@@ -341,35 +339,6 @@ public class MybatisPlusAgentStore implements AgentStore {
     public List<AgentEvent> listEventsByMessage(String messageUid) {
         return eventRepository.listByMessageUid(messageUid).stream()
                 .map(this::toDomain)
-                .toList();
-    }
-
-    @Override
-    public void appendCommandExecution(CommandExecutionRecord record) {
-        AgentCommandExecutionEntity entity = new AgentCommandExecutionEntity();
-        entity.setExecutionUid(record.executionUid());
-        entity.setConversationUid(record.conversationUid());
-        entity.setMessageUid(record.messageUid());
-        entity.setStepUid(record.stepUid());
-        entity.setAttempt(record.attempt());
-        entity.setCommandText(record.command());
-        entity.setCwd(record.cwd());
-        entity.setShell(record.shell());
-        entity.setExitCode(record.exitCode());
-        entity.setSuccess(record.success());
-        entity.setStdoutText(record.stdout());
-        entity.setStderrText(record.stderr());
-        entity.setOutputText(record.output());
-        entity.setErrorCode(record.errorCode());
-        entity.setErrorMessage(record.errorMessage());
-        entity.setCreatedTime(toLocalDateTime(record.createdAt()));
-        commandExecutionRepository.save(entity);
-    }
-
-    @Override
-    public List<CommandExecutionRecord> listCommandExecutionsByMessage(String messageUid) {
-        return commandExecutionRepository.listByMessageUid(messageUid).stream()
-                .map(this::toCommandExecutionDomain)
                 .toList();
     }
 
@@ -437,28 +406,8 @@ public class MybatisPlusAgentStore implements AgentStore {
                 StepStatus.valueOf(entity.getStatus()),
                 entity.getRetryCount() == null ? 0 : entity.getRetryCount(),
                 entity.getLastError(),
-                ApprovalStatus.valueOf(entity.getApprovalStatus())
-        );
-    }
-
-    private CommandExecutionRecord toCommandExecutionDomain(AgentCommandExecutionEntity entity) {
-        return new CommandExecutionRecord(
-                entity.getExecutionUid(),
-                entity.getConversationUid(),
-                entity.getMessageUid(),
-                entity.getStepUid(),
-                entity.getAttempt() == null ? 0 : entity.getAttempt(),
-                entity.getCommandText(),
-                entity.getCwd(),
-                entity.getShell(),
-                entity.getExitCode(),
-                Boolean.TRUE.equals(entity.getSuccess()),
-                entity.getStdoutText(),
-                entity.getStderrText(),
                 entity.getOutputText(),
-                entity.getErrorCode(),
-                entity.getErrorMessage(),
-                toInstant(entity.getCreatedTime())
+                ApprovalStatus.valueOf(entity.getApprovalStatus())
         );
     }
 

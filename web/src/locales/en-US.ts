@@ -106,7 +106,12 @@ const enUS = {
       collapseMessage: "Collapse",
       processing: "Processing...",
       runTitle: "Execution",
-      noExtraDetails: "No extra details"
+      noExtraDetails: "No extra details",
+      commandBlockLabel: "Command",
+      outputBlockLabel: "Output",
+      copyCommand: "Copy command",
+      expandOutput: "Expand",
+      collapseOutput: "Collapse"
     },
     composer: {
       placeholder: "For example: summarize the uploaded file into directly actionable conclusions and recommendations.",

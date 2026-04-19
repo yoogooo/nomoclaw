@@ -58,6 +58,10 @@ cp web/.env.example web/.env
 ./mvnw spring-boot:run
 ```
 
+Notes:
+- Local MySQL development uses Maven `prod-full` by default (activeByDefault), which includes `mysql-connector-j` and `flyway-mysql`.
+- Desktop release scripts use `prod-lite` (H2) by default to keep the packaged jar smaller.
+
 Default: `http://127.0.0.1:8080`
 
 4. Start frontend

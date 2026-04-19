@@ -14,6 +14,7 @@ public record PlanStep(
         StepStatus status,
         int retryCount,
         String lastError,
+        String outputText,
         ApprovalStatus approvalStatus
 ) {
 }

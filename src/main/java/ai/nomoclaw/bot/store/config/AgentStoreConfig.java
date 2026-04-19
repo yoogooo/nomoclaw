@@ -2,7 +2,6 @@ package ai.nomoclaw.bot.store.config;
 
 import ai.nomoclaw.bot.store.AgentStore;
 import ai.nomoclaw.bot.store.MybatisPlusAgentStore;
-import ai.nomoclaw.bot.store.repository.AgentCommandExecutionRepository;
 import ai.nomoclaw.bot.store.repository.AgentEventRepository;
 import ai.nomoclaw.bot.store.repository.AgentMessageRepository;
 import ai.nomoclaw.bot.store.repository.AgentConversationRepository;
@@ -17,14 +16,12 @@ public class AgentStoreConfig {
     public AgentStore agentStore(AgentConversationRepository sessionRepository,
                                  AgentMessageRepository messageRepository,
                                  AgentStepRepository stepRepository,
-                                 AgentEventRepository eventRepository,
-                                 AgentCommandExecutionRepository commandExecutionRepository) {
+                                 AgentEventRepository eventRepository) {
         return new MybatisPlusAgentStore(
                 sessionRepository,
                 messageRepository,
                 stepRepository,
-                eventRepository,
-                commandExecutionRepository
+                eventRepository
         );
     }
 }

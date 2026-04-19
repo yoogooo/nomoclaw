@@ -58,6 +58,10 @@ cp web/.env.example web/.env
 ./mvnw spring-boot:run
 ```
 
+说明：
+- 本地 MySQL 开发默认走 Maven `prod-full`（activeByDefault），会包含 `mysql-connector-j` 与 `flyway-mysql`。
+- 桌面发版默认脚本走 `prod-lite`（H2），用于精简打包体积。
+
 默认：`http://127.0.0.1:8080`
 
 4. 启动前端

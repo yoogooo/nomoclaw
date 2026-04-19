@@ -11,6 +11,11 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       initialization-fail-timeout: 0
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    locations: classpath:db/migration/mysql
   quartz:
     job-store-type: jdbc
     jdbc:

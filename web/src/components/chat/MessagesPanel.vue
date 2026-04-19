@@ -13,7 +13,15 @@ import { useAgentCatalogStore } from "@/stores/agentCatalog";
 import { useJinnangStore } from "@/stores/jinnang";
 import { formatMessageTime } from "@/utils/format";
 import { renderMarkdown } from "@/utils/markdown";
-import type { ConversationMessage } from "@/types/api";
+import type { ConversationMessage, ConversationRunStep } from "@/types/api";
+
+type RunStepRenderData = {
+  cacheKey: string;
+  isCommand: boolean;
+  command: string;
+  output: string;
+  details: string;
+};
 
 const conversationStore = useConversationStore();
 const conversationRunsStore = useConversationRunsStore();
@@ -24,9 +32,13 @@ const copiedMessageMap = ref<Record<string, boolean>>({});
 const savingTipMap = ref<Record<string, boolean>>({});
 const savedTipMap = ref<Record<string, boolean>>({});
 const expandedUserMessageMap = ref<Record<string, boolean>>({});
+const expandedRunOutputMap = ref<Record<string, boolean>>({});
+const copiedRunCommandMap = ref<Record<string, boolean>>({});
 const messageListRef = ref<HTMLElement | null>(null);
 const shouldScrollToBottomOnNextRender = ref(true);
 const userMessageCollapseLineLimit = 10;
+const runOutputCollapsedLineLimit = 20;
+const runStepRenderCache = new Map<string, RunStepRenderData>();
 const savedTipMessageUidSet = computed(() => {
   const uidSet = new Set<string>();
   for (const tip of jinnangStore.tips) {
@@ -71,6 +83,171 @@ function runTone(status: string) {
   if (status === "waiting_approval") return "warning";
   if (status === "running") return "info";
   return "default";
+}
+
+function runStepStateKey(messageUid: string | undefined, stepUid: string) {
+  return `${messageUid || "unknown"}:${stepUid}`;
+}
+
+function getRunStepRenderData(step: ConversationRunStep): RunStepRenderData {
+  const details = (step.displayDetails || step.displaySummary || "").trim();
+  const cacheKey = `${step.stepUid}|${step.displayTitle}|${step.displayDetails}|${step.displaySummary}`;
+  const cached = runStepRenderCache.get(step.stepUid);
+  if (cached && cached.cacheKey === cacheKey) {
+    return cached;
+  }
+
+  if (!details) {
+    const emptyData: RunStepRenderData = {
+      cacheKey,
+      isCommand: false,
+      command: "",
+      output: "",
+      details: t("chat.messages.noExtraDetails")
+    };
+    runStepRenderCache.set(step.stepUid, emptyData);
+    return emptyData;
+  }
+
+  if (!isCommandStep(details, step.displayTitle || "")) {
+    const plainData: RunStepRenderData = {
+      cacheKey,
+      isCommand: false,
+      command: "",
+      output: "",
+      details
+    };
+    runStepRenderCache.set(step.stepUid, plainData);
+    return plainData;
+  }
+
+  const command = extractCommand(details, step.displayTitle || "");
+  let output = extractCommandOutput(details, command);
+  if (!output) {
+    output = details;
+  }
+  const commandData: RunStepRenderData = {
+    cacheKey,
+    isCommand: true,
+    command,
+    output,
+    details
+  };
+  runStepRenderCache.set(step.stepUid, commandData);
+  return commandData;
+}
+
+function runStepDetailsMarkdown(step: ConversationRunStep) {
+  return getRunStepRenderData(step).details || t("chat.messages.noExtraDetails");
+}
+
+function isCommandStep(details: string, title: string) {
+  const content = `${title}\n${details}`;
+  return /执行命令|本地命令|命令执行|command/i.test(content);
+}
+
+function extractCommand(details: string, title: string) {
+  const text = `${details}\n${title}`;
+  const quoted = text.match(/(?:执行命令[:：]\s*|本地命令已执行完成[:：]\s*|命令执行失败[:：]\s*)[“"]([\s\S]*?)[”"]/);
+  if (quoted?.[1]) {
+    return quoted[1].trim();
+  }
+
+  const fromDetail = details.match(/执行命令[:：]\s*([^\n]+?)(?:，工作目录|。|$)/);
+  if (fromDetail?.[1]) {
+    return fromDetail[1].trim();
+  }
+
+  const fromTitle = title.match(/(?:正在执行命令|执行命令)[:：]\s*(.+)$/);
+  if (fromTitle?.[1]) {
+    return fromTitle[1].trim();
+  }
+
+  return "";
+}
+
+function extractCommandOutput(details: string, command: string) {
+  const normalized = details.replace(/\r\n/g, "\n").trim();
+  const markers = ["\n结果:\n", "\n输出如下：\n", "\n输出如下:\n", "结果:\n", "输出如下：\n", "输出如下:\n"];
+  for (const marker of markers) {
+    const index = normalized.indexOf(marker);
+    if (index >= 0) {
+      return normalized.slice(index + marker.length).trim();
+    }
+  }
+
+  const errorIndex = normalized.indexOf("错误：");
+  if (errorIndex >= 0) {
+    return normalized.slice(errorIndex).trim();
+  }
+
+  let fallback = normalized;
+  if (command) {
+    fallback = fallback.replace(command, "");
+  }
+  fallback = fallback
+    .replace(/本地命令已执行完成[:：]\s*[“"][\s\S]*?[”"]。?\s*/g, "")
+    .replace(/命令执行失败[:：]\s*[“"][\s\S]*?[”"]。?\s*/g, "")
+    .replace(/执行命令[:：]\s*[^\n]+(?:\n|$)/, "")
+    .replace(/^结果[:：]\s*/g, "")
+    .trim();
+  return fallback;
+}
+
+function outputLineCount(output: string) {
+  const normalized = (output || "").replace(/\r\n/g, "\n").trim();
+  if (!normalized) return 0;
+  return normalized.split("\n").length;
+}
+
+function shouldShowRunOutputExpand(output: string) {
+  return outputLineCount(output) > runOutputCollapsedLineLimit;
+}
+
+function isRunOutputExpanded(messageUid: string | undefined, stepUid: string) {
+  return Boolean(expandedRunOutputMap.value[runStepStateKey(messageUid, stepUid)]);
+}
+
+function toggleRunOutputExpanded(messageUid: string | undefined, stepUid: string) {
+  const key = runStepStateKey(messageUid, stepUid);
+  expandedRunOutputMap.value = {
+    ...expandedRunOutputMap.value,
+    [key]: !expandedRunOutputMap.value[key]
+  };
+}
+
+function visibleRunOutput(messageUid: string | undefined, step: ConversationRunStep) {
+  const output = getRunStepRenderData(step).output || "";
+  if (!shouldShowRunOutputExpand(output) || isRunOutputExpanded(messageUid, step.stepUid)) {
+    return output;
+  }
+  const lines = output.replace(/\r\n/g, "\n").split("\n");
+  return `${lines.slice(0, runOutputCollapsedLineLimit).join("\n")}\n...`;
+}
+
+function isRunCommandCopied(messageUid: string | undefined, stepUid: string) {
+  return Boolean(copiedRunCommandMap.value[runStepStateKey(messageUid, stepUid)]);
+}
+
+async function copyRunCommand(messageUid: string | undefined, step: ConversationRunStep) {
+  const command = getRunStepRenderData(step).command.trim();
+  if (!command) return;
+  const key = runStepStateKey(messageUid, step.stepUid);
+  try {
+    await window.navigator.clipboard.writeText(command);
+    copiedRunCommandMap.value = {
+      ...copiedRunCommandMap.value,
+      [key]: true
+    };
+    window.setTimeout(() => {
+      copiedRunCommandMap.value = {
+        ...copiedRunCommandMap.value,
+        [key]: false
+      };
+    }, 1200);
+  } catch {
+    discreteMessage.error(t("chat.messages.copyFailed"));
+  }
 }
 
 function messageActionKey(messageItem: ConversationMessage) {
@@ -459,7 +636,62 @@ onMounted(() => {
                     <template #header-extra>
                       <n-tag size="small" :type="runTone(step.status)">{{ step.status }}</n-tag>
                     </template>
-                    <div class="run-details">{{ step.displayDetails || step.displaySummary || t("chat.messages.noExtraDetails") }}</div>
+                    <template v-if="getRunStepRenderData(step).isCommand">
+                      <div class="run-command-blocks">
+                        <section class="run-command-section">
+                          <div class="run-code-head">
+                            <span class="run-code-label">{{ t("chat.messages.commandBlockLabel") }}</span>
+                            <UiInstantTooltip :content="t('chat.messages.copyCommand')">
+                              <button
+                                class="run-code-icon-btn"
+                                :class="{ copied: isRunCommandCopied(message.messageUid, step.stepUid) }"
+                                type="button"
+                                :aria-label="t('chat.messages.copyCommand')"
+                                @click="copyRunCommand(message.messageUid, step)"
+                              >
+                                <Check v-if="isRunCommandCopied(message.messageUid, step.stepUid)" :size="13" />
+                                <Copy v-else :size="13" />
+                              </button>
+                            </UiInstantTooltip>
+                          </div>
+                          <pre class="run-code-pre"><code>{{ getRunStepRenderData(step).command }}</code></pre>
+                        </section>
+
+                        <section class="run-command-section">
+                          <div class="run-code-head">
+                            <span class="run-code-label">{{ t("chat.messages.outputBlockLabel") }}</span>
+                          </div>
+                          <pre class="run-code-pre"><code>{{ visibleRunOutput(message.messageUid, step) }}</code></pre>
+                          <div
+                            v-if="shouldShowRunOutputExpand(getRunStepRenderData(step).output)"
+                            class="run-output-toggle-wrap"
+                          >
+                            <button
+                              class="run-output-toggle"
+                              type="button"
+                              :aria-expanded="isRunOutputExpanded(message.messageUid, step.stepUid)"
+                              @click="toggleRunOutputExpanded(message.messageUid, step.stepUid)"
+                            >
+                              <ArrowUp
+                                v-if="isRunOutputExpanded(message.messageUid, step.stepUid)"
+                                :size="12"
+                              />
+                              <ArrowDown v-else :size="12" />
+                              <span>
+                                {{ isRunOutputExpanded(message.messageUid, step.stepUid)
+                                  ? t("chat.messages.collapseOutput")
+                                  : t("chat.messages.expandOutput") }}
+                              </span>
+                            </button>
+                          </div>
+                        </section>
+                      </div>
+                    </template>
+                    <div
+                      v-else
+                      class="run-details message-html"
+                      v-html="renderMarkdown(runStepDetailsMarkdown(step))"
+                    />
                   </n-collapse-item>
                 </n-collapse>
               </n-collapse-item>
@@ -955,8 +1187,104 @@ onMounted(() => {
 }
 
 .run-details {
-  white-space: pre-wrap;
   line-height: 1.7;
+}
+
+.run-command-blocks {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.run-command-section {
+  display: grid;
+  gap: var(--space-1_5);
+}
+
+.run-code-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.run-code-label {
+  font-size: var(--text-caption-size);
+  color: var(--color-text-secondary);
+  letter-spacing: 0.02em;
+}
+
+.run-code-icon-btn {
+  width: var(--space-6);
+  height: var(--space-6);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-subtle);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.run-code-icon-btn:hover {
+  background: var(--color-bg-soft-hover);
+  color: var(--color-text-brand-strong);
+}
+
+.run-code-icon-btn.copied {
+  background: var(--color-bg-brand-tint-14);
+  color: var(--color-text-brand-strong);
+}
+
+.run-output-toggle {
+  border: none;
+  background: transparent;
+  color: var(--color-text-brand-strong);
+  font-size: var(--text-caption-size);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  line-height: 1.3;
+  cursor: pointer;
+  padding: 0;
+}
+
+.run-output-toggle:hover {
+  color: var(--color-text-brand);
+}
+
+.run-output-toggle-wrap {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.run-code-pre {
+  margin: 0;
+  padding: var(--space-3_5) var(--space-4);
+  border-radius: var(--radius-md);
+  overflow: auto;
+  line-height: 1.65;
+  background: var(--color-overlay-dark-92);
+  color: var(--color-text-code-block);
+  border: var(--size-1) solid color-mix(in srgb, var(--color-border-soft) 88%, transparent);
+}
+
+.run-code-pre code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  white-space: pre;
+}
+
+.run-details :deep(strong) {
+  display: inline-block;
+  margin-bottom: var(--space-1_5);
+  color: var(--color-text-secondary);
+  letter-spacing: 0.02em;
+}
+
+.run-details :deep(pre) {
+  margin: 0 0 var(--space-3);
+  border: var(--size-1) solid color-mix(in srgb, var(--color-border-soft) 88%, transparent);
 }
 
 .typing-indicator {

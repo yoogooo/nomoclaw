@@ -10,6 +10,10 @@ spring:
       request-timeout: -1
   profiles:
     default: local
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
   quartz:
     job-store-type: jdbc
     jdbc:

@@ -106,7 +106,12 @@ const zhCN = {
       collapseMessage: "收起",
       processing: "处理进行中…",
       runTitle: "执行过程",
-      noExtraDetails: "无附加详情"
+      noExtraDetails: "无附加详情",
+      commandBlockLabel: "执行命令",
+      outputBlockLabel: "输出结果",
+      copyCommand: "复制命令",
+      expandOutput: "展开",
+      collapseOutput: "收起"
     },
     composer: {
       placeholder: "例如：请结合我上传的文件，整理出一版可直接使用的结论和建议。",
