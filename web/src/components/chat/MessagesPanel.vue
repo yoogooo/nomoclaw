@@ -1172,6 +1172,7 @@ onMounted(() => {
 .run-card {
   width: min(var(--size-percent-message-max), var(--container-xl));
   margin-top: var(--space-3_5);
+  min-width: 0;
 }
 
 .run-title {
@@ -1194,11 +1195,13 @@ onMounted(() => {
 .run-command-blocks {
   display: grid;
   gap: var(--space-3);
+  min-width: 0;
 }
 
 .run-command-section {
   display: grid;
   gap: var(--space-1_5);
+  min-width: 0;
 }
 
 .run-code-head {
@@ -1272,13 +1275,19 @@ onMounted(() => {
 
 .run-output-shell {
   position: relative;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .run-code-pre {
   margin: 0;
   padding: var(--space-3_5) var(--space-4);
   border-radius: var(--radius-md);
-  overflow: auto;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: auto;
+  overflow-y: hidden;
   line-height: 1.65;
   background: var(--color-run-code-bg);
   color: var(--color-text-code-block);
@@ -1286,6 +1295,9 @@ onMounted(() => {
 }
 
 .run-code-pre code {
+  display: block;
+  width: max-content;
+  min-width: 100%;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   white-space: pre;
 }
