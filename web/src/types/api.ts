@@ -212,6 +212,36 @@ export interface UploadPolicy {
   allowMixedImageAndFile: boolean;
 }
 
+export interface PermissionRulePayload {
+  ruleId: string;
+  effect: "ALLOW" | "ASK" | "DENY";
+  tool: string;
+  action: string;
+  resourceType: "FILE" | "COMMAND" | "BROWSER" | "CRON" | "ANY";
+  pathPattern: string;
+  commandPattern: string;
+  expiresAt: string;
+  enabled: boolean;
+}
+
+export interface PermissionRulesResponse {
+  agentUid: string;
+  agentName: string;
+  sessionRules: PermissionRulePayload[];
+  commandRules: PermissionRulePayload[];
+  agentSettingsRules: PermissionRulePayload[];
+  userSettingsRules: PermissionRulePayload[];
+  hardGuardProtectedNames: string[];
+  hardGuardSystemRoots: string[];
+}
+
+export interface ApprovalDecisionResponse {
+  status: string;
+  appliedScope: "once" | "session" | "agent" | "user";
+  persisted: boolean;
+  matchedRuleId?: string;
+}
+
 export interface ModelCatalogStatus {
   catalogVersion: string;
   generatedAt: string;

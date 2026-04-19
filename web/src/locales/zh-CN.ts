@@ -177,6 +177,9 @@ const zhCN = {
     approval: {
       waiting: "高风险操作待确认",
       approve: "继续执行",
+      approveSession: "允许并记住到本会话",
+      approveAgent: "允许并记住到当前Agent",
+      approveUser: "允许并记住到全局",
       approving: "继续执行中",
       reject: "拒绝本次操作",
       rejecting: "拒绝中"

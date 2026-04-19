@@ -3,9 +3,6 @@ package ai.nomoclaw.bot.tool;
 import ai.nomoclaw.bot.model.ToolRequest;
 import ai.nomoclaw.bot.model.ToolResult;
 import ai.nomoclaw.bot.orchestrator.MessageCancellationRegistry;
-import ai.nomoclaw.bot.policy.tool.ToolPermissionPolicyService;
-import ai.nomoclaw.bot.policy.tool.ToolPolicyContext;
-import ai.nomoclaw.bot.policy.tool.ToolPolicyDecisionResult;
 import ai.nomoclaw.bot.util.CommandShellResolver;
 import ai.nomoclaw.bot.util.CommandShellResolver.CommandShell;
 import lombok.extern.slf4j.Slf4j;
@@ -31,13 +28,10 @@ public class CommandTool implements Tool {
     );
 
     private final MessageCancellationRegistry cancellationRegistry;
-    private final ToolPermissionPolicyService toolPermissionPolicyService;
     private final CommandShell commandShell = CommandShellResolver.resolve();
 
-    public CommandTool(MessageCancellationRegistry cancellationRegistry,
-                       ToolPermissionPolicyService toolPermissionPolicyService) {
+    public CommandTool(MessageCancellationRegistry cancellationRegistry) {
         this.cancellationRegistry = cancellationRegistry;
-        this.toolPermissionPolicyService = toolPermissionPolicyService;
     }
 
     @Override
@@ -54,23 +48,6 @@ public class CommandTool implements Tool {
                 request.conversationUid(), request.messageUid(), request.stepUid(), cwd, command);
         if (command.isBlank()) {
             return ToolResult.failure("INVALID_ARGS", "command is required", metric(start, -1, false));
-        }
-
-        ToolPolicyDecisionResult policyDecision = toolPermissionPolicyService.evaluate(new ToolPolicyContext(
-                name(),
-                request.args(),
-                request.agentWorkspacePath(),
-                "",
-                request.conversationUid(),
-                request.messageUid(),
-                request.stepUid()
-        ));
-        if (policyDecision.denied() || policyDecision.asks()) {
-            return ToolResult.failure(
-                    policyDecision.reasonCode().name(),
-                    policyDecision.message().isBlank() ? "当前命令被安全策略阻止。" : policyDecision.message(),
-                    metric(start, -1, false)
-            );
         }
 
         Path workingDir = cwd == null || cwd.isBlank()

@@ -29,7 +29,7 @@ interface ApprovalState {
   body: string;
   riskLevel: string;
   submitting: boolean;
-  submittingAction: "approve" | "reject" | null;
+  submittingAction: "allow_once" | "allow_session" | "allow_agent" | "allow_user" | "deny_once" | null;
 }
 
 interface BrowserRuntimeOverlayState {
@@ -804,50 +804,48 @@ export const useConversationStore = defineStore("conversation", () => {
     runningConversationUid.value = null;
   }
 
-  async function approveStep() {
+  async function decideStep(action: "allow" | "deny", scope: "once" | "session" | "agent" | "user") {
     if (!currentConversationUid.value || !approval.value.stepUid || approval.value.submitting) return;
     const stepUid = approval.value.stepUid;
+    const submittingAction = action === "deny"
+      ? "deny_once"
+      : (scope === "session" ? "allow_session"
+        : scope === "agent" ? "allow_agent"
+          : scope === "user" ? "allow_user" : "allow_once");
     approval.value = {
       ...approval.value,
       submitting: true,
-      submittingAction: "approve"
+      submittingAction
     };
     try {
-      await conversationApi.approveStep(currentConversationUid.value, stepUid);
-      message.success(tr("toast.approveSuccess"));
-      runtimeLogStore.append(tr("chat.runtime.approvalSubmitted", { action: "approve", stepUid }));
+      await conversationApi.decideStep(currentConversationUid.value, stepUid, { action, scope });
+      if (action === "allow") {
+        message.success(tr("toast.approveSuccess"));
+      } else {
+        message.warning(tr("toast.rejectSuccess"));
+      }
+      runtimeLogStore.append(tr("chat.runtime.approvalSubmitted", { action: `${action}:${scope}`, stepUid }));
     } catch (error) {
       approval.value = {
         ...approval.value,
         submitting: false,
         submittingAction: null
       };
-      message.error(tr("toast.approveFailed"));
+      if (action === "allow") {
+        message.error(tr("toast.approveFailed"));
+      } else {
+        message.error(tr("toast.rejectFailed"));
+      }
       throw error;
     }
   }
 
+  async function approveStep(scope: "once" | "session" | "agent" | "user" = "once") {
+    await decideStep("allow", scope);
+  }
+
   async function rejectStep() {
-    if (!currentConversationUid.value || !approval.value.stepUid || approval.value.submitting) return;
-    const stepUid = approval.value.stepUid;
-    approval.value = {
-      ...approval.value,
-      submitting: true,
-      submittingAction: "reject"
-    };
-    try {
-      await conversationApi.rejectStep(currentConversationUid.value, stepUid);
-      message.warning(tr("toast.rejectSuccess"));
-      runtimeLogStore.append(tr("chat.runtime.approvalSubmitted", { action: "reject", stepUid }));
-    } catch (error) {
-      approval.value = {
-        ...approval.value,
-        submitting: false,
-        submittingAction: null
-      };
-      message.error(tr("toast.rejectFailed"));
-      throw error;
-    }
+    await decideStep("deny", "once");
   }
 
   async function openFile(path: string) {

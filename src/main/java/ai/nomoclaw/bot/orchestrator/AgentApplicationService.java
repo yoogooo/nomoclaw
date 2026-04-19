@@ -12,7 +12,11 @@ import ai.nomoclaw.bot.llm.config.LlmProperties;
 import ai.nomoclaw.bot.model.*;
 import ai.nomoclaw.bot.planner.Planner;
 import ai.nomoclaw.bot.policy.RiskPolicy;
+import ai.nomoclaw.bot.policy.tool.ToolPermissionPolicyService;
 import ai.nomoclaw.bot.policy.tool.ToolPolicyDecisionResult;
+import ai.nomoclaw.bot.policy.tool.permission.PermissionEffect;
+import ai.nomoclaw.bot.policy.tool.permission.PermissionScope;
+import ai.nomoclaw.bot.policy.tool.permission.PermissionSource;
 import ai.nomoclaw.bot.prompt.PromptLoader;
 import ai.nomoclaw.bot.store.AgentStore;
 import ai.nomoclaw.bot.store.entity.*;
@@ -114,6 +118,8 @@ public class AgentApplicationService {
     private final ModelConfigAppService modelConfigAppService;
     private final ConversationAttachmentAppService conversationAttachmentAppService;
     private final ToolExecutionPolicyGateway toolExecutionPolicyGateway;
+    private final ToolPermissionPolicyService toolPermissionPolicyService;
+    private final PermissionAppService permissionAppService;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final ConcurrentMap<String, Boolean> runningMessages = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, ExecutionState> executionStates = new ConcurrentHashMap<>();
@@ -140,6 +146,8 @@ public class AgentApplicationService {
                                    ModelConfigAppService modelConfigAppService,
                                    ConversationAttachmentAppService conversationAttachmentAppService,
                                    ToolExecutionPolicyGateway toolExecutionPolicyGateway,
+                                   ToolPermissionPolicyService toolPermissionPolicyService,
+                                   PermissionAppService permissionAppService,
                                    @Qualifier("agentTaskExecutor") TaskExecutor agentTaskExecutor,
                                    ApplicationEventPublisher applicationEventPublisher) {
         this.store = store;
@@ -163,6 +171,8 @@ public class AgentApplicationService {
         this.modelConfigAppService = modelConfigAppService;
         this.conversationAttachmentAppService = conversationAttachmentAppService;
         this.toolExecutionPolicyGateway = toolExecutionPolicyGateway;
+        this.toolPermissionPolicyService = toolPermissionPolicyService;
+        this.permissionAppService = permissionAppService;
         this.taskExecutor = agentTaskExecutor;
         this.applicationEventPublisher = applicationEventPublisher;
     }
@@ -759,39 +769,76 @@ public class AgentApplicationService {
     }
 
     public void approveStep(String conversationUid, String stepUid) {
-        PlanStep step = store.findStep(stepUid)
-                .orElseThrow(() -> new IllegalArgumentException("step not found: " + stepUid));
-        String messageUid = store.findMessageIdByStep(stepUid)
-                .orElseThrow(() -> new IllegalArgumentException("message not found for step: " + stepUid));
-        store.updateStepApproval(stepUid, ApprovalStatus.APPROVED, StepStatus.CREATED);
-        // Reset retry metadata so an approved step can be executed again immediately.
-        // Otherwise a previously failed step may remain "retry exhausted" and fail without re-running.
-        store.updateStepStatus(stepUid, StepStatus.CREATED, 0, null);
-        log.info("[Agent] step approved conversationUid={} stepUid={} round={}", conversationUid, stepUid, step.roundIndex());
-        AgentMessage message = store.findMessage(messageUid)
-                .orElseThrow(() -> new IllegalArgumentException("message not found: " + messageUid));
-        boolean hasPendingSteps = store.listSteps(messageUid, step.roundIndex()).stream()
-                .anyMatch(item -> item.status() != StepStatus.COMPLETED);
-        if (message.status() == MessageStatus.WAITING_APPROVAL
-                || (message.status() == MessageStatus.FAILED && hasPendingSteps)) {
-            executeMessageAsync(message.messageUid());
-        }
+        decideStep(conversationUid, stepUid, "allow", PermissionScope.ONCE, "");
     }
 
     public void rejectStep(String conversationUid, String stepUid) {
+        decideStep(conversationUid, stepUid, "deny", PermissionScope.ONCE, "");
+    }
+
+    public ApprovalDecisionDto decideStep(String conversationUid,
+                                          String stepUid,
+                                          String action,
+                                          PermissionScope scope,
+                                          String note) {
         PlanStep step = store.findStep(stepUid)
                 .orElseThrow(() -> new IllegalArgumentException("step not found: " + stepUid));
         String messageUid = store.findMessageIdByStep(stepUid)
                 .orElseThrow(() -> new IllegalArgumentException("message not found for step: " + stepUid));
-        store.updateStepApproval(stepUid, ApprovalStatus.REJECTED, StepStatus.FAILED);
         AgentMessage message = store.findMessage(messageUid)
                 .orElseThrow(() -> new IllegalArgumentException("message not found: " + messageUid));
+        AgentConversation conversation = requireConversation(message.conversationUid());
+        AgentDefinitionEntity executionAgent = resolveExecutionAgent(conversation);
+        String agentName = executionAgent == null ? NomoClawPaths.DEFAULT_AGENT_NAME : executionAgent.getAgentName();
+        String normalizedAction = action == null ? "" : action.trim().toLowerCase(Locale.ROOT);
+        PermissionScope appliedScope = scope == null ? PermissionScope.ONCE : scope;
+        String matchedRuleId = "";
+
+        if ("allow".equals(normalizedAction)) {
+            if (appliedScope != PermissionScope.ONCE) {
+                var rule = permissionAppService.ruleFromApproval(
+                        step.toolName(),
+                        step.toolArgs(),
+                        PermissionEffect.ALLOW,
+                        appliedScope == PermissionScope.SESSION ? PermissionSource.SESSION
+                                : (appliedScope == PermissionScope.AGENT ? PermissionSource.AGENT_SETTINGS : PermissionSource.USER_SETTINGS)
+                );
+                matchedRuleId = rule.ruleId();
+                toolPermissionPolicyService.persistRule(appliedScope, message.conversationUid(), agentName, rule);
+            }
+            store.updateStepApproval(stepUid, ApprovalStatus.APPROVED, StepStatus.CREATED);
+            store.updateStepStatus(stepUid, StepStatus.CREATED, 0, null);
+            log.info("[Agent] step approved conversationUid={} stepUid={} round={} scope={} note={}",
+                    conversationUid, stepUid, step.roundIndex(), appliedScope, nullToEmpty(note));
+            boolean hasPendingSteps = store.listSteps(messageUid, step.roundIndex()).stream()
+                    .anyMatch(item -> item.status() != StepStatus.COMPLETED);
+            if (message.status() == MessageStatus.WAITING_APPROVAL
+                    || (message.status() == MessageStatus.FAILED && hasPendingSteps)) {
+                executeMessageAsync(message.messageUid());
+            }
+            return new ApprovalDecisionDto("accepted", appliedScope.name().toLowerCase(Locale.ROOT), appliedScope != PermissionScope.ONCE, matchedRuleId);
+        }
+
+        store.updateStepApproval(stepUid, ApprovalStatus.REJECTED, StepStatus.FAILED);
+        if (appliedScope != PermissionScope.ONCE) {
+            var rule = permissionAppService.ruleFromApproval(
+                    step.toolName(),
+                    step.toolArgs(),
+                    PermissionEffect.DENY,
+                    appliedScope == PermissionScope.SESSION ? PermissionSource.SESSION
+                            : (appliedScope == PermissionScope.AGENT ? PermissionSource.AGENT_SETTINGS : PermissionSource.USER_SETTINGS)
+            );
+            matchedRuleId = rule.ruleId();
+            toolPermissionPolicyService.persistRule(appliedScope, message.conversationUid(), agentName, rule);
+        }
         cancellationRegistry.cancel(messageUid);
-        log.info("[Agent] step rejected conversationUid={} stepUid={} round={}", conversationUid, stepUid, step.roundIndex());
+        log.info("[Agent] step rejected conversationUid={} stepUid={} round={} scope={} note={}",
+                conversationUid, stepUid, step.roundIndex(), appliedScope, nullToEmpty(note));
         ObjectNode rejectedPayload = stepPayload(step, "approval rejected by user");
         applyUserFacingFields(rejectedPayload, step, "rejected", "已停止执行", "这一步已被你拒绝，系统不会继续执行。");
         publishEvent(AgentEventType.STEP_REJECTED, conversationUid, messageUid, stepUid, rejectedPayload);
         failMessage(message, "主公已拒绝高风险操作，当前任务已停止。", "APPROVAL_REJECTED");
+        return new ApprovalDecisionDto("accepted", appliedScope.name().toLowerCase(Locale.ROOT), appliedScope != PermissionScope.ONCE, matchedRuleId);
     }
 
     public void cancelLatestMessage(String conversationUid) {
@@ -1022,6 +1069,8 @@ public class AgentApplicationService {
             ToolPolicyDecisionResult policyDecision = toolExecutionPolicyGateway.evaluateStep(
                     latestStep,
                     agentWorkspacePath,
+                    executionAgent == null ? "" : executionAgent.getAgentUid(),
+                    executionAgent == null ? NomoClawPaths.DEFAULT_AGENT_NAME : executionAgent.getAgentName(),
                     conversation.channel(),
                     message.conversationUid(),
                     message.messageUid()
@@ -1167,6 +1216,8 @@ public class AgentApplicationService {
             ToolPolicyDecisionResult policyDecision = toolExecutionPolicyGateway.evaluateStep(
                     step,
                     agentWorkspacePath,
+                    agent == null ? "" : agent.getAgentUid(),
+                    agent == null ? NomoClawPaths.DEFAULT_AGENT_NAME : agent.getAgentName(),
                     conversation.channel(),
                     message.conversationUid(),
                     message.messageUid()

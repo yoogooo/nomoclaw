@@ -177,6 +177,9 @@ const enUS = {
     approval: {
       waiting: "High-risk action pending confirmation",
       approve: "Continue",
+      approveSession: "Allow for this session",
+      approveAgent: "Allow for this Agent",
+      approveUser: "Allow globally",
       approving: "Continuing",
       reject: "Reject this action",
       rejecting: "Rejecting"

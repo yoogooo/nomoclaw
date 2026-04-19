@@ -11,10 +11,13 @@ import type {
   ConversationMessage,
   ConversationMessageRun,
   ConversationSummary,
+  ApprovalDecisionResponse,
   CreateConversationResponse,
   ImportedSkillResponse,
   ImportSkillFromUrlPayload,
   MessageResponse,
+  PermissionRulesResponse,
+  PermissionRulePayload,
   SimpleResponse,
   SystemConfig,
   UploadFilesResponse
@@ -255,6 +258,39 @@ export const conversationApi = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({})
+    });
+  },
+  decideStep(conversationUid: string, stepUid: string, payload: {
+    action: "allow" | "deny";
+    scope: "once" | "session" | "agent" | "user";
+    note?: string;
+  }) {
+    return requestJson<ApprovalDecisionResponse>(`/api/conversations/${conversationUid}/approvals/${stepUid}/decision`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+  },
+  getEffectivePermissions(conversationUid: string, agentUid: string) {
+    const query = new URLSearchParams();
+    if (conversationUid) query.set("conversationUid", conversationUid);
+    if (agentUid) query.set("agentUid", agentUid);
+    return requestJson<PermissionRulesResponse>(`/api/permissions/effective?${query.toString()}`);
+  },
+  updateAgentPermissions(agentUid: string, rules: PermissionRulePayload[]) {
+    return requestJson<PermissionRulesResponse>(`/api/permissions/agent-settings/${agentUid}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rules })
+    });
+  },
+  updateUserPermissions(agentUid: string, rules: PermissionRulePayload[]) {
+    const query = new URLSearchParams();
+    if (agentUid) query.set("agentUid", agentUid);
+    return requestJson<PermissionRulesResponse>(`/api/permissions/user-settings?${query.toString()}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rules })
     });
   },
   cancelConversation(conversationUid: string) {

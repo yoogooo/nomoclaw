@@ -15,8 +15,11 @@ const { t } = useI18n();
 const visible = computed(() => props.forceVisible || Boolean(conversationStore.approval.stepUid));
 const bannerRef = ref<HTMLElement | null>(null);
 const isSubmitting = computed(() => conversationStore.approval.submitting);
-const approveLoading = computed(() => isSubmitting.value && conversationStore.approval.submittingAction === "approve");
-const rejectLoading = computed(() => isSubmitting.value && conversationStore.approval.submittingAction === "reject");
+const allowOnceLoading = computed(() => isSubmitting.value && conversationStore.approval.submittingAction === "allow_once");
+const allowSessionLoading = computed(() => isSubmitting.value && conversationStore.approval.submittingAction === "allow_session");
+const allowAgentLoading = computed(() => isSubmitting.value && conversationStore.approval.submittingAction === "allow_agent");
+const allowUserLoading = computed(() => isSubmitting.value && conversationStore.approval.submittingAction === "allow_user");
+const rejectLoading = computed(() => isSubmitting.value && conversationStore.approval.submittingAction === "deny_once");
 const missingStepUid = computed(() => !conversationStore.approval.stepUid);
 
 async function focusAndReveal() {
@@ -65,11 +68,38 @@ onMounted(() => {
         <n-button
           class="ui-approval-approve-btn"
           secondary
-          :loading="approveLoading"
+          :loading="allowOnceLoading"
           :disabled="isSubmitting || missingStepUid"
-          @click="conversationStore.approveStep()"
+          @click="conversationStore.approveStep('once')"
         >
-          {{ approveLoading ? t("chat.approval.approving") : t("chat.approval.approve") }}
+          {{ allowOnceLoading ? t("chat.approval.approving") : t("chat.approval.approve") }}
+        </n-button>
+        <n-button
+          class="ui-approval-approve-btn"
+          secondary
+          :loading="allowSessionLoading"
+          :disabled="isSubmitting || missingStepUid"
+          @click="conversationStore.approveStep('session')"
+        >
+          {{ allowSessionLoading ? t("chat.approval.approving") : t("chat.approval.approveSession") }}
+        </n-button>
+        <n-button
+          class="ui-approval-approve-btn"
+          secondary
+          :loading="allowAgentLoading"
+          :disabled="isSubmitting || missingStepUid"
+          @click="conversationStore.approveStep('agent')"
+        >
+          {{ allowAgentLoading ? t("chat.approval.approving") : t("chat.approval.approveAgent") }}
+        </n-button>
+        <n-button
+          class="ui-approval-approve-btn"
+          secondary
+          :loading="allowUserLoading"
+          :disabled="isSubmitting || missingStepUid"
+          @click="conversationStore.approveStep('user')"
+        >
+          {{ allowUserLoading ? t("chat.approval.approving") : t("chat.approval.approveUser") }}
         </n-button>
         <n-button
           class="ui-approval-reject-btn"

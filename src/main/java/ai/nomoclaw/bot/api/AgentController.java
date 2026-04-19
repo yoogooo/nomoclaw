@@ -6,7 +6,10 @@ import ai.nomoclaw.bot.orchestrator.ConversationAttachmentAppService;
 import ai.nomoclaw.bot.orchestrator.ConversationAppService;
 import ai.nomoclaw.bot.orchestrator.MessageRunAppService;
 import ai.nomoclaw.bot.orchestrator.ModelConfigAppService;
+import ai.nomoclaw.bot.orchestrator.PermissionAppService;
+import ai.nomoclaw.bot.orchestrator.PermissionRulesResponse;
 import ai.nomoclaw.bot.orchestrator.SystemAppService;
+import ai.nomoclaw.bot.orchestrator.UpdatePermissionRulesRequest;
 import ai.nomoclaw.bot.scheduler.CronChannelTargetDirectoryService;
 import ai.nomoclaw.bot.scheduler.CronJobApplicationService;
 import jakarta.validation.Valid;
@@ -45,6 +48,7 @@ public class AgentController {
     private final ApprovalAppService approvalAppService;
     private final ModelConfigAppService modelConfigAppService;
     private final SystemAppService systemAppService;
+    private final PermissionAppService permissionAppService;
     private final CronJobApplicationService cronJobApplicationService;
     private final CronChannelTargetDirectoryService cronChannelTargetDirectoryService;
 
@@ -55,6 +59,7 @@ public class AgentController {
                            ApprovalAppService approvalAppService,
                            ModelConfigAppService modelConfigAppService,
                            SystemAppService systemAppService,
+                           PermissionAppService permissionAppService,
                            CronJobApplicationService cronJobApplicationService,
                            CronChannelTargetDirectoryService cronChannelTargetDirectoryService) {
         this.conversationAppService = conversationAppService;
@@ -64,6 +69,7 @@ public class AgentController {
         this.approvalAppService = approvalAppService;
         this.modelConfigAppService = modelConfigAppService;
         this.systemAppService = systemAppService;
+        this.permissionAppService = permissionAppService;
         this.cronJobApplicationService = cronJobApplicationService;
         this.cronChannelTargetDirectoryService = cronChannelTargetDirectoryService;
     }
@@ -429,6 +435,42 @@ public class AgentController {
         log.info("[AgentAPI] rejectStep conversationUid={} stepUid={}", conversationUid, stepUid);
         approvalAppService.rejectStep(conversationUid, stepUid);
         return new SimpleResponse("rejected");
+    }
+
+    @PostMapping("/conversations/{conversationUid}/approvals/{stepUid}/decision")
+    public ApprovalDecisionResponse decideStep(@PathVariable String conversationUid,
+                                               @PathVariable String stepUid,
+                                               @RequestBody(required = false) ApprovalDecisionRequest request) {
+        String action = request == null ? "allow" : request.action();
+        String scope = request == null ? "once" : request.scope();
+        String note = request == null ? "" : request.note();
+        log.info("[AgentAPI] decideStep conversationUid={} stepUid={} action={} scope={}",
+                conversationUid, stepUid, action, scope);
+        var decision = approvalAppService.decideStep(conversationUid, stepUid, action, scope, note);
+        return new ApprovalDecisionResponse(decision.status(), decision.appliedScope(), decision.persisted(), decision.matchedRuleId());
+    }
+
+    @GetMapping("/permissions/effective")
+    public PermissionRulesResponse getEffectivePermissions(@RequestParam(required = false, defaultValue = "") String conversationUid,
+                                                           @RequestParam(required = false, defaultValue = "") String agentUid) {
+        log.info("[AgentAPI] getEffectivePermissions conversationUid={} agentUid={}", conversationUid, agentUid);
+        return permissionAppService.getEffectiveRules(conversationUid, agentUid);
+    }
+
+    @PutMapping("/permissions/agent-settings/{agentUid}")
+    public PermissionRulesResponse updateAgentPermissions(@PathVariable String agentUid,
+                                                          @RequestBody(required = false) UpdatePermissionRulesRequest request) {
+        log.info("[AgentAPI] updateAgentPermissions agentUid={} rules={}", agentUid,
+                request == null || request.rules() == null ? 0 : request.rules().size());
+        return permissionAppService.updateAgentRules(agentUid, request == null ? new UpdatePermissionRulesRequest(List.of()) : request);
+    }
+
+    @PutMapping("/permissions/user-settings")
+    public PermissionRulesResponse updateUserPermissions(@RequestParam(required = false, defaultValue = "") String agentUid,
+                                                         @RequestBody(required = false) UpdatePermissionRulesRequest request) {
+        log.info("[AgentAPI] updateUserPermissions agentUid={} rules={}", agentUid,
+                request == null || request.rules() == null ? 0 : request.rules().size());
+        return permissionAppService.updateUserRules(agentUid, request == null ? new UpdatePermissionRulesRequest(List.of()) : request);
     }
 
     @PostMapping("/conversations/{conversationUid}/cancel")
