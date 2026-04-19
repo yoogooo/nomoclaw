@@ -307,9 +307,18 @@ Agent loop 的详细控制流、round/retry 区分、审批暂停、失败重规
 
 持久化目录约定：
 
-- `~/.nomoclaw/browser-profiles/<agent-key>/`
+- `~/.nomoclaw/runtime/browser-profiles/<agent-key>/`
+- `~/.nomoclaw/runtime/playwright-browsers/`
+- `~/.nomoclaw/runtime/plugins/browser/`
+- `~/.nomoclaw/runtime/tmp/`
+- `~/.nomoclaw/runtime/logs/backend-YYYYMMDD.log`
 
 其中 `<agent-key>` 会做字符规范化，只保留 `[a-zA-Z0-9._-]`。
+
+迁移说明（硬迁移）：
+
+- 旧目录 `~/.nomoclaw/{browser-profiles,playwright-browsers,plugins,tmp,logs}` 不再自动兼容。
+- 升级后如需保留历史数据，请手工迁移到 `~/.nomoclaw/runtime/*`。
 
 ### 6.4 `cron_tool`
 

@@ -299,6 +299,7 @@ public class BrowserTool implements Tool {
      * percent; it is not the real download size reported by Playwright.
      */
     private synchronized BrowserContext createContext(String profileKey, ToolRequest request) {
+        configurePlaywrightDriverTmpDirectory();
         Path cacheRoot = resolvePlaywrightCacheRoot();
         Map<String, String> playwrightEnv = buildPlaywrightEnv(cacheRoot);
         long baselineBytes = cacheRoot == null ? 0L : safeDirectorySize(cacheRoot);
@@ -827,7 +828,7 @@ public class BrowserTool implements Tool {
                 return sharedMacCache;
             }
         }
-        return NomoClawPaths.root().resolve("playwright-browsers").toAbsolutePath().normalize();
+        return NomoClawPaths.ensureRuntimePlaywrightBrowsersRoot();
     }
 
     private Map<String, String> buildPlaywrightEnv(Path cacheRoot) {
@@ -845,7 +846,7 @@ public class BrowserTool implements Tool {
         if (!home.isBlank()) {
             env.putIfAbsent("HOME", home);
         }
-        Path tmpDir = NomoClawPaths.root().resolve("tmp").resolve("playwright-driver").toAbsolutePath().normalize();
+        Path tmpDir = NomoClawPaths.ensureRuntimeTmpRoot().resolve("playwright-driver").toAbsolutePath().normalize();
         try {
             Files.createDirectories(tmpDir);
             env.put("TMPDIR", tmpDir.toString());
@@ -853,6 +854,20 @@ public class BrowserTool implements Tool {
             log.warn("[Tool][browser] failed to prepare tmp dir {}", tmpDir, ex);
         }
         return env;
+    }
+
+    private void configurePlaywrightDriverTmpDirectory() {
+        Path driverTmpDir = NomoClawPaths.ensureRuntimePluginsRoot()
+                .resolve("browser")
+                .resolve("lib")
+                .toAbsolutePath()
+                .normalize();
+        try {
+            Files.createDirectories(driverTmpDir);
+            System.setProperty("playwright.driver.tmpdir", driverTmpDir.toString());
+        } catch (Exception ex) {
+            log.warn("[Tool][browser] failed to prepare playwright driver temp dir {}", driverTmpDir, ex);
+        }
     }
 
     private long safeDirectorySize(Path root) {
@@ -1091,8 +1106,7 @@ public class BrowserTool implements Tool {
     }
 
     private Path profileDirectory(String profileKey) {
-        return NomoClawPaths.root()
-                .resolve("browser-profiles")
+        return NomoClawPaths.ensureRuntimeBrowserProfilesRoot()
                 .resolve(profileKey)
                 .toAbsolutePath()
                 .normalize();

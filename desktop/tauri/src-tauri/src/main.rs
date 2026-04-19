@@ -1542,7 +1542,7 @@ fn is_port_available(port: u16) -> bool {
 }
 
 fn ensure_log_file_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf> {
-    let logs_dir = nomoclaw_root_dir(app)?.join("logs");
+    let logs_dir = runtime_state_dir(app)?.join("logs");
     fs::create_dir_all(&logs_dir)
         .with_context(|| format!("failed to create logs directory: {}", logs_dir.display()))?;
     Ok(logs_dir.join(current_backend_log_file_name()))
