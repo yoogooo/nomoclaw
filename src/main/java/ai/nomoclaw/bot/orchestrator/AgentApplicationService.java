@@ -1089,9 +1089,6 @@ public class AgentApplicationService {
                         latestStep.title());
                 ObjectNode approvalPayload = stepPayload(latestStep, "approval required");
                 String approvalDetails = buildStepApprovalDetails(latestStep);
-                if (policyDecision.asks()) {
-                    approvalDetails = approvalDetails + "\n\n策略提示：" + nullToEmpty(policyDecision.message());
-                }
                 applyUserFacingFields(approvalPayload, latestStep, "waiting_approval", "等待你确认", approvalDetails);
                 approvalPayload.put("policyReasonCode", policyDecision.reasonCode().name());
                 approvalPayload.set("toolArgs", latestStep.toolArgs());
