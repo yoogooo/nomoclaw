@@ -149,6 +149,32 @@ class PermissionEngineTests {
         assertTrue(decision.hardGuardHit());
     }
 
+    @Test
+    void browserOpenShouldAllowByBaseline() {
+        StubSettingsStore settings = new StubSettingsStore();
+        SessionPermissionStore sessionStore = new SessionPermissionStore();
+        PermissionEngine engine = new PermissionEngine(settings, sessionStore, new CommandRuleResolver(), new HardGuardService());
+
+        ObjectNode args = JsonNodeFactory.instance.objectNode();
+        args.put("action", "open");
+        args.put("url", "https://weather.com.cn/weather/101010100.shtml");
+
+        PermissionDecision decision = engine.evaluate(new ToolPolicyContext(
+                "browser_tool",
+                args,
+                Path.of(".").toAbsolutePath().normalize(),
+                "agent-uid",
+                "default",
+                "local",
+                "c10",
+                "m1",
+                "s1"
+        ));
+
+        assertEquals(PermissionEffect.ALLOW, decision.effect());
+        assertEquals("builtin-browser-open-allow", decision.matchedRuleId());
+    }
+
     private PermissionRule rule(String id, PermissionSource source, PermissionEffect effect) {
         return new PermissionRule(
                 id,

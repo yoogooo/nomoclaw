@@ -83,6 +83,30 @@ public class PermissionEngine {
             );
         }
 
+        if (isBrowserOpenBaselineAllowed(context, details)) {
+            return new PermissionDecision(
+                    PermissionEffect.ALLOW,
+                    ToolPolicyReasonCode.RULE_ALLOW_MATCHED,
+                    "命中浏览器打开基线放行。",
+                    PermissionSource.COMMAND,
+                    "builtin-browser-open-allow",
+                    firstPath(details),
+                    false
+            );
+        }
+
+        if (isCronBaselineAllowed(context)) {
+            return new PermissionDecision(
+                    PermissionEffect.ALLOW,
+                    ToolPolicyReasonCode.RULE_ALLOW_MATCHED,
+                    "命中定时任务基线放行。",
+                    PermissionSource.COMMAND,
+                    "builtin-cron-allow",
+                    firstPath(details),
+                    false
+            );
+        }
+
         if (isBuiltinReadonlyTool(context.toolName())) {
             return new PermissionDecision(
                     PermissionEffect.ALLOW,
@@ -366,5 +390,23 @@ public class PermissionEngine {
             return false;
         }
         return commandRuleResolver.isReadonlyCommand(context, details) == CommandRuleResolver.ReadonlyCommandVerdict.READ_ONLY;
+    }
+
+    private boolean isBrowserOpenBaselineAllowed(ToolPolicyContext context, PermissionContextDetails details) {
+        String tool = normalize(context.toolName());
+        if (!"browser_tool".equals(tool) && !"browser_control_tool".equals(tool)) {
+            return false;
+        }
+        String action = details == null ? "" : normalize(details.action());
+        if (!"open".equals(action) && !"navigate".equals(action)) {
+            return false;
+        }
+        String url = normalize(context.toolArgs().path("url").asText(""));
+        return url.startsWith("http://") || url.startsWith("https://");
+    }
+
+    private boolean isCronBaselineAllowed(ToolPolicyContext context) {
+        String tool = normalize(context.toolName());
+        return "cron_tool".equals(tool);
     }
 }
