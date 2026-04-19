@@ -175,6 +175,32 @@ class PermissionEngineTests {
         assertEquals("builtin-browser-open-allow", decision.matchedRuleId());
     }
 
+    @Test
+    void cronToolShouldAllowByBaseline() {
+        StubSettingsStore settings = new StubSettingsStore();
+        SessionPermissionStore sessionStore = new SessionPermissionStore();
+        PermissionEngine engine = new PermissionEngine(settings, sessionStore, new CommandRuleResolver(), new HardGuardService());
+
+        ObjectNode args = JsonNodeFactory.instance.objectNode();
+        args.put("task", "提醒用户观看新闻联播");
+        args.put("expression", "0 30 19 * * ?");
+
+        PermissionDecision decision = engine.evaluate(new ToolPolicyContext(
+                "cron_tool",
+                args,
+                Path.of(".").toAbsolutePath().normalize(),
+                "agent-uid",
+                "default",
+                "local",
+                "c11",
+                "m1",
+                "s1"
+        ));
+
+        assertEquals(PermissionEffect.ALLOW, decision.effect());
+        assertEquals("builtin-cron-allow", decision.matchedRuleId());
+    }
+
     private PermissionRule rule(String id, PermissionSource source, PermissionEffect effect) {
         return new PermissionRule(
                 id,

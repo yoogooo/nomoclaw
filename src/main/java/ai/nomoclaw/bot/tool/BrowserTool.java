@@ -406,7 +406,16 @@ public class BrowserTool implements Tool {
             requireInstalledChromiumExecutable(cacheRoot);
             chromiumInstallEnsured = true;
         } catch (Exception ex) {
-            throw new IllegalStateException("failed to install chromium runtime", ex);
+            log.warn("[Tool][browser] chromium install verification failed, retrying after cleanup cacheRoot={} err={}",
+                    cacheRoot, ex.getMessage());
+            try {
+                cleanupBrokenChromiumInstall(cacheRoot);
+                forceInstallChromium(request, cacheRoot, playwrightEnv);
+                requireInstalledChromiumExecutable(cacheRoot);
+                chromiumInstallEnsured = true;
+            } catch (Exception retryEx) {
+                throw new IllegalStateException("failed to install chromium runtime", retryEx);
+            }
         }
     }
 
@@ -419,7 +428,7 @@ public class BrowserTool implements Tool {
             );
             log.info("[Tool][browser] installing chromium runtime cacheRoot={} env.PLAYWRIGHT_BROWSERS_PATH={}",
                     cacheRoot, playwrightEnv.get("PLAYWRIGHT_BROWSERS_PATH"));
-            runPlaywrightCli(playwrightEnv, "install", "chromium");
+            runPlaywrightCli(buildPlaywrightInstallEnv(playwrightEnv), "install", "chromium");
         } catch (Exception ex) {
             throw new IllegalStateException("failed to install chromium runtime", ex);
         }
@@ -854,6 +863,51 @@ public class BrowserTool implements Tool {
             log.warn("[Tool][browser] failed to prepare tmp dir {}", tmpDir, ex);
         }
         return env;
+    }
+
+    private Map<String, String> buildPlaywrightInstallEnv(Map<String, String> launchEnv) {
+        Map<String, String> env = new HashMap<>(launchEnv == null ? Map.of() : launchEnv);
+        // Installation must never inherit skip-download, otherwise Playwright "install" becomes a no-op.
+        env.remove("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD");
+        env.put("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "0");
+        return env;
+    }
+
+    private void cleanupBrokenChromiumInstall(Path cacheRoot) {
+        if (cacheRoot == null || !Files.isDirectory(cacheRoot)) {
+            return;
+        }
+        try (var stream = Files.list(cacheRoot)) {
+            List<Path> staleRevisions = stream
+                    .filter(Files::isDirectory)
+                    .filter(path -> {
+                        String name = path.getFileName() == null ? "" : path.getFileName().toString();
+                        return name.startsWith("chromium-");
+                    })
+                    .toList();
+            for (Path revision : staleRevisions) {
+                deleteRecursively(revision);
+            }
+            if (!staleRevisions.isEmpty()) {
+                log.info("[Tool][browser] removed stale chromium revisions count={} cacheRoot={}", staleRevisions.size(), cacheRoot);
+            }
+        } catch (Exception ex) {
+            log.warn("[Tool][browser] failed to cleanup stale chromium revisions cacheRoot={} err={}", cacheRoot, ex.getMessage());
+        }
+    }
+
+    private void deleteRecursively(Path root) throws Exception {
+        if (root == null || !Files.exists(root)) {
+            return;
+        }
+        try (var walk = Files.walk(root)) {
+            walk.sorted(java.util.Comparator.reverseOrder()).forEach(path -> {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (Exception ignored) {
+                }
+            });
+        }
     }
 
     private void configurePlaywrightDriverTmpDirectory() {
