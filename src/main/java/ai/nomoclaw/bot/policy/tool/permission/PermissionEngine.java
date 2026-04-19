@@ -71,6 +71,18 @@ public class PermissionEngine {
             return decision;
         }
 
+        if (isCommandReadonlyBaselineAllowed(context, details)) {
+            return new PermissionDecision(
+                    PermissionEffect.ALLOW,
+                    ToolPolicyReasonCode.RULE_ALLOW_MATCHED,
+                    "命中只读命令基线放行。",
+                    PermissionSource.COMMAND,
+                    "builtin-command-readonly-allow",
+                    firstPath(details),
+                    false
+            );
+        }
+
         if (isBuiltinReadonlyTool(context.toolName())) {
             return new PermissionDecision(
                     PermissionEffect.ALLOW,
@@ -346,5 +358,13 @@ public class PermissionEngine {
     private boolean isBuiltinReadonlyTool(String toolName) {
         String normalized = normalize(toolName);
         return BUILTIN_READONLY_TOOLS.contains(normalized);
+    }
+
+    private boolean isCommandReadonlyBaselineAllowed(ToolPolicyContext context, PermissionContextDetails details) {
+        String tool = normalize(context.toolName());
+        if (!"command_tool".equals(tool)) {
+            return false;
+        }
+        return commandRuleResolver.isReadonlyCommand(context, details) == CommandRuleResolver.ReadonlyCommandVerdict.READ_ONLY;
     }
 }

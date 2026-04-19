@@ -17,6 +17,45 @@ import java.util.regex.Pattern;
 public class CommandRuleResolver {
 
     private static final Set<String> COMMAND_WRITE_HINTS = Set.of(" >", " >>", " rm ", " chmod ", " chown ", " mv ", " cp ", " sed -i", " mkdir ", " touch ", " ln ", " unzip ", " tar ");
+    private static final Set<String> READONLY_LINUX_COMMANDS = Set.of(
+            "ls", "cat", "head", "tail", "grep", "wc", "sort", "uniq", "cut", "awk", "find", "stat", "du"
+    );
+    private static final Set<String> READONLY_CMD_COMMANDS = Set.of(
+            "dir", "type", "findstr"
+    );
+    private static final Set<String> READONLY_POWERSHELL_COMMANDS = Set.of(
+            "get-childitem", "ls", "dir",
+            "get-content", "gc", "cat", "type",
+            "select-string",
+            "measure-object",
+            "sort-object",
+            "where-object",
+            "get-item",
+            "get-filehash"
+    );
+    private static final Set<String> NON_READONLY_LINUX_COMMANDS = Set.of(
+            "rm", "mv", "cp", "chmod", "chown", "mkdir", "touch", "ln", "tee", "dd", "mkfs", "mount", "umount", "tar", "unzip", "sed"
+    );
+    private static final Set<String> NON_READONLY_CMD_COMMANDS = Set.of(
+            "del", "erase", "move", "copy", "ren", "mkdir", "rmdir", "md", "rd"
+    );
+    private static final Set<String> NON_READONLY_POWERSHELL_COMMANDS = Set.of(
+            "set-content", "add-content", "out-file", "remove-item", "move-item", "copy-item",
+            "new-item", "rename-item", "set-item", "clear-content", "invoke-expression", "iex"
+    );
+    private static final Set<String> SHELL_WRAPPERS = Set.of("bash", "sh", "zsh", "cmd", "powershell", "pwsh");
+
+    public enum ReadonlyCommandVerdict {
+        READ_ONLY,
+        NOT_READ_ONLY,
+        UNKNOWN
+    }
+
+    private enum ShellKind {
+        LINUX,
+        CMD,
+        POWERSHELL
+    }
 
     public PermissionContextDetails resolve(ToolPolicyContext context) {
         String tool = normalize(context.toolName());
@@ -91,6 +130,17 @@ public class CommandRuleResolver {
         return List.of();
     }
 
+    public ReadonlyCommandVerdict isReadonlyCommand(ToolPolicyContext context, PermissionContextDetails details) {
+        if (!"command_tool".equals(normalize(context.toolName()))) {
+            return ReadonlyCommandVerdict.UNKNOWN;
+        }
+        String command = details == null ? "" : details.commandText();
+        if (command == null || command.isBlank()) {
+            return ReadonlyCommandVerdict.UNKNOWN;
+        }
+        return classify(command, inferShell(command));
+    }
+
     private boolean matchesHighRiskPattern(String command) {
         String value = " " + normalize(command) + " ";
         return value.contains(" sudo ") || value.contains(" rm -rf") || value.contains(" mkfs ") || value.contains(" dd ")
@@ -134,6 +184,187 @@ public class CommandRuleResolver {
             }
         }
         return false;
+    }
+
+    private ReadonlyCommandVerdict classify(String command, ShellKind shell) {
+        String normalized = normalize(command);
+        if (normalized.isBlank()) {
+            return ReadonlyCommandVerdict.UNKNOWN;
+        }
+        if (containsHighRiskExecutionSignal(normalized)) {
+            return ReadonlyCommandVerdict.NOT_READ_ONLY;
+        }
+        if (hasWriteRedirection(normalized)) {
+            return ReadonlyCommandVerdict.NOT_READ_ONLY;
+        }
+
+        ShellCommand unwrapped = unwrapShellCommand(command, shell);
+        String effective = unwrapped.command();
+        ShellKind effectiveShell = unwrapped.shellKind();
+        List<String> segments = splitSegments(effective);
+        if (segments.isEmpty()) {
+            return ReadonlyCommandVerdict.UNKNOWN;
+        }
+        boolean allReadonly = true;
+        for (String segment : segments) {
+            String seg = segment == null ? "" : segment.trim();
+            if (seg.isBlank()) {
+                continue;
+            }
+            String first = firstToken(seg);
+            if (first.isBlank()) {
+                continue;
+            }
+            String firstNormalized = normalize(first);
+            if (isNonReadonly(firstNormalized, effectiveShell, seg)) {
+                return ReadonlyCommandVerdict.NOT_READ_ONLY;
+            }
+            if (!isReadonly(firstNormalized, effectiveShell)) {
+                allReadonly = false;
+            }
+        }
+        return allReadonly ? ReadonlyCommandVerdict.READ_ONLY : ReadonlyCommandVerdict.UNKNOWN;
+    }
+
+    private boolean containsHighRiskExecutionSignal(String normalizedCommand) {
+        String value = " " + normalizedCommand + " ";
+        return value.contains(" sudo ")
+                || value.contains(" invoke-expression ")
+                || value.contains(" iex ")
+                || value.contains(" start-process ") && value.contains(" -verb runas");
+    }
+
+    private boolean hasWriteRedirection(String normalizedCommand) {
+        if (!normalizedCommand.contains(">")) {
+            return false;
+        }
+        java.util.regex.Matcher matcher = Pattern.compile("(^|\\s)\\d*>>?\\s*([^\\s|;&]+)").matcher(normalizedCommand);
+        boolean found = false;
+        while (matcher.find()) {
+            found = true;
+            String target = matcher.group(2);
+            if (target == null) {
+                return true;
+            }
+            String normalizedTarget = normalize(target);
+            if (!"/dev/null".equals(normalizedTarget) && !"nul".equals(normalizedTarget)) {
+                return true;
+            }
+        }
+        return !found;
+    }
+
+    private ShellKind inferShell(String command) {
+        List<String> tokens = tokenize(command);
+        if (!tokens.isEmpty()) {
+            String first = normalize(stripQuotes(tokens.get(0)));
+            if ("powershell".equals(first) || "pwsh".equals(first)) {
+                return ShellKind.POWERSHELL;
+            }
+            if ("cmd".equals(first)) {
+                return ShellKind.CMD;
+            }
+            if ("bash".equals(first) || "sh".equals(first) || "zsh".equals(first)) {
+                return ShellKind.LINUX;
+            }
+        }
+        String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+        return os.contains("win") ? ShellKind.CMD : ShellKind.LINUX;
+    }
+
+    private ShellCommand unwrapShellCommand(String command, ShellKind shell) {
+        List<String> tokens = tokenize(command);
+        if (tokens.isEmpty()) {
+            return new ShellCommand(command, shell);
+        }
+        String first = normalize(stripQuotes(tokens.get(0)));
+        if (!SHELL_WRAPPERS.contains(first)) {
+            return new ShellCommand(command, shell);
+        }
+        if (("powershell".equals(first) || "pwsh".equals(first)) && tokens.size() >= 3) {
+            for (int i = 1; i < tokens.size() - 1; i++) {
+                String option = normalize(stripQuotes(tokens.get(i)));
+                if ("-command".equals(option) || "-c".equals(option)) {
+                    return new ShellCommand(stripQuotes(tokens.get(i + 1)), ShellKind.POWERSHELL);
+                }
+            }
+        }
+        if ("cmd".equals(first) && tokens.size() >= 3) {
+            for (int i = 1; i < tokens.size() - 1; i++) {
+                String option = normalize(stripQuotes(tokens.get(i)));
+                if ("/c".equals(option) || "/k".equals(option)) {
+                    return new ShellCommand(stripQuotes(tokens.get(i + 1)), ShellKind.CMD);
+                }
+            }
+        }
+        if (("bash".equals(first) || "sh".equals(first) || "zsh".equals(first)) && tokens.size() >= 3) {
+            for (int i = 1; i < tokens.size() - 1; i++) {
+                String option = normalize(stripQuotes(tokens.get(i)));
+                if ("-c".equals(option)) {
+                    return new ShellCommand(stripQuotes(tokens.get(i + 1)), ShellKind.LINUX);
+                }
+            }
+        }
+        return new ShellCommand(command, shell);
+    }
+
+    private List<String> splitSegments(String command) {
+        List<String> out = new ArrayList<>();
+        if (command == null || command.isBlank()) {
+            return out;
+        }
+        String[] raw = command.split("\\|\\||&&|\\||;");
+        for (String item : raw) {
+            String segment = item == null ? "" : item.trim();
+            if (!segment.isBlank()) {
+                out.add(segment);
+            }
+        }
+        return out;
+    }
+
+    private String firstToken(String segment) {
+        List<String> tokens = tokenize(segment);
+        if (tokens.isEmpty()) {
+            return "";
+        }
+        return stripQuotes(tokens.get(0));
+    }
+
+    private boolean isNonReadonly(String first, ShellKind shell, String segment) {
+        String loweredSegment = " " + normalize(segment) + " ";
+        if (shell == ShellKind.POWERSHELL) {
+            if (NON_READONLY_POWERSHELL_COMMANDS.contains(first)) {
+                return true;
+            }
+            return "start-process".equals(first) && loweredSegment.contains(" -verb runas");
+        }
+        if (shell == ShellKind.CMD) {
+            return NON_READONLY_CMD_COMMANDS.contains(first);
+        }
+        if (NON_READONLY_LINUX_COMMANDS.contains(first)) {
+            if ("tar".equals(first)) {
+                return loweredSegment.contains(" -x") || loweredSegment.contains(" --extract");
+            }
+            if ("sed".equals(first)) {
+                return loweredSegment.contains(" -i");
+            }
+            return true;
+        }
+        return false;
+    }
+
+    private boolean isReadonly(String first, ShellKind shell) {
+        if (shell == ShellKind.POWERSHELL) {
+            return READONLY_POWERSHELL_COMMANDS.contains(first);
+        }
+        if (shell == ShellKind.CMD) {
+            return READONLY_CMD_COMMANDS.contains(first);
+        }
+        return READONLY_LINUX_COMMANDS.contains(first);
+    }
+
+    private record ShellCommand(String command, ShellKind shellKind) {
     }
 
     private List<String> tokenize(String command) {
