@@ -10,10 +10,17 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 @Component
 public class PermissionEngine {
+    private static final Set<String> BUILTIN_READONLY_TOOLS = Set.of(
+            "memory_search_tool",
+            "current_time_tool",
+            "token_usage_tool",
+            "file_search_tool"
+    );
 
     private final PermissionSettingsStore settingsStore;
     private final SessionPermissionStore sessionPermissionStore;
@@ -57,6 +64,18 @@ public class PermissionEngine {
         decision = matchBySource(context, details, PermissionSource.USER_SETTINGS, userRules);
         if (decision != null) {
             return decision;
+        }
+
+        if (isBuiltinReadonlyTool(context.toolName())) {
+            return new PermissionDecision(
+                    PermissionEffect.ALLOW,
+                    ToolPolicyReasonCode.RULE_ALLOW_MATCHED,
+                    "内置只读工具默认放行。",
+                    PermissionSource.COMMAND,
+                    "builtin-readonly-allow",
+                    firstPath(details),
+                    false
+            );
         }
 
         return new PermissionDecision(
@@ -255,5 +274,10 @@ public class PermissionEngine {
 
     private String normalize(String value) {
         return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private boolean isBuiltinReadonlyTool(String toolName) {
+        String normalized = normalize(toolName);
+        return BUILTIN_READONLY_TOOLS.contains(normalized);
     }
 }

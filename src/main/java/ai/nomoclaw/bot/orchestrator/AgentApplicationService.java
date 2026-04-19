@@ -1077,7 +1077,7 @@ public class AgentApplicationService {
             );
             if (!policyDecision.denied()
                     && latestStep.approvalStatus() != ApprovalStatus.APPROVED
-                    && (riskPolicy.requiresApproval(latestStep) || policyDecision.asks())) {
+                    && policyDecision.asks()) {
                 store.updateStepApproval(latestStep.stepUid(), ApprovalStatus.PENDING, StepStatus.WAITING_APPROVAL);
                 store.updateMessageStatus(message.messageUid(), MessageStatus.WAITING_APPROVAL);
                 log.info("[Agent] waiting approval messageUid={} round={}/{} stepUid={} title={}",

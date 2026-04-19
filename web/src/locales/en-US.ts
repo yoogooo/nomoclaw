@@ -153,7 +153,7 @@ const enUS = {
         elapsedMinutesSeconds: "about {minutes}m {seconds}s in",
         oneTimeHint: "Usually only once. Later runs reuse local cache."
       },
-      highRiskStep: "System is preparing a high-risk step",
+      highRiskStep: "System is preparing a step that needs confirmation",
       processingStep: "Processing task step",
       stepNeedApproval: "Step {index} requires manual approval before continuing.",
       approvalRiskHint: "Risk notice: this action may modify local environment, page state, or trigger irreversible results. Reject if it does not match your intent.",
@@ -175,7 +175,7 @@ const enUS = {
       messageCanceled: "Message processing canceled"
     },
     approval: {
-      waiting: "High-risk action pending confirmation",
+      waiting: "Action pending confirmation",
       approve: "Continue",
       approveSession: "Allow for this session",
       approveAgent: "Allow for this Agent",

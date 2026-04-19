@@ -153,7 +153,7 @@ const zhCN = {
         elapsedMinutesSeconds: "大约 {minutes} 分 {seconds} 秒",
         oneTimeHint: "仅首次下载，后续会复用本地缓存。"
       },
-      highRiskStep: "系统准备执行高风险步骤",
+      highRiskStep: "系统准备执行待确认步骤",
       processingStep: "正在处理任务步骤",
       stepNeedApproval: "步骤 {index} 需要人工确认后才能继续执行。",
       approvalRiskHint: "风险说明：此操作可能改动本地环境、页面状态或产生不可逆结果。若与当前意图不符，请直接拒绝。",
@@ -175,7 +175,7 @@ const zhCN = {
       messageCanceled: "消息处理已取消"
     },
     approval: {
-      waiting: "高风险操作待确认",
+      waiting: "操作待确认",
       approve: "继续执行",
       approveSession: "允许并记住到本会话",
       approveAgent: "允许并记住到当前Agent",
