@@ -306,7 +306,23 @@ export const useConversationStore = defineStore("conversation", () => {
   function buildApprovalBodyFromStep(step: ConversationRunStep) {
     const details = (step.displayDetails || step.displaySummary || "").trim();
     const main = details || tr("chat.runtime.stepNeedApproval", { index: step.stepIndex || "-" });
-    return `${main}\n\n${tr("chat.runtime.approvalRiskHint")}`;
+    return `${main}\n\n${approvalRiskHintByReason(step.policyReasonCode || "")}`;
+  }
+
+  function approvalRiskHintByReason(reasonCode: string) {
+    const key = String(reasonCode || "").trim().toUpperCase();
+    if (!key) {
+      return tr("chat.runtime.approvalRiskHint");
+    }
+    const mapped = {
+      HARD_GUARD_SENSITIVE_PATH_READ_ASK: "chat.runtime.approvalRiskHintSensitiveRead",
+      HARD_GUARD_PROTECTED_PATH_ASK: "chat.runtime.approvalRiskHintProtectedPath",
+      HARD_GUARD_SYSTEM_PATH_DENY: "chat.runtime.approvalRiskHintSystemPathDeny",
+      RULE_ASK_MATCHED: "chat.runtime.approvalRiskHintRuleAsk",
+      DEFAULT_REQUIRE_APPROVAL: "chat.runtime.approvalRiskHintDefaultAsk"
+    } as const;
+    const target = mapped[key as keyof typeof mapped];
+    return target ? tr(target) : tr("chat.runtime.approvalRiskHint");
   }
 
   function restoreApprovalFromRuns(runs: ConversationMessageRun[]) {
@@ -902,15 +918,17 @@ export const useConversationStore = defineStore("conversation", () => {
       displayTitle: event.payload.displayTitle || tr("chat.runtime.processingStep"),
       displaySummary: event.payload.displaySummary || "",
       displayDetails: event.payload.displayDetails || "",
+      policyReasonCode: event.payload.policyReasonCode || "",
       updatedTime: new Date().toISOString()
     });
   }
 
   function showApprovalAlert(event: AgentEvent) {
+    const reasonCode = String(event.payload.policyReasonCode || "");
     approval.value = {
       stepUid: event.stepUid || null,
       title: event.payload.title || tr("chat.runtime.highRiskStep"),
-      body: `${tr("chat.runtime.stepPrefix", { index: event.payload.stepIndex || "-" })}：${approvalActionSummary(event.payload)}\n\n${tr("chat.runtime.approvalRiskHint")}`,
+      body: `${tr("chat.runtime.stepPrefix", { index: event.payload.stepIndex || "-" })}：${approvalActionSummary(event.payload)}\n\n${approvalRiskHintByReason(reasonCode)}`,
       riskLevel: event.payload.riskLevel || "HIGH",
       submitting: approval.value.stepUid === (event.stepUid || null) ? approval.value.submitting : false,
       submittingAction: approval.value.stepUid === (event.stepUid || null) ? approval.value.submittingAction : null

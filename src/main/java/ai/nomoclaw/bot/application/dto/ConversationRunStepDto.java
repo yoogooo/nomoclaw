@@ -10,6 +10,7 @@ public record ConversationRunStepDto(
         String displayTitle,
         String displaySummary,
         String displayDetails,
+        String policyReasonCode,
         Instant updatedTime
 ) {
 }

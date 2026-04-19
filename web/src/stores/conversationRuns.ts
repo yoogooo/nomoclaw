@@ -91,6 +91,7 @@ export const useConversationRunsStore = defineStore("conversationRuns", () => {
       displayTitle: patch.displayTitle || tr("chat.runtime.processingStep"),
       displaySummary: patch.displaySummary || "",
       displayDetails: patch.displayDetails || "",
+      policyReasonCode: patch.policyReasonCode || "",
       updatedTime: patch.updatedTime || new Date().toISOString()
     };
 

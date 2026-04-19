@@ -63,6 +63,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -1092,6 +1093,7 @@ public class AgentApplicationService {
                     approvalDetails = approvalDetails + "\n\n策略提示：" + nullToEmpty(policyDecision.message());
                 }
                 applyUserFacingFields(approvalPayload, latestStep, "waiting_approval", "等待你确认", approvalDetails);
+                approvalPayload.put("policyReasonCode", policyDecision.reasonCode().name());
                 approvalPayload.set("toolArgs", latestStep.toolArgs());
                 publishEvent(AgentEventType.STEP_WAITING_APPROVAL, message.conversationUid(), message.messageUid(), latestStep.stepUid(),
                         approvalPayload);
@@ -1340,7 +1342,7 @@ public class AgentApplicationService {
         return switch (nullToEmpty(toolName)) {
             case "command_tool" -> {
                 String command = toolArgs.path("command").asText("");
-                yield command.isBlank() ? "执行命令" : "执行命令: " + abbreviate(command, 48);
+                yield command.isBlank() ? "执行命令" : "执行命令: " + command;
             }
             case "browser_tool", "browser_control_tool" -> {
                 String action = toolArgs.path("action").asText("");
@@ -1366,7 +1368,10 @@ public class AgentApplicationService {
     private String buildDisplayTitle(PlanStep step) {
         JsonNode toolArgs = step.toolArgs();
         return switch (nullToEmpty(step.toolName())) {
-            case "command_tool" -> "正在执行本地命令";
+            case "command_tool" -> {
+                String command = toolArgs.path("command").asText("");
+                yield command.isBlank() ? "正在执行本地命令" : "正在执行命令: " + command;
+            }
             case "browser_tool", "browser_control_tool" -> switch (toolArgs.path("action").asText("")) {
                 case "open", "navigate" -> "正在打开网页";
                 case "click" -> "正在操作网页元素";
@@ -1402,7 +1407,7 @@ public class AgentApplicationService {
                 String cwd = step.toolArgs().path("cwd").asText("");
                 yield command.isBlank()
                         ? "系统已规划一条本地命令，稍后会开始执行。"
-                        : "系统准备执行本地命令“" + abbreviate(command, 60) + "”" + (cwd.isBlank() ? "。" : "，工作目录为 " + abbreviate(cwd, 48) + "。");
+                        : "系统准备执行本地命令“" + command + "”" + (cwd.isBlank() ? "。" : "，工作目录为 " + cwd + "。");
             }
             case "browser_tool", "browser_control_tool" -> {
                 String action = step.toolArgs().path("action").asText("");
@@ -1454,7 +1459,10 @@ public class AgentApplicationService {
                 String path = result.artifacts() == null ? "" : result.artifacts().path("path").asText("");
                 yield path.isBlank() ? "文件处理已完成。" : "文件处理已完成，目标路径为 " + abbreviate(path, 96) + "。";
             }
-            case "command_tool" -> "本地命令已执行完成。";
+            case "command_tool" -> {
+                String command = step.toolArgs().path("command").asText("");
+                yield command.isBlank() ? "本地命令已执行完成。" : "本地命令已执行完成：\"" + command + "\"。";
+            }
             case "send_file_tool" -> "文件已准备完成，可以发送给用户。";
             case "cron_tool" -> "定时任务已创建完成。";
             default -> hasMeaningfulText(result.output()) ? abbreviate(result.output(), 140) : "这一步已顺利完成。";
@@ -1465,6 +1473,12 @@ public class AgentApplicationService {
         String message = hasMeaningfulText(result.errorMessage()) ? result.errorMessage() : result.output();
         if (!hasMeaningfulText(message)) {
             message = "执行过程中出现异常，暂时无法完成这一步。";
+        }
+        if ("command_tool".equals(nullToEmpty(step.toolName()))) {
+            String command = step.toolArgs().path("command").asText("");
+            if (!command.isBlank()) {
+                return abbreviate("命令执行失败：\"" + command + "\"。错误：" + message, 240);
+            }
         }
         return abbreviate(message, 180);
     }
@@ -1494,8 +1508,8 @@ public class AgentApplicationService {
             case "command_tool" -> {
                 String command = toolArgs.path("command").asText("");
                 String cwd = toolArgs.path("cwd").asText("");
-                yield "系统将执行本地命令 " + (command.isBlank() ? "（未提供命令）" : "“" + abbreviate(command, 96) + "”")
-                        + (cwd.isBlank() ? "。" : "，工作目录为 " + abbreviate(cwd, 72) + "。");
+                yield "系统将执行本地命令 " + (command.isBlank() ? "（未提供命令）" : "“" + command + "”")
+                        + (cwd.isBlank() ? "。" : "，工作目录为 " + cwd + "。");
             }
             case "file_tool", "file_io_tool" -> {
                 String action = toolArgs.path("action").asText("处理");
@@ -1868,6 +1882,21 @@ public class AgentApplicationService {
             }
         }
 
+        Map<String, PlanStep> stepByUid = steps.stream()
+                .collect(Collectors.toMap(PlanStep::stepUid, Function.identity(), (left, right) -> left, LinkedHashMap::new));
+        for (Map.Entry<String, PlanStep> entry : stepByUid.entrySet()) {
+            PlanStep step = entry.getValue();
+            if (!"command_tool".equals(nullToEmpty(step.toolName()))) {
+                continue;
+            }
+            RunStepAccumulator accumulator = stepMap.computeIfAbsent(step.stepUid(), ignored -> RunStepAccumulator.fromStep(
+                    step,
+                    buildDisplayTitle(step),
+                    buildStepPlanDetails(step)
+            ));
+            enrichCommandStepDisplayFromStep(accumulator, step);
+        }
+
         List<ConversationRunStepDto> stepResponses = stepMap.values().stream()
                 .sorted(Comparator.comparingInt(RunStepAccumulator::roundIndex).thenComparingInt(RunStepAccumulator::stepIndex))
                 .map(RunStepAccumulator::toResponse)
@@ -1886,6 +1915,28 @@ public class AgentApplicationService {
                 updatedTime,
                 stepResponses
         );
+    }
+
+    private void enrichCommandStepDisplayFromStep(RunStepAccumulator accumulator, PlanStep step) {
+        String command = step.toolArgs().path("command").asText("");
+        if (command.isBlank()) {
+            return;
+        }
+        String cwd = step.toolArgs().path("cwd").asText("");
+        String commandLine = "执行命令: \"" + command + "\""
+                + (cwd.isBlank() ? "" : "，工作目录: " + cwd);
+
+        accumulator.displayTitle = "正在执行命令: " + command;
+
+        String existingDetails = nullToEmpty(accumulator.displayDetails);
+        if (existingDetails.isBlank()) {
+            accumulator.displayDetails = commandLine + "。";
+            return;
+        }
+        if (existingDetails.contains(command)) {
+            return;
+        }
+        accumulator.displayDetails = commandLine + "。" + existingDetails;
     }
 
     private String normalizeRunStatus(String currentStatus, List<ConversationRunStepDto> steps) {
@@ -1976,6 +2027,7 @@ public class AgentApplicationService {
         private String displayTitle = "";
         private String displaySummary = "";
         private String displayDetails = "";
+        private String policyReasonCode = "";
         private Instant updatedTime = Instant.now();
 
         private RunStepAccumulator(String stepUid) {
@@ -2000,6 +2052,7 @@ public class AgentApplicationService {
             accumulator.displayTitle = node.path("displayTitle").asText("");
             accumulator.displaySummary = node.path("displaySummary").asText("");
             accumulator.displayDetails = node.path("displayDetails").asText("");
+            accumulator.policyReasonCode = node.path("policyReasonCode").asText("");
             String updated = node.path("updatedTime").asText("");
             if (!updated.isBlank()) {
                 accumulator.updatedTime = Instant.parse(updated);
@@ -2041,6 +2094,9 @@ public class AgentApplicationService {
             if (!node.path("displayDetails").asText("").isBlank()) {
                 displayDetails = node.path("displayDetails").asText("");
             }
+            if (!node.path("policyReasonCode").asText("").isBlank()) {
+                policyReasonCode = node.path("policyReasonCode").asText("");
+            }
             updatedTime = eventTime;
         }
 
@@ -2061,6 +2117,7 @@ public class AgentApplicationService {
                     displayTitle == null || displayTitle.isBlank() ? "正在处理任务步骤" : displayTitle,
                     displaySummary == null ? "" : displaySummary,
                     displayDetails == null ? "" : displayDetails,
+                    policyReasonCode == null ? "" : policyReasonCode,
                     updatedTime
             );
         }
