@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { ArrowDown, ArrowUp, Check, Copy, Sparkles } from "lucide-vue-next";
+import { ArrowDown, ArrowUp, Check, ChevronsDown, ChevronsUp, Copy, Sparkles } from "lucide-vue-next";
 import { NButton, NCard, NCollapse, NCollapseItem, NFlex, NPopconfirm, NTag } from "naive-ui";
 import ApprovalBanner from "./ApprovalBanner.vue";
 import ComposerPanel from "./composer/ComposerPanel.vue";
@@ -661,22 +661,23 @@ onMounted(() => {
                           <div class="run-code-head">
                             <span class="run-code-label">{{ t("chat.messages.outputBlockLabel") }}</span>
                           </div>
-                          <pre class="run-code-pre"><code>{{ visibleRunOutput(message.messageUid, step) }}</code></pre>
-                          <div
-                            v-if="shouldShowRunOutputExpand(getRunStepRenderData(step).output)"
-                            class="run-output-toggle-wrap"
-                          >
+                          <div class="run-output-shell">
+                            <pre
+                              class="run-code-pre"
+                              :class="{ 'run-code-pre-output-collapsed': shouldShowRunOutputExpand(getRunStepRenderData(step).output) }"
+                            ><code>{{ visibleRunOutput(message.messageUid, step) }}</code></pre>
                             <button
+                              v-if="shouldShowRunOutputExpand(getRunStepRenderData(step).output)"
                               class="run-output-toggle"
                               type="button"
                               :aria-expanded="isRunOutputExpanded(message.messageUid, step.stepUid)"
                               @click="toggleRunOutputExpanded(message.messageUid, step.stepUid)"
                             >
-                              <ArrowUp
+                              <ChevronsUp
                                 v-if="isRunOutputExpanded(message.messageUid, step.stepUid)"
                                 :size="12"
                               />
-                              <ArrowDown v-else :size="12" />
+                              <ChevronsDown v-else :size="12" />
                               <span>
                                 {{ isRunOutputExpanded(message.messageUid, step.stepUid)
                                   ? t("chat.messages.collapseOutput")
@@ -1238,25 +1239,39 @@ onMounted(() => {
 }
 
 .run-output-toggle {
+  appearance: none;
+  -webkit-appearance: none;
   border: none;
   background: transparent;
-  color: var(--color-text-brand-strong);
+  color: #4fdbc7;
   font-size: var(--text-caption-size);
+  font-weight: 500;
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
   line-height: 1.3;
   cursor: pointer;
   padding: 0;
+  box-shadow: none;
+  text-decoration: none;
+  position: absolute;
+  left: var(--space-2);
+  bottom: var(--space-2);
 }
 
 .run-output-toggle:hover {
-  color: var(--color-text-brand);
+  color: #6fe5d4;
+  text-decoration: underline;
 }
 
-.run-output-toggle-wrap {
-  display: flex;
-  justify-content: flex-end;
+.run-output-toggle:focus-visible {
+  outline: none;
+  color: #6fe5d4;
+  text-decoration: underline;
+}
+
+.run-output-shell {
+  position: relative;
 }
 
 .run-code-pre {
@@ -1265,7 +1280,7 @@ onMounted(() => {
   border-radius: var(--radius-md);
   overflow: auto;
   line-height: 1.65;
-  background: var(--color-overlay-dark-92);
+  background: var(--color-run-code-bg);
   color: var(--color-text-code-block);
   border: var(--size-1) solid color-mix(in srgb, var(--color-border-soft) 88%, transparent);
 }
@@ -1273,6 +1288,10 @@ onMounted(() => {
 .run-code-pre code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   white-space: pre;
+}
+
+.run-code-pre-output-collapsed {
+  padding-bottom: calc(var(--space-3_5) + var(--space-6));
 }
 
 .run-details :deep(strong) {

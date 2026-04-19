@@ -110,7 +110,7 @@ const zhCN = {
       commandBlockLabel: "执行命令",
       outputBlockLabel: "输出结果",
       copyCommand: "复制命令",
-      expandOutput: "展开",
+      expandOutput: "展开更多",
       collapseOutput: "收起"
     },
     composer: {

@@ -368,6 +368,7 @@
   --ds-text-primary: var(--color-text-primary);
   --ds-text-secondary: var(--color-text-secondary);
   --ds-text-muted: var(--color-text-muted);
+  --color-run-code-bg: #2f343c;
   --input-default-bg: var(--color-bg-surface-soft);
   --input-default-border: var(--size-1) solid var(--color-border-default);
   --input-hover-border: var(--size-1) solid var(--color-border-active);
@@ -409,6 +410,7 @@
   --color-border-rail-avatar: rgba(148, 163, 184, 0.38);
   --color-text-rail-avatar: #D9E2EE;
   --color-bg-runtime: #0F1012;
+  --color-run-code-bg: #111214;
   --color-chat-bubble-assistant-bg: #222327;
   --color-chat-bubble-user-bg: #1D6B58;
   --color-text-primary: #F2F3F5;
