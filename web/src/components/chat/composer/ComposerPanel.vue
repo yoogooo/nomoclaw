@@ -20,6 +20,7 @@ const appliedJinnangId = ref("");
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const isDragActive = ref(false);
 const previewImageUrl = ref("");
+const isImeComposing = ref(false);
 
 const isRunningCurrentConversation = computed(() =>
   conversationStore.runningConversationUid === conversationStore.currentConversationUid
@@ -42,13 +43,22 @@ const uploadHint = computed(() => {
 });
 
 function onKeydown(event: KeyboardEvent) {
-  if (event.key === "Enter" && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && !event.isComposing) {
+  const isCompositionEvent = event.isComposing || isImeComposing.value || event.keyCode === 229;
+  if (event.key === "Enter" && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && !isCompositionEvent) {
     event.preventDefault();
     if (isRunningCurrentConversation.value) {
       return;
     }
     void conversationStore.sendMessage();
   }
+}
+
+function onCompositionStart() {
+  isImeComposing.value = true;
+}
+
+function onCompositionEnd() {
+  isImeComposing.value = false;
 }
 
 function toggleJinnangPicker() {
@@ -222,6 +232,8 @@ onBeforeUnmount(() => {
         :model-value="conversationStore.draftMessage"
         @update:model-value="conversationStore.draftMessage = $event"
         @keydown="onKeydown"
+        @compositionstart="onCompositionStart"
+        @compositionend="onCompositionEnd"
       />
 
       <ComposerAttachmentStrip
