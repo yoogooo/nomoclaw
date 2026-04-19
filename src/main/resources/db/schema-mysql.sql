@@ -11,6 +11,7 @@ DROP TABLE IF EXISTS agent_group_member;
 DROP TABLE IF EXISTS agent_group_definition;
 DROP TABLE IF EXISTS agent_definition;
 DROP TABLE IF EXISTS agent_event;
+DROP TABLE IF EXISTS agent_command_execution;
 DROP TABLE IF EXISTS agent_step;
 DROP TABLE IF EXISTS agent_message_attachment;
 DROP TABLE IF EXISTS agent_message;
@@ -365,6 +366,34 @@ CREATE TABLE IF NOT EXISTS agent_event (
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_0900_ai_ci
   COMMENT='智能体事件审计表';
+
+CREATE TABLE IF NOT EXISTS agent_command_execution (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增主键',
+    execution_uid VARCHAR(64) NOT NULL DEFAULT '' COMMENT '命令执行记录业务ID',
+    conversation_uid VARCHAR(64) NOT NULL DEFAULT '' COMMENT '所属对话ID',
+    message_uid VARCHAR(64) NOT NULL DEFAULT '' COMMENT '关联用户消息ID',
+    step_uid VARCHAR(64) NOT NULL DEFAULT '' COMMENT '关联步骤ID',
+    attempt INT NOT NULL DEFAULT 1 COMMENT '步骤执行尝试次数（从1开始）',
+    command_text TEXT NOT NULL COMMENT '执行命令',
+    cwd VARCHAR(1024) NOT NULL DEFAULT '' COMMENT '执行工作目录',
+    shell VARCHAR(64) NOT NULL DEFAULT '' COMMENT '执行 shell',
+    exit_code INT NULL COMMENT '命令退出码',
+    success TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否执行成功',
+    stdout_text LONGTEXT NULL COMMENT '标准输出',
+    stderr_text LONGTEXT NULL COMMENT '标准错误',
+    output_text LONGTEXT NULL COMMENT '工具输出文本',
+    error_code VARCHAR(64) NOT NULL DEFAULT '' COMMENT '错误码',
+    error_message LONGTEXT NULL COMMENT '错误信息',
+    created_time DATETIME(3) NOT NULL COMMENT '创建时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_agent_command_execution_uid (execution_uid),
+    KEY idx_agent_command_execution_message (message_uid),
+    KEY idx_agent_command_execution_step (step_uid),
+    KEY idx_agent_command_execution_conversation (conversation_uid)
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_0900_ai_ci
+  COMMENT='命令执行明细日志表';
 
 CREATE TABLE IF NOT EXISTS agent_cron_job (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增主键',

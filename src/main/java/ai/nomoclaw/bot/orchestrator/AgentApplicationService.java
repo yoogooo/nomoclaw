@@ -1145,6 +1145,7 @@ public class AgentApplicationService {
                     startedPayload);
 
             ToolResult result = safeExecuteTool(message, step, roundIndex, currentAttempt);
+            persistCommandExecutionRecord(message, step, currentAttempt, result);
             lastResult = result;
             StepReviewer.ReviewDecision decision = stepReviewer.review(step, result);
             lastDecisionMessage = decision.message();
@@ -1262,6 +1263,55 @@ public class AgentApplicationService {
             ObjectNode metrics = JsonNodeFactory.instance.objectNode();
             metrics.put("exception", ex.getClass().getSimpleName());
             return ToolResult.failure("TOOL_EXECUTION_ERROR", nullToEmpty(ex.getMessage()), metrics);
+        }
+    }
+
+    private void persistCommandExecutionRecord(AgentMessage message, PlanStep step, int attempt, ToolResult result) {
+        if (!"command_tool".equals(nullToEmpty(step.toolName()))) {
+            return;
+        }
+        try {
+            JsonNode args = step.toolArgs();
+            JsonNode artifacts = result.artifacts();
+            String command = firstNonBlank(
+                    artifacts == null ? "" : artifacts.path("command").asText(""),
+                    args.path("command").asText("")
+            );
+            String cwd = firstNonBlank(
+                    artifacts == null ? "" : artifacts.path("cwd").asText(""),
+                    args.path("cwd").asText("")
+            );
+            String shell = artifacts == null ? "" : artifacts.path("shell").asText("");
+            Integer exitCode = artifacts != null && !artifacts.path("exitCode").isMissingNode() && !artifacts.path("exitCode").isNull()
+                    ? artifacts.path("exitCode").asInt()
+                    : null;
+            String stdout = artifacts == null ? "" : artifacts.path("stdout").asText("");
+            String stderr = artifacts == null ? "" : artifacts.path("stderr").asText("");
+            String output = nullToEmpty(result.output());
+            String errorCode = nullToEmpty(result.errorCode());
+            String errorMessage = nullToEmpty(result.errorMessage());
+
+            store.appendCommandExecution(new CommandExecutionRecord(
+                    UUID.randomUUID().toString(),
+                    message.conversationUid(),
+                    message.messageUid(),
+                    step.stepUid(),
+                    attempt,
+                    command,
+                    cwd,
+                    shell,
+                    exitCode,
+                    result.success(),
+                    stdout,
+                    stderr,
+                    output,
+                    errorCode,
+                    errorMessage,
+                    Instant.now()
+            ));
+        } catch (Exception ex) {
+            log.warn("[Agent] failed to persist command execution messageUid={} stepUid={} err={}",
+                    message.messageUid(), step.stepUid(), ex.getMessage());
         }
     }
 
@@ -1458,7 +1508,14 @@ public class AgentApplicationService {
             }
             case "command_tool" -> {
                 String command = step.toolArgs().path("command").asText("");
-                yield command.isBlank() ? "本地命令已执行完成。" : "本地命令已执行完成：\"" + command + "\"。";
+                String stdout = result.artifacts() == null ? "" : result.artifacts().path("stdout").asText("");
+                String stderr = result.artifacts() == null ? "" : result.artifacts().path("stderr").asText("");
+                String outputBody = hasMeaningfulText(stdout) ? stdout : (hasMeaningfulText(result.output()) ? result.output() : stderr);
+                String prefix = command.isBlank() ? "本地命令已执行完成。" : "本地命令已执行完成：\"" + command + "\"。";
+                if (!hasMeaningfulText(outputBody)) {
+                    yield prefix;
+                }
+                yield prefix + " 输出如下：\n" + abbreviate(outputBody, 1200);
             }
             case "send_file_tool" -> "文件已准备完成，可以发送给用户。";
             case "cron_tool" -> "定时任务已创建完成。";
@@ -1473,8 +1530,10 @@ public class AgentApplicationService {
         }
         if ("command_tool".equals(nullToEmpty(step.toolName()))) {
             String command = step.toolArgs().path("command").asText("");
+            String stderr = result.artifacts() == null ? "" : result.artifacts().path("stderr").asText("");
+            String suffix = hasMeaningfulText(stderr) ? "\nstderr:\n" + abbreviate(stderr, 800) : "";
             if (!command.isBlank()) {
-                return abbreviate("命令执行失败：\"" + command + "\"。错误：" + message, 240);
+                return abbreviate("命令执行失败：\"" + command + "\"。错误：" + message + suffix, 1600);
             }
         }
         return abbreviate(message, 180);
@@ -1827,7 +1886,8 @@ public class AgentApplicationService {
                 .sorted(Comparator.comparingInt(PlanStep::roundIndex).thenComparingInt(PlanStep::stepIndex))
                 .toList();
         List<AgentEvent> events = store.listEventsByMessage(message.messageUid());
-        if (steps.isEmpty() && events.isEmpty()) {
+        List<CommandExecutionRecord> commandExecutions = store.listCommandExecutionsByMessage(message.messageUid());
+        if (steps.isEmpty() && events.isEmpty() && commandExecutions.isEmpty()) {
             return null;
         }
 
@@ -1894,6 +1954,17 @@ public class AgentApplicationService {
             enrichCommandStepDisplayFromStep(accumulator, step);
         }
 
+        Map<String, List<CommandExecutionRecord>> executionByStepUid = commandExecutions.stream()
+                .collect(Collectors.groupingBy(CommandExecutionRecord::stepUid, LinkedHashMap::new, Collectors.toList()));
+        for (Map.Entry<String, List<CommandExecutionRecord>> entry : executionByStepUid.entrySet()) {
+            String stepUid = entry.getKey();
+            if (stepUid == null || stepUid.isBlank()) {
+                continue;
+            }
+            RunStepAccumulator accumulator = stepMap.computeIfAbsent(stepUid, RunStepAccumulator::empty);
+            enrichCommandStepDisplayFromExecutionLogs(accumulator, entry.getValue());
+        }
+
         List<ConversationRunStepDto> stepResponses = stepMap.values().stream()
                 .sorted(Comparator.comparingInt(RunStepAccumulator::roundIndex).thenComparingInt(RunStepAccumulator::stepIndex))
                 .map(RunStepAccumulator::toResponse)
@@ -1934,6 +2005,45 @@ public class AgentApplicationService {
             return;
         }
         accumulator.displayDetails = commandLine + "。" + existingDetails;
+    }
+
+    private void enrichCommandStepDisplayFromExecutionLogs(RunStepAccumulator accumulator, List<CommandExecutionRecord> logs) {
+        if (logs == null || logs.isEmpty()) {
+            return;
+        }
+        CommandExecutionRecord latest = logs.get(logs.size() - 1);
+        String command = nullToEmpty(latest.command()).trim();
+        if (!command.isBlank()) {
+            accumulator.displayTitle = "正在执行命令: " + command;
+        }
+        String details = buildCommandExecutionDetails(logs);
+        if (!details.isBlank()) {
+            accumulator.displayDetails = details;
+        }
+    }
+
+    private String buildCommandExecutionDetails(List<CommandExecutionRecord> logs) {
+        StringBuilder builder = new StringBuilder();
+        for (CommandExecutionRecord logItem : logs) {
+            if (builder.length() > 0) {
+                builder.append("\n\n");
+            }
+            builder.append("第 ").append(Math.max(1, logItem.attempt())).append(" 次执行");
+            if (!nullToEmpty(logItem.command()).isBlank()) {
+                builder.append("\n命令: ").append(logItem.command());
+            }
+            if (!nullToEmpty(logItem.cwd()).isBlank()) {
+                builder.append("\n目录: ").append(logItem.cwd());
+            }
+            if (logItem.exitCode() != null) {
+                builder.append("\n退出码: ").append(logItem.exitCode());
+            }
+            String output = firstNonBlank(logItem.stdout(), logItem.output(), logItem.errorMessage(), logItem.stderr());
+            if (!output.isBlank()) {
+                builder.append("\n结果:\n").append(output.trim());
+            }
+        }
+        return abbreviate(builder.toString(), 2000);
     }
 
     private String normalizeRunStatus(String currentStatus, List<ConversationRunStepDto> steps) {
@@ -2628,6 +2738,18 @@ public class AgentApplicationService {
 
     private String trim(String text) {
         return text == null ? "" : text.trim();
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null || values.length == 0) {
+            return "";
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return "";
     }
 
     private String abbreviate(String text, int maxLength) {

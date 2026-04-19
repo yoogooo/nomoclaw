@@ -4,6 +4,7 @@ import ai.nomoclaw.bot.domain.AgentConversation;
 import ai.nomoclaw.bot.domain.AgentMessage;
 import ai.nomoclaw.bot.model.AgentEvent;
 import ai.nomoclaw.bot.model.ApprovalStatus;
+import ai.nomoclaw.bot.model.CommandExecutionRecord;
 import ai.nomoclaw.bot.model.MessageStatus;
 import ai.nomoclaw.bot.model.PlanStep;
 import ai.nomoclaw.bot.model.StepStatus;
@@ -79,4 +80,8 @@ public interface AgentStore {
     void appendEvent(AgentEvent event);
 
     List<AgentEvent> listEventsByMessage(String messageUid);
+
+    void appendCommandExecution(CommandExecutionRecord record);
+
+    List<CommandExecutionRecord> listCommandExecutionsByMessage(String messageUid);
 }
