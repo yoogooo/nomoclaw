@@ -4,6 +4,8 @@ import ai.nomoclaw.bot.application.dto.ApprovalDecisionDto;
 import ai.nomoclaw.bot.policy.tool.permission.PermissionScope;
 import org.springframework.stereotype.Service;
 
+import java.util.Locale;
+
 @Service
 public class ApprovalAppService {
 
@@ -14,7 +16,9 @@ public class ApprovalAppService {
     }
 
     public ApprovalDecisionDto decideStep(String conversationUid, String stepUid, String action, String scope, String note) {
-        return facade.decideStep(conversationUid, stepUid, action, PermissionScope.from(scope), note);
+        String normalizedAction = normalizeAction(action);
+        PermissionScope appliedScope = normalizeScope(scope);
+        return facade.decideStep(conversationUid, stepUid, normalizedAction, appliedScope, note);
     }
 
     public void approveStep(String conversationUid, String stepUid) {
@@ -23,5 +27,18 @@ public class ApprovalAppService {
 
     public void rejectStep(String conversationUid, String stepUid) {
         facade.decideStep(conversationUid, stepUid, "deny", PermissionScope.ONCE, "");
+    }
+
+    private String normalizeAction(String action) {
+        String value = action == null ? "" : action.trim().toLowerCase(Locale.ROOT);
+        return "deny".equals(value) ? "deny" : "allow";
+    }
+
+    private PermissionScope normalizeScope(String scope) {
+        PermissionScope parsed = PermissionScope.from(scope);
+        if (parsed == PermissionScope.AGENT) {
+            return PermissionScope.AGENT;
+        }
+        return PermissionScope.ONCE;
     }
 }

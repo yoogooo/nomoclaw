@@ -837,7 +837,7 @@ public class AgentApplicationService {
         ObjectNode rejectedPayload = stepPayload(step, "approval rejected by user");
         applyUserFacingFields(rejectedPayload, step, "rejected", "已停止执行", "这一步已被你拒绝，系统不会继续执行。");
         publishEvent(AgentEventType.STEP_REJECTED, conversationUid, messageUid, stepUid, rejectedPayload);
-        failMessage(message, "主公已拒绝高风险操作，当前任务已停止。", "APPROVAL_REJECTED");
+        failMessage(message, "你已拒绝待确认操作，当前任务已停止。", "APPROVAL_REJECTED");
         return new ApprovalDecisionDto("accepted", appliedScope.name().toLowerCase(Locale.ROOT), appliedScope != PermissionScope.ONCE, matchedRuleId);
     }
 
@@ -1506,7 +1506,7 @@ public class AgentApplicationService {
                 String task = toolArgs.path("task").asText("");
                 yield "系统将创建定时任务" + (task.isBlank() ? "。" : "：“" + abbreviate(task, 72) + "”。");
             }
-            default -> "系统将执行一项高风险操作。";
+            default -> "系统将执行一项待确认操作。";
         };
     }
 

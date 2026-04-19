@@ -5,11 +5,14 @@ import ai.nomoclaw.bot.policy.tool.ToolPolicyReasonCode;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.Files;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -49,19 +52,21 @@ public class PermissionEngine {
         List<PermissionRule> agentRules = settingsStore.loadAgentRules(context.agentName());
         List<PermissionRule> userRules = settingsStore.loadUserRules();
 
-        PermissionDecision decision = matchBySource(context, details, PermissionSource.SESSION, sessionRules);
+        Map<PermissionSource, List<PermissionRule>> rulesBySource = new LinkedHashMap<>();
+        rulesBySource.put(PermissionSource.SESSION, sessionRules);
+        rulesBySource.put(PermissionSource.COMMAND, commandRules);
+        rulesBySource.put(PermissionSource.AGENT_SETTINGS, agentRules);
+        rulesBySource.put(PermissionSource.USER_SETTINGS, userRules);
+
+        PermissionDecision decision = matchByBehavior(context, details, PermissionEffect.DENY, rulesBySource);
         if (decision != null) {
             return decision;
         }
-        decision = matchBySource(context, details, PermissionSource.COMMAND, commandRules);
+        decision = matchByBehavior(context, details, PermissionEffect.ASK, rulesBySource);
         if (decision != null) {
             return decision;
         }
-        decision = matchBySource(context, details, PermissionSource.AGENT_SETTINGS, agentRules);
-        if (decision != null) {
-            return decision;
-        }
-        decision = matchBySource(context, details, PermissionSource.USER_SETTINGS, userRules);
+        decision = matchByBehavior(context, details, PermissionEffect.ALLOW, rulesBySource);
         if (decision != null) {
             return decision;
         }
@@ -131,31 +136,34 @@ public class PermissionEngine {
         );
     }
 
-    private PermissionDecision matchBySource(ToolPolicyContext context,
-                                             PermissionContextDetails details,
-                                             PermissionSource source,
-                                             List<PermissionRule> rules) {
-        if (rules == null || rules.isEmpty()) {
-            return null;
-        }
+    private PermissionDecision matchByBehavior(ToolPolicyContext context,
+                                               PermissionContextDetails details,
+                                               PermissionEffect behavior,
+                                               Map<PermissionSource, List<PermissionRule>> rulesBySource) {
         Instant now = Instant.now();
-        List<PermissionRule> ordered = rules.stream()
-                .filter(rule -> rule != null && rule.enabled() && !rule.isExpired(now))
-                .sorted(Comparator.comparingInt(rule -> effectRank(rule.effect())))
-                .toList();
-        for (PermissionRule rule : ordered) {
-            if (!matches(context, details, rule)) {
+        for (Map.Entry<PermissionSource, List<PermissionRule>> entry : rulesBySource.entrySet()) {
+            PermissionSource source = entry.getKey();
+            List<PermissionRule> rules = entry.getValue();
+            if (rules == null || rules.isEmpty()) {
                 continue;
             }
-            return new PermissionDecision(
-                    rule.effect(),
-                    reasonCode(rule.effect()),
-                    "命中权限规则。",
-                    source,
-                    rule.ruleId(),
-                    firstPath(details),
-                    false
-            );
+            for (PermissionRule rule : rules) {
+                if (rule == null || !rule.enabled() || rule.isExpired(now) || rule.effect() != behavior) {
+                    continue;
+                }
+                if (!matches(context, details, rule)) {
+                    continue;
+                }
+                return new PermissionDecision(
+                        rule.effect(),
+                        reasonCode(rule.effect()),
+                        "命中权限规则。",
+                        source,
+                        rule.ruleId(),
+                        firstPath(details),
+                        false
+                );
+            }
         }
         return null;
     }
@@ -215,32 +223,91 @@ public class PermissionEngine {
     }
 
     private boolean matchPathPattern(Path path, String pattern) {
-        Path normalized = path == null ? Path.of(".").toAbsolutePath().normalize() : path.toAbsolutePath().normalize();
-        String absolute = normalized.toString();
+        if (path == null) {
+            return false;
+        }
+        List<Path> candidates = pathCandidates(path);
         String normalizedPattern = pattern.trim();
         if (normalizedPattern.isBlank()) {
             return true;
         }
-        normalizedPattern = normalizedPattern.replace("\\", "/");
+        normalizedPattern = expandHome(normalizedPattern).replace("\\", "/");
+        boolean insensitive = isCaseInsensitiveFs();
         if (normalizedPattern.startsWith("~/")) {
             normalizedPattern = System.getProperty("user.home") + normalizedPattern.substring(1);
         }
         if (!normalizedPattern.contains("*") && !normalizedPattern.contains("?")) {
             Path base = Path.of(normalizedPattern).toAbsolutePath().normalize();
-            return normalized.startsWith(base) || normalized.equals(base);
+            for (Path candidate : candidates) {
+                if (startsWithPath(candidate, base, insensitive) || equalsPath(candidate, base, insensitive)) {
+                    return true;
+                }
+            }
+            return false;
         }
         java.nio.file.PathMatcher matcher = java.nio.file.FileSystems.getDefault().getPathMatcher("glob:" + normalizedPattern);
-        return matcher.matches(Path.of(absolute));
+        for (Path candidate : candidates) {
+            Path normalized = candidate.toAbsolutePath().normalize();
+            if (matcher.matches(Paths.get(normalized.toString()))) {
+                return true;
+            }
+            if (insensitive && matcher.matches(Paths.get(normalized.toString().toLowerCase(Locale.ROOT)))) {
+                return true;
+            }
+        }
+        return false;
     }
 
-    private int effectRank(PermissionEffect effect) {
-        if (effect == PermissionEffect.DENY) {
-            return 0;
+    private List<Path> pathCandidates(Path path) {
+        List<Path> out = new ArrayList<>();
+        Path normalized = path.toAbsolutePath().normalize();
+        out.add(normalized);
+        try {
+            if (Files.exists(normalized)) {
+                Path real = normalized.toRealPath().normalize();
+                if (!real.equals(normalized)) {
+                    out.add(real);
+                }
+            }
+        } catch (Exception ignored) {
+            // ignore invalid path resolution and fallback to normalized only
         }
-        if (effect == PermissionEffect.ASK) {
-            return 1;
+        return out;
+    }
+
+    private boolean isCaseInsensitiveFs() {
+        String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+        return os.contains("win") || os.contains("mac");
+    }
+
+    private String expandHome(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
         }
-        return 2;
+        String home = System.getProperty("user.home");
+        if ("~".equals(value)) {
+            return home;
+        }
+        if (value.startsWith("~/")) {
+            return home + value.substring(1);
+        }
+        return value;
+    }
+
+    private boolean equalsPath(Path left, Path right, boolean insensitive) {
+        if (!insensitive) {
+            return left.equals(right);
+        }
+        return left.toString().toLowerCase(Locale.ROOT).equals(right.toString().toLowerCase(Locale.ROOT));
+    }
+
+    private boolean startsWithPath(Path value, Path base, boolean insensitive) {
+        if (!insensitive) {
+            return value.startsWith(base);
+        }
+        String valueText = value.toString().toLowerCase(Locale.ROOT);
+        String baseText = base.toString().toLowerCase(Locale.ROOT);
+        return valueText.equals(baseText) || valueText.startsWith(baseText + "/") || valueText.startsWith(baseText + "\\");
     }
 
     private ToolPolicyReasonCode reasonCode(PermissionEffect effect) {
