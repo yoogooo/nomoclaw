@@ -58,6 +58,20 @@ public class BrowserTool implements Tool {
     private static final long WINDOWS_CDP_CONNECT_TIMEOUT_MS = 10_000L;
     private static final long WINDOWS_CDP_CONNECT_RETRY_INTERVAL_MS = 200L;
     private static final Pattern PLAYWRIGHT_PROGRESS_PATTERN = Pattern.compile("(\\d{1,3})%\\s+of\\s+.+");
+    private static final Pattern PLAYWRIGHT_PROGRESS_WITH_SIZE_PATTERN = Pattern.compile("(\\d{1,3})%\\s+of\\s+([0-9]+(?:\\.[0-9]+)?)\\s*([KMG]?i?B)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PLAYWRIGHT_DOWNLOAD_START_PATTERN = Pattern.compile("^Downloading\\s+(.+?)\\s+from\\s+.+$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PLAYWRIGHT_DOWNLOAD_DONE_PATTERN = Pattern.compile("^(.+?)\\s+downloaded\\s+to\\s+.+$", Pattern.CASE_INSENSITIVE);
+    private static final long PLAYWRIGHT_UNKNOWN_ARTIFACT_ESTIMATED_BYTES = 32L * 1024L * 1024L;
+    private static final List<String> PLAYWRIGHT_DEFAULT_ARTIFACTS = List.of(
+            "chromium",
+            "ffmpeg",
+            "chromium_headless_shell"
+    );
+    private static final Map<String, Long> PLAYWRIGHT_ARTIFACT_ESTIMATED_BYTES = Map.of(
+            "chromium", 170L * 1024L * 1024L,
+            "ffmpeg", 2L * 1024L * 1024L,
+            "chromium_headless_shell", 96L * 1024L * 1024L
+    );
     private static final List<String> WINDOWS_CHROME_STABLE_ARGS = List.of(
             "--disable-background-networking",
             "--disable-background-timer-throttling",
@@ -304,19 +318,20 @@ public class BrowserTool implements Tool {
         long monitorStartedAt = System.currentTimeMillis();
         boolean maybeNeedDownload = !hasInstalledChromiumExecutable(cacheRoot);
         AtomicInteger cliProgressPercent = new AtomicInteger(-1);
+        InstallAttemptState installProgressState = new InstallAttemptState();
         if (maybeNeedDownload) {
             request.reportProgress(
                     "browser.runtime.preparing",
                     "browser.runtime.checking_dependencies",
-                    progressMetrics("checking", baselineBytes, baselineBytes, monitorStartedAt, cliProgressPercent.get())
+                    progressMetrics("checking", baselineBytes, baselineBytes, monitorStartedAt, cliProgressPercent.get(), installProgressState.snapshot())
             );
         }
         DownloadMonitor monitor = maybeNeedDownload
-                ? startDownloadMonitor(request, cacheRoot, baselineBytes, monitorStartedAt, cliProgressPercent)
+                ? startDownloadMonitor(request, cacheRoot, baselineBytes, monitorStartedAt, cliProgressPercent, installProgressState)
                 : null;
         try {
             if (playwright == null) {
-                ensureChromiumInstalled(request, cacheRoot, playwrightEnv, cliProgressPercent);
+                ensureChromiumInstalled(request, cacheRoot, playwrightEnv, cliProgressPercent, installProgressState, monitorStartedAt);
                 try {
                     playwright = Playwright.create(new Playwright.CreateOptions().setEnv(playwrightEnv));
                 } catch (Exception ex) {
@@ -349,14 +364,15 @@ public class BrowserTool implements Tool {
                 long repairBaselineBytes = cacheRoot == null ? 0L : safeDirectorySize(cacheRoot);
                 long repairStartedAt = System.currentTimeMillis();
                 AtomicInteger repairCliProgressPercent = new AtomicInteger(-1);
+                InstallAttemptState repairInstallState = new InstallAttemptState();
                 request.reportProgress(
                         "browser.runtime.preparing",
                         "browser.runtime.checking_dependencies",
-                        progressMetrics("checking", repairBaselineBytes, 0L, repairStartedAt, repairCliProgressPercent.get())
+                        progressMetrics("checking", repairBaselineBytes, 0L, repairStartedAt, repairCliProgressPercent.get(), repairInstallState.snapshot())
                 );
-                DownloadMonitor repairMonitor = startDownloadMonitor(request, cacheRoot, repairBaselineBytes, repairStartedAt, repairCliProgressPercent);
+                DownloadMonitor repairMonitor = startDownloadMonitor(request, cacheRoot, repairBaselineBytes, repairStartedAt, repairCliProgressPercent, repairInstallState);
                 try {
-                    forceInstallChromium(request, cacheRoot, playwrightEnv, repairCliProgressPercent);
+                    forceInstallChromium(request, cacheRoot, playwrightEnv, repairCliProgressPercent, repairInstallState, repairStartedAt);
                     executablePath = requireInstalledChromiumExecutable(cacheRoot);
                     context = createBrowserContext(cacheRoot, playwrightEnv, profileKey, headless, userDataDir, executablePath);
                     long repairFinalBytes = cacheRoot == null ? repairBaselineBytes : safeDirectorySize(cacheRoot);
@@ -367,7 +383,7 @@ public class BrowserTool implements Tool {
                     request.reportProgress(
                             "browser.runtime.ready",
                             repairDetails,
-                            progressMetrics("ready", repairFinalBytes, repairDownloadedBytes, repairStartedAt, repairCliProgressPercent.get())
+                            progressMetrics("ready", repairFinalBytes, repairDownloadedBytes, repairStartedAt, repairCliProgressPercent.get(), repairInstallState.snapshot())
                     );
                 } finally {
                     stopDownloadMonitor(repairMonitor);
@@ -382,7 +398,7 @@ public class BrowserTool implements Tool {
                 request.reportProgress(
                         "browser.runtime.ready",
                         details,
-                        progressMetrics("ready", finalBytes, downloadedBytes, monitorStartedAt, cliProgressPercent.get())
+                        progressMetrics("ready", finalBytes, downloadedBytes, monitorStartedAt, cliProgressPercent.get(), installProgressState.snapshot())
                 );
             }
             log.info("[Tool][browser] browser context created profile={} dir={} headless={} mode={}",
@@ -396,7 +412,9 @@ public class BrowserTool implements Tool {
     private synchronized void ensureChromiumInstalled(ToolRequest request,
                                                       Path cacheRoot,
                                                       Map<String, String> playwrightEnv,
-                                                      AtomicInteger cliProgressPercent) {
+                                                      AtomicInteger cliProgressPercent,
+                                                      InstallAttemptState installProgressState,
+                                                      long startedAtMs) {
         if (chromiumInstallEnsured) {
             return;
         }
@@ -405,7 +423,7 @@ public class BrowserTool implements Tool {
             return;
         }
         try {
-            forceInstallChromium(request, cacheRoot, playwrightEnv, cliProgressPercent);
+            forceInstallChromium(request, cacheRoot, playwrightEnv, cliProgressPercent, installProgressState, startedAtMs);
             requireInstalledChromiumExecutable(cacheRoot);
             chromiumInstallEnsured = true;
         } catch (Exception ex) {
@@ -413,7 +431,7 @@ public class BrowserTool implements Tool {
                     cacheRoot, ex.getMessage());
             try {
                 cleanupBrokenChromiumInstall(cacheRoot);
-                forceInstallChromium(request, cacheRoot, playwrightEnv, cliProgressPercent);
+                forceInstallChromium(request, cacheRoot, playwrightEnv, cliProgressPercent, installProgressState, startedAtMs);
                 requireInstalledChromiumExecutable(cacheRoot);
                 chromiumInstallEnsured = true;
             } catch (Exception retryEx) {
@@ -425,21 +443,26 @@ public class BrowserTool implements Tool {
     private synchronized void forceInstallChromium(ToolRequest request,
                                                    Path cacheRoot,
                                                    Map<String, String> playwrightEnv,
-                                                   AtomicInteger cliProgressPercent) {
+                                                   AtomicInteger cliProgressPercent,
+                                                   InstallAttemptState installProgressState,
+                                                   long startedAtMs) {
         try {
             if (cliProgressPercent != null) {
                 cliProgressPercent.set(-1);
             }
+            if (installProgressState != null) {
+                installProgressState.beginAttempt();
+            }
             request.reportProgress(
                     "browser.runtime.installing_chromium",
                     "browser.runtime.installing_chromium_only",
-                    progressMetrics("checking", 0L, 0L, System.currentTimeMillis(), -1)
+                    progressMetrics("checking", 0L, 0L, startedAtMs, -1, installProgressState == null ? InstallAttemptSnapshot.empty() : installProgressState.snapshot())
             );
             log.info("[Tool][browser] installing chromium runtime cacheRoot={} env.PLAYWRIGHT_BROWSERS_PATH={}",
                     cacheRoot, playwrightEnv.get("PLAYWRIGHT_BROWSERS_PATH"));
             runPlaywrightCli(
                     buildPlaywrightInstallEnv(playwrightEnv),
-                    line -> handlePlaywrightInstallOutput(line, request, cacheRoot, cliProgressPercent),
+                    line -> handlePlaywrightInstallOutput(line, request, cacheRoot, cliProgressPercent, installProgressState, startedAtMs),
                     "install",
                     "chromium"
             );
@@ -799,7 +822,8 @@ public class BrowserTool implements Tool {
                                                  Path cacheRoot,
                                                  long baselineBytes,
                                                  long startedAtMs,
-                                                 AtomicInteger cliProgressPercent) {
+                                                 AtomicInteger cliProgressPercent,
+                                                 InstallAttemptState installProgressState) {
         if (cacheRoot == null) {
             return null;
         }
@@ -834,7 +858,8 @@ public class BrowserTool implements Tool {
                         "browser.runtime.downloading",
                         "browser.runtime.cached_bytes:" + formatBytes(downloadedBytes),
                         progressMetrics("downloading", currentBytes, downloadedBytes, startedAtMs,
-                                cliProgressPercent == null ? -1 : cliProgressPercent.get())
+                                cliProgressPercent == null ? -1 : cliProgressPercent.get(),
+                                installProgressState == null ? InstallAttemptSnapshot.empty() : installProgressState.snapshot())
                 );
             }
         }, 300L, DOWNLOAD_REPORT_INTERVAL_MS, TimeUnit.MILLISECONDS);
@@ -851,35 +876,74 @@ public class BrowserTool implements Tool {
     private void handlePlaywrightInstallOutput(String line,
                                                ToolRequest request,
                                                Path cacheRoot,
-                                               AtomicInteger cliProgressPercent) {
+                                               AtomicInteger cliProgressPercent,
+                                               InstallAttemptState installProgressState,
+                                               long startedAtMs) {
         if (line == null || line.isBlank()) {
             return;
         }
-        Matcher matcher = PLAYWRIGHT_PROGRESS_PATTERN.matcher(line);
+        String trimmed = line.trim();
+        Matcher startMatcher = PLAYWRIGHT_DOWNLOAD_START_PATTERN.matcher(trimmed);
+        if (startMatcher.find()) {
+            if (installProgressState != null) {
+                installProgressState.onDownloadStart(startMatcher.group(1));
+            }
+            if (cliProgressPercent != null) {
+                cliProgressPercent.set(0);
+            }
+            long cacheBytes = cacheRoot == null ? 0L : safeDirectorySize(cacheRoot);
+            request.reportProgress(
+                    "browser.runtime.downloading",
+                    "browser.runtime.downloading_artifact:" + startMatcher.group(1),
+                    progressMetrics("downloading", cacheBytes, 0L, startedAtMs, 0,
+                            installProgressState == null ? InstallAttemptSnapshot.empty() : installProgressState.snapshot())
+            );
+            return;
+        }
+
+        Matcher doneMatcher = PLAYWRIGHT_DOWNLOAD_DONE_PATTERN.matcher(trimmed);
+        if (doneMatcher.find()) {
+            if (installProgressState != null) {
+                installProgressState.onDownloadDone(doneMatcher.group(1));
+            }
+            if (cliProgressPercent != null) {
+                cliProgressPercent.set(100);
+            }
+            long cacheBytes = cacheRoot == null ? 0L : safeDirectorySize(cacheRoot);
+            request.reportProgress(
+                    "browser.runtime.downloading",
+                    "browser.runtime.downloaded_artifact:" + doneMatcher.group(1),
+                    progressMetrics("downloading", cacheBytes, 0L, startedAtMs, 100,
+                            installProgressState == null ? InstallAttemptSnapshot.empty() : installProgressState.snapshot())
+            );
+            return;
+        }
+
+        Matcher matcher = PLAYWRIGHT_PROGRESS_PATTERN.matcher(trimmed);
         if (!matcher.find()) {
             return;
         }
-        int percent;
-        try {
-            percent = Integer.parseInt(matcher.group(1));
-        } catch (Exception ignored) {
-            return;
-        }
+        int percent = parseIntSafe(matcher.group(1), -1);
         if (percent < 0 || percent > 100) {
             return;
         }
+        long artifactTotalBytes = -1L;
+        Matcher sizedMatcher = PLAYWRIGHT_PROGRESS_WITH_SIZE_PATTERN.matcher(trimmed);
+        if (sizedMatcher.find()) {
+            artifactTotalBytes = parseSizeToBytes(sizedMatcher.group(2), sizedMatcher.group(3));
+        }
+        if (installProgressState != null) {
+            installProgressState.onProgress(percent, artifactTotalBytes);
+        }
         if (cliProgressPercent != null) {
-            int prev = cliProgressPercent.get();
-            if (percent <= prev) {
-                return;
-            }
             cliProgressPercent.set(percent);
         }
         long cacheBytes = cacheRoot == null ? 0L : safeDirectorySize(cacheRoot);
         request.reportProgress(
                 "browser.runtime.downloading",
                 "browser.runtime.downloading_cli:" + percent + "%",
-                progressMetrics("downloading", cacheBytes, 0L, System.currentTimeMillis(), percent)
+                progressMetrics("downloading", cacheBytes, 0L, startedAtMs, percent,
+                        installProgressState == null ? InstallAttemptSnapshot.empty() : installProgressState.snapshot())
         );
     }
 
@@ -890,7 +954,12 @@ public class BrowserTool implements Tool {
      * {@code estimatedTotalBytes} is intentionally heuristic, because Playwright does not
      * expose the browser archive's total size through this code path.
      */
-    private JsonNode progressMetrics(String phase, long cacheBytes, long downloadedBytes, long startedAtMs, int cliPercent) {
+    private JsonNode progressMetrics(String phase,
+                                     long cacheBytes,
+                                     long downloadedBytes,
+                                     long startedAtMs,
+                                     int cliPercent,
+                                     InstallAttemptSnapshot installAttempt) {
         ObjectNode metrics = JsonNodeFactory.instance.objectNode();
         long elapsedMs = Math.max(0L, System.currentTimeMillis() - startedAtMs);
         metrics.put("phase", phase);
@@ -898,9 +967,23 @@ public class BrowserTool implements Tool {
         metrics.put("downloadedBytes", Math.max(0L, downloadedBytes));
         metrics.put("elapsedMs", elapsedMs);
         metrics.put("cliProgressPercent", Math.max(-1, cliPercent));
+        metrics.put("attemptId", installAttempt.attemptId());
+        metrics.put("attemptIndex", installAttempt.attemptIndex());
+        metrics.put("retryCount", installAttempt.retryCount());
+        metrics.put("currentArtifact", installAttempt.currentArtifact());
+        metrics.put("segmentPercent", installAttempt.segmentPercent());
+        metrics.put("overallPercent", installAttempt.overallPercent());
+        metrics.put("segmentBytesTotal", installAttempt.currentArtifactTotalBytes());
+        tools.jackson.databind.node.ArrayNode completedNode = metrics.putArray("completedArtifacts");
+        for (String artifact : installAttempt.completedArtifacts()) {
+            completedNode.add(artifact);
+        }
         long estimatedTotalBytes = Math.max(ESTIMATED_BROWSER_DOWNLOAD_BYTES, Math.max(0L, downloadedBytes));
-        boolean indeterminate = "downloading".equals(phase) && downloadedBytes <= 0L && cliPercent < 0;
-        int progressPercent = estimateProgressPercent(phase, downloadedBytes, estimatedTotalBytes, elapsedMs, cliPercent);
+        boolean indeterminate = "downloading".equals(phase)
+                && downloadedBytes <= 0L
+                && cliPercent < 0
+                && installAttempt.segmentPercent() < 0;
+        int progressPercent = estimateProgressPercent(phase, downloadedBytes, estimatedTotalBytes, elapsedMs, cliPercent, installAttempt.overallPercent());
         metrics.put("estimatedTotalBytes", estimatedTotalBytes);
         metrics.put("progressPercent", progressPercent);
         metrics.put("indeterminate", indeterminate);
@@ -913,12 +996,20 @@ public class BrowserTool implements Tool {
      * <p>This value is not a protocol-level download percentage; it is only meant to keep
      * the UI responsive until the install either completes or fails.
      */
-    private int estimateProgressPercent(String phase, long downloadedBytes, long estimatedTotalBytes, long elapsedMs, int cliPercent) {
+    private int estimateProgressPercent(String phase,
+                                        long downloadedBytes,
+                                        long estimatedTotalBytes,
+                                        long elapsedMs,
+                                        int cliPercent,
+                                        int overallPercent) {
         if ("ready".equals(phase)) {
             return 100;
         }
         if ("checking".equals(phase)) {
             return 3;
+        }
+        if ("downloading".equals(phase) && overallPercent >= 0) {
+            return Math.max(1, Math.min(99, overallPercent));
         }
         if ("downloading".equals(phase) && cliPercent >= 0) {
             return Math.max(1, Math.min(99, cliPercent));
@@ -934,6 +1025,43 @@ public class BrowserTool implements Tool {
             return 5;
         }
         return Math.min(95, combined);
+    }
+
+    private int parseIntSafe(String value, int fallback) {
+        if (value == null || value.isBlank()) {
+            return fallback;
+        }
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (Exception ignored) {
+            return fallback;
+        }
+    }
+
+    private long parseSizeToBytes(String value, String unit) {
+        if (value == null || value.isBlank() || unit == null || unit.isBlank()) {
+            return -1L;
+        }
+        double numeric;
+        try {
+            numeric = Double.parseDouble(value.trim());
+        } catch (Exception ignored) {
+            return -1L;
+        }
+        long multiplier = switch (unit.trim().toUpperCase(Locale.ROOT)) {
+            case "B" -> 1L;
+            case "KB" -> 1_000L;
+            case "MB" -> 1_000_000L;
+            case "GB" -> 1_000_000_000L;
+            case "KIB" -> 1_024L;
+            case "MIB" -> 1_048_576L;
+            case "GIB" -> 1_073_741_824L;
+            default -> -1L;
+        };
+        if (multiplier <= 0L) {
+            return -1L;
+        }
+        return Math.max(0L, Math.round(numeric * multiplier));
     }
 
     private Path resolvePlaywrightCacheRoot() {
@@ -1077,6 +1205,227 @@ public class BrowserTool implements Tool {
     }
 
     private record DownloadMonitor(ScheduledExecutorService scheduler) {
+    }
+
+    private record InstallAttemptSnapshot(
+            String attemptId,
+            int attemptIndex,
+            int retryCount,
+            String currentArtifact,
+            int segmentPercent,
+            int overallPercent,
+            long currentArtifactTotalBytes,
+            List<String> completedArtifacts
+    ) {
+        private static InstallAttemptSnapshot empty() {
+            return new InstallAttemptSnapshot("", 0, 0, "", -1, -1, 0L, List.of());
+        }
+    }
+
+    private enum ArtifactStatus {
+        PENDING,
+        DOWNLOADING,
+        DONE
+    }
+
+    private static final class InstallArtifactState {
+        private final String name;
+        private ArtifactStatus status;
+        private int segmentPercent;
+        private long totalBytes;
+        private long estimatedBytes;
+
+        private InstallArtifactState(String name, long estimatedBytes) {
+            this.name = name;
+            this.status = ArtifactStatus.PENDING;
+            this.segmentPercent = -1;
+            this.totalBytes = 0L;
+            this.estimatedBytes = Math.max(0L, estimatedBytes);
+        }
+
+        private long weightBytes() {
+            if (totalBytes > 0L) {
+                return totalBytes;
+            }
+            if (estimatedBytes > 0L) {
+                return estimatedBytes;
+            }
+            return PLAYWRIGHT_UNKNOWN_ARTIFACT_ESTIMATED_BYTES;
+        }
+    }
+
+    private static final class InstallAttemptState {
+        private String attemptId = "";
+        private int attemptIndex = 0;
+        private int maxOverallPercent = -1;
+        private String currentArtifact = "";
+        private int segmentPercent = -1;
+        private long currentArtifactTotalBytes = 0L;
+        private final LinkedHashMap<String, InstallArtifactState> artifacts = new LinkedHashMap<>();
+
+        private synchronized void beginAttempt() {
+            attemptIndex += 1;
+            attemptId = UUID.randomUUID().toString();
+            maxOverallPercent = -1;
+            currentArtifact = "";
+            segmentPercent = -1;
+            currentArtifactTotalBytes = 0L;
+            artifacts.clear();
+            for (String artifact : PLAYWRIGHT_DEFAULT_ARTIFACTS) {
+                ensureArtifact(artifact);
+            }
+        }
+
+        private synchronized void onDownloadStart(String rawArtifactLabel) {
+            String artifactName = normalizeArtifactName(rawArtifactLabel);
+            if (artifactName.isBlank()) {
+                return;
+            }
+            InstallArtifactState artifact = ensureArtifact(artifactName);
+            artifact.status = ArtifactStatus.DOWNLOADING;
+            artifact.segmentPercent = 0;
+            currentArtifact = artifactName;
+            segmentPercent = 0;
+            currentArtifactTotalBytes = artifact.weightBytes();
+        }
+
+        private synchronized void onProgress(int percent, long totalBytes) {
+            if (currentArtifact.isBlank()) {
+                return;
+            }
+            InstallArtifactState artifact = ensureArtifact(currentArtifact);
+            if (artifact.status == ArtifactStatus.PENDING) {
+                artifact.status = ArtifactStatus.DOWNLOADING;
+            }
+            if (percent >= 0) {
+                int bounded = Math.max(0, Math.min(100, percent));
+                segmentPercent = bounded;
+                artifact.segmentPercent = bounded;
+            }
+            if (totalBytes > 0L) {
+                artifact.totalBytes = totalBytes;
+                artifact.estimatedBytes = Math.max(artifact.estimatedBytes, totalBytes);
+            }
+            currentArtifactTotalBytes = artifact.weightBytes();
+        }
+
+        private synchronized void onDownloadDone(String rawArtifactLabel) {
+            String artifactName = normalizeArtifactName(rawArtifactLabel);
+            if (artifactName.isBlank()) {
+                artifactName = currentArtifact;
+            }
+            if (artifactName.isBlank()) {
+                return;
+            }
+            InstallArtifactState artifact = ensureArtifact(artifactName);
+            artifact.status = ArtifactStatus.DONE;
+            artifact.segmentPercent = 100;
+            if (artifactName.equals(currentArtifact)) {
+                segmentPercent = 100;
+                currentArtifactTotalBytes = artifact.weightBytes();
+            }
+        }
+
+        private synchronized InstallAttemptSnapshot snapshot() {
+            if (attemptIndex <= 0) {
+                return InstallAttemptSnapshot.empty();
+            }
+
+            long totalWeight = 0L;
+            long weightedDone = 0L;
+            List<String> completed = new ArrayList<>();
+
+            for (InstallArtifactState artifact : artifacts.values()) {
+                long weight = artifact.weightBytes();
+                totalWeight += weight;
+                if (artifact.status == ArtifactStatus.DONE) {
+                    weightedDone += weight;
+                    completed.add(artifact.name);
+                }
+            }
+
+            if (!currentArtifact.isBlank()) {
+                InstallArtifactState current = artifacts.get(currentArtifact);
+                if (current != null && current.status != ArtifactStatus.DONE && segmentPercent >= 0) {
+                    long weight = current.weightBytes();
+                    weightedDone += Math.round(weight * (Math.min(100, segmentPercent) / 100.0));
+                }
+            }
+
+            int overallRaw = -1;
+            if (totalWeight > 0L) {
+                overallRaw = (int) Math.round((weightedDone * 100.0) / totalWeight);
+                overallRaw = Math.max(0, Math.min(100, overallRaw));
+            } else if (segmentPercent >= 0) {
+                overallRaw = Math.max(0, Math.min(100, segmentPercent));
+            }
+
+            if (overallRaw >= 0) {
+                maxOverallPercent = Math.max(maxOverallPercent, overallRaw);
+            }
+
+            int overallDisplay = maxOverallPercent;
+            if (overallDisplay > 99) {
+                overallDisplay = 99;
+            }
+
+            long currentWeight = 0L;
+            if (!currentArtifact.isBlank()) {
+                InstallArtifactState current = artifacts.get(currentArtifact);
+                if (current != null) {
+                    currentWeight = current.weightBytes();
+                }
+            }
+            if (currentWeight <= 0L) {
+                currentWeight = Math.max(0L, currentArtifactTotalBytes);
+            }
+
+            return new InstallAttemptSnapshot(
+                    attemptId,
+                    attemptIndex,
+                    Math.max(0, attemptIndex - 1),
+                    currentArtifact,
+                    segmentPercent,
+                    overallDisplay,
+                    currentWeight,
+                    List.copyOf(completed)
+            );
+        }
+
+        private InstallArtifactState ensureArtifact(String artifactName) {
+            String normalized = normalizeArtifactName(artifactName);
+            if (normalized.isBlank()) {
+                normalized = artifactName == null ? "" : artifactName.trim().toLowerCase(Locale.ROOT);
+            }
+            if (normalized.isBlank()) {
+                normalized = "unknown_artifact";
+            }
+            return artifacts.computeIfAbsent(
+                    normalized,
+                    key -> new InstallArtifactState(key, PLAYWRIGHT_ARTIFACT_ESTIMATED_BYTES.getOrDefault(key, PLAYWRIGHT_UNKNOWN_ARTIFACT_ESTIMATED_BYTES))
+            );
+        }
+
+        private String normalizeArtifactName(String raw) {
+            if (raw == null) {
+                return "";
+            }
+            String normalized = raw.trim();
+            if (normalized.isBlank()) {
+                return "";
+            }
+            String lower = normalized.toLowerCase(Locale.ROOT);
+            if (lower.contains("chrome for testing")) {
+                return "chromium";
+            }
+            if (lower.contains("chrome headless shell")) {
+                return "chromium_headless_shell";
+            }
+            if (lower.contains("ffmpeg")) {
+                return "ffmpeg";
+            }
+            return normalized.replaceAll("[^a-zA-Z0-9]+", "_").replaceAll("_+", "_").replaceAll("^_|_$", "").toLowerCase(Locale.ROOT);
+        }
     }
 
     private String buildErrorMessage(Throwable ex) {

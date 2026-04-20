@@ -10,6 +10,7 @@ import { useAgentCatalogStore } from "@/stores/agentCatalog";
 import { useConversationRunsStore } from "@/stores/conversationRuns";
 import { useModelGateStore } from "@/stores/modelGate";
 import { useRuntimeLogStore } from "@/stores/runtimeLog";
+import { loadChatLastViewState, saveChatLastViewState } from "@/stores/chatViewState";
 import type {
   AgentEvent,
   ConversationAttachment,
@@ -35,12 +36,19 @@ interface ApprovalState {
 interface BrowserRuntimeOverlayState {
   visible: boolean;
   stepUid: string | null;
+  attemptId: string;
+  attemptIndex: number;
+  retryCount: number;
   title: string;
   details: string;
   hint: string;
   downloadedBytes: number;
   progressPercent: number;
   indeterminate: boolean;
+  currentArtifact: string;
+  segmentPercent: number;
+  overallPercent: number;
+  completedArtifacts: string[];
 }
 
 const EMPTY_UPLOAD_POLICY: UploadPolicy = {
@@ -145,12 +153,19 @@ export const useConversationStore = defineStore("conversation", () => {
   const browserRuntimeOverlay = ref<BrowserRuntimeOverlayState>({
     visible: false,
     stepUid: null,
+    attemptId: "",
+    attemptIndex: 0,
+    retryCount: 0,
     title: "",
     details: "",
     hint: "",
     downloadedBytes: 0,
     progressPercent: 0,
-    indeterminate: false
+    indeterminate: false,
+    currentArtifact: "",
+    segmentPercent: -1,
+    overallPercent: -1,
+    completedArtifacts: []
   });
 
   let eventSource: EventSource | null = null;
@@ -257,12 +272,19 @@ export const useConversationStore = defineStore("conversation", () => {
     browserRuntimeOverlay.value = {
       visible: false,
       stepUid: null,
+      attemptId: "",
+      attemptIndex: 0,
+      retryCount: 0,
       title: "",
       details: "",
       hint: "",
       downloadedBytes: 0,
       progressPercent: 0,
-      indeterminate: false
+      indeterminate: false,
+      currentArtifact: "",
+      segmentPercent: -1,
+      overallPercent: -1,
+      completedArtifacts: []
     };
   }
 
@@ -281,31 +303,87 @@ export const useConversationStore = defineStore("conversation", () => {
     const progressPercent = Number.isFinite(progressPercentRaw)
       ? Math.max(0, Math.min(100, Math.round(progressPercentRaw)))
       : 0;
+    const attemptId = String(metrics.attemptId || "");
+    const attemptIndexRaw = Number(metrics.attemptIndex ?? 0);
+    const attemptIndex = Number.isFinite(attemptIndexRaw)
+      ? Math.max(0, Math.round(attemptIndexRaw))
+      : 0;
+    const retryCountRaw = Number(metrics.retryCount ?? 0);
+    const retryCount = Number.isFinite(retryCountRaw)
+      ? Math.max(0, Math.round(retryCountRaw))
+      : 0;
+    const segmentPercentRaw = Number(metrics.segmentPercent ?? -1);
+    const segmentPercent = Number.isFinite(segmentPercentRaw)
+      ? Math.max(-1, Math.min(100, Math.round(segmentPercentRaw)))
+      : -1;
+    const overallPercentRaw = Number(metrics.overallPercent ?? -1);
+    const overallPercent = Number.isFinite(overallPercentRaw)
+      ? Math.max(-1, Math.min(100, Math.round(overallPercentRaw)))
+      : -1;
+    const currentArtifact = String(metrics.currentArtifact || "");
+    const completedArtifacts = Array.isArray(metrics.completedArtifacts)
+      ? metrics.completedArtifacts.map((item) => String(item || "")).filter(Boolean)
+      : [];
     const indeterminate = Boolean(metrics.indeterminate);
     const title = phase === "checking"
       ? tr("chat.runtime.browserRuntime.checkingTitle")
       : tr("chat.runtime.browserRuntime.downloadingTitle");
     const details = phase === "checking"
       ? tr("chat.runtime.browserRuntime.checkingDesc")
-      : tr("chat.runtime.browserRuntime.downloadingDescSimple");
+      : buildBrowserDownloadingDetails(currentArtifact, retryCount);
     const hint = tr("chat.runtime.browserRuntime.oneTimeHint");
 
     if (phase === "checking" || phase === "downloading") {
+      const existing = browserRuntimeOverlay.value;
+      const sameStep = existing.stepUid && existing.stepUid === (event.stepUid || null);
+      if (sameStep && existing.attemptIndex > attemptIndex) {
+        return;
+      }
       browserRuntimeOverlay.value = {
         visible: true,
         stepUid: event.stepUid || null,
+        attemptId,
+        attemptIndex,
+        retryCount,
         title,
         details,
         hint,
         downloadedBytes: Math.max(0, downloadedBytes),
         progressPercent,
-        indeterminate
+        indeterminate,
+        currentArtifact,
+        segmentPercent,
+        overallPercent,
+        completedArtifacts
       };
       return;
     }
     if (phase === "ready" && browserRuntimeOverlay.value.stepUid === (event.stepUid || null)) {
       clearBrowserRuntimeOverlay();
     }
+  }
+
+  function buildBrowserDownloadingDetails(currentArtifact: string, retryCount: number) {
+    const artifactLabel = formatBrowserArtifactName(currentArtifact);
+    if (artifactLabel) {
+      if (retryCount > 0) {
+        return `正在重试下载 ${artifactLabel}（第${retryCount + 1}次尝试）`;
+      }
+      return `正在下载 ${artifactLabel}`;
+    }
+    if (retryCount > 0) {
+      return `正在重试下载浏览器依赖（第${retryCount + 1}次尝试）`;
+    }
+    return tr("chat.runtime.browserRuntime.downloadingDescSimple");
+  }
+
+  function formatBrowserArtifactName(name: string) {
+    const normalized = String(name || "").trim().toLowerCase();
+    if (!normalized) return "";
+    if (normalized === "chromium") return "Chromium";
+    if (normalized === "ffmpeg") return "FFmpeg";
+    if (normalized === "chromium_headless_shell") return "Chrome Headless Shell";
+    return name;
   }
 
   function buildApprovalBodyFromStep(step: ConversationRunStep) {
@@ -571,11 +649,15 @@ export const useConversationStore = defineStore("conversation", () => {
     }
   }
 
+  async function loadConversationSummaries() {
+    conversations.value = await conversationApi.listConversations();
+    agentCatalogStore.ensureSelection();
+  }
+
   async function refreshConversations(preferredConversationUid: string | null = currentConversationUid.value) {
     loading.value = true;
     try {
-      conversations.value = await conversationApi.listConversations();
-      agentCatalogStore.ensureSelection();
+      await loadConversationSummaries();
 
       if (!filteredConversations.value.length) {
         currentConversationUid.value = null;
@@ -583,6 +665,7 @@ export const useConversationStore = defineStore("conversation", () => {
         messages.value = [];
         resetRuntimePanels();
         disconnectEventSource();
+        saveChatLastViewState({ mode: "draft", conversationUid: null });
         syncRuntimeModelSelection();
         return;
       }
@@ -604,10 +687,36 @@ export const useConversationStore = defineStore("conversation", () => {
 
   async function init() {
     agentCatalogStore.restoreSelection();
+    const lastViewState = loadChatLastViewState();
     await Promise.all([agentCatalogStore.loadCatalog(), loadModelConfig()]);
-    await refreshConversations();
-    if (!currentConversationUid.value) {
-      startDraftConversation();
+    loading.value = true;
+    try {
+      await loadConversationSummaries();
+
+      if (!filteredConversations.value.length) {
+        startDraftConversation();
+        return;
+      }
+
+      if (lastViewState?.mode === "draft") {
+        startDraftConversation();
+        return;
+      }
+
+      const preferredConversationUid = lastViewState?.mode === "conversation"
+        ? (lastViewState.conversationUid || null)
+        : null;
+      const nextConversationUid = filteredConversations.value.some((item) => item.conversationUid === preferredConversationUid)
+        ? preferredConversationUid
+        : filteredConversations.value[0].conversationUid;
+
+      if (nextConversationUid) {
+        await selectConversation(nextConversationUid);
+      } else {
+        startDraftConversation();
+      }
+    } finally {
+      loading.value = false;
     }
   }
 
@@ -620,6 +729,7 @@ export const useConversationStore = defineStore("conversation", () => {
     draftAttachments.value = [];
     resetRuntimePanels();
     disconnectEventSource();
+    saveChatLastViewState({ mode: "draft", conversationUid: null });
     if (previousConversationModel) {
       selectedModelProvider.value = previousConversationModel.modelProvider;
       selectedModelName.value = previousConversationModel.modelName;
@@ -630,6 +740,7 @@ export const useConversationStore = defineStore("conversation", () => {
 
   async function selectConversation(conversationUid: string) {
     currentConversationUid.value = conversationUid;
+    saveChatLastViewState({ mode: "conversation", conversationUid });
     draftAttachments.value = [];
     resetRuntimePanels();
     await loadMessages(conversationUid);
