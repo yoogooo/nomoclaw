@@ -1,17 +1,12 @@
 package ai.nomoclaw.bot.tool;
 
-import com.microsoft.playwright.Browser;
-import com.microsoft.playwright.BrowserContext;
-import com.microsoft.playwright.BrowserType;
-import com.microsoft.playwright.Download;
-import com.microsoft.playwright.Page;
-import com.microsoft.playwright.Playwright;
-import com.microsoft.playwright.options.LoadState;
 import ai.nomoclaw.bot.config.AgentProperties;
 import ai.nomoclaw.bot.model.ToolRequest;
 import ai.nomoclaw.bot.model.ToolResult;
 import ai.nomoclaw.bot.orchestrator.MessageCancellationRegistry;
 import ai.nomoclaw.bot.workspace.NomoClawPaths;
+import com.microsoft.playwright.*;
+import com.microsoft.playwright.options.LoadState;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -19,24 +14,26 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.lang.ProcessBuilder.Redirect;
+import java.lang.reflect.Method;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
-import java.lang.reflect.Method;
-import java.lang.ProcessBuilder.Redirect;
-import java.net.InetSocketAddress;
-import java.net.ServerSocket;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Component
 @Slf4j
@@ -48,7 +45,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * In Playwright Java 1.58.0, {@code CLI.main} eventually calls {@code System.exit(code)},
  * which terminates the whole Spring Boot backend process after install commands finish.
  * Chromium installation must run in an isolated child process (see
- * {@link #runPlaywrightCli(Map, String...)}). The child process and the runtime
+ * {@link #runPlaywrightCli(Map, Consumer, String...)}). The child process and the runtime
  * Playwright instance must share the same browser cache environment, otherwise
  * progress will be measured against one directory while the actual download is
  * written to another.
@@ -60,6 +57,7 @@ public class BrowserTool implements Tool {
     private static final long ESTIMATED_BROWSER_DOWNLOAD_BYTES = 520L * 1024L * 1024L;
     private static final long WINDOWS_CDP_CONNECT_TIMEOUT_MS = 10_000L;
     private static final long WINDOWS_CDP_CONNECT_RETRY_INTERVAL_MS = 200L;
+    private static final Pattern PLAYWRIGHT_PROGRESS_PATTERN = Pattern.compile("(\\d{1,3})%\\s+of\\s+.+");
     private static final List<String> WINDOWS_CHROME_STABLE_ARGS = List.of(
             "--disable-background-networking",
             "--disable-background-timer-throttling",
@@ -267,7 +265,7 @@ public class BrowserTool implements Tool {
     private BrowserContext resolveContext(String profileKey, ToolRequest request) {
         synchronized (contextByProfile) {
             BrowserContext existing = contextByProfile.get(profileKey);
-            if (existing != null && isContextUsable(existing)) {
+            if (isContextUsable(existing)) {
                 return existing;
             }
             if (existing != null) {
@@ -286,7 +284,7 @@ public class BrowserTool implements Tool {
      *
      * <p>Key behavior:
      * - If local cache does not contain a platform-appropriate Chromium executable,
-     *   report download progress and install chromium.
+     * report download progress and install chromium.
      * - If launch fails with "Executable doesn't exist", force reinstall chromium and retry once.
      *
      * <p>This guards against partial cache states like:
@@ -305,28 +303,29 @@ public class BrowserTool implements Tool {
         long baselineBytes = cacheRoot == null ? 0L : safeDirectorySize(cacheRoot);
         long monitorStartedAt = System.currentTimeMillis();
         boolean maybeNeedDownload = !hasInstalledChromiumExecutable(cacheRoot);
+        AtomicInteger cliProgressPercent = new AtomicInteger(-1);
         if (maybeNeedDownload) {
             request.reportProgress(
                     "browser.runtime.preparing",
                     "browser.runtime.checking_dependencies",
-                    progressMetrics("checking", baselineBytes, baselineBytes, monitorStartedAt)
+                    progressMetrics("checking", baselineBytes, baselineBytes, monitorStartedAt, cliProgressPercent.get())
             );
         }
         DownloadMonitor monitor = maybeNeedDownload
-                ? startDownloadMonitor(request, cacheRoot, baselineBytes, monitorStartedAt)
+                ? startDownloadMonitor(request, cacheRoot, baselineBytes, monitorStartedAt, cliProgressPercent)
                 : null;
         try {
             if (playwright == null) {
-                ensureChromiumInstalled(request, cacheRoot, playwrightEnv);
+                ensureChromiumInstalled(request, cacheRoot, playwrightEnv, cliProgressPercent);
                 try {
                     playwright = Playwright.create(new Playwright.CreateOptions().setEnv(playwrightEnv));
                 } catch (Exception ex) {
                     throw new IllegalStateException(
                             "failed to create playwright driver"
-                                    + " env.PLAYWRIGHT_BROWSERS_PATH=" + playwrightEnv.get("PLAYWRIGHT_BROWSERS_PATH")
-                                    + " env.HOME=" + playwrightEnv.getOrDefault("HOME", "")
-                                    + " env.TMPDIR=" + playwrightEnv.getOrDefault("TMPDIR", "")
-                                    + " cause=" + buildErrorMessage(ex),
+                            + " env.PLAYWRIGHT_BROWSERS_PATH=" + playwrightEnv.get("PLAYWRIGHT_BROWSERS_PATH")
+                            + " env.HOME=" + playwrightEnv.getOrDefault("HOME", "")
+                            + " env.TMPDIR=" + playwrightEnv.getOrDefault("TMPDIR", "")
+                            + " cause=" + buildErrorMessage(ex),
                             ex
                     );
                 }
@@ -349,14 +348,15 @@ public class BrowserTool implements Tool {
                 log.info("[Tool][browser] chromium executable missing during launch, reinstalling runtime");
                 long repairBaselineBytes = cacheRoot == null ? 0L : safeDirectorySize(cacheRoot);
                 long repairStartedAt = System.currentTimeMillis();
+                AtomicInteger repairCliProgressPercent = new AtomicInteger(-1);
                 request.reportProgress(
                         "browser.runtime.preparing",
                         "browser.runtime.checking_dependencies",
-                        progressMetrics("checking", repairBaselineBytes, 0L, repairStartedAt)
+                        progressMetrics("checking", repairBaselineBytes, 0L, repairStartedAt, repairCliProgressPercent.get())
                 );
-                DownloadMonitor repairMonitor = startDownloadMonitor(request, cacheRoot, repairBaselineBytes, repairStartedAt);
+                DownloadMonitor repairMonitor = startDownloadMonitor(request, cacheRoot, repairBaselineBytes, repairStartedAt, repairCliProgressPercent);
                 try {
-                    forceInstallChromium(request, cacheRoot, playwrightEnv);
+                    forceInstallChromium(request, cacheRoot, playwrightEnv, repairCliProgressPercent);
                     executablePath = requireInstalledChromiumExecutable(cacheRoot);
                     context = createBrowserContext(cacheRoot, playwrightEnv, profileKey, headless, userDataDir, executablePath);
                     long repairFinalBytes = cacheRoot == null ? repairBaselineBytes : safeDirectorySize(cacheRoot);
@@ -367,7 +367,7 @@ public class BrowserTool implements Tool {
                     request.reportProgress(
                             "browser.runtime.ready",
                             repairDetails,
-                            progressMetrics("ready", repairFinalBytes, repairDownloadedBytes, repairStartedAt)
+                            progressMetrics("ready", repairFinalBytes, repairDownloadedBytes, repairStartedAt, repairCliProgressPercent.get())
                     );
                 } finally {
                     stopDownloadMonitor(repairMonitor);
@@ -382,7 +382,7 @@ public class BrowserTool implements Tool {
                 request.reportProgress(
                         "browser.runtime.ready",
                         details,
-                        progressMetrics("ready", finalBytes, downloadedBytes, monitorStartedAt)
+                        progressMetrics("ready", finalBytes, downloadedBytes, monitorStartedAt, cliProgressPercent.get())
                 );
             }
             log.info("[Tool][browser] browser context created profile={} dir={} headless={} mode={}",
@@ -393,7 +393,10 @@ public class BrowserTool implements Tool {
         }
     }
 
-    private synchronized void ensureChromiumInstalled(ToolRequest request, Path cacheRoot, Map<String, String> playwrightEnv) {
+    private synchronized void ensureChromiumInstalled(ToolRequest request,
+                                                      Path cacheRoot,
+                                                      Map<String, String> playwrightEnv,
+                                                      AtomicInteger cliProgressPercent) {
         if (chromiumInstallEnsured) {
             return;
         }
@@ -402,7 +405,7 @@ public class BrowserTool implements Tool {
             return;
         }
         try {
-            forceInstallChromium(request, cacheRoot, playwrightEnv);
+            forceInstallChromium(request, cacheRoot, playwrightEnv, cliProgressPercent);
             requireInstalledChromiumExecutable(cacheRoot);
             chromiumInstallEnsured = true;
         } catch (Exception ex) {
@@ -410,7 +413,7 @@ public class BrowserTool implements Tool {
                     cacheRoot, ex.getMessage());
             try {
                 cleanupBrokenChromiumInstall(cacheRoot);
-                forceInstallChromium(request, cacheRoot, playwrightEnv);
+                forceInstallChromium(request, cacheRoot, playwrightEnv, cliProgressPercent);
                 requireInstalledChromiumExecutable(cacheRoot);
                 chromiumInstallEnsured = true;
             } catch (Exception retryEx) {
@@ -419,16 +422,27 @@ public class BrowserTool implements Tool {
         }
     }
 
-    private synchronized void forceInstallChromium(ToolRequest request, Path cacheRoot, Map<String, String> playwrightEnv) {
+    private synchronized void forceInstallChromium(ToolRequest request,
+                                                   Path cacheRoot,
+                                                   Map<String, String> playwrightEnv,
+                                                   AtomicInteger cliProgressPercent) {
         try {
+            if (cliProgressPercent != null) {
+                cliProgressPercent.set(-1);
+            }
             request.reportProgress(
                     "browser.runtime.installing_chromium",
                     "browser.runtime.installing_chromium_only",
-                    progressMetrics("checking", 0L, 0L, System.currentTimeMillis())
+                    progressMetrics("checking", 0L, 0L, System.currentTimeMillis(), -1)
             );
             log.info("[Tool][browser] installing chromium runtime cacheRoot={} env.PLAYWRIGHT_BROWSERS_PATH={}",
                     cacheRoot, playwrightEnv.get("PLAYWRIGHT_BROWSERS_PATH"));
-            runPlaywrightCli(buildPlaywrightInstallEnv(playwrightEnv), "install", "chromium");
+            runPlaywrightCli(
+                    buildPlaywrightInstallEnv(playwrightEnv),
+                    line -> handlePlaywrightInstallOutput(line, request, cacheRoot, cliProgressPercent),
+                    "install",
+                    "chromium"
+            );
         } catch (Exception ex) {
             throw new IllegalStateException("failed to install chromium runtime", ex);
         }
@@ -546,10 +560,10 @@ public class BrowserTool implements Tool {
         while (System.currentTimeMillis() < deadline) {
             if (process != null && !process.isAlive()) {
                 throw new IllegalStateException("chrome process exited before CDP was ready"
-                        + " executable=" + executablePath
-                        + " userDataDir=" + userDataDir
-                        + " debugPort=" + debugPort
-                        + " exitCode=" + process.exitValue());
+                                                + " executable=" + executablePath
+                                                + " userDataDir=" + userDataDir
+                                                + " debugPort=" + debugPort
+                                                + " exitCode=" + process.exitValue());
             }
             try (var socket = new java.net.Socket()) {
                 socket.connect(new InetSocketAddress("127.0.0.1", debugPort), (int) WINDOWS_CDP_CONNECT_RETRY_INTERVAL_MS);
@@ -559,9 +573,9 @@ public class BrowserTool implements Tool {
             Thread.sleep(WINDOWS_CDP_CONNECT_RETRY_INTERVAL_MS);
         }
         throw new IllegalStateException("timed out waiting for chrome debug port"
-                + " executable=" + executablePath
-                + " userDataDir=" + userDataDir
-                + " debugPort=" + debugPort);
+                                        + " executable=" + executablePath
+                                        + " userDataDir=" + userDataDir
+                                        + " debugPort=" + debugPort);
     }
 
     private BrowserContext resolveConnectedContext(Browser browser) {
@@ -571,7 +585,7 @@ public class BrowserTool implements Tool {
         for (int attempt = 0; attempt < 10; attempt++) {
             List<BrowserContext> contexts = browser.contexts();
             if (!contexts.isEmpty()) {
-                return contexts.get(0);
+                return contexts.getFirst();
             }
             try {
                 Thread.sleep(100L);
@@ -594,8 +608,7 @@ public class BrowserTool implements Tool {
      * <p>Verified against Playwright Java 1.58.0:
      * {@code com.microsoft.playwright.CLI.main(...)} ends with {@code System.exit(exitCode)}.
      */
-    @SuppressWarnings("unchecked")
-    private void runPlaywrightCli(Map<String, String> env, String... args) throws Exception {
+    private void runPlaywrightCli(Map<String, String> env, Consumer<String> stdoutLineConsumer, String... args) throws Exception {
         Class<?> driverClass = Class.forName("com.microsoft.playwright.impl.driver.Driver");
         Method ensureDriverInstalled = driverClass.getMethod("ensureDriverInstalled", Map.class, Boolean.class);
         Object driver = ensureDriverInstalled.invoke(null, Map.of(), Boolean.FALSE);
@@ -604,10 +617,31 @@ public class BrowserTool implements Tool {
         if (env != null && !env.isEmpty()) {
             pb.environment().putAll(env);
         }
-        pb.command().addAll(java.util.Arrays.asList(args));
-        pb.inheritIO();
+        pb.command().addAll(Arrays.asList(args));
+        pb.redirectErrorStream(true);
+        pb.redirectOutput(Redirect.PIPE);
         Process process = pb.start();
+        Thread pipeThread = new Thread(() -> {
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (stdoutLineConsumer != null) {
+                        stdoutLineConsumer.accept(line);
+                    }
+                    log.info("[Tool][browser][playwright-cli] {}", line);
+                }
+            } catch (Exception ex) {
+                log.warn("[Tool][browser] failed reading playwright cli output err={}", ex.getMessage());
+            }
+        }, "playwright-cli-output");
+        pipeThread.setDaemon(true);
+        pipeThread.start();
         int exitCode = process.waitFor();
+        try {
+            pipeThread.join(1000L);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        }
         if (exitCode != 0) {
             throw new IllegalStateException("playwright cli failed with exit code " + exitCode);
         }
@@ -655,21 +689,59 @@ public class BrowserTool implements Tool {
             return null;
         }
         if (PlatformSupport.isWindows()) {
-            Path win64 = revisionDir.resolve("chrome-win64").resolve("chrome.exe");
-            if (Files.isRegularFile(win64)) {
-                return win64;
+            List<Path> candidates = List.of(
+                    revisionDir.resolve("chrome-win64").resolve("chrome.exe"),
+                    revisionDir.resolve("chrome-win").resolve("chrome.exe")
+            );
+            for (Path candidate : candidates) {
+                if (Files.isRegularFile(candidate)) {
+                    return candidate;
+                }
             }
-            return revisionDir.resolve("chrome-win").resolve("chrome.exe");
+            return null;
         }
         if (PlatformSupport.isMac()) {
-            return revisionDir
-                    .resolve("chrome-mac")
-                    .resolve("Chromium.app")
-                    .resolve("Contents")
-                    .resolve("MacOS")
-                    .resolve("Chromium");
+            // Playwright 1.58+ chromium on macOS uses Chrome for Testing layout.
+            // Keep legacy Chromium.app paths for backward compatibility.
+            List<Path> candidates = List.of(
+                    revisionDir.resolve("chrome-mac-arm64")
+                            .resolve("Google Chrome for Testing.app")
+                            .resolve("Contents")
+                            .resolve("MacOS")
+                            .resolve("Google Chrome for Testing"),
+                    revisionDir.resolve("chrome-mac-x64")
+                            .resolve("Google Chrome for Testing.app")
+                            .resolve("Contents")
+                            .resolve("MacOS")
+                            .resolve("Google Chrome for Testing"),
+                    revisionDir.resolve("chrome-mac")
+                            .resolve("Google Chrome for Testing.app")
+                            .resolve("Contents")
+                            .resolve("MacOS")
+                            .resolve("Google Chrome for Testing"),
+                    revisionDir.resolve("chrome-mac")
+                            .resolve("Chromium.app")
+                            .resolve("Contents")
+                            .resolve("MacOS")
+                            .resolve("Chromium")
+            );
+            for (Path candidate : candidates) {
+                if (Files.isRegularFile(candidate)) {
+                    return candidate;
+                }
+            }
+            return null;
         }
-        return revisionDir.resolve("chrome-linux").resolve("chrome");
+        List<Path> candidates = List.of(
+                revisionDir.resolve("chrome-linux").resolve("chrome"),
+                revisionDir.resolve("chrome-linux64").resolve("chrome")
+        );
+        for (Path candidate : candidates) {
+            if (Files.isRegularFile(candidate)) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     private boolean isUsableExecutable(Path executable) {
@@ -694,7 +766,7 @@ public class BrowserTool implements Tool {
             message.append(" debugPort=").append(debugPort);
         }
         String detail = buildErrorMessage(launchEx);
-        if (detail != null && !detail.isBlank()) {
+        if (!detail.isBlank()) {
             message.append(" cause=").append(detail);
         }
         if (isWindowsNativeBrowserCrash(launchEx)) {
@@ -712,7 +784,7 @@ public class BrowserTool implements Tool {
         while (current != null) {
             String message = current.getMessage();
             if (message != null
-                    && (message.contains("CreateFile() Error: 5")
+                && (message.contains("CreateFile() Error: 5")
                     || message.contains("exitCode=3221226356")
                     || message.contains("0xc0000374")
                     || message.contains("STATUS_HEAP_CORRUPTION"))) {
@@ -723,7 +795,11 @@ public class BrowserTool implements Tool {
         return false;
     }
 
-    private DownloadMonitor startDownloadMonitor(ToolRequest request, Path cacheRoot, long baselineBytes, long startedAtMs) {
+    private DownloadMonitor startDownloadMonitor(ToolRequest request,
+                                                 Path cacheRoot,
+                                                 long baselineBytes,
+                                                 long startedAtMs,
+                                                 AtomicInteger cliProgressPercent) {
         if (cacheRoot == null) {
             return null;
         }
@@ -757,7 +833,8 @@ public class BrowserTool implements Tool {
                 request.reportProgress(
                         "browser.runtime.downloading",
                         "browser.runtime.cached_bytes:" + formatBytes(downloadedBytes),
-                        progressMetrics("downloading", currentBytes, downloadedBytes, startedAtMs)
+                        progressMetrics("downloading", currentBytes, downloadedBytes, startedAtMs,
+                                cliProgressPercent == null ? -1 : cliProgressPercent.get())
                 );
             }
         }, 300L, DOWNLOAD_REPORT_INTERVAL_MS, TimeUnit.MILLISECONDS);
@@ -771,6 +848,41 @@ public class BrowserTool implements Tool {
         monitor.scheduler().shutdownNow();
     }
 
+    private void handlePlaywrightInstallOutput(String line,
+                                               ToolRequest request,
+                                               Path cacheRoot,
+                                               AtomicInteger cliProgressPercent) {
+        if (line == null || line.isBlank()) {
+            return;
+        }
+        Matcher matcher = PLAYWRIGHT_PROGRESS_PATTERN.matcher(line);
+        if (!matcher.find()) {
+            return;
+        }
+        int percent;
+        try {
+            percent = Integer.parseInt(matcher.group(1));
+        } catch (Exception ignored) {
+            return;
+        }
+        if (percent < 0 || percent > 100) {
+            return;
+        }
+        if (cliProgressPercent != null) {
+            int prev = cliProgressPercent.get();
+            if (percent <= prev) {
+                return;
+            }
+            cliProgressPercent.set(percent);
+        }
+        long cacheBytes = cacheRoot == null ? 0L : safeDirectorySize(cacheRoot);
+        request.reportProgress(
+                "browser.runtime.downloading",
+                "browser.runtime.downloading_cli:" + percent + "%",
+                progressMetrics("downloading", cacheBytes, 0L, System.currentTimeMillis(), percent)
+        );
+    }
+
     /**
      * Builds progress metrics for the UI.
      *
@@ -778,17 +890,20 @@ public class BrowserTool implements Tool {
      * {@code estimatedTotalBytes} is intentionally heuristic, because Playwright does not
      * expose the browser archive's total size through this code path.
      */
-    private JsonNode progressMetrics(String phase, long cacheBytes, long downloadedBytes, long startedAtMs) {
+    private JsonNode progressMetrics(String phase, long cacheBytes, long downloadedBytes, long startedAtMs, int cliPercent) {
         ObjectNode metrics = JsonNodeFactory.instance.objectNode();
         long elapsedMs = Math.max(0L, System.currentTimeMillis() - startedAtMs);
         metrics.put("phase", phase);
         metrics.put("cacheBytes", Math.max(0L, cacheBytes));
         metrics.put("downloadedBytes", Math.max(0L, downloadedBytes));
         metrics.put("elapsedMs", elapsedMs);
+        metrics.put("cliProgressPercent", Math.max(-1, cliPercent));
         long estimatedTotalBytes = Math.max(ESTIMATED_BROWSER_DOWNLOAD_BYTES, Math.max(0L, downloadedBytes));
-        int progressPercent = estimateProgressPercent(phase, downloadedBytes, estimatedTotalBytes, elapsedMs);
+        boolean indeterminate = "downloading".equals(phase) && downloadedBytes <= 0L && cliPercent < 0;
+        int progressPercent = estimateProgressPercent(phase, downloadedBytes, estimatedTotalBytes, elapsedMs, cliPercent);
         metrics.put("estimatedTotalBytes", estimatedTotalBytes);
         metrics.put("progressPercent", progressPercent);
+        metrics.put("indeterminate", indeterminate);
         return metrics;
     }
 
@@ -798,16 +913,19 @@ public class BrowserTool implements Tool {
      * <p>This value is not a protocol-level download percentage; it is only meant to keep
      * the UI responsive until the install either completes or fails.
      */
-    private int estimateProgressPercent(String phase, long downloadedBytes, long estimatedTotalBytes, long elapsedMs) {
+    private int estimateProgressPercent(String phase, long downloadedBytes, long estimatedTotalBytes, long elapsedMs, int cliPercent) {
         if ("ready".equals(phase)) {
             return 100;
         }
         if ("checking".equals(phase)) {
             return 3;
         }
-        int floorByTime = 5 + (int) Math.min(35, Math.max(0L, elapsedMs / 1200L));
+        if ("downloading".equals(phase) && cliPercent >= 0) {
+            return Math.max(1, Math.min(99, cliPercent));
+        }
+        int floorByTime = 5 + (int) Math.min(90, Math.max(0L, elapsedMs / 1500L));
         if (downloadedBytes <= 0L || estimatedTotalBytes <= 0L) {
-            return Math.min(60, floorByTime);
+            return Math.min(95, floorByTime);
         }
         double raw = (downloadedBytes * 100.0) / estimatedTotalBytes;
         int rounded = (int) Math.round(raw);

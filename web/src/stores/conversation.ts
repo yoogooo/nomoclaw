@@ -40,6 +40,7 @@ interface BrowserRuntimeOverlayState {
   hint: string;
   downloadedBytes: number;
   progressPercent: number;
+  indeterminate: boolean;
 }
 
 const EMPTY_UPLOAD_POLICY: UploadPolicy = {
@@ -148,7 +149,8 @@ export const useConversationStore = defineStore("conversation", () => {
     details: "",
     hint: "",
     downloadedBytes: 0,
-    progressPercent: 0
+    progressPercent: 0,
+    indeterminate: false
   });
 
   let eventSource: EventSource | null = null;
@@ -259,7 +261,8 @@ export const useConversationStore = defineStore("conversation", () => {
       details: "",
       hint: "",
       downloadedBytes: 0,
-      progressPercent: 0
+      progressPercent: 0,
+      indeterminate: false
     };
   }
 
@@ -278,6 +281,7 @@ export const useConversationStore = defineStore("conversation", () => {
     const progressPercent = Number.isFinite(progressPercentRaw)
       ? Math.max(0, Math.min(100, Math.round(progressPercentRaw)))
       : 0;
+    const indeterminate = Boolean(metrics.indeterminate);
     const title = phase === "checking"
       ? tr("chat.runtime.browserRuntime.checkingTitle")
       : tr("chat.runtime.browserRuntime.downloadingTitle");
@@ -294,7 +298,8 @@ export const useConversationStore = defineStore("conversation", () => {
         details,
         hint,
         downloadedBytes: Math.max(0, downloadedBytes),
-        progressPercent
+        progressPercent,
+        indeterminate
       };
       return;
     }

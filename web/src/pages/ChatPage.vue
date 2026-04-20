@@ -75,12 +75,18 @@ watch(
             <div class="browser-runtime-overlay__spinner" />
             <h3 class="browser-runtime-overlay__title">{{ browserRuntimeOverlay.title || "浏览器依赖准备中" }}</h3>
           </div>
-          <span class="browser-runtime-overlay__percent">{{ Math.max(0, Math.min(100, browserRuntimeOverlay.progressPercent || 0)) }}%</span>
+          <span class="browser-runtime-overlay__percent">
+            {{ browserRuntimeOverlay.indeterminate ? "..." : `${Math.max(0, Math.min(100, browserRuntimeOverlay.progressPercent || 0))}%` }}
+          </span>
         </div>
         <p class="browser-runtime-overlay__desc">{{ browserRuntimeOverlay.details || "首次运行可能下载较大资源，请稍候。" }}</p>
         <p class="browser-runtime-overlay__hint">{{ browserRuntimeOverlay.hint }}</p>
         <div class="browser-runtime-overlay__track">
-          <div class="browser-runtime-overlay__bar" :style="{ width: `${Math.max(2, Math.min(100, browserRuntimeOverlay.progressPercent || 0))}%` }" />
+          <div
+            class="browser-runtime-overlay__bar"
+            :class="{ 'browser-runtime-overlay__bar--indeterminate': browserRuntimeOverlay.indeterminate }"
+            :style="{ width: browserRuntimeOverlay.indeterminate ? '45%' : `${Math.max(2, Math.min(100, browserRuntimeOverlay.progressPercent || 0))}%` }"
+          />
         </div>
       </div>
     </div>
@@ -178,9 +184,22 @@ watch(
   transition: width 0.45s ease;
 }
 
+.browser-runtime-overlay__bar--indeterminate {
+  animation: browser-runtime-indeterminate 1.1s ease-in-out infinite;
+}
+
 @keyframes browser-runtime-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes browser-runtime-indeterminate {
+  0% {
+    transform: translateX(-48%);
+  }
+  100% {
+    transform: translateX(148%);
   }
 }
 </style>
