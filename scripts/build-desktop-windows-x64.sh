@@ -52,6 +52,7 @@ DESKTOP_PRODUCT_NAME=""
 TAURI_CONFIG_OVERRIDE_PATH=""
 BUILD_NO=""
 FULL_VERSION=""
+MSI_BUILD_MARKER_FILE=""
 
 log() {
   printf '[build-desktop-win] %s\n' "$*" >&2
@@ -379,6 +380,9 @@ build_tauri_bundle() {
 
   build_tauri_config_override
 
+  MSI_BUILD_MARKER_FILE="$BUILD_DIR/.msi-build-start.marker"
+  : > "$MSI_BUILD_MARKER_FILE"
+
   log "Building tauri bundle target=$RUST_TARGET productName=$DESKTOP_PRODUCT_NAME version=$DESKTOP_VERSION bundles=$TAURI_BUNDLES"
   if [[ "$(normalize_bool "$TAURI_BUILD_CI")" == "true" ]]; then
     (cd "$DESKTOP_DIR" && CI=true pnpm tauri build --target "$RUST_TARGET" --config "$TAURI_CONFIG_OVERRIDE_PATH" --bundles "$TAURI_BUNDLES")
@@ -408,16 +412,51 @@ validate_staged_backend_runtime() {
 }
 
 collect_msi_artifact() {
-  local bundle_dir latest_msi output_msi
+  local bundle_dir output_msi selected_msi
+  local msi_path msi_name
+  local -a new_msis version_msis
   bundle_dir="$DESKTOP_TAURI_DIR/target/$RUST_TARGET/release/bundle/msi"
   [[ -d "$bundle_dir" ]] || fail "MSI bundle directory not found: $bundle_dir"
 
-  latest_msi="$(find "$bundle_dir" -maxdepth 1 -type f -name '*.msi' | sort | tail -n 1)"
-  [[ -n "$latest_msi" ]] || fail "No MSI found under: $bundle_dir"
+  [[ -n "$MSI_BUILD_MARKER_FILE" && -f "$MSI_BUILD_MARKER_FILE" ]] \
+    || fail "MSI build marker missing. Build bundle step may not have run."
+
+  new_msis=()
+  while IFS= read -r -d '' msi_path; do
+    new_msis+=("$msi_path")
+  done < <(find "$bundle_dir" -maxdepth 1 -type f -name '*.msi' -newer "$MSI_BUILD_MARKER_FILE" -print0)
+
+  [[ ${#new_msis[@]} -gt 0 ]] || fail "No newly generated MSI found after build marker ($MSI_BUILD_MARKER_FILE). Please clean $bundle_dir and retry."
+
+  selected_msi=""
+  if [[ ${#new_msis[@]} -eq 1 ]]; then
+    selected_msi="${new_msis[0]}"
+  else
+    version_msis=()
+    for msi_path in "${new_msis[@]}"; do
+      msi_name="$(basename "$msi_path")"
+      if [[ "$msi_name" == *"_${DESKTOP_VERSION}_"* || "$msi_name" == *"-${DESKTOP_VERSION}-"* ]]; then
+        version_msis+=("$msi_path")
+      fi
+    done
+
+    if [[ ${#version_msis[@]} -eq 1 ]]; then
+      selected_msi="${version_msis[0]}"
+    elif [[ ${#version_msis[@]} -gt 1 ]]; then
+      selected_msi="$(ls -1t "${version_msis[@]}" | head -n 1)"
+      log "Multiple new MSI matched DESKTOP_VERSION=$DESKTOP_VERSION; selected latest by mtime: $selected_msi"
+    else
+      selected_msi="$(ls -1t "${new_msis[@]}" | head -n 1)"
+      log "No new MSI filename matched DESKTOP_VERSION=$DESKTOP_VERSION; selected latest by mtime: $selected_msi"
+    fi
+  fi
+
+  [[ -n "$selected_msi" ]] || fail "Failed to resolve MSI artifact from newly generated files."
 
   mkdir -p "$DIST_DIR"
   output_msi="$DIST_DIR/${DESKTOP_PRODUCT_NAME}-${DESKTOP_VERSION}-windows-x64.msi"
-  cp -f "$latest_msi" "$output_msi"
+  cp -f "$selected_msi" "$output_msi"
+  log "Resolved MSI source: $selected_msi"
   log "MSI output: $output_msi"
 }
 
