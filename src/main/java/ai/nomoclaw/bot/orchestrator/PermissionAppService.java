@@ -13,6 +13,7 @@ import ai.nomoclaw.bot.policy.tool.permission.HardGuardService;
 import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
 import ai.nomoclaw.bot.store.repository.AgentDefinitionRepository;
 import ai.nomoclaw.bot.tool.PathResolver;
+import ai.nomoclaw.bot.workspace.AgentWorkspaceConfig;
 import ai.nomoclaw.bot.workspace.NomoClawPaths;
 import org.springframework.stereotype.Service;
 
@@ -28,6 +29,7 @@ import java.util.regex.Pattern;
 @Service
 public class PermissionAppService {
 
+    private static final String MANAGED_WORKSPACE_RULE_PREFIX = "managed-agent-workspace-";
     private static final Set<String> COMMAND_KEYWORDS = Set.of(
             "bash", "sh", "zsh", "python", "node", "ruby", "perl", "env", "command", "git", "clone",
             "mkdir", "cp", "mv", "rm", "chmod", "chown", "touch", "ln", "sed", "tee", "tar", "unzip",
@@ -87,6 +89,12 @@ public class PermissionAppService {
         }
         List<PermissionRule> rules = parseRules(request, PermissionSource.AGENT_SETTINGS);
         settingsStore.saveAgentRules(agent.getAgentName(), rules);
+        AgentWorkspaceConfig workspaceConfig = AgentWorkspaceConfig.resolve(agent.getAgentName(), agent.getWorkspace());
+        syncAgentManagedWorkspaceAllowRule(
+                agent.getAgentUid(),
+                agent.getAgentName(),
+                workspaceConfig.workspaceDir()
+        );
         return getEffectiveRules("", agentUid);
     }
 
@@ -96,7 +104,11 @@ public class PermissionAppService {
         return getEffectiveRules("", agentUid);
     }
 
-    public PermissionRule ruleFromApproval(String toolName, tools.jackson.databind.JsonNode toolArgs, PermissionEffect effect, PermissionSource source) {
+    public PermissionRule ruleFromApproval(String toolName,
+                                           tools.jackson.databind.JsonNode toolArgs,
+                                           PermissionEffect effect,
+                                           PermissionSource source,
+                                           Path workspacePath) {
         String action = toolArgs == null ? "*" : toolArgs.path("action").asText("*");
         String path = toolArgs == null ? "" : toolArgs.path("path").asText("");
         String command = toolArgs == null ? "" : toolArgs.path("command").asText("");
@@ -104,7 +116,11 @@ public class PermissionAppService {
         String pathPattern = path == null ? "" : path;
         String commandPattern = command.isBlank() ? "" : command;
         if ("command_tool".equalsIgnoreCase(normalizedTool)) {
-            pathPattern = resolveCommandScopePath(command, toolArgs == null ? "" : toolArgs.path("cwd").asText(""));
+            pathPattern = resolveCommandScopePath(
+                    command,
+                    toolArgs == null ? "" : toolArgs.path("cwd").asText(""),
+                    workspacePath
+            );
             commandPattern = "";
         }
         return new PermissionRule(
@@ -121,11 +137,64 @@ public class PermissionAppService {
         );
     }
 
-    private String resolveCommandScopePath(String command, String cwdRaw) {
-        if (command == null || command.isBlank()) {
-            return normalizeCwd(cwdRaw);
+    public void syncAgentManagedWorkspaceAllowRule(String agentUid,
+                                                   String agentName,
+                                                   Path workspacePath) {
+        String normalizedAgentName = agentName == null ? "" : agentName.trim();
+        if (normalizedAgentName.isBlank()) {
+            return;
         }
-        Path cwd = normalizePath(cwdRaw);
+        Path workspace = (workspacePath == null
+                ? NomoClawPaths.agentHome(normalizedAgentName).resolve("workspace")
+                : workspacePath).toAbsolutePath().normalize();
+        List<PermissionRule> existing = new ArrayList<>(settingsStore.loadAgentRules(normalizedAgentName));
+        String key = managedRuleKey(agentUid, normalizedAgentName);
+        existing.removeIf(rule -> isManagedRule(rule, key));
+        existing.add(new PermissionRule(
+                managedRuleId(key, "file", 0),
+                PermissionSource.AGENT_SETTINGS,
+                PermissionEffect.ALLOW,
+                "file_*",
+                "*",
+                PermissionResourceType.FILE,
+                workspace.toString(),
+                "",
+                null,
+                true
+        ));
+        existing.add(new PermissionRule(
+                managedRuleId(key, "command", 0),
+                PermissionSource.AGENT_SETTINGS,
+                PermissionEffect.ALLOW,
+                "command_tool",
+                "execute",
+                PermissionResourceType.COMMAND,
+                workspace.toString(),
+                "",
+                null,
+                true
+        ));
+        settingsStore.saveAgentRules(normalizedAgentName, existing);
+    }
+
+    public void removeAgentManagedWorkspaceRules(String agentUid, String agentName) {
+        String normalizedAgentName = agentName == null ? "" : agentName.trim();
+        if (normalizedAgentName.isBlank()) {
+            return;
+        }
+        String key = managedRuleKey(agentUid, normalizedAgentName);
+        List<PermissionRule> existing = new ArrayList<>(settingsStore.loadAgentRules(normalizedAgentName));
+        boolean changed = existing.removeIf(rule -> isManagedRule(rule, key));
+        if (changed) {
+            settingsStore.saveAgentRules(normalizedAgentName, existing);
+        }
+    }
+
+    private String resolveCommandScopePath(String command, String cwdRaw, Path workspacePath) {
+        if (command == null || command.isBlank()) {
+            return normalizeCwd(cwdRaw, workspacePath);
+        }
+        Path cwd = normalizePath(cwdRaw, workspacePath);
         List<Path> candidates = new ArrayList<>();
         for (String token : tokenize(command)) {
             String cleaned = stripQuotes(token);
@@ -153,15 +222,18 @@ public class PermissionAppService {
         return (common == null ? cwd : common).toString();
     }
 
-    private Path normalizePath(String cwdRaw) {
+    private Path normalizePath(String cwdRaw, Path workspacePath) {
+        Path workspace = workspacePath == null
+                ? Path.of(".").toAbsolutePath().normalize()
+                : workspacePath.toAbsolutePath().normalize();
         if (cwdRaw == null || cwdRaw.isBlank()) {
-            return Path.of(".").toAbsolutePath().normalize();
+            return workspace;
         }
-        return PathResolver.resolve(cwdRaw, Path.of(".").toAbsolutePath().normalize());
+        return PathResolver.resolve(cwdRaw, workspace);
     }
 
-    private String normalizeCwd(String cwdRaw) {
-        return normalizePath(cwdRaw).toString();
+    private String normalizeCwd(String cwdRaw, Path workspacePath) {
+        return normalizePath(cwdRaw, workspacePath).toString();
     }
 
     private Path toDirectoryScope(Path path) {
@@ -218,6 +290,26 @@ public class PermissionAppService {
             out = out.substring(1, out.length() - 1);
         }
         return out.trim();
+    }
+
+    private String managedRuleKey(String agentUid, String agentName) {
+        String normalizedAgentUid = agentUid == null ? "" : agentUid.trim();
+        if (!normalizedAgentUid.isBlank()) {
+            return normalizedAgentUid;
+        }
+        return "name-" + agentName.replaceAll("[^a-zA-Z0-9_-]", "_");
+    }
+
+    private String managedRuleId(String key, String category, int index) {
+        return MANAGED_WORKSPACE_RULE_PREFIX + key + "-" + category + "-" + index;
+    }
+
+    private boolean isManagedRule(PermissionRule rule, String key) {
+        if (rule == null || rule.ruleId() == null) {
+            return false;
+        }
+        String prefix = MANAGED_WORKSPACE_RULE_PREFIX + key + "-";
+        return rule.ruleId().startsWith(prefix);
     }
 
     private List<PermissionRule> parseRules(UpdatePermissionRulesRequest request, PermissionSource source) {

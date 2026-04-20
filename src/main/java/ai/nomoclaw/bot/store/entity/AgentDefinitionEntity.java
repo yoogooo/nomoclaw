@@ -26,6 +26,7 @@ public class AgentDefinitionEntity {
     private Integer sortIndex;
     private Integer isGroupEntry;
     private String status;
+    private String workspace;
     private String extConfig;
     private LocalDateTime createdTime;
     private LocalDateTime updatedTime;
@@ -132,6 +133,14 @@ public class AgentDefinitionEntity {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public String getWorkspace() {
+        return workspace;
+    }
+
+    public void setWorkspace(String workspace) {
+        this.workspace = workspace;
     }
 
     public String getExtConfig() {

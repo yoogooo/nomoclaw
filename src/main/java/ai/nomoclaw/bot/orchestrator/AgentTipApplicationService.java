@@ -17,6 +17,7 @@ import ai.nomoclaw.bot.store.repository.AgentDefinitionRepository;
 import ai.nomoclaw.bot.store.repository.AgentGroupDefinitionRepository;
 import ai.nomoclaw.bot.store.repository.AgentGroupMemberRepository;
 import ai.nomoclaw.bot.store.repository.AgentTipRepository;
+import ai.nomoclaw.bot.workspace.AgentWorkspaceConfig;
 import ai.nomoclaw.bot.workspace.NomoClawPaths;
 import org.springframework.stereotype.Service;
 
@@ -293,13 +294,21 @@ public class AgentTipApplicationService {
                                                           String sessionId,
                                                           String messageUid) {
         AgentGroupDefinitionEntity group = resolveConversationGroup(conversation);
+        String agentName = executionAgent == null ? NomoClawPaths.DEFAULT_AGENT_NAME : executionAgent.getAgentName();
+        AgentWorkspaceConfig workspaceConfig = executionAgent == null
+                ? AgentWorkspaceConfig.defaults(agentName)
+                : AgentWorkspaceConfig.resolve(agentName, executionAgent.getWorkspace());
         return PromptLoader.PromptContext.forAgent(
                 sessionId,
                 messageUid,
                 conversation.channel() == null || conversation.channel().isBlank() ? "web" : conversation.channel(),
                 group == null ? "" : group.getGroupName(),
-                executionAgent == null ? "" : executionAgent.getAgentName(),
-                NomoClawPaths.root()
+                agentName,
+                NomoClawPaths.root(),
+                NomoClawPaths.agentHome(agentName),
+                workspaceConfig.workspaceDir(),
+                workspaceConfig.tmpDir(),
+                workspaceConfig.reportDir()
         );
     }
 

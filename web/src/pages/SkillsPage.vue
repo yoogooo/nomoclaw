@@ -19,6 +19,7 @@ const skills = ref<ManagedGlobalSkill[]>([]);
 const skillDrawerVisible = ref(false);
 const selectedSkillId = ref("");
 const nomoclawRootDir = ref("");
+const agentsRootDir = ref("");
 const skillsRootDir = ref("");
 const importSkillVisible = ref(false);
 const importAgentUid = ref("");
@@ -53,6 +54,7 @@ async function loadSkills() {
   try {
     const systemConfig = await conversationApi.getSystemConfig();
     nomoclawRootDir.value = (systemConfig.nomoclawRootDir || "").trim();
+    agentsRootDir.value = (systemConfig.agentsRootDir || "").trim();
     skillsRootDir.value = (systemConfig.skillsRootDir || "").trim();
 
     const groups = await conversationApi.listAgentGroups();
@@ -62,6 +64,7 @@ async function loadSkills() {
     skills.value = globalSkills
       .map((skill) => mapApiGlobalSkill(skill, {
         nomoclawRootDir: nomoclawRootDir.value,
+        agentsRootDir: agentsRootDir.value,
         skillsRootDir: skillsRootDir.value,
         avatarIconKeys: [],
         avatarColorOptions: [],

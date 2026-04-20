@@ -338,6 +338,7 @@ watch([selectedAgentUid, detailTab], ([agentUid, tab]) => {
                     @update:description="management.basicForm.description = $event"
                     @update:avatar="management.basicForm.avatar = $event"
                     @update:avatar-color="management.basicForm.avatarColor = $event"
+                    @update:workspace="management.basicForm.workspace = $event"
                   />
                 </n-tab-pane>
 
@@ -420,6 +421,7 @@ watch([selectedAgentUid, detailTab], ([agentUid, tab]) => {
     @update:description="management.createForm.description = $event"
     @update:avatar="management.createForm.avatar = $event"
     @update:avatar-color="management.createForm.avatarColor = $event"
+    @update:workspace="management.createForm.workspace = $event"
   />
 </template>
 

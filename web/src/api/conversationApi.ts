@@ -96,6 +96,7 @@ export const conversationApi = {
     modelProvider: string;
     modelName: string;
     modelNames: string[];
+    workspace: string;
   }) {
     return requestJson<AgentCatalogAgent>(`/api/agents/${agentUid}/basic`, {
       method: "PATCH",
@@ -112,6 +113,7 @@ export const conversationApi = {
     modelProvider: string;
     modelName: string;
     modelNames: string[];
+    workspace: string;
   }) {
     return requestJson<AgentCatalogAgent>("/api/agents", {
       method: "POST",

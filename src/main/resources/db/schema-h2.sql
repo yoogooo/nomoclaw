@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS agent_definition (
     sort_index INT NOT NULL DEFAULT 0,
     is_group_entry TINYINT(1) NOT NULL DEFAULT 0,
     status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+    workspace VARCHAR(1024) NOT NULL DEFAULT '',
     ext_config CLOB NULL,
     created_time TIMESTAMP(3) NOT NULL,
     updated_time TIMESTAMP(3) NOT NULL,
@@ -344,10 +345,10 @@ CREATE TABLE IF NOT EXISTS agent_cron_job (
 
 INSERT INTO agent_definition (
     agent_uid, agent_name, display_name, avatar, description, capability_tags, prompt_profile,
-    model_provider_id, model_id, sort_index, is_group_entry, status, ext_config, created_time, updated_time
+    model_provider_id, model_id, sort_index, is_group_entry, status, workspace, ext_config, created_time, updated_time
 ) VALUES
     ('agent_general_assistant', 'general_assistant', '通用助手', '🤝', '负责综合规划、协调执行与最终总结。', '["planning","coordination","delivery"]',
-     'generalist', '', '', 10, 0, 'ACTIVE', '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+     'generalist', '', '', 10, 0, 'ACTIVE', '', '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO tool_definition (
     tool_key, display_name, description, risk_level, status, sort_index, config_json, created_time, updated_time

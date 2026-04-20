@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS agent_definition (
     sort_index INT NOT NULL DEFAULT 0 COMMENT '排序值，越小越靠前',
     is_group_entry TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否为群组入口节点：0否 1是',
     status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE' COMMENT '状态：ACTIVE / DISABLED',
+    workspace VARCHAR(1024) NOT NULL DEFAULT '' COMMENT 'Agent 工作区绝对路径',
     ext_config JSON NULL COMMENT '扩展配置JSON',
     created_time DATETIME(3) NOT NULL COMMENT '创建时间',
     updated_time DATETIME(3) NOT NULL COMMENT '更新时间',
@@ -395,16 +396,16 @@ CREATE TABLE IF NOT EXISTS agent_cron_job (
 
 INSERT INTO agent_definition (
     agent_uid, agent_name, display_name, avatar, description, capability_tags, prompt_profile,
-    model_provider_id, model_id, sort_index, is_group_entry, status, ext_config, created_time, updated_time
+    model_provider_id, model_id, sort_index, is_group_entry, status, workspace, ext_config, created_time, updated_time
 ) VALUES
     ('agent_general_assistant', 'general_assistant', '通用助手', '🤝', '负责综合规划、协调执行与最终总结。', JSON_ARRAY('planning', 'coordination', 'delivery'),
-     'generalist', '', '', 10, 0, 'ACTIVE', JSON_OBJECT(), NOW(3), NOW(3)),
+     'generalist', '', '', 10, 0, 'ACTIVE', '', JSON_OBJECT(), NOW(3), NOW(3)),
     ('agent_test_expert', 'test_expert', '测试专家', '🧪', '负责测试设计、缺陷定位与质量把关。', JSON_ARRAY('testing', 'qa', 'review'),
-     'qa-specialist', '', '', 20, 0, 'ACTIVE', JSON_OBJECT(), NOW(3), NOW(3)),
+     'qa-specialist', '', '', 20, 0, 'ACTIVE', '', JSON_OBJECT(), NOW(3), NOW(3)),
     ('agent_public_opinion', 'public_opinion_monitor', '舆情监测', '📡', '负责舆情跟踪、热点观察与风险提示。', JSON_ARRAY('monitoring', 'trend', 'risk'),
-     'opinion-specialist', '', '', 30, 0, 'ACTIVE', JSON_OBJECT(), NOW(3), NOW(3)),
+     'opinion-specialist', '', '', 30, 0, 'ACTIVE', '', JSON_OBJECT(), NOW(3), NOW(3)),
     ('agent_marketing_assistant', 'marketing_assistant', '营销助理', '📣', '负责传播文案、活动建议与投放辅助。', JSON_ARRAY('marketing', 'campaign', 'copywriting'),
-     'marketing-specialist', '', '', 40, 0, 'ACTIVE', JSON_OBJECT(), NOW(3), NOW(3));
+     'marketing-specialist', '', '', 40, 0, 'ACTIVE', '', JSON_OBJECT(), NOW(3), NOW(3));
 
 INSERT INTO tool_definition (
     tool_key, display_name, description, risk_level, status, sort_index, config_json, created_time, updated_time

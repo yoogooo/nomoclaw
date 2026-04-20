@@ -82,4 +82,5 @@ export interface BasicFormModel {
   description: string;
   avatar: string;
   avatarColor: string;
+  workspace: string;
 }

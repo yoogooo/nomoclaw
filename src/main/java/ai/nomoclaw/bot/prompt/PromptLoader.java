@@ -52,11 +52,11 @@ public final class PromptLoader {
                                            String fallback) {
         StringBuilder builder = new StringBuilder();
 
-        Path workspacePath = context.agentWorkspacePath();
+        Path promptProfilePath = context.agentProfilePath() == null ? context.agentWorkspacePath() : context.agentProfilePath();
         Map<String, String> sections = new LinkedHashMap<>();
-        if (workspacePath != null) {
+        if (promptProfilePath != null) {
             for (String fileName : PROMPT_FILES) {
-                sections.put(fileName, readPromptFile(workspacePath.resolve(fileName)));
+                sections.put(fileName, readPromptFile(promptProfilePath.resolve(fileName)));
             }
         }
 
@@ -116,8 +116,8 @@ public final class PromptLoader {
                 CURRENT_OS_CONTEXT,
                 context.workingDirectory().toAbsolutePath().normalize(),
                 context.agentWorkspacePath() == null ? "" : context.agentWorkspacePath().toAbsolutePath().normalize(),
-                context.agentWorkspacePath() == null ? "" : NomoClawPaths.agentTmp(context.agentWorkspacePath()),
-                context.agentWorkspacePath() == null ? "" : NomoClawPaths.agentReport(context.agentWorkspacePath()),
+                context.agentTmpPath() == null ? "" : context.agentTmpPath().toAbsolutePath().normalize(),
+                context.agentReportPath() == null ? "" : context.agentReportPath().toAbsolutePath().normalize(),
                 localZone.getId()
         ).trim();
     }
@@ -242,22 +242,46 @@ public final class PromptLoader {
             Path workingDirectory,
             String agentGroup,
             String agentName,
-            Path agentWorkspacePath
+            Path agentProfilePath,
+            Path agentWorkspacePath,
+            Path agentTmpPath,
+            Path agentReportPath
     ) {
         public PromptContext {
             workingDirectory = workingDirectory == null
                     ? NomoClawPaths.root()
                     : workingDirectory.toAbsolutePath().normalize();
-            agentWorkspacePath = agentWorkspacePath == null && agentName != null && !agentName.isBlank()
-                    ? workingDirectory.resolve(NomoClawPaths.AGENTS_DIR_NAME).resolve(agentName).toAbsolutePath().normalize()
-                    : normalize(agentWorkspacePath);
+            Path defaultAgentHome = null;
+            if (agentName != null && !agentName.isBlank()) {
+                defaultAgentHome = workingDirectory.resolve(NomoClawPaths.AGENTS_DIR_NAME).resolve(agentName).toAbsolutePath().normalize();
+            }
+            agentProfilePath = agentProfilePath == null ? normalize(defaultAgentHome) : normalize(agentProfilePath);
+            if (agentProfilePath != null) {
+                agentProfilePath = ensureDirectory(agentProfilePath);
+            }
+
+            agentWorkspacePath = agentWorkspacePath == null ? normalize(agentProfilePath) : normalize(agentWorkspacePath);
             if (agentWorkspacePath != null) {
-                agentWorkspacePath = NomoClawPaths.ensureAgentWorkspace(agentWorkspacePath);
+                agentWorkspacePath = ensureDirectory(agentWorkspacePath);
+            }
+
+            agentTmpPath = agentTmpPath == null && agentWorkspacePath != null
+                    ? normalize(NomoClawPaths.agentTmp(agentWorkspacePath))
+                    : normalize(agentTmpPath);
+            if (agentTmpPath != null) {
+                agentTmpPath = ensureDirectory(agentTmpPath);
+            }
+
+            agentReportPath = agentReportPath == null && agentWorkspacePath != null
+                    ? normalize(NomoClawPaths.agentReport(agentWorkspacePath))
+                    : normalize(agentReportPath);
+            if (agentReportPath != null) {
+                agentReportPath = ensureDirectory(agentReportPath);
             }
         }
 
         public static PromptContext defaultFor(String sessionId, String channel) {
-            return new PromptContext(sessionId, "", "local-user", channel, NomoClawPaths.root(), "", "", null);
+            return new PromptContext(sessionId, "", "local-user", channel, NomoClawPaths.root(), "", "", null, null, null, null);
         }
 
         public static PromptContext forAgent(String sessionId,
@@ -266,12 +290,47 @@ public final class PromptLoader {
                                              String agentGroup,
                                              String agentName,
                                              Path workingDirectory) {
+            return forAgent(sessionId, messageUid, channel, agentGroup, agentName, workingDirectory, null, null, null, null);
+        }
+
+        public static PromptContext forAgent(String sessionId,
+                                             String messageUid,
+                                             String channel,
+                                             String agentGroup,
+                                             String agentName,
+                                             Path workingDirectory,
+                                             Path agentProfilePath,
+                                             Path agentWorkspacePath,
+                                             Path agentTmpPath,
+                                             Path agentReportPath) {
             Path basePath = workingDirectory == null ? NomoClawPaths.root() : workingDirectory;
-            return new PromptContext(sessionId, messageUid, "local-user", channel, basePath, agentGroup, agentName, null);
+            return new PromptContext(
+                    sessionId,
+                    messageUid,
+                    "local-user",
+                    channel,
+                    basePath,
+                    agentGroup,
+                    agentName,
+                    agentProfilePath,
+                    agentWorkspacePath,
+                    agentTmpPath,
+                    agentReportPath
+            );
         }
 
         private static Path normalize(Path path) {
             return path == null ? null : path.toAbsolutePath().normalize();
+        }
+
+        private static Path ensureDirectory(Path path) {
+            try {
+                Path normalized = path.toAbsolutePath().normalize();
+                Files.createDirectories(normalized);
+                return normalized;
+            } catch (Exception ex) {
+                throw new IllegalStateException("failed to initialize prompt context path: " + path, ex);
+            }
         }
     }
 }

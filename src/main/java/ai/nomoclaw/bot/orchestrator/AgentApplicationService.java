@@ -24,6 +24,7 @@ import ai.nomoclaw.bot.store.repository.*;
 import ai.nomoclaw.bot.tool.PlatformSupport;
 import ai.nomoclaw.bot.tool.ToolExecutor;
 import ai.nomoclaw.bot.util.JsonUtil;
+import ai.nomoclaw.bot.workspace.AgentWorkspaceConfig;
 import ai.nomoclaw.bot.workspace.NomoClawPaths;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
@@ -44,22 +45,20 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
-import java.awt.Desktop;
+import java.awt.*;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Consumer;
@@ -364,10 +363,21 @@ public class AgentApplicationService {
         ObjectNode extConfig = JsonNodeFactory.instance.objectNode();
         extConfig.put("avatarColor", avatarColor);
         extConfig.set("modelIds", JsonUtil.fromJson(JsonUtil.toJson(modelIds), JsonNode.class));
+        AgentWorkspaceConfig workspaceConfig = resolveWorkspaceConfigForMutation(
+                agentName,
+                "",
+                request.workspace()
+        ).ensureDirectories();
+        agent.setWorkspace(workspaceConfig.workspaceDir().toString());
         agent.setExtConfig(JsonUtil.toJson(extConfig));
         agent.setCreatedTime(now);
         agent.setUpdatedTime(now);
         agentDefinitionRepository.save(agent);
+        permissionAppService.syncAgentManagedWorkspaceAllowRule(
+                agentUid,
+                agentName,
+                workspaceConfig.workspaceDir()
+        );
 
         AgentGroupMemberEntity member = new AgentGroupMemberEntity();
         member.setAgentUid(agentUid);
@@ -414,8 +424,19 @@ public class AgentApplicationService {
         ObjectNode extConfig = readExtConfigObject(agent.getExtConfig());
         extConfig.put("avatarColor", avatarColor);
         extConfig.set("modelIds", JsonUtil.fromJson(JsonUtil.toJson(modelIds), JsonNode.class));
+        AgentWorkspaceConfig workspaceConfig = resolveWorkspaceConfigForMutation(
+                agent.getAgentName(),
+                agent.getWorkspace(),
+                request.workspace()
+        ).ensureDirectories();
+        agent.setWorkspace(workspaceConfig.workspaceDir().toString());
         agent.setExtConfig(JsonUtil.toJson(extConfig));
         agentDefinitionRepository.updateById(agent);
+        permissionAppService.syncAgentManagedWorkspaceAllowRule(
+                agent.getAgentUid(),
+                agent.getAgentName(),
+                workspaceConfig.workspaceDir()
+        );
 
         AgentGroupMemberEntity member = agentGroupMemberRepository.findPrimaryByAgentUid(agent.getAgentUid());
         if (member == null) {
@@ -538,7 +559,7 @@ public class AgentApplicationService {
     public List<AgentDocDto> listAgentDocs(String agentUid) {
         AgentDefinitionEntity agent = requireAgentByUid(agentUid);
         ensureWorkspaceDocsForExistingAgent(agent);
-        Path workspace = NomoClawPaths.ensureAgentWorkspace(agent.getAgentName());
+        Path workspace = NomoClawPaths.ensureAgentHome(agent.getAgentName());
         List<AgentDocDto> docs = new ArrayList<>();
         for (Map.Entry<String, String> entry : AGENT_DOC_FILES.entrySet()) {
             docs.add(readAgentDoc(workspace, entry.getKey(), entry.getValue()));
@@ -554,7 +575,7 @@ public class AgentApplicationService {
         if (fileName == null) {
             throw new IllegalArgumentException("unsupported doc key: " + normalizedDocKey);
         }
-        Path workspace = NomoClawPaths.ensureAgentWorkspace(agent.getAgentName());
+        Path workspace = NomoClawPaths.ensureAgentHome(agent.getAgentName());
         Path file = workspace.resolve(fileName).toAbsolutePath().normalize();
         try {
             Files.writeString(file, content == null ? "" : content, StandardCharsets.UTF_8);
@@ -624,34 +645,11 @@ public class AgentApplicationService {
         agentToolRelationRepository.deleteByAgentUid(normalizedAgentUid);
         agentGroupMemberRepository.deleteByAgentUid(normalizedAgentUid);
         agentDefinitionRepository.deleteByAgentUid(normalizedAgentUid);
-        deleteDirectoryRecursively(NomoClawPaths.agentWorkspace(agent.getAgentName()));
-        log.info("[Agent] deleted agentUid={} agentName={} conversations={}",
+        permissionAppService.removeAgentManagedWorkspaceRules(agent.getAgentUid(), agent.getAgentName());
+        log.info("[Agent] deleted agentUid={} agentName={} conversations={} workspaceRetained=true",
                 normalizedAgentUid,
                 agent.getAgentName(),
                 conversationUids.size());
-    }
-
-    private void deleteDirectoryRecursively(Path rootPath) {
-        if (rootPath == null || !Files.exists(rootPath)) {
-            return;
-        }
-        try {
-            Files.walkFileTree(rootPath, new SimpleFileVisitor<>() {
-                @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                    Files.deleteIfExists(file);
-                    return FileVisitResult.CONTINUE;
-                }
-
-                @Override
-                public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
-                    Files.deleteIfExists(dir);
-                    return FileVisitResult.CONTINUE;
-                }
-            });
-        } catch (IOException ex) {
-            throw new IllegalStateException("failed to delete agent workspace: " + rootPath, ex);
-        }
     }
 
     public void updateConversationTitle(String conversationUid, String title) {
@@ -791,6 +789,7 @@ public class AgentApplicationService {
         AgentConversation conversation = requireConversation(message.conversationUid());
         AgentDefinitionEntity executionAgent = resolveExecutionAgent(conversation);
         String agentName = executionAgent == null ? NomoClawPaths.DEFAULT_AGENT_NAME : executionAgent.getAgentName();
+        AgentWorkspaceConfig workspaceConfig = resolveWorkspaceConfig(executionAgent);
         String normalizedAction = action == null ? "" : action.trim().toLowerCase(Locale.ROOT);
         PermissionScope appliedScope = scope == null ? PermissionScope.ONCE : scope;
         String matchedRuleId = "";
@@ -802,7 +801,8 @@ public class AgentApplicationService {
                         step.toolArgs(),
                         PermissionEffect.ALLOW,
                         appliedScope == PermissionScope.SESSION ? PermissionSource.SESSION
-                                : (appliedScope == PermissionScope.AGENT ? PermissionSource.AGENT_SETTINGS : PermissionSource.USER_SETTINGS)
+                                : (appliedScope == PermissionScope.AGENT ? PermissionSource.AGENT_SETTINGS : PermissionSource.USER_SETTINGS),
+                        workspaceConfig.workspaceDir()
                 );
                 matchedRuleId = rule.ruleId();
                 toolPermissionPolicyService.persistRule(appliedScope, message.conversationUid(), agentName, rule);
@@ -827,7 +827,8 @@ public class AgentApplicationService {
                     step.toolArgs(),
                     PermissionEffect.DENY,
                     appliedScope == PermissionScope.SESSION ? PermissionSource.SESSION
-                            : (appliedScope == PermissionScope.AGENT ? PermissionSource.AGENT_SETTINGS : PermissionSource.USER_SETTINGS)
+                            : (appliedScope == PermissionScope.AGENT ? PermissionSource.AGENT_SETTINGS : PermissionSource.USER_SETTINGS),
+                    workspaceConfig.workspaceDir()
             );
             matchedRuleId = rule.ruleId();
             toolPermissionPolicyService.persistRule(appliedScope, message.conversationUid(), agentName, rule);
@@ -1054,9 +1055,8 @@ public class AgentApplicationService {
     private RoundExecutionResult executeRound(AgentMessage message, ExecutionState state, List<PlanStep> steps) {
         AgentConversation conversation = requireConversation(message.conversationUid());
         AgentDefinitionEntity executionAgent = resolveExecutionAgent(conversation);
-        Path agentWorkspacePath = NomoClawPaths.ensureAgentWorkspace(
-                executionAgent == null ? NomoClawPaths.DEFAULT_AGENT_NAME : executionAgent.getAgentName()
-        );
+        AgentWorkspaceConfig workspaceConfig = resolveWorkspaceConfig(executionAgent);
+        Path agentWorkspacePath = workspaceConfig.workspaceDir();
         for (PlanStep step : steps) {
             if (cancellationRegistry.isCanceled(message.messageUid())) {
                 return RoundExecutionResult.cancelled();
@@ -1210,9 +1210,8 @@ public class AgentApplicationService {
                 return ToolResult.success("定时触发执行时已禁止再次创建定时任务。", artifacts, metrics);
             }
             AgentDefinitionEntity agent = resolveExecutionAgent(conversation);
-            java.nio.file.Path agentWorkspacePath = NomoClawPaths.ensureAgentWorkspace(
-                    agent == null ? NomoClawPaths.DEFAULT_AGENT_NAME : agent.getAgentName()
-            );
+            AgentWorkspaceConfig workspaceConfig = resolveWorkspaceConfig(agent);
+            Path agentWorkspacePath = workspaceConfig.workspaceDir();
             ToolPolicyDecisionResult policyDecision = toolExecutionPolicyGateway.evaluateStep(
                     step,
                     agentWorkspacePath,
@@ -1252,7 +1251,9 @@ public class AgentApplicationService {
                     message.messageUid(),
                     agent == null ? "" : agent.getAgentUid(),
                     agent == null ? "" : agent.getAgentName(),
-                    agentWorkspacePath,
+                    workspaceConfig.workspaceDir(),
+                    workspaceConfig.tmpDir(),
+                    workspaceConfig.reportDir(),
                     step,
                     timeoutMs,
                     progress -> publishStepProgress(message, step, roundIndex, currentAttempt, progress)
@@ -1600,13 +1601,19 @@ public class AgentApplicationService {
                                                           String sessionId,
                                                           String messageUid) {
         AgentGroupDefinitionEntity group = resolveConversationGroup(conversation);
+        String agentName = executionAgent == null ? NomoClawPaths.DEFAULT_AGENT_NAME : executionAgent.getAgentName();
+        AgentWorkspaceConfig workspaceConfig = resolveWorkspaceConfig(executionAgent);
         return PromptLoader.PromptContext.forAgent(
                 sessionId,
                 messageUid,
                 conversation.channel() == null || conversation.channel().isBlank() ? "web" : conversation.channel(),
                 group == null ? "" : group.getGroupName(),
-                executionAgent == null ? "" : executionAgent.getAgentName(),
-                NomoClawPaths.root()
+                agentName,
+                NomoClawPaths.root(),
+                NomoClawPaths.agentHome(agentName),
+                workspaceConfig.workspaceDir(),
+                workspaceConfig.tmpDir(),
+                workspaceConfig.reportDir()
         );
     }
 
@@ -2418,6 +2425,7 @@ public class AgentApplicationService {
         if (agent == null) {
             return null;
         }
+        AgentWorkspaceConfig workspaceConfig = resolveWorkspaceConfig(agent);
         String avatarColor = readAvatarColor(agent.getExtConfig());
         List<String> modelIds = readModelIds(agent.getExtConfig(), agent.getModelId());
         return new AgentCatalogAgentDto(
@@ -2430,6 +2438,9 @@ public class AgentApplicationService {
                 nullToEmpty(agent.getModelProviderId()),
                 nullToEmpty(agent.getModelId()),
                 modelIds,
+                workspaceConfig.workspaceDir().toString(),
+                workspaceConfig.reportDir().toString(),
+                workspaceConfig.tmpDir().toString(),
                 agent.getSortIndex() == null ? 0 : agent.getSortIndex(),
                 readStringArray(agent.getCapabilityTags()),
                 member.getMemberRole(),
@@ -2529,6 +2540,39 @@ public class AgentApplicationService {
         return List.copyOf(modelIds);
     }
 
+    private AgentWorkspaceConfig resolveWorkspaceConfig(AgentDefinitionEntity agent) {
+        if (agent == null) {
+            return AgentWorkspaceConfig.defaults(NomoClawPaths.DEFAULT_AGENT_NAME).ensureDirectories();
+        }
+        return AgentWorkspaceConfig.resolve(agent.getAgentName(), agent.getWorkspace()).ensureDirectories();
+    }
+
+    private AgentWorkspaceConfig resolveWorkspaceConfigForMutation(String agentName,
+                                                                   String currentWorkspaceRaw,
+                                                                   String workspaceRaw) {
+        AgentWorkspaceConfig current = AgentWorkspaceConfig.resolve(agentName, currentWorkspaceRaw);
+        Path workspace = parseAbsolutePathOrDefault(workspaceRaw, current.workspaceDir(), "workspace");
+        return AgentWorkspaceConfig.fromWorkspacePath(workspace);
+    }
+
+    private Path parseAbsolutePathOrDefault(String rawValue, Path fallback, String fieldName) {
+        if (rawValue == null || rawValue.trim().isBlank()) {
+            return fallback.toAbsolutePath().normalize();
+        }
+        String trimmed = rawValue.trim();
+        try {
+            Path parsed = Path.of(trimmed);
+            if (!parsed.isAbsolute()) {
+                throw new IllegalArgumentException(fieldName + " must be an absolute path: " + trimmed);
+            }
+            return parsed.toAbsolutePath().normalize();
+        } catch (IllegalArgumentException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("invalid " + fieldName + ": " + trimmed, ex);
+        }
+    }
+
     private int nextAgentSortIndex() {
         return agentDefinitionRepository.listAllActive().stream()
                 .map(AgentDefinitionEntity::getSortIndex)
@@ -2538,7 +2582,7 @@ public class AgentApplicationService {
     }
 
     private void initializeAgentWorkspaceDocs(String agentName, String displayName) {
-        Path workspace = NomoClawPaths.ensureAgentWorkspace(agentName);
+        Path workspace = NomoClawPaths.ensureAgentHome(agentName);
         Map<String, String> defaults = new LinkedHashMap<>();
         String name = (displayName == null || displayName.isBlank()) ? agentName : displayName.trim();
         defaults.put("SOUL.md", "# SOUL\n\n你是 " + name + " 的内核人格，保持清晰、稳健、可执行。\n");
@@ -2611,6 +2655,7 @@ public class AgentApplicationService {
         if (agent == null) {
             return;
         }
+        resolveWorkspaceConfig(agent);
         initializeAgentWorkspaceDocs(agent.getAgentName(), agent.getDisplayName());
     }
 

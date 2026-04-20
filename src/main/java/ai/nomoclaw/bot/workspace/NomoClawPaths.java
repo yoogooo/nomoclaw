@@ -90,9 +90,13 @@ public final class NomoClawPaths {
         return ensureDirectory(runtimeTmpRoot(), "runtime tmp root");
     }
 
-    public static Path agentWorkspace(String agentName) {
+    public static Path agentHome(String agentName) {
         String normalizedName = (agentName == null || agentName.isBlank()) ? DEFAULT_AGENT_NAME : agentName.trim();
         return agentsRoot().resolve(normalizedName).toAbsolutePath().normalize();
+    }
+
+    public static Path agentWorkspace(String agentName) {
+        return agentHome(agentName);
     }
 
     public static Path agentTmp(String agentName) {
@@ -113,6 +117,14 @@ public final class NomoClawPaths {
 
     public static Path ensureAgentWorkspace(String agentName) {
         return ensureAgentWorkspace(agentWorkspace(agentName));
+    }
+
+    public static Path ensureAgentHome(String agentName) {
+        return ensureAgentHome(agentHome(agentName));
+    }
+
+    public static Path ensureAgentHome(Path agentHome) {
+        return ensureDirectory(agentHome, "agent home");
     }
 
     public static Path ensureAgentWorkspace(Path agentWorkspace) {

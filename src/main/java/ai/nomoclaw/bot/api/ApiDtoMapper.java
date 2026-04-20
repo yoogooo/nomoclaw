@@ -76,6 +76,9 @@ public final class ApiDtoMapper {
                 dto.modelProvider(),
                 dto.modelName(),
                 dto.modelNames(),
+                dto.workspace(),
+                dto.reportDir(),
+                dto.tmpDir(),
                 dto.sortIndex(),
                 dto.capabilityTags(),
                 dto.memberRole(),
@@ -508,7 +511,8 @@ public final class ApiDtoMapper {
                 request.avatarColor(),
                 request.modelProvider(),
                 request.modelName(),
-                request.modelNames()
+                request.modelNames(),
+                request.workspace()
         );
     }
 
@@ -521,7 +525,8 @@ public final class ApiDtoMapper {
                 request == null ? null : request.avatarColor(),
                 request == null ? null : request.modelProvider(),
                 request == null ? null : request.modelName(),
-                request == null ? null : request.modelNames()
+                request == null ? null : request.modelNames(),
+                request == null ? null : request.workspace()
         );
     }
 

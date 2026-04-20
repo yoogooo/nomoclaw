@@ -8,6 +8,9 @@ export interface AgentCatalogAgent {
   modelProvider: string;
   modelName: string;
   modelNames: string[];
+  workspace: string;
+  reportDir: string;
+  tmpDir: string;
   sortIndex: number;
   capabilityTags: string[];
   memberRole: string;

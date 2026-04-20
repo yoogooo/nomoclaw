@@ -34,7 +34,9 @@ public class ToolExecutor {
                               String messageUid,
                               String agentUid,
                               String agentName,
-                              java.nio.file.Path agentWorkspacePath,
+                              Path agentWorkspacePath,
+                              Path tmpDirectory,
+                              Path reportDirectory,
                               PlanStep step,
                               long timeoutMs,
                               Consumer<ToolProgress> progressReporter) {
@@ -50,6 +52,8 @@ public class ToolExecutor {
         Path workspace = NomoClawPaths.ensureAgentWorkspace(agentWorkspacePath == null
                 ? NomoClawPaths.agentWorkspace(agentName)
                 : agentWorkspacePath);
+        Path tmpDir = ensureDirectory(tmpDirectory == null ? NomoClawPaths.agentTmp(workspace) : tmpDirectory, "agent tmp");
+        Path reportDir = ensureDirectory(reportDirectory == null ? NomoClawPaths.agentReport(workspace) : reportDirectory, "agent report");
         ToolRequest request = new ToolRequest(
                 conversationUid,
                 messageUid,
@@ -57,12 +61,22 @@ public class ToolExecutor {
                 agentUid,
                 agentName,
                 workspace,
-                NomoClawPaths.agentTmp(workspace),
-                NomoClawPaths.agentReport(workspace),
+                tmpDir,
+                reportDir,
                 step.toolArgs(),
                 timeoutMs,
                 progressReporter
         );
         return tool.execute(request);
+    }
+
+    private Path ensureDirectory(Path path, String label) {
+        try {
+            Path normalized = path.toAbsolutePath().normalize();
+            java.nio.file.Files.createDirectories(normalized);
+            return normalized;
+        } catch (Exception ex) {
+            throw new IllegalStateException("failed to initialize " + label + ": " + path, ex);
+        }
     }
 }

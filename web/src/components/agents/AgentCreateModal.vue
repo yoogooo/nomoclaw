@@ -13,6 +13,7 @@ const props = defineProps<{
     description: string;
     avatar: string;
     avatarColor: string;
+    workspace: string;
   };
   avatarIconOptions: AvatarIconOption[];
   avatarColorOptions: string[];
@@ -26,6 +27,7 @@ const emit = defineEmits<{
   (e: "update:description", value: string): void;
   (e: "update:avatar", value: string): void;
   (e: "update:avatarColor", value: string): void;
+  (e: "update:workspace", value: string): void;
 }>();
 const { t } = useI18n();
 
@@ -40,6 +42,20 @@ function avatarIconOf(raw: unknown) {
   const key = typeof raw === "string" ? raw.trim().toLowerCase() : "";
   return iconMap.value[key] || null;
 }
+
+function normalizePath(path: string) {
+  return (path || "").trim().replace(/[\\/]+$/, "");
+}
+
+const derivedReportDir = computed(() => {
+  const workspace = normalizePath(props.form.workspace);
+  return workspace ? `${workspace}/report` : "";
+});
+
+const derivedTmpDir = computed(() => {
+  const workspace = normalizePath(props.form.workspace);
+  return workspace ? `${workspace}/tmp` : "";
+});
 </script>
 
 <template>
@@ -63,6 +79,27 @@ function avatarIconOf(raw: unknown) {
       </n-form-item>
       <n-form-item :label="t('agents.basic.description')">
         <n-input :value="form.description" type="textarea" :autosize="{ minRows: 3, maxRows: 6 }" @update:value="emit('update:description', $event)" />
+      </n-form-item>
+      <n-form-item :label="t('agents.basic.workspaceDir')">
+        <n-input
+          :value="form.workspace"
+          :placeholder="t('agents.create.workspaceDirPlaceholder')"
+          @update:value="emit('update:workspace', $event)"
+        />
+      </n-form-item>
+      <n-form-item :label="t('agents.basic.reportDir')">
+        <n-input
+          :value="derivedReportDir"
+          :placeholder="t('agents.create.reportDirPlaceholder')"
+          disabled
+        />
+      </n-form-item>
+      <n-form-item :label="t('agents.basic.tmpDir')">
+        <n-input
+          :value="derivedTmpDir"
+          :placeholder="t('agents.create.tmpDirPlaceholder')"
+          disabled
+        />
       </n-form-item>
       <n-form-item :label="t('agents.basic.iconSelect')">
         <div class="ui-avatar-config">

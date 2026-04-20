@@ -77,6 +77,9 @@ public class HardGuardService {
                     );
                 }
                 if (containsProtectedName(candidate)) {
+                    if (isWithinWorkspace(candidate, details.resolvedCwd())) {
+                        continue;
+                    }
                     return new PermissionDecision(
                             PermissionEffect.ASK,
                             ToolPolicyReasonCode.HARD_GUARD_PROTECTED_PATH_ASK,
@@ -142,6 +145,23 @@ public class HardGuardService {
             }
         }
         return false;
+    }
+
+    private boolean isWithinWorkspace(Path candidate, Path cwd) {
+        if (candidate == null || cwd == null) {
+            return false;
+        }
+        Path normalizedCandidate = candidate.toAbsolutePath().normalize();
+        Path normalizedWorkspace = cwd.toAbsolutePath().normalize();
+        boolean insensitive = isWindows() || isMac();
+        if (!insensitive) {
+            return normalizedCandidate.startsWith(normalizedWorkspace);
+        }
+        String candidateText = normalizedCandidate.toString().toLowerCase(Locale.ROOT);
+        String workspaceText = normalizedWorkspace.toString().toLowerCase(Locale.ROOT);
+        return candidateText.equals(workspaceText)
+                || candidateText.startsWith(workspaceText + "/")
+                || candidateText.startsWith(workspaceText + "\\");
     }
 
     private boolean isSensitiveReadPath(Path path) {

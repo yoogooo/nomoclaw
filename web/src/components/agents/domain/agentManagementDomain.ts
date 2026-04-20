@@ -20,6 +20,7 @@ import { tr } from "@/i18n";
 
 export interface AgentDomainOptions {
   nomoclawRootDir: string;
+  agentsRootDir: string;
   skillsRootDir: string;
   avatarIconKeys: string[];
   avatarColorOptions: string[];
@@ -43,6 +44,16 @@ export function normalizePath(path: string, nomoclawRootDir: string) {
   if (!trimmed) return "";
   if (trimmed.startsWith("/") || /^[a-zA-Z]:[\\/]/.test(trimmed)) return trimmed;
   return joinPath(nomoclawRootDir, trimmed);
+}
+
+export function resolveDefaultWorkspacePaths(agentsRootDir: string, agentName: string) {
+  const normalizedAgentName = (agentName || "").trim() || "default";
+  const workspace = joinPath(agentsRootDir, normalizedAgentName, "workspace");
+  return {
+    workspace,
+    reportDir: joinPath(workspace, "report"),
+    tmpDir: joinPath(workspace, "tmp")
+  };
 }
 
 export function defaultDocs(displayName: string): AgentDocConfig {
@@ -110,11 +121,18 @@ export function normalizeAvatarColor(raw: unknown, options: AgentDomainOptions) 
 
 export function toManagedAgent(agent: AgentCatalogAgent, agentGroupUid: string, options: AgentDomainOptions): ManagedAgent {
   const docs = defaultDocs(agent.displayName || agent.agentName);
+  const defaults = resolveDefaultWorkspacePaths(options.agentsRootDir, agent.agentName);
+  const workspace = normalizePath(agent.workspace || defaults.workspace, options.nomoclawRootDir);
+  const reportDir = joinPath(workspace || defaults.workspace, "report");
+  const tmpDir = joinPath(workspace || defaults.workspace, "tmp");
   return {
     ...agent,
     agentGroupUid,
     avatar: normalizeAvatarIcon(agent.avatar, options),
     avatarColor: normalizeAvatarColor(agent.avatarColor, options),
+    workspace,
+    reportDir,
+    tmpDir,
     managedSkills: (agent.capabilityTags || []).map((skillKey) => ({
       id: `skill_${skillKey}`,
       skillKey,
