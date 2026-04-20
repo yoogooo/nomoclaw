@@ -281,6 +281,7 @@
   /* Layout semantics */
   --layout-main-content-padding-desktop: var(--space-7);
   --layout-main-content-padding-mobile: var(--space-4_5);
+  --layout-directory-rail-width: var(--size-72);
 
   /* Size (Foundation, non-spacing only) */
   --size-1: 1px;

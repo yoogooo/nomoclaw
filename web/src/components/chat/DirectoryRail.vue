@@ -124,6 +124,7 @@ function toggleThemeMode() {
   display: flex;
   width: var(--size-54);
   height: var(--size-54);
+  position: relative;
   align-items: center;
   justify-content: center;
   border: 0;
@@ -134,7 +135,9 @@ function toggleThemeMode() {
 }
 
 .rail-brand {
-  border: var(--size-2) solid var(--color-border-rail-brand);
+  width: var(--size-48);
+  height: var(--size-48);
+  border: var(--size-1) solid var(--color-border-rail-brand);
   background: var(--color-bg-rail-brand);
   color: var(--color-text-rail-brand);
 }
@@ -146,9 +149,24 @@ function toggleThemeMode() {
 }
 
 .rail-item.active {
-  background: var(--color-bg-rail-active);
+  background: transparent;
   color: var(--color-text-inverse);
+  box-shadow: none;
+}
+
+.rail-item.active::before {
+  content: "";
+  position: absolute;
+  inset: var(--space-1);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-rail-active);
   box-shadow: var(--color-shadow-rail-active);
+  z-index: 0;
+}
+
+.rail-item.active .rail-icon {
+  position: relative;
+  z-index: 1;
 }
 
 .rail-theme-toggle {
@@ -164,8 +182,8 @@ function toggleThemeMode() {
 
 .rail-avatar {
   display: flex;
-  width: var(--size-54);
-  height: var(--size-54);
+  width: var(--size-42);
+  height: var(--size-42);
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-pill);
