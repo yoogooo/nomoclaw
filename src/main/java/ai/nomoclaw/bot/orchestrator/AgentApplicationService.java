@@ -1711,6 +1711,7 @@ public class AgentApplicationService {
         payload.put("stepIndex", step.stepIndex());
         payload.put("title", step.title());
         payload.put("toolName", step.toolName());
+        payload.put("command", extractCommandArg(step));
         payload.put("riskLevel", step.riskLevel().name());
         return payload;
     }
@@ -1739,8 +1740,16 @@ public class AgentApplicationService {
         node.put("displayTitle", buildDisplayTitle(step));
         node.put("displaySummary", nullToEmpty(displaySummary));
         node.put("displayDetails", nullToEmpty(displayDetails));
+        node.put("command", extractCommandArg(step));
         node.put("updatedTime", updatedTime == null ? "" : updatedTime.toString());
         return node;
+    }
+
+    private String extractCommandArg(PlanStep step) {
+        if (step == null || step.toolArgs() == null || step.toolArgs().isNull()) {
+            return "";
+        }
+        return step.toolArgs().path("command").asText("");
     }
 
     private ObjectNode resultPayload(PlanStep step, ToolResult result, int attempt, int maxRounds) {
@@ -1948,6 +1957,7 @@ public class AgentApplicationService {
         if (command.isBlank()) {
             return;
         }
+        accumulator.command = command;
         String cwd = step.toolArgs().path("cwd").asText("");
         String commandLine = "执行命令: \"" + command + "\""
                 + (cwd.isBlank() ? "" : "，工作目录: " + cwd);
@@ -2058,6 +2068,7 @@ public class AgentApplicationService {
         private String displayTitle = "";
         private String displaySummary = "";
         private String displayDetails = "";
+        private String command = "";
         private String policyReasonCode = "";
         private Instant updatedTime = Instant.now();
 
@@ -2072,6 +2083,7 @@ public class AgentApplicationService {
             accumulator.displayTitle = displayTitle;
             accumulator.displaySummary = "已规划，等待开始执行";
             accumulator.displayDetails = displayDetails;
+            accumulator.command = step.toolArgs() == null ? "" : step.toolArgs().path("command").asText("");
             return accumulator;
         }
 
@@ -2083,6 +2095,7 @@ public class AgentApplicationService {
             accumulator.displayTitle = node.path("displayTitle").asText("");
             accumulator.displaySummary = node.path("displaySummary").asText("");
             accumulator.displayDetails = node.path("displayDetails").asText("");
+            accumulator.command = node.path("command").asText("");
             accumulator.policyReasonCode = node.path("policyReasonCode").asText("");
             String updated = node.path("updatedTime").asText("");
             if (!updated.isBlank()) {
@@ -2125,6 +2138,9 @@ public class AgentApplicationService {
             if (!node.path("displayDetails").asText("").isBlank()) {
                 displayDetails = node.path("displayDetails").asText("");
             }
+            if (!node.path("command").asText("").isBlank()) {
+                command = node.path("command").asText("");
+            }
             if (!node.path("policyReasonCode").asText("").isBlank()) {
                 policyReasonCode = node.path("policyReasonCode").asText("");
             }
@@ -2148,6 +2164,7 @@ public class AgentApplicationService {
                     displayTitle == null || displayTitle.isBlank() ? "正在处理任务步骤" : displayTitle,
                     displaySummary == null ? "" : displaySummary,
                     displayDetails == null ? "" : displayDetails,
+                    command == null ? "" : command,
                     policyReasonCode == null ? "" : policyReasonCode,
                     updatedTime
             );

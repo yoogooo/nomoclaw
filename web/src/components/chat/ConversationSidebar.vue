@@ -325,7 +325,7 @@ function handleAgentChange(agentUid: string | number | null) {
 .conversation-row {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-2);
+  gap: var(--space-1_5);
   padding: var(--space-4) var(--space-3);
   margin: 0;
   border-left: var(--size-3) solid transparent;
@@ -361,7 +361,7 @@ function handleAgentChange(agentUid: string | number | null) {
   overflow: hidden;
   font-size: var(--text-body-size);
   line-height: 1.4;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--color-text-primary);
 }
 
@@ -395,17 +395,19 @@ function handleAgentChange(agentUid: string | number | null) {
   display: flex;
   flex-shrink: 0;
   align-self: center;
+  margin-right: calc(var(--space-2) * -1);
 }
 
 .history-menu-button {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: var(--size-32);
-  height: var(--size-32);
+  width: var(--size-24);
+  height: var(--size-24);
   border: 0;
   background: transparent;
   color: var(--color-text-tertiary);
+  font-weight: 700;
   cursor: pointer;
   opacity: 0;
   visibility: hidden;

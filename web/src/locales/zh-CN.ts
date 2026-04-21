@@ -185,6 +185,9 @@ const zhCN = {
     },
     approval: {
       waiting: "操作审批",
+      riskPrompt: "检测到命令执行风险，请确认后继续",
+      commandLabel: "待执行命令",
+      commandUnavailable: "当前步骤未提供结构化命令",
       approve: "继续执行",
       approveSession: "允许并记住到本会话",
       approveAgent: "始终允许",

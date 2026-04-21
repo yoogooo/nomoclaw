@@ -778,7 +778,7 @@ a {
 
 .grid-chat {
   display: grid;
-  grid-template-columns: var(--layout-directory-rail-width) var(--size-280) minmax(0, 1fr) var(--size-420);
+  grid-template-columns: var(--layout-directory-rail-width) var(--size-260) minmax(0, 1fr) var(--size-420);
   gap: 0;
   height: 100vh;
   min-height: 100vh;
@@ -787,7 +787,7 @@ a {
 }
 
 .grid-chat.runtime-collapsed {
-  grid-template-columns: var(--layout-directory-rail-width) var(--size-280) minmax(0, 1fr);
+  grid-template-columns: var(--layout-directory-rail-width) var(--size-260) minmax(0, 1fr);
 }
 
 .runtime-expand-toggle {
@@ -1095,6 +1095,12 @@ a {
 .ui-approval-content {
   display: flex;
   flex-direction: column;
+  gap: var(--space-4);
+}
+
+.ui-approval-info {
+  display: flex;
+  flex-direction: column;
   gap: var(--space-3);
 }
 
@@ -1102,7 +1108,6 @@ a {
   display: grid;
   grid-template-columns: var(--space-6) minmax(0, 1fr);
   column-gap: var(--space-2_5);
-  row-gap: var(--space-1_5);
   align-items: center;
 }
 
@@ -1129,7 +1134,6 @@ a {
 
 .ui-approval-headline {
   grid-column: 2;
-  grid-row: 1;
   line-height: 1;
   color: var(--approval-icon-bg);
   font-size: var(--text-lg);
@@ -1137,10 +1141,8 @@ a {
 }
 
 .ui-approval-title {
-  grid-column: 2;
-  grid-row: 2;
   margin-top: 0;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--approval-content-color);
 }
 
@@ -1160,11 +1162,26 @@ a {
   background: var(--approval-body-bg);
 }
 
+.ui-approval-command {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ui-approval-command-label {
+  font-size: var(--text-caption-size);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  letter-spacing: 0.02em;
+}
+
 .ui-approval-actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-2_5);
+  padding-top: var(--space-3);
+  border-top: var(--size-1) solid var(--approval-body-border);
 }
 
 .ui-approval-approve-btn {
@@ -1225,7 +1242,7 @@ a {
 
 @media (max-width: var(--size-breakpoint-xl)) {
   .grid-chat {
-    grid-template-columns: var(--layout-directory-rail-width) var(--size-280) minmax(0, 1fr);
+    grid-template-columns: var(--layout-directory-rail-width) var(--size-260) minmax(0, 1fr);
   }
 
   .grid-chat > .runtime-panel {

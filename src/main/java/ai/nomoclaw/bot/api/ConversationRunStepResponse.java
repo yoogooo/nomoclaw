@@ -10,6 +10,7 @@ public record ConversationRunStepResponse(
         String displayTitle,
         String displaySummary,
         String displayDetails,
+        String command,
         String policyReasonCode,
         Instant updatedTime
 ) {

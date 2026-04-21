@@ -20,7 +20,14 @@ const allowOnceLoading = computed(() => isSubmitting.value && conversationStore.
 const allowAgentLoading = computed(() => isSubmitting.value && conversationStore.approval.submittingAction === "allow_agent");
 const rejectLoading = computed(() => isSubmitting.value && conversationStore.approval.submittingAction === "deny_once");
 const missingStepUid = computed(() => !conversationStore.approval.stepUid);
-const approvalBodyHtml = computed(() => renderMarkdown(conversationStore.approval.body || ""));
+const approvalPrompt = computed(() => conversationStore.approval.title || t("chat.approval.riskPrompt"));
+const approvalBodyHtml = computed(() => {
+  const body = String(conversationStore.approval.body || "").trim();
+  if (body) {
+    return renderMarkdown(body);
+  }
+  return renderMarkdown(`\`\`\`text\n${t("chat.approval.commandUnavailable")}\n\`\`\``);
+});
 
 async function focusAndReveal() {
   await nextTick();
@@ -56,18 +63,23 @@ onMounted(() => {
     :aria-label="t('chat.approval.waiting')"
   >
     <div class="ui-approval-content">
-      <div class="ui-approval-head">
-        <div class="ui-approval-icon" aria-hidden="true">
-          <svg class="ui-approval-icon-svg" viewBox="0 0 24 24" fill="none">
-            <path d="M12 3L19 7V12C19 16.4 16.2 20.2 12 21C7.8 20.2 5 16.4 5 12V7L12 3Z" />
-            <path d="M12 8V13" />
-            <path d="M12 16H12.01" />
-          </svg>
+      <div class="ui-approval-info">
+        <div class="ui-approval-head">
+          <div class="ui-approval-icon" aria-hidden="true">
+            <svg class="ui-approval-icon-svg" viewBox="0 0 24 24" fill="none">
+              <path d="M12 3L19 7V12C19 16.4 16.2 20.2 12 21C7.8 20.2 5 16.4 5 12V7L12 3Z" />
+              <path d="M12 8V13" />
+              <path d="M12 16H12.01" />
+            </svg>
+          </div>
+          <div class="ui-approval-headline">{{ t("chat.approval.waiting") }}</div>
         </div>
-        <div class="ui-approval-headline">{{ t("chat.approval.waiting") }}</div>
-        <div class="ui-approval-title">{{ conversationStore.approval.title }}</div>
+        <div class="ui-approval-title">{{ approvalPrompt }}</div>
+        <div class="ui-approval-command">
+          <div class="ui-approval-command-label">{{ t("chat.approval.commandLabel") }}</div>
+          <div class="ui-approval-body message-html mono" v-html="approvalBodyHtml" />
+        </div>
       </div>
-      <div v-if="conversationStore.approval.body.trim()" class="ui-approval-body message-html mono" v-html="approvalBodyHtml" />
       <div class="ui-approval-actions">
         <n-button
           class="ui-approval-approve-btn"

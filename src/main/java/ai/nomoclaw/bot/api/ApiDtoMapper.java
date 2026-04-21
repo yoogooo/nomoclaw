@@ -257,6 +257,7 @@ public final class ApiDtoMapper {
                 dto.displayTitle(),
                 dto.displaySummary(),
                 dto.displayDetails(),
+                dto.command(),
                 dto.policyReasonCode(),
                 dto.updatedTime()
         );

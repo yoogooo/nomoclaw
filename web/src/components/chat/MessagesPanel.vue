@@ -1385,5 +1385,6 @@ onMounted(() => {
 
 .run-approval-banner {
   margin-top: var(--space-3);
+  align-self: flex-start;
 }
 </style>
