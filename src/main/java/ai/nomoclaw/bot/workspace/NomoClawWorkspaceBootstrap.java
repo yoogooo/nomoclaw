@@ -2,9 +2,13 @@ package ai.nomoclaw.bot.workspace;
 
 import lombok.extern.slf4j.Slf4j;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -12,14 +16,22 @@ import java.util.Map;
 public final class NomoClawWorkspaceBootstrap {
 
     private static final Map<String, String> DEFAULT_AGENT_FILES = buildDefaultAgentFiles();
+    private static final String SKILL_FILE = "SKILL.md";
+    private static final String DEFAULT_BUNDLED_SKILLS_DIR = "skills";
+    private static final String SKILLS_INIT_SENTINEL = ".bootstrap.done";
 
     private NomoClawWorkspaceBootstrap() {
     }
 
     public static void bootstrap(Path rootPath) {
+        bootstrap(rootPath, resolveBundledSkillsRoot());
+    }
+
+    public static void bootstrap(Path rootPath, Path bundledSkillsRoot) {
         Path normalizedRoot = rootPath.toAbsolutePath().normalize();
         Path agentsRoot = normalizedRoot.resolve(NomoClawPaths.AGENTS_DIR_NAME);
         Path defaultAgentRoot = agentsRoot.resolve(NomoClawPaths.DEFAULT_AGENT_NAME);
+        Path skillsRoot = normalizedRoot.resolve(NomoClawPaths.SKILLS_DIR_NAME);
         try {
             NomoClawPaths.ensureAgentWorkspace(defaultAgentRoot);
             for (Map.Entry<String, String> entry : DEFAULT_AGENT_FILES.entrySet()) {
@@ -29,10 +41,93 @@ public final class NomoClawWorkspaceBootstrap {
                 }
             }
             Files.deleteIfExists(defaultAgentRoot.resolve("AGENTS.md"));
+            initializeBundledSkills(bundledSkillsRoot, skillsRoot);
         } catch (Exception ex) {
             throw new IllegalStateException("failed to initialize nomoclaw workspace: " + normalizedRoot, ex);
         }
-        log.info("[Workspace] initialized root={} defaultAgent={}", normalizedRoot, defaultAgentRoot);
+        log.info("[Workspace] initialized root={} defaultAgent={} skillsRoot={}", normalizedRoot, defaultAgentRoot, skillsRoot);
+    }
+
+    private static Path resolveBundledSkillsRoot() {
+        String userDir = System.getProperty("user.dir", "");
+        if (userDir.isBlank()) {
+            return null;
+        }
+        return Path.of(userDir).toAbsolutePath().normalize().resolve(DEFAULT_BUNDLED_SKILLS_DIR);
+    }
+
+    private static void initializeBundledSkills(Path sourceSkillsRoot, Path targetSkillsRoot) throws IOException {
+        Path sentinel = targetSkillsRoot.resolve(SKILLS_INIT_SENTINEL);
+        if (Files.isRegularFile(sentinel)) {
+            return;
+        }
+        // Backward compatibility: old installs may already have copied skills without sentinel.
+        // Detect once, mark as done, and avoid repeated source scans on subsequent startups.
+        if (hasAnyInitializedSkill(targetSkillsRoot)) {
+            markSkillsInitialized(targetSkillsRoot, sentinel);
+            return;
+        }
+        if (sourceSkillsRoot == null || !Files.isDirectory(sourceSkillsRoot)) {
+            log.info("[Workspace] bundled skills source not found, skip initialization source={}", sourceSkillsRoot);
+            return;
+        }
+        Files.createDirectories(targetSkillsRoot);
+        try (var children = Files.list(sourceSkillsRoot)) {
+            children.filter(Files::isDirectory)
+                    .forEach(skillDir -> copySkillDirectoryIfNeeded(skillDir, targetSkillsRoot.resolve(skillDir.getFileName())));
+        }
+        markSkillsInitialized(targetSkillsRoot, sentinel);
+    }
+
+    private static void copySkillDirectoryIfNeeded(Path sourceSkillDir, Path targetSkillDir) {
+        Path sourceSkillFile = sourceSkillDir.resolve(SKILL_FILE);
+        if (!Files.isRegularFile(sourceSkillFile)) {
+            return;
+        }
+        if (Files.exists(targetSkillDir)) {
+            return;
+        }
+        try {
+            copyDirectory(sourceSkillDir, targetSkillDir);
+            log.info("[Workspace] initialized bundled skill source={} target={}", sourceSkillDir, targetSkillDir);
+        } catch (IOException ex) {
+            throw new IllegalStateException("failed to initialize bundled skill: " + sourceSkillDir, ex);
+        }
+    }
+
+    private static void copyDirectory(Path sourceDir, Path targetDir) throws IOException {
+        Files.walkFileTree(sourceDir, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                Path relative = sourceDir.relativize(dir);
+                Files.createDirectories(targetDir.resolve(relative));
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                Path relative = sourceDir.relativize(file);
+                Files.copy(file, targetDir.resolve(relative));
+                return FileVisitResult.CONTINUE;
+            }
+        });
+    }
+
+    private static boolean hasAnyInitializedSkill(Path targetSkillsRoot) throws IOException {
+        if (!Files.isDirectory(targetSkillsRoot)) {
+            return false;
+        }
+        try (var children = Files.list(targetSkillsRoot)) {
+            return children.filter(Files::isDirectory)
+                    .anyMatch(skillDir -> Files.isRegularFile(skillDir.resolve(SKILL_FILE)));
+        }
+    }
+
+    private static void markSkillsInitialized(Path targetSkillsRoot, Path sentinel) throws IOException {
+        Files.createDirectories(targetSkillsRoot);
+        if (Files.notExists(sentinel)) {
+            Files.writeString(sentinel, "initialized", StandardCharsets.UTF_8);
+        }
     }
 
     private static Map<String, String> buildDefaultAgentFiles() {

@@ -425,7 +425,10 @@ INSERT INTO tool_definition (
 INSERT INTO skill_definition (
     skill_key, display_name, description, skill_path, status, sort_index, config_json, created_time, updated_time
 ) VALUES
-    ('pdf', 'pdf', 'Use this skill whenever the task involves reading or generating PDFs.', 'skills/pdf', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3));
+    ('pdf', 'pdf', 'Use this skill whenever the task involves reading or generating PDFs.', 'skills/pdf', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('xlsx', 'xlsx', 'Use this skill whenever the task involves spreadsheet files (.xlsx/.xls/.csv/.tsv).', 'skills/xlsx', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('pptx', 'pptx', 'Use this skill whenever the task involves creating or editing PowerPoint presentations.', 'skills/pptx', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('docx', 'docx', 'Use this skill whenever the task involves creating or editing Word documents with formatting fidelity.', 'skills/docx', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3));
 
 INSERT INTO agent_tool_relation (
     relation_uid, agent_uid, tool_key, status, sort_index, config_json, created_time, updated_time
@@ -461,9 +464,21 @@ INSERT INTO agent_skill_relation (
     relation_uid, agent_uid, skill_key, status, sort_index, config_json, created_time, updated_time
 ) VALUES
     ('rel_general_pdf', 'agent_general_assistant', 'pdf', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_general_xlsx', 'agent_general_assistant', 'xlsx', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_general_pptx', 'agent_general_assistant', 'pptx', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_general_docx', 'agent_general_assistant', 'docx', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
     ('rel_test_pdf', 'agent_test_expert', 'pdf', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_test_xlsx', 'agent_test_expert', 'xlsx', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_test_pptx', 'agent_test_expert', 'pptx', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_test_docx', 'agent_test_expert', 'docx', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
     ('rel_public_pdf', 'agent_public_opinion', 'pdf', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_market_pdf', 'agent_marketing_assistant', 'pdf', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3));
+    ('rel_public_xlsx', 'agent_public_opinion', 'xlsx', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_public_pptx', 'agent_public_opinion', 'pptx', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_public_docx', 'agent_public_opinion', 'docx', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_market_pdf', 'agent_marketing_assistant', 'pdf', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_market_xlsx', 'agent_marketing_assistant', 'xlsx', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_market_pptx', 'agent_marketing_assistant', 'pptx', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_market_docx', 'agent_marketing_assistant', 'docx', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3));
 
 INSERT INTO agent_tip (
     tip_uid, agent_uid, title, summary, source_content, source_conversation_uid, source_message_uid,

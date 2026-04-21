@@ -368,7 +368,10 @@ INSERT INTO tool_definition (
 INSERT INTO skill_definition (
     skill_key, display_name, description, skill_path, status, sort_index, config_json, created_time, updated_time
 ) VALUES
-    ('pdf', 'pdf', 'Use this skill whenever the task involves reading or generating PDFs.', 'skills/pdf', 'ACTIVE', 10, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+    ('pdf', 'pdf', 'Use this skill whenever the task involves reading or generating PDFs.', 'skills/pdf', 'ACTIVE', 10, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('xlsx', 'xlsx', 'Use this skill whenever the task involves spreadsheet files (.xlsx/.xls/.csv/.tsv).', 'skills/xlsx', 'ACTIVE', 20, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('pptx', 'pptx', 'Use this skill whenever the task involves creating or editing PowerPoint presentations.', 'skills/pptx', 'ACTIVE', 30, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('docx', 'docx', 'Use this skill whenever the task involves creating or editing Word documents with formatting fidelity.', 'skills/docx', 'ACTIVE', 40, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO agent_tool_relation (
     relation_uid, agent_uid, tool_key, status, sort_index, config_json, created_time, updated_time
@@ -388,7 +391,10 @@ INSERT INTO agent_tool_relation (
 INSERT INTO agent_skill_relation (
     relation_uid, agent_uid, skill_key, status, sort_index, config_json, created_time, updated_time
 ) VALUES
-    ('rel_general_pdf', 'agent_general_assistant', 'pdf', 'ACTIVE', 10, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+    ('rel_general_pdf', 'agent_general_assistant', 'pdf', 'ACTIVE', 10, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('rel_general_xlsx', 'agent_general_assistant', 'xlsx', 'ACTIVE', 20, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('rel_general_pptx', 'agent_general_assistant', 'pptx', 'ACTIVE', 30, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('rel_general_docx', 'agent_general_assistant', 'docx', 'ACTIVE', 40, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO agent_tip (
     tip_uid, agent_uid, title, summary, source_content, source_conversation_uid, source_message_uid,
