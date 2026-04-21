@@ -22,7 +22,6 @@ import type {
   ModelProviderOption,
   UploadPolicy
 } from "@/types/api";
-import { approvalActionSummary } from "@/utils/format";
 
 interface ApprovalState {
   stepUid: string | null;
@@ -386,26 +385,14 @@ export const useConversationStore = defineStore("conversation", () => {
     return name;
   }
 
-  function buildApprovalBodyFromStep(step: ConversationRunStep) {
-    const details = (step.displayDetails || step.displaySummary || "").trim();
-    const main = details || tr("chat.runtime.stepNeedApproval", { index: step.stepIndex || "-" });
-    return `${main}\n\n${approvalRiskHintByReason(step.policyReasonCode || "")}`;
+  function approvalBodyMarkdownFromCommand(command: string) {
+    const cmd = String(command || "").trim();
+    if (!cmd) return "";
+    return `\`\`\`bash\n${cmd}\n\`\`\``;
   }
 
-  function approvalRiskHintByReason(reasonCode: string) {
-    const key = String(reasonCode || "").trim().toUpperCase();
-    if (!key) {
-      return tr("chat.runtime.approvalRiskHint");
-    }
-    const mapped = {
-      HARD_GUARD_SENSITIVE_PATH_READ_ASK: "chat.runtime.approvalRiskHintSensitiveRead",
-      HARD_GUARD_PROTECTED_PATH_ASK: "chat.runtime.approvalRiskHintProtectedPath",
-      HARD_GUARD_SYSTEM_PATH_DENY: "chat.runtime.approvalRiskHintSystemPathDeny",
-      RULE_ASK_MATCHED: "chat.runtime.approvalRiskHintRuleAsk",
-      DEFAULT_REQUIRE_APPROVAL: "chat.runtime.approvalRiskHintDefaultAsk"
-    } as const;
-    const target = mapped[key as keyof typeof mapped];
-    return target ? tr(target) : tr("chat.runtime.approvalRiskHint");
+  function buildApprovalBodyFromStep(step: ConversationRunStep) {
+    return approvalBodyMarkdownFromCommand(step.command || "");
   }
 
   function restoreApprovalFromRuns(runs: ConversationMessageRun[]) {
@@ -1027,6 +1014,8 @@ export const useConversationStore = defineStore("conversation", () => {
 
   function handleRunStepEvent(event: AgentEvent) {
     if (!event.messageUid || !event.stepUid) return;
+    const toolArgs = event.payload.toolArgs || {};
+    const command = String(toolArgs.command || "").trim();
     conversationRunsStore.updateRunStep(event.messageUid, event.stepUid, {
       roundIndex: event.payload.roundIndex || 1,
       stepIndex: event.payload.stepIndex || 1,
@@ -1034,17 +1023,19 @@ export const useConversationStore = defineStore("conversation", () => {
       displayTitle: event.payload.displayTitle || tr("chat.runtime.processingStep"),
       displaySummary: event.payload.displaySummary || "",
       displayDetails: event.payload.displayDetails || "",
+      command,
       policyReasonCode: event.payload.policyReasonCode || "",
       updatedTime: new Date().toISOString()
     });
   }
 
   function showApprovalAlert(event: AgentEvent) {
-    const reasonCode = String(event.payload.policyReasonCode || "");
+    const toolArgs = event.payload.toolArgs || {};
+    const command = String(toolArgs.command || "").trim();
     approval.value = {
       stepUid: event.stepUid || null,
       title: event.payload.title || tr("chat.runtime.highRiskStep"),
-      body: `${tr("chat.runtime.stepPrefix", { index: event.payload.stepIndex || "-" })}：${approvalActionSummary(event.payload)}\n\n${approvalRiskHintByReason(reasonCode)}`,
+      body: approvalBodyMarkdownFromCommand(command),
       riskLevel: event.payload.riskLevel || "HIGH",
       submitting: approval.value.stepUid === (event.stepUid || null) ? approval.value.submitting : false,
       submittingAction: approval.value.stepUid === (event.stepUid || null) ? approval.value.submittingAction : null

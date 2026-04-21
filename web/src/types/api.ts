@@ -313,6 +313,7 @@ export interface ConversationRunStep {
   displayTitle: string;
   displaySummary: string;
   displayDetails: string;
+  command?: string;
   policyReasonCode?: string;
   updatedTime: string;
 }

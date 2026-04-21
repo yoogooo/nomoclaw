@@ -165,7 +165,6 @@ const enUS = {
       approvalRiskHintSensitiveRead: "Risk notice: reading this sensitive path may expose keys or credentials. Please confirm manually.",
       approvalRiskHintProtectedPath: "Risk notice: the target is under a protected directory. Confirm this action matches your intent before proceeding.",
       approvalRiskHintSystemPathDeny: "Risk notice: this targets a critical system path and is high risk. Rejecting is recommended.",
-      approvalRiskHintRuleAsk: "Risk notice: this action matched an ask rule and requires your confirmation.",
       approvalRiskHintDefaultAsk: "Risk notice: no allow rule matched, so manual confirmation is required by default.",
       stepPrefix: "Step {index}",
       planCreatedWithoutSteps: "Plan created, but no displayable steps.",

@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { NButton } from "naive-ui";
 import { useConversationStore } from "@/stores/conversation";
+import { renderMarkdown } from "@/utils/markdown";
 
 const props = withDefaults(defineProps<{
   forceVisible?: boolean;
@@ -19,6 +20,7 @@ const allowOnceLoading = computed(() => isSubmitting.value && conversationStore.
 const allowAgentLoading = computed(() => isSubmitting.value && conversationStore.approval.submittingAction === "allow_agent");
 const rejectLoading = computed(() => isSubmitting.value && conversationStore.approval.submittingAction === "deny_once");
 const missingStepUid = computed(() => !conversationStore.approval.stepUid);
+const approvalBodyHtml = computed(() => renderMarkdown(conversationStore.approval.body || ""));
 
 async function focusAndReveal() {
   await nextTick();
@@ -55,13 +57,17 @@ onMounted(() => {
   >
     <div class="ui-approval-content">
       <div class="ui-approval-head">
-        <div class="ui-approval-icon" aria-hidden="true">!</div>
-        <div>
-          <div class="ui-approval-headline">{{ t("chat.approval.waiting") }}</div>
-          <div class="ui-approval-title">{{ conversationStore.approval.title }}</div>
+        <div class="ui-approval-icon" aria-hidden="true">
+          <svg class="ui-approval-icon-svg" viewBox="0 0 24 24" fill="none">
+            <path d="M12 3L19 7V12C19 16.4 16.2 20.2 12 21C7.8 20.2 5 16.4 5 12V7L12 3Z" />
+            <path d="M12 8V13" />
+            <path d="M12 16H12.01" />
+          </svg>
         </div>
+        <div class="ui-approval-headline">{{ t("chat.approval.waiting") }}</div>
+        <div class="ui-approval-title">{{ conversationStore.approval.title }}</div>
       </div>
-      <pre class="ui-approval-body mono">{{ conversationStore.approval.body }}</pre>
+      <div v-if="conversationStore.approval.body.trim()" class="ui-approval-body message-html mono" v-html="approvalBodyHtml" />
       <div class="ui-approval-actions">
         <n-button
           class="ui-approval-approve-btn"

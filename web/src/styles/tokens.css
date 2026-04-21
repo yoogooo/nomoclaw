@@ -144,9 +144,9 @@
   --color-border-brand-inner: rgba(15, 118, 110, 0.12);
 
   /* Approval semantic tokens */
-  --approval-card-border: var(--color-border-brand-light);
+  --approval-card-border: var(--color-border-strong);
   --approval-card-bg: var(--color-bg-surface-soft);
-  --approval-card-focus-border: var(--color-border-brand-hover);
+  --approval-card-focus-border: var(--color-border-strong);
   --approval-content-color: var(--color-text-body-alt);
   --approval-heading-color: var(--color-text-heading);
   --approval-body-bg: var(--color-bg-surface-mute);
@@ -173,6 +173,14 @@
   --color-button-danger-bg: var(--color-accent-danger);
   --color-button-danger-bg-hover: var(--color-accent-danger-hover);
   --color-button-danger-text: var(--color-text-inverse);
+  --color-button-danger-primary-bg: var(--color-button-danger-bg);
+  --color-button-danger-primary-bg-hover: var(--color-button-danger-bg-hover);
+  --color-button-danger-primary-text: var(--color-button-danger-text);
+  --color-button-danger-secondary-bg: var(--color-overlay-danger-soft);
+  --color-button-danger-secondary-bg-hover: rgba(181, 75, 54, 0.22);
+  --color-button-danger-secondary-border: rgba(182, 75, 54, 0.32);
+  --color-button-danger-secondary-border-hover: rgba(182, 75, 54, 0.44);
+  --color-button-danger-secondary-text: var(--color-text-danger-strong);
   --color-composer-stop-bg: #000000;
   --color-composer-stop-bg-hover: #141414;
   --color-composer-stop-fg: #FFFFFF;
@@ -465,14 +473,22 @@
   --color-shadow-surface: rgba(0, 0, 0, 0.42);
   --color-accent-brand: #36CBB5;
   --color-accent-brand-hover: #4FDBC7;
-  --color-accent-danger: #FF6B6B;
-  --color-accent-danger-hover: #FF8585;
+  --color-accent-danger: #B94E4E;
+  --color-accent-danger-hover: #C95C5C;
   --color-button-primary-bg: var(--color-accent-brand);
   --color-button-primary-bg-hover: var(--color-accent-brand-hover);
   --color-button-primary-text: var(--color-bg-runtime);
   --color-button-danger-bg: var(--color-accent-danger);
   --color-button-danger-bg-hover: var(--color-accent-danger-hover);
   --color-button-danger-text: var(--color-text-inverse);
+  --color-button-danger-primary-bg: var(--color-button-danger-bg);
+  --color-button-danger-primary-bg-hover: var(--color-button-danger-bg-hover);
+  --color-button-danger-primary-text: #F8EDEA;
+  --color-button-danger-secondary-bg: rgba(255, 107, 107, 0.16);
+  --color-button-danger-secondary-bg-hover: rgba(255, 107, 107, 0.24);
+  --color-button-danger-secondary-border: rgba(255, 107, 107, 0.34);
+  --color-button-danger-secondary-border-hover: rgba(255, 107, 107, 0.5);
+  --color-button-danger-secondary-text: #FFB7B7;
   --color-composer-stop-bg: #F2F3F5;
   --color-composer-stop-bg-hover: #FFFFFF;
   --color-composer-stop-fg: #000000;
@@ -489,6 +505,7 @@
   --approval-body-bg: #141518;
   --approval-content-color: #E1E4E9;
   --approval-heading-color: #F2F3F5;
+  --approval-icon-bg: #F0B35A;
   --color-overlay-brand-08: rgba(54, 203, 181, 0.14);
   --color-overlay-brand-12: rgba(54, 203, 181, 0.18);
   --color-overlay-brand-15: rgba(54, 203, 181, 0.22);

@@ -1099,33 +1099,54 @@ a {
 }
 
 .ui-approval-head {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2_5);
+  display: grid;
+  grid-template-columns: var(--space-6) minmax(0, 1fr);
+  column-gap: var(--space-2_5);
+  row-gap: var(--space-1_5);
+  align-items: center;
 }
 
 .ui-approval-icon {
-  width: var(--space-7);
-  height: var(--space-7);
+  grid-column: 1;
+  grid-row: 1;
+  width: var(--space-6);
+  height: var(--space-6);
+  flex: 0 0 var(--space-6);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-pill);
-  background: var(--approval-icon-bg);
-  color: var(--approval-icon-color);
-  font-weight: 800;
+  color: var(--approval-icon-bg);
+}
+
+.ui-approval-icon-svg {
+  width: var(--space-6);
+  height: var(--space-6);
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .ui-approval-headline {
-  color: var(--approval-heading-color);
-  font-size: var(--text-title-md-size);
+  grid-column: 2;
+  grid-row: 1;
+  line-height: 1;
+  color: var(--approval-icon-bg);
+  font-size: var(--text-lg);
   font-weight: 700;
 }
 
 .ui-approval-title {
-  margin-top: var(--space-1_5);
+  grid-column: 2;
+  grid-row: 2;
+  margin-top: 0;
   font-weight: 700;
   color: var(--approval-content-color);
+}
+
+:root:not([data-theme="dark"]) .ui-approval-title {
+  color: var(--color-text-secondary);
+  font-weight: 600;
 }
 
 .ui-approval-body {
@@ -1142,18 +1163,55 @@ a {
 .ui-approval-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--space-2_5);
 }
 
 .ui-approval-approve-btn {
-  color: var(--approval-content-color);
-  border-color: var(--approval-approve-border);
-  background: var(--approval-approve-bg);
+  color: var(--color-text-secondary) !important;
+  border: var(--size-1) solid var(--color-border-strong) !important;
+  background: var(--color-bg-surface-soft) !important;
+  box-shadow: none !important;
 }
 
 .ui-approval-approve-btn:hover {
-  border-color: var(--approval-approve-hover-border);
-  background: var(--approval-approve-hover-bg);
+  color: var(--color-text-primary) !important;
+  border-color: var(--color-border-active) !important;
+  background: var(--color-bg-soft-hover) !important;
+}
+
+/* Danger button style system:
+ * - primary: filled red
+ * - secondary: soft red surface with border
+ */
+.n-button--error-type:not(.n-button--secondary-type):not(.n-button--tertiary-type):not(.n-button--quaternary-type):not(.n-button--text-type) {
+  --n-color: var(--color-button-danger-primary-bg) !important;
+  --n-color-hover: var(--color-button-danger-primary-bg-hover) !important;
+  --n-color-pressed: var(--color-button-danger-primary-bg-hover) !important;
+  --n-border: var(--size-1) solid var(--color-button-danger-primary-bg) !important;
+  --n-border-hover: var(--size-1) solid var(--color-button-danger-primary-bg-hover) !important;
+  --n-border-pressed: var(--size-1) solid var(--color-button-danger-primary-bg-hover) !important;
+  --n-text-color: var(--color-button-danger-primary-text) !important;
+  --n-text-color-hover: var(--color-button-danger-primary-text) !important;
+  --n-text-color-pressed: var(--color-button-danger-primary-text) !important;
+}
+
+.n-button--error-type.n-button--secondary-type {
+  --n-color: var(--color-button-danger-secondary-bg) !important;
+  --n-color-hover: var(--color-button-danger-secondary-bg-hover) !important;
+  --n-color-pressed: var(--color-button-danger-secondary-bg-hover) !important;
+  --n-border: var(--size-1) solid var(--color-button-danger-secondary-border) !important;
+  --n-border-hover: var(--size-1) solid var(--color-button-danger-secondary-border-hover) !important;
+  --n-border-pressed: var(--size-1) solid var(--color-button-danger-secondary-border-hover) !important;
+  --n-text-color: var(--color-button-danger-secondary-text) !important;
+  --n-text-color-hover: var(--color-button-danger-secondary-text) !important;
+  --n-text-color-pressed: var(--color-button-danger-secondary-text) !important;
+}
+
+.ui-approval-reject-btn {
+  --n-text-color: var(--color-button-danger-primary-text) !important;
+  --n-text-color-hover: var(--color-button-danger-primary-text) !important;
+  --n-text-color-pressed: var(--color-button-danger-primary-text) !important;
 }
 
 /* Naive UI Drawer: enforce square corners globally */

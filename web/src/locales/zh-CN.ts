@@ -165,7 +165,6 @@ const zhCN = {
       approvalRiskHintSensitiveRead: "风险说明：检测到敏感信息路径读取，可能导致密钥或凭据泄露，请手动确认。",
       approvalRiskHintProtectedPath: "风险说明：目标位于受保护目录，继续执行前请确认本次操作符合你的预期。",
       approvalRiskHintSystemPathDeny: "风险说明：目标涉及系统关键路径，存在高风险，建议拒绝本次操作。",
-      approvalRiskHintRuleAsk: "风险说明：命中询问规则，需你确认后才能继续执行。",
       approvalRiskHintDefaultAsk: "风险说明：未命中放行规则，系统默认要求人工确认。",
       stepPrefix: "步骤 {index}",
       planCreatedWithoutSteps: "计划已生成，但没有可展示的步骤。",
@@ -185,10 +184,10 @@ const zhCN = {
       messageCanceled: "消息处理已取消"
     },
     approval: {
-      waiting: "操作待确认",
+      waiting: "操作审批",
       approve: "继续执行",
       approveSession: "允许并记住到本会话",
-      approveAgent: "允许并记住到当前Agent",
+      approveAgent: "始终允许",
       approveUser: "允许并记住到全局",
       approving: "继续执行中",
       reject: "拒绝本次操作",
