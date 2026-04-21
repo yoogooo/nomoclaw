@@ -4,12 +4,7 @@ import ai.nomoclaw.bot.api.PermissionRulePayload;
 import ai.nomoclaw.bot.api.PermissionRulesResponse;
 import ai.nomoclaw.bot.api.UpdatePermissionRulesRequest;
 import ai.nomoclaw.bot.policy.tool.ToolPermissionPolicyService;
-import ai.nomoclaw.bot.policy.tool.permission.PermissionEffect;
-import ai.nomoclaw.bot.policy.tool.permission.PermissionResourceType;
-import ai.nomoclaw.bot.policy.tool.permission.PermissionRule;
-import ai.nomoclaw.bot.policy.tool.permission.PermissionSettingsStore;
-import ai.nomoclaw.bot.policy.tool.permission.PermissionSource;
-import ai.nomoclaw.bot.policy.tool.permission.HardGuardService;
+import ai.nomoclaw.bot.policy.tool.permission.*;
 import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
 import ai.nomoclaw.bot.store.repository.AgentDefinitionRepository;
 import ai.nomoclaw.bot.tool.PathResolver;
@@ -19,11 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.nio.file.Path;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.regex.Pattern;
 
 @Service

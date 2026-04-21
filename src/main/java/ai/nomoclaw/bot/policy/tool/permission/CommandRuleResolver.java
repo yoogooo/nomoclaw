@@ -26,6 +26,7 @@ public class CommandRuleResolver {
     private static final Set<String> READONLY_POWERSHELL_COMMANDS = Set.of(
             "get-childitem", "ls", "dir",
             "get-content", "gc", "cat", "type",
+            "select-object",
             "select-string",
             "measure-object",
             "sort-object",

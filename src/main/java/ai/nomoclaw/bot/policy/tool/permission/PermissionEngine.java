@@ -89,7 +89,7 @@ public class PermissionEngine {
                     ToolPolicyReasonCode.RULE_ALLOW_MATCHED,
                     "命中浏览器工具基线放行。",
                     PermissionSource.COMMAND,
-                    "builtin-browser-allow",
+                    "builtin-browser-open-allow",
                     firstPath(details),
                     false
             );
