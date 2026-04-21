@@ -167,16 +167,6 @@ public class ToolSpecificationRegistry {
                                 .required("query")
                                 .additionalProperties(true)
                                 .build())
-                        .build(),
-                ToolSpecification.builder()
-                        .name("send_file_tool")
-                        .description("Prepare a local file for sending to the user. Relative paths are resolved from the current agent workspace; prefer files under report/.")
-                        .parameters(JsonObjectSchema.builder()
-                                .description("File sending arguments")
-                                .addStringProperty("filePath", "Path to the file. Relative paths are resolved from the current agent workspace.")
-                                .required("filePath")
-                                .additionalProperties(true)
-                                .build())
                         .build()
         );
         this.toolSpecificationsByName = toolSpecifications.stream()

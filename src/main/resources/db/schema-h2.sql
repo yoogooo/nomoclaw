@@ -363,8 +363,7 @@ INSERT INTO tool_definition (
     ('desktop_screenshot_tool', '桌面截图', 'Capture a desktop screenshot on the local machine.', 'LOW', 'ACTIVE', 80, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('current_time_tool', '当前时间', 'Get the current UTC time.', 'LOW', 'ACTIVE', 90, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('token_usage_tool', 'Token 使用', 'Query stored token usage summary from message records.', 'LOW', 'ACTIVE', 100, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('memory_search_tool', '记忆搜索', 'Search historical conversation messages by keyword.', 'LOW', 'ACTIVE', 110, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('send_file_tool', '发送文件', 'Prepare a local file for sending to the user.', 'LOW', 'ACTIVE', 120, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+    ('memory_search_tool', '记忆搜索', 'Search historical conversation messages by keyword.', 'LOW', 'ACTIVE', 110, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO skill_definition (
     skill_key, display_name, description, skill_path, status, sort_index, config_json, created_time, updated_time
@@ -384,8 +383,7 @@ INSERT INTO agent_tool_relation (
     ('rel_general_shot', 'agent_general_assistant', 'desktop_screenshot_tool', 'ACTIVE', 80, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('rel_general_time', 'agent_general_assistant', 'current_time_tool', 'ACTIVE', 90, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('rel_general_token', 'agent_general_assistant', 'token_usage_tool', 'ACTIVE', 100, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_general_memory', 'agent_general_assistant', 'memory_search_tool', 'ACTIVE', 110, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_general_send', 'agent_general_assistant', 'send_file_tool', 'ACTIVE', 120, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+    ('rel_general_memory', 'agent_general_assistant', 'memory_search_tool', 'ACTIVE', 110, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO agent_skill_relation (
     relation_uid, agent_uid, skill_key, status, sort_index, config_json, created_time, updated_time

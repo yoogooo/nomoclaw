@@ -253,7 +253,8 @@ public class PermissionEngine {
             return toolName.startsWith(prefix);
         }
         if ("file_*".equals(ruleTool)) {
-            return "file_tool".equals(toolName) || "file_io_tool".equals(toolName);
+            return "file_tool".equals(toolName)
+                    || "file_io_tool".equals(toolName);
         }
         return ruleTool.equals(toolName);
     }

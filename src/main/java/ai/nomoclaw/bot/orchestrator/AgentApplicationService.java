@@ -1408,7 +1408,6 @@ public class AgentApplicationService {
             case "cron_tool" -> "正在创建定时任务";
             case "desktop_screenshot_tool" -> "正在截取桌面画面";
             case "file_search_tool" -> "正在搜索文件内容";
-            case "send_file_tool" -> "正在准备发送文件";
             default -> step.title() == null || step.title().isBlank() ? "正在处理任务步骤" : step.title();
         };
     }
@@ -1483,7 +1482,6 @@ public class AgentApplicationService {
                 }
                 yield prefix + " 输出如下：\n" + abbreviate(outputBody, 1200);
             }
-            case "send_file_tool" -> "文件已准备完成，可以发送给用户。";
             case "cron_tool" -> "定时任务已创建完成。";
             default -> hasMeaningfulText(result.output()) ? abbreviate(result.output(), 140) : "这一步已顺利完成。";
         };
