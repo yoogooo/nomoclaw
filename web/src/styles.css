@@ -1153,19 +1153,28 @@ a {
 
 .ui-approval-body {
   margin: 0;
-  white-space: pre-wrap;
   color: var(--approval-content-color);
-  line-height: 1.8;
-  padding: var(--space-3);
-  border-radius: var(--radius-md);
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.ui-approval-body pre {
+  margin: 0;
+  padding: var(--space-3_5) var(--space-4);
+  border-radius: var(--radius-lg);
   border: var(--size-1) solid var(--approval-body-border);
   background: var(--approval-body-bg);
+}
+
+.ui-approval-body code:not(pre code) {
+  background: color-mix(in srgb, var(--approval-body-bg) 70%, transparent);
 }
 
 .ui-approval-command {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-1_5);
 }
 
 .ui-approval-command-label {
