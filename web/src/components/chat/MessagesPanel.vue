@@ -1175,7 +1175,13 @@ onMounted(() => {
   min-width: 0;
 }
 
+.message-wrap.user .run-card {
+  align-self: flex-start;
+}
+
 .run-title {
+  width: 100%;
+  text-align: left;
   font-size: var(--text-body-size);
   font-weight: 700;
   letter-spacing: 0.12em;
