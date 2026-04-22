@@ -31,6 +31,8 @@ import java.util.Optional;
 public class MybatisPlusAgentStore implements AgentStore {
 
     private static final ZoneId SYSTEM_ZONE = ZoneId.systemDefault();
+    private static final int MAX_STEP_TITLE_LENGTH = 255;
+    private static final int MAX_STEP_DONE_CRITERIA_LENGTH = 512;
 
     private final AgentConversationRepository conversationRepository;
     private final AgentMessageRepository messageRepository;
@@ -253,10 +255,10 @@ public class MybatisPlusAgentStore implements AgentStore {
             entity.setConversationUid(conversationUid);
             entity.setRoundIndex(step.roundIndex());
             entity.setStepIndex(step.stepIndex());
-            entity.setTitle(step.title());
+            entity.setTitle(truncate(step.title(), MAX_STEP_TITLE_LENGTH));
             entity.setToolName(step.toolName());
             entity.setToolArgs(JsonUtil.toJson(step.toolArgs()));
-            entity.setDoneCriteria(step.doneCriteria());
+            entity.setDoneCriteria(truncate(step.doneCriteria(), MAX_STEP_DONE_CRITERIA_LENGTH));
             entity.setRiskLevel(step.riskLevel().name());
             entity.setStatus(step.status().name());
             entity.setRetryCount(step.retryCount());
@@ -267,6 +269,19 @@ public class MybatisPlusAgentStore implements AgentStore {
             entity.setUpdatedTime(now);
             stepRepository.save(entity);
         }
+    }
+
+    private String truncate(String value, int maxLength) {
+        if (value == null) {
+            return "";
+        }
+        if (maxLength <= 0 || value.length() <= maxLength) {
+            return value;
+        }
+        if (maxLength <= 3) {
+            return value.substring(0, maxLength);
+        }
+        return value.substring(0, maxLength - 3) + "...";
     }
 
     @Override

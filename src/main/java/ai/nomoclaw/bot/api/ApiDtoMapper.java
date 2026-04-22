@@ -254,10 +254,11 @@ public final class ApiDtoMapper {
                 dto.roundIndex(),
                 dto.stepIndex(),
                 dto.status(),
+                dto.toolName(),
+                dto.toolArgs(),
                 dto.displayTitle(),
                 dto.displaySummary(),
                 dto.displayDetails(),
-                dto.command(),
                 dto.policyReasonCode(),
                 dto.updatedTime()
         );

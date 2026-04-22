@@ -21,7 +21,14 @@ const allowAgentLoading = computed(() => isSubmitting.value && conversationStore
 const rejectLoading = computed(() => isSubmitting.value && conversationStore.approval.submittingAction === "deny_once");
 const missingStepUid = computed(() => !conversationStore.approval.stepUid);
 const approvalPrompt = computed(() => conversationStore.approval.title || t("chat.approval.riskPrompt"));
+const approvalBodyLabel = computed(() => {
+  return t(conversationStore.approval.labelKey || "chat.approval.payloadLabel");
+});
 const approvalBodyHtml = computed(() => {
+  const command = String(conversationStore.approval.command || "").trim();
+  if (command) {
+    return renderMarkdown(`\`\`\`bash\n${command}\n\`\`\``);
+  }
   const body = String(conversationStore.approval.body || "").trim();
   if (body) {
     return renderMarkdown(body);
@@ -76,7 +83,7 @@ onMounted(() => {
         </div>
         <div class="ui-approval-title">{{ approvalPrompt }}</div>
         <div class="ui-approval-command">
-          <div class="ui-approval-command-label">{{ t("chat.approval.commandLabel") }}</div>
+          <div class="ui-approval-command-label">{{ approvalBodyLabel }}</div>
           <div class="ui-approval-body message-html mono" v-html="approvalBodyHtml" />
         </div>
       </div>

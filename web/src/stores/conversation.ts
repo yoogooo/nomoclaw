@@ -11,6 +11,8 @@ import { useConversationRunsStore } from "@/stores/conversationRuns";
 import { useModelGateStore } from "@/stores/modelGate";
 import { useRuntimeLogStore } from "@/stores/runtimeLog";
 import { loadChatLastViewState, saveChatLastViewState } from "@/stores/chatViewState";
+import { resolveApprovalFromPayload, resolveApprovalFromStep } from "@/utils/approvalRenderer";
+import type { ApprovalLabelKey } from "@/utils/approvalRenderer";
 import type {
   AgentEvent,
   ConversationAttachment,
@@ -27,7 +29,9 @@ interface ApprovalState {
   stepUid: string | null;
   title: string;
   body: string;
+  labelKey: ApprovalLabelKey;
   command: string;
+  toolName: string;
   riskLevel: string;
   submitting: boolean;
   submittingAction: "allow_once" | "allow_session" | "allow_agent" | "allow_user" | "deny_once" | null;
@@ -146,7 +150,9 @@ export const useConversationStore = defineStore("conversation", () => {
     stepUid: null,
     title: "",
     body: "",
+    labelKey: "chat.approval.commandLabel",
     command: "",
+    toolName: "",
     riskLevel: "HIGH",
     submitting: false,
     submittingAction: null
@@ -263,7 +269,9 @@ export const useConversationStore = defineStore("conversation", () => {
       stepUid: null,
       title: "",
       body: "",
+      labelKey: "chat.approval.commandLabel",
       command: "",
+      toolName: "",
       riskLevel: "HIGH",
       submitting: false,
       submittingAction: null
@@ -388,16 +396,6 @@ export const useConversationStore = defineStore("conversation", () => {
     return name;
   }
 
-  function approvalBodyMarkdownFromCommand(command: string) {
-    const cmd = String(command || "").trim();
-    if (!cmd) return "";
-    return `\`\`\`bash\n${cmd}\n\`\`\``;
-  }
-
-  function buildApprovalBodyFromStep(step: ConversationRunStep) {
-    return approvalBodyMarkdownFromCommand(step.command || "");
-  }
-
   function restoreApprovalFromRuns(runs: ConversationMessageRun[]) {
     const waitingSteps = runs
       .flatMap((run) =>
@@ -422,12 +420,15 @@ export const useConversationStore = defineStore("conversation", () => {
       clearApproval();
       return;
     }
+    const rendered = resolveApprovalFromStep(current.step);
 
     approval.value = {
       stepUid: current.step.stepUid || null,
-      title: tr("chat.approval.riskPrompt"),
-      body: buildApprovalBodyFromStep(current.step),
-      command: String(current.step.command || "").trim(),
+      title: tr(rendered.promptKey),
+      body: rendered.body,
+      labelKey: rendered.labelKey,
+      command: rendered.command,
+      toolName: rendered.toolName,
       riskLevel: "HIGH",
       submitting: approval.value.stepUid === current.step.stepUid ? approval.value.submitting : false,
       submittingAction: approval.value.stepUid === current.step.stepUid ? approval.value.submittingAction : null
@@ -989,15 +990,17 @@ export const useConversationStore = defineStore("conversation", () => {
     displaySteps.forEach((step: Record<string, any>) => {
       const stepUid = step.stepUid || "";
       if (!stepUid) return;
+      const rendered = resolveApprovalFromPayload(step);
       const normalized: ConversationRunStep = {
         stepUid,
         roundIndex: Number(step.roundIndex || 1),
         stepIndex: Number(step.stepIndex || 1),
         status: step.status || "planned",
+        toolName: rendered.toolName,
+        toolArgs: step.toolArgs && typeof step.toolArgs === "object" ? step.toolArgs : {},
         displayTitle: step.displayTitle || tr("chat.runtime.processingStep"),
         displaySummary: step.displaySummary || "",
         displayDetails: step.displayDetails || "",
-        command: String(step.command || "").trim(),
         updatedTime: step.updatedTime || new Date().toISOString()
       };
       const previous = stepsByUid.get(stepUid);
@@ -1019,27 +1022,30 @@ export const useConversationStore = defineStore("conversation", () => {
 
   function handleRunStepEvent(event: AgentEvent) {
     if (!event.messageUid || !event.stepUid) return;
-    const command = String(event.payload.command || "").trim();
+    const rendered = resolveApprovalFromPayload(event.payload || {});
     conversationRunsStore.updateRunStep(event.messageUid, event.stepUid, {
       roundIndex: event.payload.roundIndex || 1,
       stepIndex: event.payload.stepIndex || 1,
       status: event.payload.status || "planned",
+      toolName: rendered.toolName,
+      toolArgs: event.payload.toolArgs && typeof event.payload.toolArgs === "object" ? event.payload.toolArgs : undefined,
       displayTitle: event.payload.displayTitle || tr("chat.runtime.processingStep"),
       displaySummary: event.payload.displaySummary || "",
       displayDetails: event.payload.displayDetails || "",
-      command,
       policyReasonCode: event.payload.policyReasonCode || "",
       updatedTime: new Date().toISOString()
     });
   }
 
   function showApprovalAlert(event: AgentEvent) {
-    const command = String(event.payload.command || "").trim();
+    const rendered = resolveApprovalFromPayload(event.payload || {});
     approval.value = {
       stepUid: event.stepUid || null,
-      title: tr("chat.approval.riskPrompt"),
-      body: approvalBodyMarkdownFromCommand(command),
-      command,
+      title: tr(rendered.promptKey),
+      body: rendered.body,
+      labelKey: rendered.labelKey,
+      command: rendered.command,
+      toolName: rendered.toolName,
       riskLevel: event.payload.riskLevel || "HIGH",
       submitting: approval.value.stepUid === (event.stepUid || null) ? approval.value.submitting : false,
       submittingAction: approval.value.stepUid === (event.stepUid || null) ? approval.value.submittingAction : null

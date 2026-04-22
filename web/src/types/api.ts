@@ -310,10 +310,11 @@ export interface ConversationRunStep {
   roundIndex: number;
   stepIndex: number;
   status: string;
+  toolName?: string;
+  toolArgs?: Record<string, any>;
   displayTitle: string;
   displaySummary: string;
   displayDetails: string;
-  command?: string;
   policyReasonCode?: string;
   updatedTime: string;
 }

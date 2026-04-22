@@ -186,8 +186,12 @@ const enUS = {
     approval: {
       waiting: "Action pending confirmation",
       riskPrompt: "Command execution risk detected. Please confirm before continuing.",
+      riskPromptGeneric: "Tool operation risk detected. Please confirm before continuing.",
+      riskPromptScreenshot: "Desktop screenshot will be captured. Please confirm before continuing.",
       commandLabel: "Command to Execute",
-      commandUnavailable: "No structured command was provided for this step",
+      payloadLabel: "Parameters to Execute",
+      screenshotPathLabel: "Screenshot Output Path",
+      commandUnavailable: "No structured parameters were provided for this step",
       approve: "Continue",
       approveSession: "Allow for this session",
       approveAgent: "Allow for this Agent",

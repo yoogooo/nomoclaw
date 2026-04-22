@@ -93,8 +93,11 @@ export const useConversationRunsStore = defineStore("conversationRuns", () => {
       displayDetails: patch.displayDetails || "",
       updatedTime: patch.updatedTime || new Date().toISOString()
     };
-    if (patch.command !== undefined) {
-      nextStep.command = patch.command;
+    if (patch.toolName !== undefined) {
+      nextStep.toolName = patch.toolName;
+    }
+    if (patch.toolArgs !== undefined) {
+      nextStep.toolArgs = patch.toolArgs;
     }
     if (patch.policyReasonCode !== undefined) {
       nextStep.policyReasonCode = patch.policyReasonCode;
@@ -110,10 +113,11 @@ export const useConversationRunsStore = defineStore("conversationRuns", () => {
         roundIndex: Number(nextStep.roundIndex ?? 1),
         stepIndex: Number(nextStep.stepIndex ?? 1),
         status: nextStep.status || "planned",
+        toolName: nextStep.toolName || "",
+        toolArgs: nextStep.toolArgs || {},
         displayTitle: nextStep.displayTitle || tr("chat.runtime.processingStep"),
         displaySummary: nextStep.displaySummary || "",
         displayDetails: nextStep.displayDetails || "",
-        command: nextStep.command || "",
         policyReasonCode: nextStep.policyReasonCode || "",
         updatedTime: nextStep.updatedTime || new Date().toISOString()
       });

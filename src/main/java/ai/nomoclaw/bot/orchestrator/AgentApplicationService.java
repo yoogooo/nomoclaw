@@ -1091,7 +1091,6 @@ public class AgentApplicationService {
                 String approvalDetails = buildStepApprovalDetails(latestStep);
                 applyUserFacingFields(approvalPayload, latestStep, "waiting_approval", "等待你确认", approvalDetails);
                 approvalPayload.put("policyReasonCode", policyDecision.reasonCode().name());
-                approvalPayload.set("toolArgs", latestStep.toolArgs());
                 publishEvent(AgentEventType.STEP_WAITING_APPROVAL, message.conversationUid(), message.messageUid(), latestStep.stepUid(),
                         approvalPayload);
                 return RoundExecutionResult.pendingApproval();
@@ -1355,7 +1354,7 @@ public class AgentApplicationService {
         return switch (nullToEmpty(toolName)) {
             case "command_tool" -> {
                 String command = toolArgs.path("command").asText("");
-                yield command.isBlank() ? "执行命令" : "执行命令: " + command;
+                yield command.isBlank() ? "执行命令" : "执行命令: " + abbreviate(command, 96);
             }
             case "browser_tool", "browser_control_tool" -> {
                 String action = toolArgs.path("action").asText("");
@@ -1691,7 +1690,7 @@ public class AgentApplicationService {
                     node.put("stepIndex", step.stepIndex());
                     node.put("title", step.title());
                     node.put("toolName", step.toolName());
-                    node.set("toolArgs", step.toolArgs());
+                    node.set("toolArgs", step.toolArgs() == null ? JsonNodeFactory.instance.objectNode() : step.toolArgs());
                     node.put("riskLevel", step.riskLevel().name());
                     return node;
                 }).toList()
@@ -1711,7 +1710,7 @@ public class AgentApplicationService {
         payload.put("stepIndex", step.stepIndex());
         payload.put("title", step.title());
         payload.put("toolName", step.toolName());
-        payload.put("command", extractCommandArg(step));
+        payload.set("toolArgs", step.toolArgs() == null ? JsonNodeFactory.instance.objectNode() : step.toolArgs());
         payload.put("riskLevel", step.riskLevel().name());
         return payload;
     }
@@ -1737,19 +1736,13 @@ public class AgentApplicationService {
         node.put("roundIndex", step.roundIndex());
         node.put("stepIndex", step.stepIndex());
         node.put("status", status);
+        node.put("toolName", nullToEmpty(step.toolName()));
+        node.set("toolArgs", step.toolArgs() == null ? JsonNodeFactory.instance.objectNode() : step.toolArgs());
         node.put("displayTitle", buildDisplayTitle(step));
         node.put("displaySummary", nullToEmpty(displaySummary));
         node.put("displayDetails", nullToEmpty(displayDetails));
-        node.put("command", extractCommandArg(step));
         node.put("updatedTime", updatedTime == null ? "" : updatedTime.toString());
         return node;
-    }
-
-    private String extractCommandArg(PlanStep step) {
-        if (step == null || step.toolArgs() == null || step.toolArgs().isNull()) {
-            return "";
-        }
-        return step.toolArgs().path("command").asText("");
     }
 
     private ObjectNode resultPayload(PlanStep step, ToolResult result, int attempt, int maxRounds) {
@@ -1921,15 +1914,11 @@ public class AgentApplicationService {
                 .collect(Collectors.toMap(PlanStep::stepUid, Function.identity(), (left, right) -> left, LinkedHashMap::new));
         for (Map.Entry<String, PlanStep> entry : stepByUid.entrySet()) {
             PlanStep step = entry.getValue();
-            if (!"command_tool".equals(nullToEmpty(step.toolName()))) {
-                continue;
-            }
-            RunStepAccumulator accumulator = stepMap.computeIfAbsent(step.stepUid(), ignored -> RunStepAccumulator.fromStep(
+            stepMap.computeIfAbsent(step.stepUid(), ignored -> RunStepAccumulator.fromStep(
                     step,
                     buildDisplayTitle(step),
                     buildStepPlanDetails(step)
             ));
-            enrichCommandStepDisplayFromStep(accumulator, step);
         }
 
         List<ConversationRunStepDto> stepResponses = stepMap.values().stream()
@@ -1950,34 +1939,6 @@ public class AgentApplicationService {
                 updatedTime,
                 stepResponses
         );
-    }
-
-    private void enrichCommandStepDisplayFromStep(RunStepAccumulator accumulator, PlanStep step) {
-        String command = step.toolArgs().path("command").asText("");
-        if (command.isBlank()) {
-            return;
-        }
-        accumulator.command = command;
-        String cwd = step.toolArgs().path("cwd").asText("");
-        String commandLine = "执行命令: \"" + command + "\""
-                + (cwd.isBlank() ? "" : "，工作目录: " + cwd);
-
-        accumulator.displayTitle = "正在执行命令: " + command;
-
-        String existingDetails = nullToEmpty(accumulator.displayDetails);
-        String outputText = nullToEmpty(step.outputText()).trim();
-        String outputBlock = outputText.isBlank() ? "" : "\n结果:\n" + outputText;
-        if (existingDetails.isBlank() || existingDetails.contains("系统已规划一条本地命令，稍后会开始执行。")) {
-            accumulator.displayDetails = commandLine + "。" + outputBlock;
-            return;
-        }
-        if (existingDetails.contains(command)) {
-            if (!outputText.isBlank() && !existingDetails.contains(outputText)) {
-                accumulator.displayDetails = existingDetails + outputBlock;
-            }
-            return;
-        }
-        accumulator.displayDetails = commandLine + "。" + existingDetails + outputBlock;
     }
 
     private String normalizeRunStatus(String currentStatus, List<ConversationRunStepDto> steps) {
@@ -2065,10 +2026,11 @@ public class AgentApplicationService {
         private int roundIndex;
         private int stepIndex;
         private String status = "planned";
+        private String toolName = "";
+        private JsonNode toolArgs = JsonNodeFactory.instance.objectNode();
         private String displayTitle = "";
         private String displaySummary = "";
         private String displayDetails = "";
-        private String command = "";
         private String policyReasonCode = "";
         private Instant updatedTime = Instant.now();
 
@@ -2080,10 +2042,11 @@ public class AgentApplicationService {
             RunStepAccumulator accumulator = new RunStepAccumulator(step.stepUid());
             accumulator.roundIndex = step.roundIndex();
             accumulator.stepIndex = step.stepIndex();
+            accumulator.toolName = step.toolName() == null ? "" : step.toolName();
+            accumulator.toolArgs = copyJson(step.toolArgs());
             accumulator.displayTitle = displayTitle;
             accumulator.displaySummary = "已规划，等待开始执行";
             accumulator.displayDetails = displayDetails;
-            accumulator.command = step.toolArgs() == null ? "" : step.toolArgs().path("command").asText("");
             return accumulator;
         }
 
@@ -2092,10 +2055,11 @@ public class AgentApplicationService {
             accumulator.roundIndex = node.path("roundIndex").asInt(1);
             accumulator.stepIndex = node.path("stepIndex").asInt(1);
             accumulator.status = node.path("status").asText("planned");
+            accumulator.toolName = node.path("toolName").asText("");
+            accumulator.toolArgs = copyJson(node.path("toolArgs"));
             accumulator.displayTitle = node.path("displayTitle").asText("");
             accumulator.displaySummary = node.path("displaySummary").asText("");
             accumulator.displayDetails = node.path("displayDetails").asText("");
-            accumulator.command = node.path("command").asText("");
             accumulator.policyReasonCode = node.path("policyReasonCode").asText("");
             String updated = node.path("updatedTime").asText("");
             if (!updated.isBlank()) {
@@ -2129,6 +2093,12 @@ public class AgentApplicationService {
             roundIndex = node.path("roundIndex").asInt(roundIndex == 0 ? 1 : roundIndex);
             stepIndex = node.path("stepIndex").asInt(stepIndex == 0 ? 1 : stepIndex);
             status = node.path("status").asText(status == null || status.isBlank() ? "planned" : status);
+            if (!node.path("toolName").asText("").isBlank()) {
+                toolName = node.path("toolName").asText("");
+            }
+            if (node.hasNonNull("toolArgs") && node.path("toolArgs").isObject()) {
+                toolArgs = copyJson(node.path("toolArgs"));
+            }
             if (!node.path("displayTitle").asText("").isBlank()) {
                 displayTitle = node.path("displayTitle").asText("");
             }
@@ -2137,9 +2107,6 @@ public class AgentApplicationService {
             }
             if (!node.path("displayDetails").asText("").isBlank()) {
                 displayDetails = node.path("displayDetails").asText("");
-            }
-            if (!node.path("command").asText("").isBlank()) {
-                command = node.path("command").asText("");
             }
             if (!node.path("policyReasonCode").asText("").isBlank()) {
                 policyReasonCode = node.path("policyReasonCode").asText("");
@@ -2161,14 +2128,23 @@ public class AgentApplicationService {
                     roundIndex,
                     stepIndex,
                     status == null || status.isBlank() ? "planned" : status,
+                    toolName == null ? "" : toolName,
+                    copyJson(toolArgs),
                     displayTitle == null || displayTitle.isBlank() ? "正在处理任务步骤" : displayTitle,
                     displaySummary == null ? "" : displaySummary,
                     displayDetails == null ? "" : displayDetails,
-                    command == null ? "" : command,
                     policyReasonCode == null ? "" : policyReasonCode,
                     updatedTime
             );
         }
+
+        private static JsonNode copyJson(JsonNode node) {
+            if (node == null || node.isNull() || node.isMissingNode() || !node.isObject()) {
+                return JsonNodeFactory.instance.objectNode();
+            }
+            return node.deepCopy();
+        }
+
     }
 
     private String buildToolResultMessage(PlanStep step, ToolResult result, boolean success, String reviewMessage) {
