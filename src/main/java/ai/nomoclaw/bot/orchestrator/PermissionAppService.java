@@ -141,30 +141,12 @@ public class PermissionAppService {
         List<PermissionRule> existing = new ArrayList<>(settingsStore.loadAgentRules(normalizedAgentName));
         String key = managedRuleKey(agentUid, normalizedAgentName);
         existing.removeIf(rule -> isManagedRule(rule, key));
-        existing.add(new PermissionRule(
-                managedRuleId(key, "file", 0),
-                PermissionSource.AGENT_SETTINGS,
-                PermissionEffect.ALLOW,
-                "file_*",
-                "*",
-                PermissionResourceType.FILE,
-                workspace.toString(),
-                "",
-                null,
-                true
-        ));
-        existing.add(new PermissionRule(
-                managedRuleId(key, "command", 0),
-                PermissionSource.AGENT_SETTINGS,
-                PermissionEffect.ALLOW,
-                "command_tool",
-                "execute",
-                PermissionResourceType.COMMAND,
-                workspace.toString(),
-                "",
-                null,
-                true
-        ));
+        addManagedRule(existing, key, "file", "file_*", "*", PermissionResourceType.FILE, workspace.toString(), 0);
+        addManagedRule(existing, key, "command", "command_tool", "execute", PermissionResourceType.COMMAND, workspace.toString(), 0);
+
+        Path skillsRoot = NomoClawPaths.skillsRoot();
+        addManagedRule(existing, key, "skills-read", "file_*", "read", PermissionResourceType.FILE, skillsRoot.toString(), 0);
+        addManagedRule(existing, key, "skills-list", "file_*", "list", PermissionResourceType.FILE, skillsRoot.toString(), 0);
         settingsStore.saveAgentRules(normalizedAgentName, existing);
     }
 
@@ -301,6 +283,28 @@ public class PermissionAppService {
         }
         String prefix = MANAGED_WORKSPACE_RULE_PREFIX + key + "-";
         return rule.ruleId().startsWith(prefix);
+    }
+
+    private void addManagedRule(List<PermissionRule> rules,
+                                String key,
+                                String category,
+                                String tool,
+                                String action,
+                                PermissionResourceType resourceType,
+                                String pathPattern,
+                                int index) {
+        rules.add(new PermissionRule(
+                managedRuleId(key, category, index),
+                PermissionSource.AGENT_SETTINGS,
+                PermissionEffect.ALLOW,
+                tool,
+                action,
+                resourceType,
+                pathPattern,
+                "",
+                null,
+                true
+        ));
     }
 
     private List<PermissionRule> parseRules(UpdatePermissionRulesRequest request, PermissionSource source) {
