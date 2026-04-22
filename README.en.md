@@ -29,6 +29,14 @@ TARGET_ARCH=x64 ./scripts/build-desktop-macos.sh
 - Automation that can be operated: built-in cron scheduling, execution reports, and channel delivery (Feishu / DingTalk).
 - Decoupled model layer: unified multi-provider model management with local model discovery for cost/quality switching.
 
+## Upcoming Feature Roadmap
+
+- Knowledge base integration into the Agent assistant (moving from separate "tips/docs/skills" to a unified retrieval entry), improving response consistency and traceability.
+- Workflow integration into the Agent assistant (evolving from chat execution to orchestrated flows), turning high-frequency tasks into reusable processes.
+- Multi-Agent collaboration, supporting task decomposition, role-based execution, and coordinated delivery.
+- Plugin capabilities, enabling on-demand integration with external systems and business-specific extensions.
+- Control center (multi-Agent node status, output summaries, and token usage monitoring), enabling operational observability and cost management.
+
 ## Typical Use Cases
 
 - Complex task execution: plan steps first, execute step-by-step, and require human approval for risky actions
