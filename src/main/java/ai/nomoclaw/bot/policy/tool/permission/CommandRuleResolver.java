@@ -4,6 +4,7 @@ import ai.nomoclaw.bot.policy.tool.ToolPolicyContext;
 import ai.nomoclaw.bot.tool.PathResolver;
 import org.springframework.stereotype.Component;
 
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -189,7 +190,11 @@ public class CommandRuleResolver {
             if (isCommandKeyword(token) || "/dev/null".equals(token)) {
                 continue;
             }
-            targets.add(PathResolver.resolve(token, cwd));
+            try {
+                targets.add(PathResolver.resolve(token, cwd));
+            } catch (InvalidPathException ignored) {
+                // Ignore non-path script fragments (for example PowerShell pipelines).
+            }
         }
         return new ArrayList<>(targets);
     }
