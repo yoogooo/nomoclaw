@@ -85,6 +85,9 @@ public class AgentApplicationService {
 
     private static final String STOP_REASON_MAX_LOOP_REACHED = "MAX_LOOP_REACHED";
     private static final String DEFAULT_AGENT_UID = "agent_general_assistant";
+    private static final String VIRTUAL_AGENT_GROUP_UID = "group_short_drama";
+    private static final String VIRTUAL_AGENT_GROUP_NAME = "all_agents";
+    private static final String VIRTUAL_AGENT_GROUP_DISPLAY_NAME = "全部 Agent";
     private static final int CONVERSATION_CONTEXT_LIMIT = 30;
     private static final Map<String, String> AGENT_DOC_FILES = new LinkedHashMap<>();
     static {
@@ -187,7 +190,7 @@ public class AgentApplicationService {
     public String createConversation(String agentGroupUid, String agentUid, String channel) {
         String conversationUid = UUID.randomUUID().toString();
         String normalizedGroupUid = normalizeAgentGroupUid(agentGroupUid);
-        String normalizedAgentUid = normalizedGroupUid.isBlank() ? normalizeAgentUid(agentUid) : "";
+        String normalizedAgentUid = normalizeOptionalAgentUid(agentUid);
         String normalizedChannel = channel == null || channel.isBlank() ? "web" : channel.trim();
         store.createConversation(
                 conversationUid,
@@ -215,56 +218,36 @@ public class AgentApplicationService {
     }
 
     public List<AgentCatalogGroupDto> listAgentGroups() {
-        List<AgentGroupDefinitionEntity> groups = agentGroupDefinitionRepository.listActive();
-        if (groups == null || groups.isEmpty()) {
+        List<AgentDefinitionEntity> allAgents = agentDefinitionRepository.listAllActive();
+        if (allAgents == null || allAgents.isEmpty()) {
             return List.of();
         }
-        List<String> groupUids = groups.stream().map(AgentGroupDefinitionEntity::getAgentGroupUid).toList();
-        List<AgentGroupMemberEntity> members = agentGroupMemberRepository.listActiveByGroupUids(groupUids);
-        List<AgentDefinitionEntity> allAgents = agentDefinitionRepository.listAllActive();
         allAgents.forEach(this::ensureWorkspaceDocsForExistingAgent);
 
-        String fallbackGroupUid = groups.get(0).getAgentGroupUid();
-        Map<String, AgentGroupMemberEntity> preferredMemberByAgent = new LinkedHashMap<>();
-        Map<String, String> assignedGroupByAgent = new LinkedHashMap<>();
-        for (AgentGroupMemberEntity member : members) {
-            if (member == null || member.getAgentUid() == null || member.getAgentUid().isBlank()) {
-                continue;
-            }
-            preferredMemberByAgent.putIfAbsent(member.getAgentUid(), member);
-            String groupUid = member.getAgentGroupUid();
-            if (groupUid != null && !groupUid.isBlank()) {
-                assignedGroupByAgent.putIfAbsent(member.getAgentUid(), groupUid);
-            }
-        }
-
-        Map<String, List<AgentCatalogAgentDto>> agentsByGroup = new LinkedHashMap<>();
-        for (AgentGroupDefinitionEntity group : groups) {
-            agentsByGroup.put(group.getAgentGroupUid(), new ArrayList<>());
-        }
+        List<AgentCatalogAgentDto> agentItems = new ArrayList<>();
         for (AgentDefinitionEntity agent : allAgents) {
             String agentUid = agent.getAgentUid();
-            String assignedGroupUid = assignedGroupByAgent.getOrDefault(agentUid, fallbackGroupUid);
-            AgentGroupMemberEntity member = preferredMemberByAgent.get(agentUid);
-            AgentCatalogAgentDto item = toAgentCatalogItem(withDefaultMember(member, assignedGroupUid, agentUid), agent);
+            AgentGroupMemberEntity member = withDefaultMember(null, VIRTUAL_AGENT_GROUP_UID, agentUid);
+            member.setMemberRole(DEFAULT_AGENT_UID.equals(agentUid) ? "owner" : "member");
+            member.setResponsibility(DEFAULT_AGENT_UID.equals(agentUid) ? "默认主 Agent" : "");
+            member.setIsPrimary(DEFAULT_AGENT_UID.equals(agentUid) ? 1 : 0);
+            AgentCatalogAgentDto item = toAgentCatalogItem(member, agent);
             if (item == null) {
                 continue;
             }
-            agentsByGroup.computeIfAbsent(assignedGroupUid, ignored -> new ArrayList<>()).add(item);
+            agentItems.add(item);
         }
 
-        return groups.stream()
-                .map(group -> new AgentCatalogGroupDto(
-                        group.getAgentGroupUid(),
-                        group.getGroupName(),
-                        group.getDisplayName(),
-                        group.getAvatar(),
-                        group.getDescription(),
-                        readStringArray(group.getSceneTags()),
-                        group.getCollaborationMode(),
-                        agentsByGroup.getOrDefault(group.getAgentGroupUid(), List.of())
-                ))
-                .toList();
+        return List.of(new AgentCatalogGroupDto(
+                VIRTUAL_AGENT_GROUP_UID,
+                VIRTUAL_AGENT_GROUP_NAME,
+                VIRTUAL_AGENT_GROUP_DISPLAY_NAME,
+                "🧭",
+                "基于 agent_definition 自动聚合",
+                List.of("general"),
+                "single",
+                agentItems
+        ));
     }
 
     public List<ConversationMessageDto> listMessages(String conversationUid) {
@@ -1411,7 +1394,7 @@ public class AgentApplicationService {
             }
             case "image_loader_tool" -> {
                 String reference = toolArgs.path("reference").asText("");
-                yield reference.isBlank() ? "加载图片上下文" : "加载图片上下文: " + abbreviate(reference, 48);
+                yield reference.isBlank() ? "分析图片" : "分析图片: " + abbreviate(reference, 48);
             }
             default -> "执行工具: " + nullToEmpty(toolName);
         };
@@ -1445,7 +1428,7 @@ public class AgentApplicationService {
                 default -> "正在处理文件";
             };
             case "cron_tool" -> "正在创建定时任务";
-            case "image_loader_tool" -> "正在加载图片上下文";
+            case "image_loader_tool" -> "正在分析图片";
             case "desktop_screenshot_tool" -> "正在截取桌面画面";
             case "file_search_tool" -> "正在搜索文件内容";
             default -> step.title() == null || step.title().isBlank() ? "正在处理任务步骤" : step.title();
@@ -1484,8 +1467,8 @@ public class AgentApplicationService {
             case "image_loader_tool" -> {
                 String reference = step.toolArgs().path("reference").asText("");
                 yield reference.isBlank()
-                        ? "系统准备加载历史图片作为视觉分析上下文。"
-                        : "系统准备根据“" + abbreviate(reference, 72) + "”加载历史图片作为视觉分析上下文。";
+                        ? "系统准备加载图片并进行视觉分析。"
+                        : "系统准备根据“" + abbreviate(reference, 72) + "”加载图片并进行视觉分析。";
             }
             default -> "系统已规划这一步，稍后会开始执行。";
         };
@@ -1509,7 +1492,7 @@ public class AgentApplicationService {
             case "browser_tool", "browser_control_tool" -> {
                 String path = result.artifacts() == null ? "" : result.artifacts().path("path").asText("");
                 if (!path.isBlank()) {
-                    yield "网页操作已完成，生成的文件已保存到 " + abbreviate(path, 96) + "。";
+                    yield "网页操作已完成，生成的文件已保存到 " + path + "。";
                 }
                 yield hasMeaningfulText(result.output()) ? "网页操作已完成：" + abbreviate(result.output(), 120) : "网页操作已顺利完成。";
             }
@@ -1533,9 +1516,9 @@ public class AgentApplicationService {
                 int resolved = result.artifacts() == null ? 0 : result.artifacts().path("resolvedCount").asInt(0);
                 boolean matched = result.artifacts() != null && result.artifacts().path("matched").asBoolean(false);
                 if (!matched || resolved <= 0) {
-                    yield "未匹配到可加载的图片上下文。";
+                    yield "未匹配到可分析的图片。";
                 }
-                yield "图片上下文加载完成，共匹配 " + resolved + " 张图片。";
+                yield "图片分析完成，共匹配 " + resolved + " 张图片。";
             }
             default -> hasMeaningfulText(result.output()) ? abbreviate(result.output(), 140) : "这一步已顺利完成。";
         };
@@ -2430,6 +2413,10 @@ public class AgentApplicationService {
 
     private String normalizeAgentUid(String agentUid) {
         return agentUid == null || agentUid.isBlank() ? DEFAULT_AGENT_UID : agentUid.trim();
+    }
+
+    private String normalizeOptionalAgentUid(String agentUid) {
+        return agentUid == null || agentUid.isBlank() ? "" : agentUid.trim();
     }
 
     /**
