@@ -114,6 +114,10 @@ public class PermissionAppService {
             );
             commandPattern = "";
         }
+        if (isScreenshotApproval(normalizedTool, action)) {
+            // Screenshot approvals should apply to screenshot behavior, not a single output file path.
+            pathPattern = "";
+        }
         return new PermissionRule(
                 UUID.randomUUID().toString(),
                 source,
@@ -126,6 +130,16 @@ public class PermissionAppService {
                 null,
                 true
         );
+    }
+
+    private boolean isScreenshotApproval(String normalizedTool, String action) {
+        String tool = normalizedTool == null ? "" : normalizedTool.trim().toLowerCase(Locale.ROOT);
+        String normalizedAction = action == null ? "" : action.trim().toLowerCase(Locale.ROOT);
+        if ("desktop_screenshot_tool".equals(tool)) {
+            return true;
+        }
+        return ("browser_tool".equals(tool) || "browser_control_tool".equals(tool))
+                && "screenshot".equals(normalizedAction);
     }
 
     public void syncAgentManagedWorkspaceAllowRule(String agentUid,

@@ -100,9 +100,26 @@ public class CommandRuleResolver {
                 false,
                 false,
                 "",
-                List.of(),
+                resolveGenericPaths(context),
                 context.agentWorkspacePath()
         );
+    }
+
+    private List<Path> resolveGenericPaths(ToolPolicyContext context) {
+        if (context == null || context.toolArgs() == null) {
+            return List.of();
+        }
+        Path base = context.agentWorkspacePath() == null ? Path.of(".").toAbsolutePath().normalize() : context.agentWorkspacePath();
+        LinkedHashSet<Path> out = new LinkedHashSet<>();
+        String pathArg = context.toolArgs().path("path").asText("");
+        if (pathArg != null && !pathArg.isBlank()) {
+            out.add(PathResolver.resolve(pathArg, base));
+        }
+        String outputArg = context.toolArgs().path("output").asText("");
+        if (outputArg != null && !outputArg.isBlank()) {
+            out.add(PathResolver.resolve(outputArg, base));
+        }
+        return out.isEmpty() ? List.of() : new ArrayList<>(out);
     }
 
     public List<PermissionRule> buildCommandRules(ToolPolicyContext context, PermissionContextDetails details) {
@@ -400,7 +417,11 @@ public class CommandRuleResolver {
             return "";
         }
         String out = token.trim();
-        if ((out.startsWith("\"") && out.endsWith("\"")) || (out.startsWith("'") && out.endsWith("'"))) {
+        if ("\"".equals(out) || "'".equals(out)) {
+            return "";
+        }
+        if (out.length() >= 2
+                && ((out.startsWith("\"") && out.endsWith("\"")) || (out.startsWith("'") && out.endsWith("'")))) {
             out = out.substring(1, out.length() - 1);
         }
         return out.trim();

@@ -36,9 +36,11 @@ public class ApprovalAppService {
 
     private PermissionScope normalizeScope(String scope) {
         PermissionScope parsed = PermissionScope.from(scope);
-        if (parsed == PermissionScope.AGENT) {
-            return PermissionScope.AGENT;
-        }
-        return PermissionScope.ONCE;
+        return switch (parsed) {
+            case SESSION -> PermissionScope.SESSION;
+            case AGENT -> PermissionScope.AGENT;
+            case USER -> PermissionScope.USER;
+            case ONCE -> PermissionScope.ONCE;
+        };
     }
 }

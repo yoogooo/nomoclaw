@@ -19,7 +19,9 @@ import tools.jackson.databind.node.ObjectNode;
 import java.nio.file.Path;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PermissionEngineTests {
@@ -77,6 +79,29 @@ class PermissionEngineTests {
     }
 
     @Test
+    void imageLoaderToolShouldAllowByDefault() {
+        StubSettingsStore settings = new StubSettingsStore();
+        SessionPermissionStore sessionStore = new SessionPermissionStore();
+        PermissionEngine engine = new PermissionEngine(settings, sessionStore, new CommandRuleResolver(), new HardGuardService());
+
+        ObjectNode args = JsonNodeFactory.instance.objectNode();
+        args.put("reference", "刚才截图");
+        PermissionDecision decision = engine.evaluate(new ToolPolicyContext(
+                "image_loader_tool",
+                args,
+                Path.of(".").toAbsolutePath().normalize(),
+                "agent-uid",
+                "default",
+                "local",
+                "c3-image",
+                "m1",
+                "s1"
+        ));
+        assertEquals(PermissionEffect.ALLOW, decision.effect());
+        assertEquals(ToolPolicyReasonCode.RULE_ALLOW_MATCHED, decision.reasonCode());
+    }
+
+    @Test
     void hardGuardShouldBlockSystemPathWriteBeforeRules() {
         StubSettingsStore settings = new StubSettingsStore();
         settings.userRules = List.of(rule("r-user-allow", PermissionSource.USER_SETTINGS, PermissionEffect.ALLOW));
@@ -123,6 +148,54 @@ class PermissionEngineTests {
         PermissionDecision decision = engine.evaluate(commandContext("c7", "ls -la > out.txt"));
         assertEquals(PermissionEffect.ASK, decision.effect());
         assertEquals(ToolPolicyReasonCode.DEFAULT_REQUIRE_APPROVAL, decision.reasonCode());
+    }
+
+    @Test
+    void commandWithDanglingSingleQuoteShouldNotCrash() {
+        StubSettingsStore settings = new StubSettingsStore();
+        SessionPermissionStore sessionStore = new SessionPermissionStore();
+        PermissionEngine engine = new PermissionEngine(settings, sessionStore, new CommandRuleResolver(), new HardGuardService());
+
+        PermissionDecision decision = assertDoesNotThrow(() -> engine.evaluate(commandContext("c7-quote", "echo '")));
+        assertNotNull(decision);
+        assertNotNull(decision.effect());
+    }
+
+    @Test
+    void desktopScreenshotAllowRuleWithPathShouldMatch() {
+        StubSettingsStore settings = new StubSettingsStore();
+        SessionPermissionStore sessionStore = new SessionPermissionStore();
+        PermissionEngine engine = new PermissionEngine(settings, sessionStore, new CommandRuleResolver(), new HardGuardService());
+
+        sessionStore.addRule("c-shot", new PermissionRule(
+                "r-shot-allow",
+                PermissionSource.SESSION,
+                PermissionEffect.ALLOW,
+                "desktop_screenshot_tool",
+                "*",
+                PermissionResourceType.ANY,
+                "tmp/dingtalk_now.png",
+                "",
+                null,
+                true
+        ));
+
+        ObjectNode args = JsonNodeFactory.instance.objectNode();
+        args.put("path", "tmp/dingtalk_now.png");
+        PermissionDecision decision = engine.evaluate(new ToolPolicyContext(
+                "desktop_screenshot_tool",
+                args,
+                Path.of(".").toAbsolutePath().normalize(),
+                "agent-uid",
+                "default",
+                "local",
+                "c-shot",
+                "m1",
+                "s1"
+        ));
+
+        assertEquals(PermissionEffect.ALLOW, decision.effect());
+        assertEquals("r-shot-allow", decision.matchedRuleId());
     }
 
     @Test

@@ -139,6 +139,17 @@ public class ToolSpecificationRegistry {
                                 .build())
                         .build(),
                 ToolSpecification.builder()
+                        .name("image_loader_tool")
+                        .description("按需加载图片上下文，仅在需要视觉分析时使用。适用于截图、浏览器等返回图片路径的工具步骤之后；支持“刚才截图”“第 N 轮截图”“文件名”引用，以及直接传入 HTTP(S) 图片链接（仅透传，不本地下载）。")
+                        .parameters(JsonObjectSchema.builder()
+                                .description("图片加载参数")
+                                .addStringProperty("reference", "图片引用，示例：刚才截图、第 3 轮截图、desktop_screenshot_xxx.png、https://example.com/demo.png")
+                                .addIntegerProperty("maxImages", "最多解析图片数量，范围 1-3，默认 1。")
+                                .required("reference")
+                                .additionalProperties(true)
+                                .build())
+                        .build(),
+                ToolSpecification.builder()
                         .name("current_time_tool")
                         .description("Get the current UTC time.")
                         .parameters(JsonObjectSchema.builder()

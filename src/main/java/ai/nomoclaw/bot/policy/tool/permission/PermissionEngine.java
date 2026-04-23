@@ -22,7 +22,8 @@ public class PermissionEngine {
             "memory_search_tool",
             "current_time_tool",
             "token_usage_tool",
-            "file_search_tool"
+            "file_search_tool",
+            "image_loader_tool"
     );
 
     private final PermissionSettingsStore settingsStore;

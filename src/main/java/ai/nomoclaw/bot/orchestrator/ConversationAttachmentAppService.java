@@ -20,6 +20,7 @@ import org.springframework.util.unit.DataSize;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -219,6 +220,100 @@ public class ConversationAttachmentAppService {
             contents.add(toContent(attachment));
         }
         return contents;
+    }
+
+    public List<Content> attachExistingImageFilesToMessage(String conversationUid,
+                                                           String messageUid,
+                                                           Collection<String> imagePaths) {
+        store.findConversation(conversationUid)
+                .orElseThrow(() -> new IllegalArgumentException("conversation not found: " + conversationUid));
+        if (messageUid == null || messageUid.isBlank()) {
+            throw new IllegalArgumentException("messageUid must not be blank");
+        }
+        List<Path> resolvedPaths = resolveExistingImagePaths(imagePaths);
+        if (resolvedPaths.isEmpty()) {
+            return List.of();
+        }
+
+        List<AgentMessageAttachmentEntity> boundEntities = new ArrayList<>();
+        LocalDateTime now = LocalDateTime.now();
+        for (Path file : resolvedPaths) {
+            String name = file.getFileName() == null ? "" : file.getFileName().toString();
+            String contentType = normalizeContentType(detectImageContentType(file));
+
+            AgentMessageAttachmentEntity existing = attachmentRepository.findActiveByMessageUidAndFilePath(messageUid, file.toString());
+            if (existing != null) {
+                boundEntities.add(existing);
+                continue;
+            }
+
+            AgentMessageAttachmentEntity entity = new AgentMessageAttachmentEntity();
+            entity.setUploadUid(UUID.randomUUID().toString());
+            entity.setConversationUid(conversationUid);
+            entity.setMessageUid(messageUid);
+            entity.setOriginalName(name.isBlank() ? "image" : name);
+            entity.setContentType(contentType);
+            entity.setMimeGroup("image");
+            entity.setFilePath(file.toString());
+            entity.setFileUrl(buildFileUrl(conversationUid, entity.getUploadUid()));
+            try {
+                entity.setSizeBytes(Files.size(file));
+            } catch (IOException ex) {
+                throw new IllegalStateException("failed to read image size: " + file, ex);
+            }
+            entity.setPreviewable(1);
+            entity.setStatus("ACTIVE");
+            entity.setCreatedTime(now);
+            entity.setUpdatedTime(now);
+            attachmentRepository.save(entity);
+            boundEntities.add(entity);
+        }
+
+        List<Content> contents = new ArrayList<>();
+        for (AgentMessageAttachmentEntity attachment : boundEntities) {
+            contents.add(toContent(attachment));
+        }
+        return contents;
+    }
+
+    public List<Content> loadExistingImageFilesAsContents(Collection<String> imagePaths) {
+        List<Path> resolvedPaths = resolveExistingImagePaths(imagePaths);
+        if (resolvedPaths.isEmpty()) {
+            return List.of();
+        }
+        List<Content> contents = new ArrayList<>();
+        for (Path file : resolvedPaths) {
+            String contentType = normalizeContentType(detectImageContentType(file));
+            contents.add(ImageContent.from(file, contentType));
+        }
+        return contents;
+    }
+
+    private List<Path> resolveExistingImagePaths(Collection<String> imagePaths) {
+        List<String> normalizedPaths = imagePaths == null ? List.of() : imagePaths.stream()
+                .map(path -> path == null ? "" : path.trim())
+                .filter(path -> !path.isBlank())
+                .map(path -> Path.of(path).toAbsolutePath().normalize().toString())
+                .distinct()
+                .toList();
+        if (normalizedPaths.isEmpty()) {
+            return List.of();
+        }
+        List<Path> resolved = new ArrayList<>();
+        for (String normalizedPath : normalizedPaths) {
+            Path file = Path.of(normalizedPath).toAbsolutePath().normalize();
+            if (!Files.isRegularFile(file)) {
+                throw new IllegalArgumentException("image file not found: " + normalizedPath);
+            }
+            String name = file.getFileName() == null ? "" : file.getFileName().toString();
+            String contentType = normalizeContentType(detectImageContentType(file));
+            String mimeGroup = classifyMimeGroup(contentType, name);
+            if (!"image".equals(mimeGroup)) {
+                throw new IllegalArgumentException("unsupported image file type: " + normalizedPath);
+            }
+            resolved.add(file);
+        }
+        return resolved;
     }
 
     private Content toContent(AgentMessageAttachmentEntity attachment) {
@@ -424,6 +519,28 @@ public class ConversationAttachmentAppService {
             return "";
         }
         return fileName.substring(idx + 1).replaceAll("[^A-Za-z0-9]", "").toLowerCase(Locale.ROOT);
+    }
+
+    private String detectImageContentType(Path file) {
+        try {
+            String detected = Files.probeContentType(file);
+            if (detected != null && !detected.isBlank()) {
+                return detected;
+            }
+        } catch (IOException ignored) {
+            // fallback to extension based detection
+        }
+        String byName = URLConnection.guessContentTypeFromName(file.getFileName() == null ? "" : file.getFileName().toString());
+        if (byName != null && !byName.isBlank()) {
+            return byName;
+        }
+        String extension = extensionOf(file.getFileName() == null ? "" : file.getFileName().toString());
+        return switch (extension) {
+            case "png" -> "image/png";
+            case "jpg", "jpeg" -> "image/jpeg";
+            case "webp" -> "image/webp";
+            default -> "application/octet-stream";
+        };
     }
 
     private record PendingAttachment(String name, String contentType, String mimeGroup, long sizeBytes, boolean previewable) {

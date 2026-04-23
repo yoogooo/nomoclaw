@@ -117,6 +117,7 @@ public class AgentApplicationService {
     private final AgentToolRelationRepository agentToolRelationRepository;
     private final ModelConfigAppService modelConfigAppService;
     private final ConversationAttachmentAppService conversationAttachmentAppService;
+    private final ImageLoaderContextService imageLoaderContextService;
     private final ToolExecutionPolicyGateway toolExecutionPolicyGateway;
     private final ToolPermissionPolicyService toolPermissionPolicyService;
     private final PermissionAppService permissionAppService;
@@ -145,6 +146,7 @@ public class AgentApplicationService {
                                    AgentToolRelationRepository agentToolRelationRepository,
                                    ModelConfigAppService modelConfigAppService,
                                    ConversationAttachmentAppService conversationAttachmentAppService,
+                                   ImageLoaderContextService imageLoaderContextService,
                                    ToolExecutionPolicyGateway toolExecutionPolicyGateway,
                                    ToolPermissionPolicyService toolPermissionPolicyService,
                                    PermissionAppService permissionAppService,
@@ -170,6 +172,7 @@ public class AgentApplicationService {
         this.agentToolRelationRepository = agentToolRelationRepository;
         this.modelConfigAppService = modelConfigAppService;
         this.conversationAttachmentAppService = conversationAttachmentAppService;
+        this.imageLoaderContextService = imageLoaderContextService;
         this.toolExecutionPolicyGateway = toolExecutionPolicyGateway;
         this.toolPermissionPolicyService = toolPermissionPolicyService;
         this.permissionAppService = permissionAppService;
@@ -1036,7 +1039,7 @@ public class AgentApplicationService {
                         availableTools
                 );
                 recordRoundTokenUsage(message, summaryResult.response(), state.currentRound());
-                answer = summaryResult.answer();
+                answer = nullToEmpty(summaryResult.answer()).trim();
             }
             if (streamedResult.streamed() && !answer.isBlank() && !cancellationRegistry.isCanceled(message.messageUid())) {
                 publishMessageDelta(message, roundIndex, "", answer, true);
@@ -1100,11 +1103,15 @@ public class AgentApplicationService {
             if (outcome.canceled()) {
                 return RoundExecutionResult.cancelled();
             }
+            StepExecutionOutcome integratedOutcome = integrateImageLoaderContext(message, latestStep, outcome);
             state.memory().add(ToolExecutionResultMessage.from(
                     toolCallId(latestStep),
                     latestStep.toolName(),
-                    outcome.memoryText()
+                    integratedOutcome.memoryText()
             ));
+            if (integratedOutcome.injectedMemoryMessage() != null) {
+                state.memory().add(integratedOutcome.injectedMemoryMessage());
+            }
         }
 
         return RoundExecutionResult.success();
@@ -1185,6 +1192,35 @@ public class AgentApplicationService {
                 ? lastResult
                 : ToolResult.failure("RETRY_EXHAUSTED", "step retry exhausted", JsonNodeFactory.instance.objectNode());
         return StepExecutionOutcome.failure(exhausted, buildToolResultMessage(step, exhausted, false, lastDecisionMessage));
+    }
+
+    private StepExecutionOutcome integrateImageLoaderContext(AgentMessage message, PlanStep step, StepExecutionOutcome outcome) {
+        if (outcome == null || outcome.canceled()) {
+            return outcome;
+        }
+        ImageLoaderContextService.IntegrationResult integrationResult = imageLoaderContextService.integrate(message, step, outcome.toolResult());
+        if (integrationResult == null) {
+            return outcome;
+        }
+        String mergedMemoryText = appendMemoryTextLine(outcome.memoryText(), integrationResult.memoryLine());
+        return new StepExecutionOutcome(
+                false,
+                outcome.toolResult(),
+                mergedMemoryText,
+                integrationResult.injectedMessage()
+        );
+    }
+
+    private String appendMemoryTextLine(String origin, String appendix) {
+        String left = origin == null ? "" : origin.trim();
+        String right = appendix == null ? "" : appendix.trim();
+        if (right.isBlank()) {
+            return left;
+        }
+        if (left.isBlank()) {
+            return right;
+        }
+        return left + "\n" + right;
     }
 
     /**
@@ -1373,6 +1409,10 @@ public class AgentApplicationService {
                 String task = toolArgs.path("task").asText("");
                 yield task.isBlank() ? "创建定时任务" : "创建定时任务: " + abbreviate(task, 48);
             }
+            case "image_loader_tool" -> {
+                String reference = toolArgs.path("reference").asText("");
+                yield reference.isBlank() ? "加载图片上下文" : "加载图片上下文: " + abbreviate(reference, 48);
+            }
             default -> "执行工具: " + nullToEmpty(toolName);
         };
     }
@@ -1405,6 +1445,7 @@ public class AgentApplicationService {
                 default -> "正在处理文件";
             };
             case "cron_tool" -> "正在创建定时任务";
+            case "image_loader_tool" -> "正在加载图片上下文";
             case "desktop_screenshot_tool" -> "正在截取桌面画面";
             case "file_search_tool" -> "正在搜索文件内容";
             default -> step.title() == null || step.title().isBlank() ? "正在处理任务步骤" : step.title();
@@ -1439,6 +1480,12 @@ public class AgentApplicationService {
             case "cron_tool" -> {
                 String task = step.toolArgs().path("task").asText("");
                 yield task.isBlank() ? "系统准备创建一个定时任务。" : "系统准备创建定时任务：“" + abbreviate(task, 72) + "”。";
+            }
+            case "image_loader_tool" -> {
+                String reference = step.toolArgs().path("reference").asText("");
+                yield reference.isBlank()
+                        ? "系统准备加载历史图片作为视觉分析上下文。"
+                        : "系统准备根据“" + abbreviate(reference, 72) + "”加载历史图片作为视觉分析上下文。";
             }
             default -> "系统已规划这一步，稍后会开始执行。";
         };
@@ -1482,6 +1529,14 @@ public class AgentApplicationService {
                 yield prefix + " 输出如下：\n" + abbreviate(outputBody, 1200);
             }
             case "cron_tool" -> "定时任务已创建完成。";
+            case "image_loader_tool" -> {
+                int resolved = result.artifacts() == null ? 0 : result.artifacts().path("resolvedCount").asInt(0);
+                boolean matched = result.artifacts() != null && result.artifacts().path("matched").asBoolean(false);
+                if (!matched || resolved <= 0) {
+                    yield "未匹配到可加载的图片上下文。";
+                }
+                yield "图片上下文加载完成，共匹配 " + resolved + " 张图片。";
+            }
             default -> hasMeaningfulText(result.output()) ? abbreviate(result.output(), 140) : "这一步已顺利完成。";
         };
     }
@@ -2738,19 +2793,20 @@ public class AgentApplicationService {
         }
     }
 
-    private record StepExecutionOutcome(boolean canceled, ToolResult toolResult, String memoryText) {
+    private record StepExecutionOutcome(boolean canceled, ToolResult toolResult, String memoryText, ChatMessage injectedMemoryMessage) {
         static StepExecutionOutcome success(ToolResult result, String memoryText) {
-            return new StepExecutionOutcome(false, result, memoryText);
+            return new StepExecutionOutcome(false, result, memoryText, null);
         }
 
         static StepExecutionOutcome failure(ToolResult result, String memoryText) {
-            return new StepExecutionOutcome(false, result, memoryText);
+            return new StepExecutionOutcome(false, result, memoryText, null);
         }
 
         static StepExecutionOutcome cancelled() {
             return new StepExecutionOutcome(true,
                     ToolResult.failure("CANCELLED", "message canceled", JsonNodeFactory.instance.objectNode()),
-                    "errorCode=CANCELLED\nerrorMessage=message canceled");
+                    "errorCode=CANCELLED\nerrorMessage=message canceled",
+                    null);
         }
     }
 

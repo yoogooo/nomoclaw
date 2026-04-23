@@ -420,7 +420,8 @@ INSERT INTO tool_definition (
     ('desktop_screenshot_tool', '桌面截图', 'Capture a desktop screenshot on the local machine.', 'LOW', 'ACTIVE', 80, JSON_OBJECT(), NOW(3), NOW(3)),
     ('current_time_tool', '当前时间', 'Get the current UTC time.', 'LOW', 'ACTIVE', 90, JSON_OBJECT(), NOW(3), NOW(3)),
     ('token_usage_tool', 'Token 使用', 'Query stored token usage summary from message records.', 'LOW', 'ACTIVE', 100, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('memory_search_tool', '记忆搜索', 'Search historical conversation messages by keyword.', 'LOW', 'ACTIVE', 110, JSON_OBJECT(), NOW(3), NOW(3));
+    ('memory_search_tool', '记忆搜索', 'Search historical conversation messages by keyword.', 'LOW', 'ACTIVE', 110, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('image_loader_tool', '图片加载', 'On-demand image context loader for visual analysis after tools that return image paths; supports 刚才截图/第N轮截图/文件名 and direct HTTP(S) image URL passthrough without local download.', 'LOW', 'ACTIVE', 115, JSON_OBJECT(), NOW(3), NOW(3));
 
 INSERT INTO skill_definition (
     skill_key, display_name, description, skill_path, status, sort_index, config_json, created_time, updated_time
@@ -443,6 +444,7 @@ INSERT INTO agent_tool_relation (
     ('rel_general_shot', 'agent_general_assistant', 'desktop_screenshot_tool', 'ACTIVE', 80, JSON_OBJECT(), NOW(3), NOW(3)),
     ('rel_general_time', 'agent_general_assistant', 'current_time_tool', 'ACTIVE', 90, JSON_OBJECT(), NOW(3), NOW(3)),
     ('rel_general_token', 'agent_general_assistant', 'token_usage_tool', 'ACTIVE', 100, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_general_image_loader', 'agent_general_assistant', 'image_loader_tool', 'ACTIVE', 115, JSON_OBJECT(), NOW(3), NOW(3)),
     ('rel_general_memory', 'agent_general_assistant', 'memory_search_tool', 'ACTIVE', 110, JSON_OBJECT(), NOW(3), NOW(3)),
     ('rel_test_command', 'agent_test_expert', 'command_tool', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
     ('rel_test_file', 'agent_test_expert', 'file_io_tool', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),

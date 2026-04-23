@@ -64,5 +64,6 @@ class ToolSpecificationRegistryTests {
 
         assertTrue(registry.listForAgent("unknown").size() > 3);
         assertTrue(registry.isToolAllowed("unknown", "cron_tool"));
+        assertTrue(registry.isToolAllowed("unknown", "image_loader_tool"));
     }
 }
