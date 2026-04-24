@@ -13,8 +13,7 @@ on:
         type: choice
         options:
           - all
-          - windows-x64
-          - windows-arm64
+          - windows
           - macos-x64
           - macos-arm64
       version:
@@ -25,76 +24,82 @@ on:
 permissions:
   contents: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
+  select-targets:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Select build matrix
+        id: matrix
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          TARGET_INPUT: ${{ github.event.inputs.target || 'all' }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            TARGET_INPUT="all"
+          fi
+
+          case "$TARGET_INPUT" in
+            all)
+              matrix='{"include":[{"id":"windows-x64","runs_on":"windows-latest","rust_target":"x86_64-pc-windows-msvc","run_script":"./scripts/build-desktop-windows-x64.sh","artifact_paths":"desktop/tauri/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi\ndesktop/tauri/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe"},{"id":"macos-x64","runs_on":"macos-13","rust_target":"x86_64-apple-darwin","run_script":"./scripts/build-desktop-macos.sh","target_arch":"x64","artifact_paths":"desktop/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg\ndesktop/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app.tar.gz\ndesktop/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.sig\ndesktop/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/latest.json"},{"id":"macos-arm64","runs_on":"macos-14","rust_target":"aarch64-apple-darwin","run_script":"./scripts/build-desktop-macos.sh","target_arch":"arm64","artifact_paths":"desktop/tauri/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg\ndesktop/tauri/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.tar.gz\ndesktop/tauri/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.sig\ndesktop/tauri/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/latest.json"}]}'
+              ;;
+            windows)
+              matrix='{"include":[{"id":"windows-x64","runs_on":"windows-latest","rust_target":"x86_64-pc-windows-msvc","run_script":"./scripts/build-desktop-windows-x64.sh","artifact_paths":"desktop/tauri/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi\ndesktop/tauri/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe"}]}'
+              ;;
+            macos-x64)
+              matrix='{"include":[{"id":"macos-x64","runs_on":"macos-13","rust_target":"x86_64-apple-darwin","run_script":"./scripts/build-desktop-macos.sh","target_arch":"x64","artifact_paths":"desktop/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg\ndesktop/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app.tar.gz\ndesktop/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.sig\ndesktop/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/latest.json"}]}'
+              ;;
+            macos-arm64)
+              matrix='{"include":[{"id":"macos-arm64","runs_on":"macos-14","rust_target":"aarch64-apple-darwin","run_script":"./scripts/build-desktop-macos.sh","target_arch":"arm64","artifact_paths":"desktop/tauri/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg\ndesktop/tauri/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.tar.gz\ndesktop/tauri/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.sig\ndesktop/tauri/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/latest.json"}]}'
+              ;;
+            *)
+              echo "Unsupported target: $TARGET_INPUT" >&2
+              exit 1
+              ;;
+          esac
+
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: select-targets
     name: build-${{ matrix.id }}
     runs-on: ${{ matrix.runs_on }}
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - id: windows-x64
-            runs_on: windows-latest
-            target_filter: windows-x64
-            run_script: ./scripts/build-desktop-windows-x64.sh
-            target_arch: x64
-            artifact_paths: |
-              desktop/tauri/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
-              desktop/tauri/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
-          - id: windows-arm64
-            runs_on: windows-11-arm
-            target_filter: windows-arm64
-            run_script: ./scripts/build-desktop-windows-x64.sh
-            target_arch: arm64
-            artifact_paths: |
-              desktop/tauri/src-tauri/target/aarch64-pc-windows-msvc/release/bundle/msi/*.msi
-              desktop/tauri/src-tauri/target/aarch64-pc-windows-msvc/release/bundle/nsis/*.exe
-          - id: macos-x64
-            runs_on: macos-13
-            target_filter: macos-x64
-            run_script: ./scripts/build-desktop-macos.sh
-            target_arch: x64
-            artifact_paths: |
-              desktop/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
-              desktop/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app.tar.gz
-              desktop/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.sig
-              desktop/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/latest.json
-          - id: macos-arm64
-            runs_on: macos-14
-            target_filter: macos-arm64
-            run_script: ./scripts/build-desktop-macos.sh
-            target_arch: arm64
-            artifact_paths: |
-              desktop/tauri/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
-              desktop/tauri/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.tar.gz
-              desktop/tauri/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.sig
-              desktop/tauri/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/latest.json
-    if: >
-      github.event_name == 'push' ||
-      github.event.inputs.target == 'all' ||
-      github.event.inputs.target == matrix.target_filter
+      matrix: ${{ fromJSON(needs.select-targets.outputs.matrix) }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Java 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
 
       - name: Setup Node 20
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "20"
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
+        shell: bash
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.32.1 --activate
+          pnpm --version
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
 
       - name: Resolve desktop version
         shell: bash
