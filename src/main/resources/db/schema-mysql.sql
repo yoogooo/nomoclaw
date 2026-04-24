@@ -398,7 +398,7 @@ INSERT INTO agent_definition (
     agent_uid, agent_name, display_name, avatar, description, capability_tags, prompt_profile,
     model_provider_id, model_id, sort_index, is_group_entry, status, workspace, ext_config, created_time, updated_time
 ) VALUES
-    ('agent_general_assistant', 'general_assistant', '通用助手', '🤝', '负责综合规划、协调执行与最终总结。', JSON_ARRAY('planning', 'coordination', 'delivery'),
+    ('agent_general_assistant', 'default_agent', '默认助手', '🤝', '负责综合规划、协调执行与最终总结。', JSON_ARRAY('planning', 'coordination', 'delivery'),
      'generalist', '', '', 10, 0, 'ACTIVE', '', JSON_OBJECT(), NOW(3), NOW(3)),
     ('agent_test_expert', 'test_expert', '测试专家', '🧪', '负责测试设计、缺陷定位与质量把关。', JSON_ARRAY('testing', 'qa', 'review'),
      'qa-specialist', '', '', 20, 0, 'ACTIVE', '', JSON_OBJECT(), NOW(3), NOW(3)),

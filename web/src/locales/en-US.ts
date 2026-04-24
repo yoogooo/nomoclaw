@@ -498,8 +498,8 @@ const enUS = {
     },
     create: {
       title: "Create Agent",
-      displayNamePlaceholder: "e.g. General Assistant",
-      agentNamePlaceholder: "e.g. agent_general_assistant",
+      displayNamePlaceholder: "e.g. Default Assistant",
+      agentNamePlaceholder: "e.g. default_agent",
       workspaceDirPlaceholder: "Default: <agentsRoot>/<agentName>/workspace",
       reportDirPlaceholder: "Default: <workspace>/report",
       tmpDirPlaceholder: "Default: <workspace>/tmp",

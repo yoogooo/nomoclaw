@@ -25,7 +25,7 @@ class NomoClawWorkspaceBootstrapTests {
 
         NomoClawWorkspaceBootstrap.bootstrap(tempDir, bundledSkillsRoot);
 
-        Path defaultAgent = tempDir.resolve("agents").resolve("default");
+        Path defaultAgent = tempDir.resolve("agents").resolve("default_agent");
         Path skillsRoot = tempDir.resolve("skills");
         assertTrue(Files.isDirectory(defaultAgent));
         assertTrue(Files.isRegularFile(defaultAgent.resolve("AGENT.md")));

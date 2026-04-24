@@ -8,7 +8,7 @@ public final class NomoClawPaths {
     public static final String ROOT_DIR_NAME = ".nomoclaw";
     public static final String AGENTS_DIR_NAME = "agents";
     public static final String SKILLS_DIR_NAME = "skills";
-    public static final String DEFAULT_AGENT_NAME = "default";
+    public static final String DEFAULT_AGENT_NAME = "default_agent";
     public static final String TMP_DIR_NAME = "tmp";
     public static final String REPORT_DIR_NAME = "report";
     public static final String RUNTIME_DIR_NAME = "runtime";

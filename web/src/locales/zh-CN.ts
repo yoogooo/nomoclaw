@@ -498,8 +498,8 @@ const zhCN = {
     },
     create: {
       title: "新建 Agent",
-      displayNamePlaceholder: "例如：通用助手",
-      agentNamePlaceholder: "例如：agent_general_assistant",
+      displayNamePlaceholder: "例如：默认助手",
+      agentNamePlaceholder: "例如：default_agent",
       workspaceDirPlaceholder: "默认：<agentsRoot>/<agentName>/workspace",
       reportDirPlaceholder: "默认：<workspace>/report",
       tmpDirPlaceholder: "默认：<workspace>/tmp",
