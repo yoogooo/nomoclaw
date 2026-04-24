@@ -648,8 +648,7 @@ const enUS = {
       editConfig: "Edit Config",
       loadLocalModels: "Load Local Models",
       addModel: "Add Model",
-      testConnection: "Test Connection",
-      refreshCatalog: "Update Catalog"
+      testConnection: "Test Connection"
     },
     labels: {
       defaultModel: "Default Model",
@@ -697,8 +696,7 @@ const enUS = {
       localModelsLoaded: "Local Ollama models loaded",
       localModelsLoadFailed: "Failed to load local models",
       connectionTestSuccess: "Connection test succeeded",
-      connectionTestFailed: "Connection test failed",
-      catalogRefreshed: "Model catalog updated"
+      connectionTestFailed: "Connection test failed"
     }
   },
   pages: {

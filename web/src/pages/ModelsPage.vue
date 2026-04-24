@@ -17,7 +17,7 @@ import AppPageHeader from "@/components/layout/AppPageHeader.vue";
 import { modelApi } from "@/api/modelApi";
 import { message } from "@/discrete";
 import { useModelGateStore } from "@/stores/modelGate";
-import type { ModelCatalogStatus, ModelConfig, ModelProvider, ModelProviderOption } from "@/types/api";
+import type { ModelConfig, ModelProvider, ModelProviderOption } from "@/types/api";
 
 type ProviderStatusType = "success" | "warning";
 const { t } = useI18n();
@@ -26,14 +26,12 @@ const loading = ref(false);
 const saving = ref(false);
 const loadingLocalModels = ref(false);
 const testingProviderConnection = ref(false);
-const refreshingCatalog = ref(false);
 const showEditor = ref(false);
 const editingProviderId = ref("");
 const modelGateStore = useModelGateStore();
 
 const config = reactive<ModelConfig>({ providers: [] });
 const draft = reactive<ModelConfig>({ providers: [] });
-const catalogStatus = ref<ModelCatalogStatus | null>(null);
 const modelIdInputRefs = ref<Array<{ focus: () => void } | null>>([]);
 const modelCardRefs = ref<Array<HTMLElement | null>>([]);
 
@@ -108,12 +106,8 @@ function normalizeProvider(provider: ModelProvider): ModelProvider {
 async function loadConfig() {
   loading.value = true;
   try {
-    const [data, status] = await Promise.all([
-      modelApi.getModelConfig(),
-      modelApi.getModelCatalogStatus()
-    ]);
+    const data = await modelApi.getModelConfig();
     config.providers = data.providers.map(normalizeProvider);
-    catalogStatus.value = status;
   } finally {
     loading.value = false;
   }
@@ -126,19 +120,6 @@ async function refreshConfig() {
   } catch (error) {
     const text = error instanceof Error ? error.message : t("toast.refreshFailed");
     message.error(text);
-  }
-}
-
-async function refreshModelCatalog() {
-  refreshingCatalog.value = true;
-  try {
-    catalogStatus.value = await modelApi.refreshModelCatalog();
-    await loadConfig();
-    message.success(catalogStatus.value.message || t("models.toast.catalogRefreshed"));
-  } catch (error) {
-    message.error(error instanceof Error ? error.message : t("toast.refreshFailed"));
-  } finally {
-    refreshingCatalog.value = false;
   }
 }
 
@@ -333,7 +314,6 @@ onMounted(() => {
             :subtitle="t('pages.models.subtitle')"
           >
             <template #actions>
-              <n-button :loading="refreshingCatalog" @click="refreshModelCatalog">{{ t("models.actions.refreshCatalog") }}</n-button>
               <n-button :loading="loading" @click="refreshConfig">{{ t("common.refresh") }}</n-button>
             </template>
           </AppPageHeader>
@@ -498,15 +478,6 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: var(--space-4);
-}
-
-.catalog-status {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--color-text-secondary);
-  font-size: var(--text-caption-size);
 }
 
 .provider-card {

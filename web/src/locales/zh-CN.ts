@@ -648,8 +648,7 @@ const zhCN = {
       editConfig: "编辑配置",
       loadLocalModels: "加载本地模型",
       addModel: "新增模型",
-      testConnection: "测试连接",
-      refreshCatalog: "更新模型目录"
+      testConnection: "测试连接"
     },
     labels: {
       defaultModel: "默认模型",
@@ -697,8 +696,7 @@ const zhCN = {
       localModelsLoaded: "已加载本地 Ollama 模型",
       localModelsLoadFailed: "加载本地模型失败",
       connectionTestSuccess: "连接测试成功",
-      connectionTestFailed: "连接测试失败",
-      catalogRefreshed: "模型目录已更新"
+      connectionTestFailed: "连接测试失败"
     }
   },
   pages: {
