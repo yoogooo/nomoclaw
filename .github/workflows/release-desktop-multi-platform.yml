@@ -13,7 +13,8 @@ on:
         type: choice
         options:
           - all
-          - windows
+          - windows-x64
+          - windows-arm64
           - macos-x64
           - macos-arm64
       version:
@@ -48,10 +49,13 @@ jobs:
 
           case "$TARGET_INPUT" in
             all)
-              matrix='{"include":[{"id":"windows-x64","runs_on":"windows-latest","rust_target":"x86_64-pc-windows-msvc","run_script":"./scripts/build-desktop-windows-x64.sh","artifact_paths":"desktop/tauri/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi\ndesktop/tauri/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe"},{"id":"macos-x64","runs_on":"macos-13","rust_target":"x86_64-apple-darwin","run_script":"./scripts/build-desktop-macos.sh","target_arch":"x64","artifact_paths":"desktop/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg\ndesktop/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app.tar.gz\ndesktop/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.sig\ndesktop/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/latest.json"},{"id":"macos-arm64","runs_on":"macos-14","rust_target":"aarch64-apple-darwin","run_script":"./scripts/build-desktop-macos.sh","target_arch":"arm64","artifact_paths":"desktop/tauri/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg\ndesktop/tauri/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.tar.gz\ndesktop/tauri/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.sig\ndesktop/tauri/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/latest.json"}]}'
+              matrix='{"include":[{"id":"windows-x64","runs_on":"windows-latest","rust_target":"x86_64-pc-windows-msvc","run_script":"./scripts/build-desktop-windows-x64.sh","target_arch":"x64","artifact_paths":"desktop/tauri/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi\ndesktop/tauri/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe"},{"id":"windows-arm64","runs_on":"windows-11-arm","rust_target":"aarch64-pc-windows-msvc","run_script":"./scripts/build-desktop-windows-x64.sh","target_arch":"arm64","artifact_paths":"desktop/tauri/src-tauri/target/aarch64-pc-windows-msvc/release/bundle/msi/*.msi\ndesktop/tauri/src-tauri/target/aarch64-pc-windows-msvc/release/bundle/nsis/*.exe"},{"id":"macos-x64","runs_on":"macos-13","rust_target":"x86_64-apple-darwin","run_script":"./scripts/build-desktop-macos.sh","target_arch":"x64","artifact_paths":"desktop/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg\ndesktop/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app.tar.gz\ndesktop/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.sig\ndesktop/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/latest.json"},{"id":"macos-arm64","runs_on":"macos-14","rust_target":"aarch64-apple-darwin","run_script":"./scripts/build-desktop-macos.sh","target_arch":"arm64","artifact_paths":"desktop/tauri/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg\ndesktop/tauri/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.tar.gz\ndesktop/tauri/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.sig\ndesktop/tauri/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/latest.json"}]}'
               ;;
-            windows)
-              matrix='{"include":[{"id":"windows-x64","runs_on":"windows-latest","rust_target":"x86_64-pc-windows-msvc","run_script":"./scripts/build-desktop-windows-x64.sh","artifact_paths":"desktop/tauri/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi\ndesktop/tauri/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe"}]}'
+            windows-x64)
+              matrix='{"include":[{"id":"windows-x64","runs_on":"windows-latest","rust_target":"x86_64-pc-windows-msvc","run_script":"./scripts/build-desktop-windows-x64.sh","target_arch":"x64","artifact_paths":"desktop/tauri/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi\ndesktop/tauri/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe"}]}'
+              ;;
+            windows-arm64)
+              matrix='{"include":[{"id":"windows-arm64","runs_on":"windows-11-arm","rust_target":"aarch64-pc-windows-msvc","run_script":"./scripts/build-desktop-windows-x64.sh","target_arch":"arm64","artifact_paths":"desktop/tauri/src-tauri/target/aarch64-pc-windows-msvc/release/bundle/msi/*.msi\ndesktop/tauri/src-tauri/target/aarch64-pc-windows-msvc/release/bundle/nsis/*.exe"}]}'
               ;;
             macos-x64)
               matrix='{"include":[{"id":"macos-x64","runs_on":"macos-13","rust_target":"x86_64-apple-darwin","run_script":"./scripts/build-desktop-macos.sh","target_arch":"x64","artifact_paths":"desktop/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg\ndesktop/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app.tar.gz\ndesktop/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.sig\ndesktop/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/latest.json"}]}'
