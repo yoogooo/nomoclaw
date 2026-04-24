@@ -37,13 +37,14 @@ TARGET_ARCH=x64 ./scripts/build-desktop-macos.sh
 ### `build-desktop-windows-x64.sh`
 
 - 作用:
-  - Windows x64 统一桌面打包脚本（Tauri 壳 + 内嵌 Spring Boot 后端）
+  - Windows x64 / arm64 统一桌面打包脚本（Tauri 壳 + 内嵌 Spring Boot 后端）
   - 执行前端构建、后端打包、`jlink` 运行时裁剪、Tauri 打包（默认 MSI）
 - 运行环境:
   - 需在 Windows（Git Bash / MSYS / Cygwin）执行
 - 用法:
   - `./scripts/build-desktop-windows-x64.sh`
 - 可选参数（环境变量）:
+  - `TARGET_ARCH=x64|arm64`（默认 `x64`）
   - `SKIP_TESTS=true|false`（默认 `true`）
   - `SKIP_WEB_BUILD=true|false`（默认 `false`）
   - `MAVEN_PROFILE=prod-lite`（默认 `prod-lite`）
@@ -56,6 +57,7 @@ TARGET_ARCH=x64 ./scripts/build-desktop-macos.sh
   - `WINDOWS_ICON_FILE=<path to .ico>`（可选；未指定时会自动探测 `desktop/tauri/src-tauri/icons/icon.ico`、`build/windows/NomoClaw.ico`）
 - 示例:
   - `TAURI_BUNDLES=msi,nsis DESKTOP_VERSION=1.0.0 ./scripts/build-desktop-windows-x64.sh`
+  - `TARGET_ARCH=arm64 TAURI_BUNDLES=msi,nsis DESKTOP_VERSION=1.0.0 ./scripts/build-desktop-windows-x64.sh`
 
 ## 历史脚本（Legacy）
 

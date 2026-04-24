@@ -8,7 +8,7 @@ set -euo pipefail
 # - Packages Spring Boot fat jar
 # - Builds minimal Java runtime via jlink
 # - Copies jar/runtime into desktop/tauri/src-tauri/resources/backend
-# - Runs tauri build for x86_64-pc-windows-msvc to produce MSI
+# - Runs tauri build for x86_64-pc-windows-msvc or aarch64-pc-windows-msvc to produce MSI
 #
 # Optional env:
 #   SKIP_TESTS=true|false             (default: true)
@@ -21,6 +21,7 @@ set -euo pipefail
 #   APP_VERSION=1.0.0                 (default: 1.0.0)
 #   DESKTOP_VERSION=1.0.0             (alias of APP_VERSION, if set takes precedence)
 #   DESKTOP_NAME_PREFIX=NomoClaw      (default: NomoClaw)
+#   TARGET_ARCH=x64|arm64             (default: x64)
 #   WINDOWS_ICON_FILE=build/windows/NomoClaw.ico (optional)
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -31,10 +32,11 @@ DESKTOP_DIR="$ROOT_DIR/desktop/tauri"
 DESKTOP_RES_DIR="$DESKTOP_DIR/src-tauri/resources/backend"
 DESKTOP_TAURI_DIR="$DESKTOP_DIR/src-tauri"
 TARGET_DIR="$ROOT_DIR/target"
-BUILD_DIR="$ROOT_DIR/build/desktop-windows-x64"
 DIST_DIR="$ROOT_DIR/dist"
 
-RUST_TARGET="x86_64-pc-windows-msvc"
+TARGET_ARCH="${TARGET_ARCH:-x64}"
+RUST_TARGET=""
+BUILD_DIR=""
 
 SKIP_TESTS="${SKIP_TESTS:-true}"
 SKIP_WEB_BUILD="${SKIP_WEB_BUILD:-false}"
@@ -74,7 +76,25 @@ normalize_bool() {
   esac
 }
 
-ensure_windows_x64() {
+setup_windows_target() {
+  case "${TARGET_ARCH,,}" in
+    x64|amd64)
+      TARGET_ARCH="x64"
+      RUST_TARGET="x86_64-pc-windows-msvc"
+      ;;
+    arm64|aarch64)
+      TARGET_ARCH="arm64"
+      RUST_TARGET="aarch64-pc-windows-msvc"
+      ;;
+    *)
+      fail "Unsupported TARGET_ARCH=$TARGET_ARCH (expected x64/arm64)"
+      ;;
+  esac
+
+  BUILD_DIR="$ROOT_DIR/build/desktop-windows-$TARGET_ARCH"
+}
+
+ensure_windows_host() {
   case "$(uname -s)" in
     MINGW*|MSYS*|CYGWIN*) ;;
     *) fail "This script only supports Windows (Git Bash / MSYS / Cygwin)." ;;
@@ -83,21 +103,31 @@ ensure_windows_x64() {
   local arch
   arch="$(uname -m)"
   case "$arch" in
-    x86_64|amd64) ;;
-    *) fail "This script requires x64 host, current arch=$arch" ;;
+    x86_64|amd64|aarch64|arm64) ;;
+    *) fail "Unsupported host arch=$arch (expected x64 or arm64)" ;;
   esac
 }
 
-ensure_java21_x64() {
+ensure_java21_target_arch() {
   require_cmd java
   local major arch
   major="$(java -version 2>&1 | awk -F '"' '/version/ {print $2}' | awk -F. '{if ($1=="1") print $2; else print $1}')"
   [[ "$major" == "21" ]] || fail "Active Java major version is not 21."
 
   arch="$(java -XshowSettings:properties -version 2>&1 | awk -F'= ' '/os.arch/ {print $2}' | tr -d '\r' | head -n 1)"
-  case "$arch" in
-    amd64|x86_64) ;;
-    *) fail "Active Java is not x64 (os.arch=$arch). Please use JDK 21 x64." ;;
+  case "$TARGET_ARCH" in
+    x64)
+      case "$arch" in
+        amd64|x86_64) ;;
+        *) fail "Active Java is not x64 (os.arch=$arch). Please use JDK 21 x64." ;;
+      esac
+      ;;
+    arm64)
+      case "$arch" in
+        aarch64|arm64) ;;
+        *) fail "Active Java is not arm64 (os.arch=$arch). Please use JDK 21 arm64." ;;
+      esac
+      ;;
   esac
 }
 
@@ -267,7 +297,7 @@ ensure_required_modules() {
 
 build_runtime() {
   local runtime_dir modules
-  runtime_dir="$BUILD_DIR/runtime-x64"
+  runtime_dir="$BUILD_DIR/runtime-$TARGET_ARCH"
 
   rm -rf "$runtime_dir"
   mkdir -p "$BUILD_DIR"
@@ -289,7 +319,7 @@ build_runtime() {
   fi
   modules="$(ensure_required_modules "$modules")"
 
-  log "Creating jlink runtime (x64)"
+  log "Creating jlink runtime ($TARGET_ARCH)"
   jlink \
     --add-modules "$modules" \
     --compress=zip-6 \
@@ -326,7 +356,7 @@ build_tauri_config_override() {
 
   local base_config_path icon_path
   base_config_path="$DESKTOP_TAURI_DIR/tauri.conf.json"
-  TAURI_CONFIG_OVERRIDE_PATH="$BUILD_DIR/tauri.conf.windows-x64.generated.json"
+  TAURI_CONFIG_OVERRIDE_PATH="$BUILD_DIR/tauri.conf.windows-$TARGET_ARCH.generated.json"
   icon_path=""
 
   if [[ -n "$WINDOWS_ICON_FILE" ]]; then
@@ -454,22 +484,22 @@ collect_msi_artifact() {
   [[ -n "$selected_msi" ]] || fail "Failed to resolve MSI artifact from newly generated files."
 
   mkdir -p "$DIST_DIR"
-  output_msi="$DIST_DIR/${DESKTOP_PRODUCT_NAME}-${DESKTOP_VERSION}-windows-x64.msi"
+  output_msi="$DIST_DIR/${DESKTOP_PRODUCT_NAME}-${DESKTOP_VERSION}-windows-$TARGET_ARCH.msi"
   cp -f "$selected_msi" "$output_msi"
   log "Resolved MSI source: $selected_msi"
   log "MSI output: $output_msi"
 }
 
 main() {
-  ensure_windows_x64
-  ensure_java21_x64
+  setup_windows_target
+  ensure_windows_host
+  ensure_java21_target_arch
   require_cmd jdeps
   require_cmd jlink
   setup_desktop_naming
   setup_version_metadata
   write_version_file
   setup_rust_toolchain
-  check_rust_target_build
 
   mkdir -p "$BUILD_DIR" "$DIST_DIR"
 
@@ -482,6 +512,7 @@ main() {
   log "Resolved backend jar: $main_jar"
 
   prepare_tauri_resources "$main_jar" "$runtime_dir"
+  check_rust_target_build
   build_tauri_bundle
   validate_staged_backend_runtime
 
@@ -491,7 +522,7 @@ main() {
     log "TAURI_BUNDLES does not include msi; skipping dist MSI copy"
   fi
 
-  log "Desktop Windows x64 build complete"
+  log "Desktop Windows $TARGET_ARCH build complete"
 }
 
 main "$@"
