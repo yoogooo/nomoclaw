@@ -12,6 +12,21 @@ public final class ModelProviderDefaults {
     public static List<ModelConfigDto.Provider> providers() {
         return List.of(
                 new ModelConfigDto.Provider(
+                        "deepseek",
+                        "DeepSeek",
+                        "OpenAI Compatible",
+                        false,
+                        true,
+                        true,
+                        "https://api.deepseek.com",
+                        "",
+                        "deepseek-v4-flash",
+                        List.of(
+                                model("deepseek-v4-pro", "DeepSeek-V4-Pro", List.of("text"), true, 1048576, 0, 393216, disabledUpload()),
+                                model("deepseek-v4-flash", "DeepSeek-V4-Flash", List.of("text"), true, 1048576, 0, 393216, disabledUpload())
+                        )
+                ),
+                new ModelConfigDto.Provider(
                         "dashscope",
                         "DashScope",
                         "OpenAI Compatible",

@@ -1,8 +1,81 @@
 {
   "schemaVersion": 1,
-  "catalogVersion": "2026-04-16.1",
-  "generatedAt": "2026-04-16T00:00:00Z",
+  "catalogVersion": "2026-04-25.1",
+  "generatedAt": "2026-04-25T00:00:00Z",
   "models": [
+    {
+      "providerIds": [
+        "deepseek"
+      ],
+      "modelId": "deepseek-v4-pro",
+      "displayName": "DeepSeek-V4-Pro",
+      "aliases": [],
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "reasoning": true,
+      "contextWindowTokens": 1048576,
+      "maxInputTokens": 0,
+      "maxOutputTokens": 393216,
+      "uploadPolicy": {
+        "enabled": false,
+        "allowedMimeGroups": [],
+        "maxFilesPerMessage": 0,
+        "maxImagesPerMessage": 0,
+        "maxFileBytes": 0,
+        "maxTotalBytes": 0,
+        "singleMimeGroupOnly": false,
+        "allowMixedImageAndFile": false
+      },
+      "sourceRefs": [
+        "https://api-docs.deepseek.com/updates",
+        "https://api-docs.deepseek.com/quick_start/pricing",
+        "https://api-docs.deepseek.com/api/create-chat-completion/"
+      ],
+      "lastVerifiedAt": "2026-04-24",
+      "confidence": "high"
+    },
+    {
+      "providerIds": [
+        "deepseek"
+      ],
+      "modelId": "deepseek-v4-flash",
+      "displayName": "DeepSeek-V4-Flash",
+      "aliases": [
+        "deepseek-chat",
+        "deepseek-reasoner"
+      ],
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "reasoning": true,
+      "contextWindowTokens": 1048576,
+      "maxInputTokens": 0,
+      "maxOutputTokens": 393216,
+      "uploadPolicy": {
+        "enabled": false,
+        "allowedMimeGroups": [],
+        "maxFilesPerMessage": 0,
+        "maxImagesPerMessage": 0,
+        "maxFileBytes": 0,
+        "maxTotalBytes": 0,
+        "singleMimeGroupOnly": false,
+        "allowMixedImageAndFile": false
+      },
+      "sourceRefs": [
+        "https://api-docs.deepseek.com/updates",
+        "https://api-docs.deepseek.com/quick_start/pricing",
+        "https://api-docs.deepseek.com/api/create-chat-completion/"
+      ],
+      "lastVerifiedAt": "2026-04-24",
+      "confidence": "high"
+    },
     {
       "providerIds": [
         "dashscope",
