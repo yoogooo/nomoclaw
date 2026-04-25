@@ -1,14 +1,18 @@
 package ai.nomoclaw.bot.tool;
 
-import ai.nomoclaw.bot.workspace.NomoClawPaths;
 import ai.nomoclaw.bot.model.PlanStep;
+import ai.nomoclaw.bot.model.ToolProgress;
 import ai.nomoclaw.bot.model.ToolRequest;
 import ai.nomoclaw.bot.model.ToolResult;
 import ai.nomoclaw.bot.orchestrator.MessageCancellationRegistry;
 import ai.nomoclaw.bot.orchestrator.ToolSpecificationRegistry;
+import ai.nomoclaw.bot.workspace.NomoClawPaths;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.node.JsonNodeFactory;
+
+import java.nio.file.Path;
+import java.util.function.Consumer;
 
 @Component
 @Slf4j
@@ -30,9 +34,12 @@ public class ToolExecutor {
                               String messageUid,
                               String agentUid,
                               String agentName,
-                              java.nio.file.Path agentWorkspacePath,
+                              Path agentWorkspacePath,
+                              Path tmpDirectory,
+                              Path reportDirectory,
                               PlanStep step,
-                              long timeoutMs) {
+                              long timeoutMs,
+                              Consumer<ToolProgress> progressReporter) {
         if (cancellationRegistry.isCanceled(messageUid)) {
             return ToolResult.failure("CANCELLED", "message canceled", JsonNodeFactory.instance.objectNode());
         }
@@ -42,9 +49,11 @@ public class ToolExecutor {
         Tool tool = toolRegistry.getRequired(step.toolName());
         log.info("[ToolExecutor] dispatch tool={} conversationUid={} messageUid={} stepUid={} timeoutMs={}",
                 tool.name(), conversationUid, messageUid, step.stepUid(), timeoutMs);
-        java.nio.file.Path workspace = NomoClawPaths.ensureAgentWorkspace(agentWorkspacePath == null
+        Path workspace = NomoClawPaths.ensureAgentWorkspace(agentWorkspacePath == null
                 ? NomoClawPaths.agentWorkspace(agentName)
                 : agentWorkspacePath);
+        Path tmpDir = ensureDirectory(tmpDirectory == null ? NomoClawPaths.agentTmp(workspace) : tmpDirectory, "agent tmp");
+        Path reportDir = ensureDirectory(reportDirectory == null ? NomoClawPaths.agentReport(workspace) : reportDirectory, "agent report");
         ToolRequest request = new ToolRequest(
                 conversationUid,
                 messageUid,
@@ -52,11 +61,22 @@ public class ToolExecutor {
                 agentUid,
                 agentName,
                 workspace,
-                NomoClawPaths.agentTmp(workspace),
-                NomoClawPaths.agentReport(workspace),
+                tmpDir,
+                reportDir,
                 step.toolArgs(),
-                timeoutMs
+                timeoutMs,
+                progressReporter
         );
         return tool.execute(request);
+    }
+
+    private Path ensureDirectory(Path path, String label) {
+        try {
+            Path normalized = path.toAbsolutePath().normalize();
+            java.nio.file.Files.createDirectories(normalized);
+            return normalized;
+        } catch (Exception ex) {
+            throw new IllegalStateException("failed to initialize " + label + ": " + path, ex);
+        }
     }
 }

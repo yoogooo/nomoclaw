@@ -37,6 +37,8 @@ public record UpdateModelConfigRequest(
             List<String> allowedMimeGroups,
             Integer maxFilesPerMessage,
             Integer maxImagesPerMessage,
+            Long maxFileBytes,
+            Long maxTotalBytes,
             boolean singleMimeGroupOnly,
             boolean allowMixedImageAndFile
     ) {

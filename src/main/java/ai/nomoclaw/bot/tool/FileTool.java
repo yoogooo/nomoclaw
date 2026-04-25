@@ -2,9 +2,6 @@ package ai.nomoclaw.bot.tool;
 
 import ai.nomoclaw.bot.model.ToolRequest;
 import ai.nomoclaw.bot.model.ToolResult;
-import ai.nomoclaw.bot.policy.tool.ToolPermissionPolicyService;
-import ai.nomoclaw.bot.policy.tool.ToolPolicyContext;
-import ai.nomoclaw.bot.policy.tool.ToolPolicyDecisionResult;
 import ai.nomoclaw.bot.util.JsonUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -24,10 +21,7 @@ import java.util.List;
 @Slf4j
 public class FileTool implements Tool {
 
-    private final ToolPermissionPolicyService toolPermissionPolicyService;
-
-    public FileTool(ToolPermissionPolicyService toolPermissionPolicyService) {
-        this.toolPermissionPolicyService = toolPermissionPolicyService;
+    public FileTool() {
     }
 
     @Override
@@ -45,23 +39,6 @@ public class FileTool implements Tool {
                     request.conversationUid(), request.messageUid(), request.stepUid(), action, pathRaw);
             if (pathRaw.isBlank()) {
                 return ToolResult.failure("INVALID_ARGS", "path is required", metric(start, 0));
-            }
-
-            ToolPolicyDecisionResult policyDecision = toolPermissionPolicyService.evaluate(new ToolPolicyContext(
-                    name(),
-                    request.args(),
-                    request.agentWorkspacePath(),
-                    "",
-                    request.conversationUid(),
-                    request.messageUid(),
-                    request.stepUid()
-            ));
-            if (policyDecision.denied() || policyDecision.asks()) {
-                return ToolResult.failure(
-                        policyDecision.reasonCode().name(),
-                        policyDecision.message().isBlank() ? "当前文件操作被安全策略阻止。" : policyDecision.message(),
-                        metric(start, 0)
-                );
             }
 
             Path path = PathResolver.resolveInAgentWorkspace(pathRaw, request);

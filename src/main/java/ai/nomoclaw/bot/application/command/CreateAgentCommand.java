@@ -10,6 +10,7 @@ public record CreateAgentCommand(
         String avatarColor,
         String modelProvider,
         String modelName,
-        List<String> modelNames
+        List<String> modelNames,
+        String workspace
 ) {
 }

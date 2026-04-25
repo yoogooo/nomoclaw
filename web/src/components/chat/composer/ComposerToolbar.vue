@@ -134,12 +134,12 @@ const modelSelectWidthCh = computed(() => {
 }
 
 .composer-tool-btn {
-  padding: var(--size-7) var(--space-3);
+  padding: var(--space-1_5) var(--space-3);
   border: 0;
   border-radius: var(--radius-pill);
   background: transparent;
   color: var(--color-text-subtle);
-  font-size: var(--font-size-xs);
+  font-size: var(--text-caption-size);
   font-weight: 600;
   cursor: pointer;
   transition: color 0.16s ease, background-color 0.16s ease;
@@ -194,12 +194,12 @@ const modelSelectWidthCh = computed(() => {
 }
 
 .composer-submit-cancel {
-  background: var(--color-button-danger-bg);
-  color: var(--color-button-danger-text);
+  background: var(--color-composer-stop-bg);
+  color: var(--color-composer-stop-fg);
 }
 
 .composer-submit-cancel:hover {
-  background: var(--color-button-danger-bg-hover);
+  background: var(--color-composer-stop-bg-hover);
 }
 
 .composer-submit:disabled {
@@ -237,6 +237,7 @@ const modelSelectWidthCh = computed(() => {
   .composer-meta {
     margin-left: 0;
     justify-content: flex-end;
+    align-items: flex-end;
   }
 }
 </style>

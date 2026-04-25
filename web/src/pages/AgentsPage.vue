@@ -22,7 +22,7 @@ import {
   User,
   Wrench
 } from "lucide-vue-next";
-import { NTabPane, NTabs } from "naive-ui";
+import { NButton, NTabPane, NTabs } from "naive-ui";
 import DirectoryRail from "@/components/chat/DirectoryRail.vue";
 import AppPageHeader from "@/components/layout/AppPageHeader.vue";
 import AgentBasicTab from "@/components/agents/AgentBasicTab.vue";
@@ -44,6 +44,51 @@ import type { ImportedSkillResponse } from "@/types/api";
 import { approxBytes, formatRelativeTime, joinPath } from "@/components/agents/domain/agentManagementDomain";
 import { useAgentsManagement } from "@/components/agents/useAgentsManagement";
 import { getSortLocale } from "@/i18n";
+import { message } from "@/discrete";
+
+const AGENTS_PAGE_STATE_STORAGE_KEY = "agents-page:selection:v1";
+const AGENT_DETAIL_TABS = ["basic", "skills", "tools", "tips", "docs"] as const;
+
+interface AgentsPagePersistedState {
+  selectedAgentUid: string;
+  detailTab: string;
+}
+
+function isValidDetailTab(value: string) {
+  return AGENT_DETAIL_TABS.includes(value as (typeof AGENT_DETAIL_TABS)[number]);
+}
+
+function restoreAgentsPageState(): AgentsPagePersistedState | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  try {
+    const raw = window.localStorage.getItem(AGENTS_PAGE_STATE_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw) as Partial<AgentsPagePersistedState>;
+    const selectedAgentUid = String(parsed.selectedAgentUid || "").trim();
+    const detailTab = isValidDetailTab(String(parsed.detailTab || "")) ? String(parsed.detailTab) : "basic";
+    return {
+      selectedAgentUid,
+      detailTab
+    };
+  } catch {
+    return null;
+  }
+}
+
+function persistAgentsPageState(payload: AgentsPagePersistedState) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.setItem(AGENTS_PAGE_STATE_STORAGE_KEY, JSON.stringify(payload));
+  } catch {
+    // Ignore local persistence errors to avoid breaking page interactions.
+  }
+}
 
 const detailTab = ref("basic");
 const selectedAgentUid = ref("");
@@ -53,6 +98,7 @@ const docEditable = ref(false);
 const skillDrawerVisible = ref(false);
 const selectedSkillId = ref("");
 const importSkillVisible = ref(false);
+const refreshingConfig = ref(false);
 const { t } = useI18n();
 
 const avatarIconOptions: AvatarIconOption[] = [
@@ -194,15 +240,39 @@ async function handleSkillImported(skill: ImportedSkillResponse) {
   detailTab.value = "skills";
 }
 
-onMounted(async () => {
-  try {
-    await management.init();
-  } catch {
+async function refreshAgentsConfig(notify = true) {
+  if (refreshingConfig.value) {
     return;
   }
-  selectedAgentUid.value = management.ensureSelectedAgent(selectedAgentUid.value);
-  management.syncDocsFormFromSelection(selectedAgent.value);
-  management.syncBasicFormFromSelection(selectedAgent.value);
+  refreshingConfig.value = true;
+  const preferredAgentUid = selectedAgentUid.value;
+  try {
+    await management.init();
+    selectedAgentUid.value = management.ensureSelectedAgent(preferredAgentUid);
+    management.syncDocsFormFromSelection(selectedAgent.value);
+    management.syncBasicFormFromSelection(selectedAgent.value);
+    if (selectedAgentUid.value) {
+      await management.loadAgentWorkspace(selectedAgentUid.value);
+    }
+    if (notify) {
+      message.success(t("toast.configRefreshed"));
+    }
+  } catch {
+    if (notify) {
+      message.error(t("toast.refreshFailed"));
+    }
+  } finally {
+    refreshingConfig.value = false;
+  }
+}
+
+onMounted(async () => {
+  const restoredState = restoreAgentsPageState();
+  if (restoredState) {
+    detailTab.value = restoredState.detailTab;
+    selectedAgentUid.value = restoredState.selectedAgentUid;
+  }
+  await refreshAgentsConfig(false);
 });
 
 watch([selectedDocKey, detailTab, selectedAgentUid], () => {
@@ -218,6 +288,13 @@ watch(selectedAgentUid, async (agentUid) => {
   await management.loadAgentWorkspace(agentUid);
   management.syncDocsFormFromSelection(selectedAgent.value);
 });
+
+watch([selectedAgentUid, detailTab], ([agentUid, tab]) => {
+  persistAgentsPageState({
+    selectedAgentUid: agentUid || "",
+    detailTab: isValidDetailTab(tab || "") ? tab : "basic"
+  });
+});
 </script>
 
 <template>
@@ -229,7 +306,13 @@ watch(selectedAgentUid, async (agentUid) => {
           <AppPageHeader
             :title="t('pages.agents.title')"
             :subtitle="t('pages.agents.subtitle')"
-          />
+          >
+            <template #actions>
+              <n-button :loading="refreshingConfig" @click="refreshAgentsConfig()">
+                {{ t("common.refresh") }}
+              </n-button>
+            </template>
+          </AppPageHeader>
 
           <div class="agent-main-grid">
             <AgentListPane
@@ -255,12 +338,14 @@ watch(selectedAgentUid, async (agentUid) => {
                     @update:description="management.basicForm.description = $event"
                     @update:avatar="management.basicForm.avatar = $event"
                     @update:avatar-color="management.basicForm.avatarColor = $event"
+                    @update:workspace="management.basicForm.workspace = $event"
                   />
                 </n-tab-pane>
 
                 <n-tab-pane name="skills" :tab="t('pages.agents.tabSkills')">
                   <AgentSkillsTab
                     :skills="selectedAgent.managedSkills"
+                    :show-toolbar="false"
                     @import="importSkillVisible = true"
                     @open="openSkillDrawer"
                     @toggle="onToggleSkill"
@@ -336,6 +421,7 @@ watch(selectedAgentUid, async (agentUid) => {
     @update:description="management.createForm.description = $event"
     @update:avatar="management.createForm.avatar = $event"
     @update:avatar-color="management.createForm.avatarColor = $event"
+    @update:workspace="management.createForm.workspace = $event"
   />
 </template>
 

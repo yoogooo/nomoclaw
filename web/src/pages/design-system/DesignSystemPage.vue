@@ -200,7 +200,7 @@ const spacingRows = [
 
 const radiusRows = [
   { token: "radius-sm", value: "6px", radius: "var(--radius-sm)" },
-  { token: "radius-m", value: "12px", radius: "var(--radius-m)" },
+  { token: "radius-m", value: "12px", radius: "var(--radius-md)" },
   { token: "radius-md", value: "16px", radius: "var(--radius-md)" },
   { token: "radius-xl", value: "24px", radius: "var(--radius-xl)" },
   { token: "radius-pill", value: "999px", radius: "var(--radius-pill)" }
@@ -532,7 +532,7 @@ function switchTheme(mode: "light" | "dark") {
                   <n-modal v-model:show="showcaseDialogVisible" preset="dialog" title="Dialog Showcase" positive-text="确认" negative-text="取消">
                     这是 Dialog 示例（用于确认类操作）。
                   </n-modal>
-                  <n-modal v-model:show="showcaseModalVisible" preset="card" title="Modal Showcase" style="width: min(var(--size-420), calc(100vw - var(--size-32)))">
+                  <n-modal v-model:show="showcaseModalVisible" preset="card" title="Modal Showcase" style="width: min(var(--size-420), calc(100vw - var(--space-8)))">
                     <div class="ui-caption-muted">这是 Modal 示例（用于承载较完整的内容块）。</div>
                   </n-modal>
                   <n-drawer v-model:show="showcaseDrawerVisible" :width="420" placement="right">
@@ -622,7 +622,7 @@ function switchTheme(mode: "light" | "dark") {
 .design-spec-shell {
   height: 100vh;
   overflow-y: auto;
-  padding: var(--size-28);
+  padding: var(--space-7);
   background: var(--color-bg-canvas);
 }
 
@@ -673,12 +673,12 @@ function switchTheme(mode: "light" | "dark") {
   gap: var(--space-3);
   padding: var(--space-3);
   border: var(--size-1) solid var(--ds-border);
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-md);
   background: var(--ds-bg-card-soft);
 }
 
 .component-subgroup-title {
-  font-size: var(--font-size-md);
+  font-size: var(--text-body-size);
   font-weight: 700;
   color: var(--ds-text-primary);
 }
@@ -710,13 +710,13 @@ function switchTheme(mode: "light" | "dark") {
 }
 
 .demo-block-title {
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   font-weight: 600;
   color: var(--color-text-muted);
 }
 
 .inner-demo-card {
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-md);
 }
 
 .modal-trigger {
@@ -728,7 +728,7 @@ function switchTheme(mode: "light" | "dark") {
 }
 
 .list-item-title {
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   font-weight: 600;
 }
 
@@ -741,7 +741,7 @@ function switchTheme(mode: "light" | "dark") {
 }
 
 .overlay-pop-content {
-  font-size: var(--font-size-xs);
+  font-size: var(--text-caption-size);
   color: var(--color-text-muted);
 }
 
@@ -779,7 +779,7 @@ function switchTheme(mode: "light" | "dark") {
 }
 
 .color-token {
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   font-weight: 600;
 }
 
@@ -794,12 +794,12 @@ function switchTheme(mode: "light" | "dark") {
   gap: var(--space-1_5);
   padding: var(--space-2);
   border: var(--size-1) solid var(--ds-border);
-  border-radius: var(--radius-s-md);
+  border-radius: var(--control-radius-md);
   background: var(--ds-bg-card-soft);
 }
 
 .chip-title {
-  font-size: var(--font-size-2xs);
+  font-size: var(--text-caption-size);
   color: var(--ds-text-muted);
 }
 
@@ -813,7 +813,7 @@ function switchTheme(mode: "light" | "dark") {
 .scale-row code,
 .typo-meta {
   font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
+  font-size: var(--text-caption-size);
   color: var(--ds-text-secondary);
 }
 
@@ -835,18 +835,18 @@ function switchTheme(mode: "light" | "dark") {
   gap: var(--space-2_5);
   padding: var(--space-3);
   border: var(--size-1) solid var(--ds-border);
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-md);
   background: var(--ds-bg-card-soft);
 }
 
 .typo-panel-title {
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   font-weight: 700;
   color: var(--ds-text-primary);
 }
 
 .typo-label {
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   color: var(--ds-text-muted);
 }
 
@@ -868,17 +868,17 @@ function switchTheme(mode: "light" | "dark") {
 }
 
 .typo-body {
-  font-size: var(--font-size-md);
+  font-size: var(--text-body-size);
   line-height: 1.7;
 }
 
 .typo-helper {
-  font-size: var(--font-size-xs);
+  font-size: var(--text-caption-size);
   color: var(--ds-text-muted);
 }
 
 .typo-placeholder {
-  font-size: var(--font-size-md);
+  font-size: var(--text-body-size);
   color: var(--ds-text-muted);
   opacity: 0.72;
 }
@@ -923,13 +923,13 @@ function switchTheme(mode: "light" | "dark") {
 .typo-heading-head {
   padding-bottom: var(--space-2);
   border-bottom: var(--size-2) solid var(--ds-border);
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   font-weight: 700;
 }
 
 .typo-heading-tag {
   font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   color: var(--color-text-brand);
 }
 
@@ -961,12 +961,12 @@ function switchTheme(mode: "light" | "dark") {
 }
 
 .typo-h5 {
-  font-size: var(--font-size-lg);
+  font-size: var(--text-title-sm-size);
   font-weight: 600;
 }
 
 .typo-h6 {
-  font-size: var(--font-size-md);
+  font-size: var(--text-body-size);
   font-weight: 600;
 }
 
@@ -974,7 +974,7 @@ function switchTheme(mode: "light" | "dark") {
   margin-top: var(--space-1_5);
   color: var(--ds-text-muted);
   font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
+  font-size: var(--text-caption-size);
 }
 
 .scale-row {
@@ -982,7 +982,7 @@ function switchTheme(mode: "light" | "dark") {
   grid-template-columns: var(--size-96) minmax(0, 1fr) var(--size-72);
   gap: var(--space-2);
   align-items: center;
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
 }
 
 .space-bar {
@@ -1054,17 +1054,17 @@ function switchTheme(mode: "light" | "dark") {
 .shadow-card {
   width: var(--size-170);
   padding: var(--space-3);
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-md);
   background: var(--ds-bg-card);
   border: var(--size-1) solid var(--ds-border);
   text-align: center;
-  font-size: var(--font-size-xs);
+  font-size: var(--text-caption-size);
   font-weight: 600;
 }
 
 .shadow-stack {
   padding: var(--space-2_5);
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-md);
   background: linear-gradient(180deg, var(--ds-bg-card-soft) 0%, var(--ds-bg-card) 100%);
 }
 
@@ -1074,7 +1074,7 @@ function switchTheme(mode: "light" | "dark") {
 }
 
 .shadow-token {
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   font-weight: 600;
 }
 
@@ -1084,7 +1084,7 @@ function switchTheme(mode: "light" | "dark") {
   gap: var(--space-3);
   padding: var(--space-2);
   border: var(--size-1) dashed var(--ds-border);
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-md);
   background: linear-gradient(180deg, var(--ds-bg-card) 0%, var(--ds-bg-card-soft) 100%);
 }
 
@@ -1127,12 +1127,12 @@ function switchTheme(mode: "light" | "dark") {
 .metric-card-item {
   padding: var(--space-3);
   border: var(--size-1) solid var(--ds-border);
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-md);
   background: var(--ds-bg-card-soft);
 }
 
 .metric-label {
-  font-size: var(--font-size-xs);
+  font-size: var(--text-caption-size);
   color: var(--ds-text-muted);
 }
 
@@ -1144,7 +1144,7 @@ function switchTheme(mode: "light" | "dark") {
 
 .metric-trend {
   margin-top: var(--space-1);
-  font-size: var(--font-size-xs);
+  font-size: var(--text-caption-size);
   color: var(--color-text-brand);
 }
 
@@ -1178,12 +1178,12 @@ function switchTheme(mode: "light" | "dark") {
 }
 
 .empty-title {
-  font-size: var(--font-size-lg);
+  font-size: var(--text-title-sm-size);
   font-weight: 600;
 }
 
 .empty-desc {
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   color: var(--ds-text-muted);
   line-height: 1.6;
 }
@@ -1241,7 +1241,7 @@ function switchTheme(mode: "light" | "dark") {
 
 @media (max-width: var(--size-breakpoint-lg)) {
   .design-spec-shell {
-    padding: var(--size-16);
+    padding: var(--space-4);
   }
 
   .core-ui-grid {

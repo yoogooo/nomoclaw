@@ -2,6 +2,7 @@ import { createRouter, createWebHashHistory } from "vue-router";
 import ChatPage from "@/pages/ChatPage.vue";
 import CronPage from "@/pages/CronPage.vue";
 import AgentsPage from "@/pages/AgentsPage.vue";
+import SkillsPage from "@/pages/SkillsPage.vue";
 import SettingsPage from "@/pages/SettingsPage.vue";
 import ChannelsPage from "@/pages/ChannelsPage.vue";
 import ModelsPage from "@/pages/ModelsPage.vue";
@@ -29,6 +30,11 @@ export const router = createRouter({
       path: "/agents",
       name: "agents",
       component: AgentsPage
+    },
+    {
+      path: "/skills",
+      name: "skills",
+      component: SkillsPage
     },
     {
       path: "/settings",

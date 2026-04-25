@@ -41,6 +41,10 @@ public class ConversationAppService {
         facade.updateConversationTitle(conversationUid, title);
     }
 
+    public void updateConversationPinned(String conversationUid, boolean pinned) {
+        facade.updateConversationPinned(conversationUid, pinned);
+    }
+
     public AgentConversation getConversation(String conversationUid) {
         return facade.getConversation(conversationUid);
     }

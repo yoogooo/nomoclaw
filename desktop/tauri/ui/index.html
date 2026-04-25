@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NomoClaw Desktop</title>
+  <script src="./loader-i18n.js"></script>
+
+  <script>
+    (function () {
+      const fallback = { themeMode: "dark", locale: "zh-CN" };
+      const loaderI18n = window.__NOMOCLAW_LOADER_I18N__;
+
+      function normalizeThemeMode(value) {
+        return String(value || "dark").toLowerCase() === "light" ? "light" : "dark";
+      }
+
+      function normalizeLocale(value) {
+        if (loaderI18n && typeof loaderI18n.normalizeLocale === "function") {
+          return loaderI18n.normalizeLocale(value);
+        }
+        return String(value || "zh-CN").toLowerCase().startsWith("en") ? "en-US" : "zh-CN";
+      }
+
+      function resolveLoaderTexts(locale) {
+        if (loaderI18n && typeof loaderI18n.resolveLoaderTexts === "function") {
+          return loaderI18n.resolveLoaderTexts(locale);
+        }
+        return locale === "en-US"
+          ? {
+              label: "Booting Engine",
+              tip: "Tip: Right-click to refresh the page"
+            }
+          : {
+              label: "启动中",
+              tip: "提示：页面没更新？右键点一下刷新试试"
+            };
+      }
+
+      function applyBootstrapPrefs(input, options) {
+        const raw = Object.assign({}, fallback, input || {});
+        const normalized = {
+          themeMode: normalizeThemeMode(raw.themeMode),
+          locale: normalizeLocale(raw.locale)
+        };
+        const persistToStorage = options && options.persistToStorage !== false;
+
+        document.documentElement.setAttribute("lang", normalized.locale);
+        document.documentElement.setAttribute("data-theme", normalized.themeMode);
+        window.__NOMOCLAW_BOOTSTRAP_PREFS__ = normalized;
+
+        if (persistToStorage) {
+          try {
+            localStorage.setItem("ui:theme-mode", normalized.themeMode);
+            localStorage.setItem("ui:locale", normalized.locale);
+          } catch (_) {}
+        }
+
+        const texts = resolveLoaderTexts(normalized.locale);
+        const labelEl = document.getElementById("loaderLabel");
+        const tipEl = document.getElementById("loaderTip");
+        if (labelEl) labelEl.textContent = texts.label;
+        if (tipEl) tipEl.textContent = texts.tip;
+
+        return normalized;
+      }
+
+      window.__NOMOCLAW_APPLY_BOOTSTRAP_PREFS__ = applyBootstrapPrefs;
+      const fromBridge = window.__NOMOCLAW_BOOTSTRAP_PREFS__ || null;
+      let fromStorage = null;
+      try {
+        fromStorage = {
+          themeMode: localStorage.getItem("ui:theme-mode") || undefined,
+          locale: localStorage.getItem("ui:locale") || undefined
+        };
+      } catch (_) {}
+
+      applyBootstrapPrefs(Object.assign({}, fromStorage || {}, fromBridge || {}), {
+        persistToStorage: false
+      });
+      document.addEventListener("DOMContentLoaded", function () {
+        applyBootstrapPrefs(window.__NOMOCLAW_BOOTSTRAP_PREFS__, {
+          persistToStorage: false
+        });
+      }, { once: true });
+    })();
+  </script>
+
+  <style>
+    :root { color-scheme: dark; }
+    :root[data-theme="light"] { color-scheme: light; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif;
+      min-height: 100vh;
+      display: grid;
+      overflow: hidden;
+      place-items: center;
+      color: #e5edf9;
+      background:
+        radial-gradient(1200px 640px at 10% -20%, rgba(59, 130, 246, 0.32), transparent 60%),
+        radial-gradient(900px 560px at 100% 100%, rgba(16, 185, 129, 0.2), transparent 62%),
+        #1f232a;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    :root[data-theme="light"] body {
+      color: #243142;
+      background:
+        radial-gradient(1200px 640px at 10% -20%, rgba(56, 189, 248, 0.22), transparent 60%),
+        radial-gradient(900px 560px at 100% 100%, rgba(16, 185, 129, 0.16), transparent 62%),
+        #e8edf3;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(
+        115deg,
+        transparent 20%,
+        rgba(255, 255, 255, 0.04) 45%,
+        rgba(255, 255, 255, 0.08) 50%,
+        rgba(255, 255, 255, 0.04) 55%,
+        transparent 70%
+      );
+      transform: translateX(-120%);
+      animation: shine 4.8s ease-in-out infinite;
+    }
+
+    .wrap {
+      position: relative;
+      text-align: center;
+      z-index: 1;
+    }
+
+    .loader-wrap {
+      position: relative;
+      z-index: 1;
+      width: 334px;
+      height: 334px;
+      margin: 0 auto;
+    }
+
+    .solar-system {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.28));
+    }
+
+    .sun {
+      position: absolute;
+      inset: 50%;
+      width: 18px;
+      height: 18px;
+      margin-left: -9px;
+      margin-top: -9px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 35% 30%, #fff7c2 0%, #ffd66e 45%, #f5a623 100%);
+      box-shadow:
+        0 0 20px rgba(255, 186, 77, 0.88),
+        0 0 54px rgba(255, 166, 46, 0.35);
+    }
+
+    .orbit {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: var(--orbit-size);
+      height: var(--orbit-size);
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      border: 1px solid rgba(203, 213, 225, 0.05);
+      animation: orbit var(--period) linear infinite;
+    }
+
+    .orbit .planet {
+      position: absolute;
+      top: 50%;
+      left: 100%;
+      width: var(--planet-size);
+      height: var(--planet-size);
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: var(--planet-color);
+      box-shadow: 0 0 6px var(--planet-glow);
+    }
+
+    .orbit.mercury { --orbit-size: 59px; --planet-size: 3px; --period: 1.92s; --planet-color: #b7b7b5; --planet-glow: rgba(183, 183, 181, 0.65); }
+    .orbit.venus { --orbit-size: 82px; --planet-size: 4px; --period: 3.08s; --planet-color: #d6b484; --planet-glow: rgba(214, 180, 132, 0.58); }
+    .orbit.earth { --orbit-size: 105px; --planet-size: 4px; --period: 4.08s; --planet-color: #4fa3ff; --planet-glow: rgba(79, 163, 255, 0.62); }
+    .orbit.mars { --orbit-size: 127px; --planet-size: 3px; --period: 5.08s; --planet-color: #d37758; --planet-glow: rgba(211, 119, 88, 0.62); }
+    .orbit.jupiter { --orbit-size: 158px; --planet-size: 9px; --period: 6.5s; --planet-color: #d7b48a; --planet-glow: rgba(215, 180, 138, 0.56); }
+    .orbit.saturn { --orbit-size: 192px; --planet-size: 7px; --period: 8.08s; --planet-color: #d8c28f; --planet-glow: rgba(216, 194, 143, 0.54); }
+    .orbit.uranus { --orbit-size: 232px; --planet-size: 6px; --period: 9.92s; --planet-color: #87d6d6; --planet-glow: rgba(135, 214, 214, 0.52); }
+    .orbit.neptune { --orbit-size: 274px; --planet-size: 6px; --period: 12.08s; --planet-color: #5578d8; --planet-glow: rgba(85, 120, 216, 0.58); }
+
+    .orbit.saturn .planet::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 13px;
+      height: 4px;
+      transform: translate(-50%, -50%) rotate(-25deg);
+      border: 1px solid rgba(232, 214, 169, 0.85);
+      border-radius: 50%;
+    }
+
+    :root[data-theme="light"] .orbit {
+      border-color: rgba(71, 85, 105, 0.08);
+    }
+
+    :root[data-theme="light"] .solar-system {
+      filter: drop-shadow(0 6px 14px rgba(80, 96, 126, 0.22));
+    }
+
+    :root[data-theme="light"] .sun {
+      box-shadow:
+        0 0 14px rgba(245, 166, 35, 0.55),
+        0 0 34px rgba(245, 166, 35, 0.22);
+    }
+
+    :root[data-theme="light"] .orbit .planet {
+      box-shadow: 0 0 3px rgba(71, 85, 105, 0.24);
+    }
+
+    .loader-label {
+      position: relative;
+      z-index: 1;
+      margin-top: 22px;
+      font-size: 16px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: rgba(203, 213, 225, 0.6);
+      text-align: center;
+    }
+
+    :root[data-theme="light"] .loader-label {
+      color: rgba(60, 78, 100, 0.62);
+    }
+
+    .tips {
+      position: fixed;
+      left: 50%;
+      bottom: 80px;
+      z-index: 1;
+      transform: translateX(-50%);
+      font-size: 14px;
+      color: rgba(203, 213, 225, 0.45);
+      text-align: center;
+      opacity: 0;
+      animation: fadeIn 1.2s ease forwards;
+      animation-delay: 0.6s;
+      white-space: nowrap;
+    }
+
+    :root[data-theme="light"] .tips {
+      color: rgba(50, 66, 84, 0.78);
+    }
+
+    @keyframes fadeIn {
+      to { opacity: 1; }
+    }
+
+    @keyframes shine {
+      0% { transform: translateX(-120%); }
+      55%,
+      100% { transform: translateX(140%); }
+    }
+
+    @keyframes orbit {
+      from { transform: translate(-50%, -50%) rotate(0deg); }
+      to { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+  </style>
+</head>
+
+<body>
+<div class="wrap">
+  <div class="loader-wrap">
+    <div class="solar-system">
+      <div class="sun"></div>
+      <div class="orbit mercury"><span class="planet"></span></div>
+      <div class="orbit venus"><span class="planet"></span></div>
+      <div class="orbit earth"><span class="planet"></span></div>
+      <div class="orbit mars"><span class="planet"></span></div>
+      <div class="orbit jupiter"><span class="planet"></span></div>
+      <div class="orbit saturn"><span class="planet"></span></div>
+      <div class="orbit uranus"><span class="planet"></span></div>
+      <div class="orbit neptune"><span class="planet"></span></div>
+    </div>
+  </div>
+
+  <p class="loader-label" id="loaderLabel">Booting Engine</p>
+</div>
+
+<div class="tips" id="loaderTip">Tip：页面没更新？右键点一下刷新试试</div>
+<script>
+  (function () {
+    function randomizeOrbitPhases() {
+      const orbits = document.querySelectorAll(".orbit");
+      orbits.forEach((orbit) => {
+        const periodRaw = getComputedStyle(orbit).getPropertyValue("--period").trim();
+        const period = Number.parseFloat(periodRaw);
+        if (!Number.isFinite(period) || period <= 0) return;
+        const randomOffset = Math.random() * period;
+        orbit.style.animationDelay = `-${randomOffset}s`;
+      });
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", randomizeOrbitPhases, { once: true });
+    } else {
+      randomizeOrbitPhases();
+    }
+  })();
+</script>
+</body>
+</html>

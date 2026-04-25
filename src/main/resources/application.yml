@@ -1,15 +1,19 @@
 spring:
   application:
     name: bot
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 40MB
+  mvc:
+    async:
+      request-timeout: -1
   profiles:
     default: local
-  datasource:
-    url: "${MYSQL_URL:jdbc:mysql://localhost:3306/bot?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}"
-    username: "${MYSQL_USER:}"
-    password: "${MYSQL_PASSWORD:}"
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    hikari:
-      initialization-fail-timeout: 0
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
   quartz:
     job-store-type: jdbc
     jdbc:
@@ -28,6 +32,10 @@ spring:
     #       mode: always
     #       schema-locations: classpath:db/schema-mysql.sql
 
+mybatis-plus:
+  global-config:
+    banner: false
+
 server:
   address: 127.0.0.1
   tomcat:
@@ -41,6 +49,8 @@ agent:
   browser:
     step-timeout-seconds: 10
     headless: false
+    shared-profile-enabled: true
+    shared-profile-name: shared
   retry:
     max-attempts: 2
   loop:
@@ -49,6 +59,9 @@ agent:
     high-risk-enabled: true
   api:
     local-only-enabled: true
+    chat-upload:
+      max-file-size: 10MB
+      max-request-size: 100MB
 
 nomoclaw:
   root-dir: "${NOMOCLAW_ROOT_DIR:${user.home}/.nomoclaw}"
@@ -81,6 +94,8 @@ llm:
     model-name: MiniMax-M2.7
   model-config:
     encryption-key: "${LLM_MODEL_CONFIG_ENCRYPTION_KEY:}"
+  model-catalog:
+    remote-url: "${LLM_MODEL_CATALOG_REMOTE_URL:}"
 
 logging:
   level:

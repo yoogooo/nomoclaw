@@ -161,7 +161,7 @@ function avatarBgColor(raw?: string | null, explicitColor?: string | null) {
 
 .agent-brand-title {
   color: var(--color-text-brand);
-  font-size: var(--font-size-lg);
+  font-size: var(--text-title-sm-size);
   font-weight: 600;
   letter-spacing: 0.08em;
 }
@@ -169,7 +169,7 @@ function avatarBgColor(raw?: string | null, explicitColor?: string | null) {
 .agent-brand-subtitle {
   margin-top: var(--space-2_5);
   color: var(--color-text-subtle);
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
 }
 
 .agent-sidebar-body {
@@ -193,7 +193,7 @@ function avatarBgColor(raw?: string | null, explicitColor?: string | null) {
   width: 100%;
   padding: var(--space-3) var(--space-4);
   border: var(--size-1) solid var(--color-border-soft);
-  border-radius: var(--radius-xl-2);
+  border-radius: var(--radius-xl);
   background: var(--color-bg-surface);
   color: inherit;
   cursor: pointer;
@@ -232,7 +232,7 @@ function avatarBgColor(raw?: string | null, explicitColor?: string | null) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--font-size-md);
+  font-size: var(--text-body-size);
   font-weight: 700;
   text-align: left;
 }
@@ -269,7 +269,7 @@ function avatarBgColor(raw?: string | null, explicitColor?: string | null) {
     flex-direction: row;
     gap: var(--space-2_5);
     overflow-x: auto;
-    padding-bottom: var(--size-2);
+    padding-bottom: var(--space-0_5);
   }
 
   .agent-entry {

@@ -32,6 +32,27 @@ export interface ManagedSkill {
   enabled: boolean;
 }
 
+export interface SkillLinkedAgent {
+  agentUid: string;
+  agentName: string;
+  displayName: string;
+}
+
+export interface ManagedSharedSkill extends ManagedSkill {
+  linkedAgents: SkillLinkedAgent[];
+}
+
+export interface ManagedGlobalSkill extends ManagedSharedSkill {
+  status: string;
+}
+
+export interface ManagedGlobalSkillAgentBinding {
+  agentUid: string;
+  agentName: string;
+  displayName: string;
+  enabled: boolean;
+}
+
 export interface ManagedTool {
   id: string;
   toolKey: string;
@@ -61,4 +82,5 @@ export interface BasicFormModel {
   description: string;
   avatar: string;
   avatarColor: string;
+  workspace: string;
 }

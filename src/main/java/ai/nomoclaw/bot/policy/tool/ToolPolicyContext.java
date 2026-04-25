@@ -8,6 +8,8 @@ public record ToolPolicyContext(
         String toolName,
         JsonNode toolArgs,
         Path agentWorkspacePath,
+        String agentUid,
+        String agentName,
         String channel,
         String conversationUid,
         String messageUid,

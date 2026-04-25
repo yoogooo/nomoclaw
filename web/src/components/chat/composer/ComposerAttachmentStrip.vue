@@ -123,7 +123,7 @@ function isImageAttachment(attachment: ConversationAttachment) {
 
 .composer-attachment-name {
   max-width: 122px;
-  font-size: var(--font-size-xs);
+  font-size: var(--text-caption-size);
   font-weight: 500;
   color: var(--color-text-primary);
   overflow: hidden;
@@ -139,17 +139,17 @@ function isImageAttachment(attachment: ConversationAttachment) {
   height: 24px;
   border: var(--size-1) solid color-mix(in srgb, var(--color-border-strong) 78%, transparent);
   border-radius: var(--radius-pill);
-  background: white;
+  background: var(--color-bg-surface);
   color: var(--color-text-primary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   opacity: 1;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 2px 8px color-mix(in srgb, black 24%, transparent);
 }
 
 .composer-attachment-remove:hover {
-  background: color-mix(in srgb, white 90%, var(--color-bg-soft-hover));
+  background: var(--color-bg-surface-soft);
 }
 </style>

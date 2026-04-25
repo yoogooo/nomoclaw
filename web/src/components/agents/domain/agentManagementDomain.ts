@@ -1,6 +1,7 @@
 import type {
   AgentCatalogAgent,
   AgentSkill,
+  GlobalSkill,
   AgentTip as ApiAgentTip,
   AgentTool,
   ModelConfig
@@ -11,6 +12,7 @@ import type {
   DocKey,
   DocState,
   ManagedAgent,
+  ManagedGlobalSkill,
   ManagedSkill,
   ManagedTool
 } from "@/components/agents/agentManagementTypes";
@@ -18,6 +20,7 @@ import { tr } from "@/i18n";
 
 export interface AgentDomainOptions {
   nomoclawRootDir: string;
+  agentsRootDir: string;
   skillsRootDir: string;
   avatarIconKeys: string[];
   avatarColorOptions: string[];
@@ -41,6 +44,16 @@ export function normalizePath(path: string, nomoclawRootDir: string) {
   if (!trimmed) return "";
   if (trimmed.startsWith("/") || /^[a-zA-Z]:[\\/]/.test(trimmed)) return trimmed;
   return joinPath(nomoclawRootDir, trimmed);
+}
+
+export function resolveDefaultWorkspacePaths(agentsRootDir: string, agentName: string) {
+  const normalizedAgentName = (agentName || "").trim() || "default";
+  const workspace = joinPath(agentsRootDir, normalizedAgentName, "workspace");
+  return {
+    workspace,
+    reportDir: joinPath(workspace, "report"),
+    tmpDir: joinPath(workspace, "tmp")
+  };
 }
 
 export function defaultDocs(displayName: string): AgentDocConfig {
@@ -108,11 +121,18 @@ export function normalizeAvatarColor(raw: unknown, options: AgentDomainOptions) 
 
 export function toManagedAgent(agent: AgentCatalogAgent, agentGroupUid: string, options: AgentDomainOptions): ManagedAgent {
   const docs = defaultDocs(agent.displayName || agent.agentName);
+  const defaults = resolveDefaultWorkspacePaths(options.agentsRootDir, agent.agentName);
+  const workspace = normalizePath(agent.workspace || defaults.workspace, options.nomoclawRootDir);
+  const reportDir = joinPath(workspace || defaults.workspace, "report");
+  const tmpDir = joinPath(workspace || defaults.workspace, "tmp");
   return {
     ...agent,
     agentGroupUid,
     avatar: normalizeAvatarIcon(agent.avatar, options),
     avatarColor: normalizeAvatarColor(agent.avatarColor, options),
+    workspace,
+    reportDir,
+    tmpDir,
     managedSkills: (agent.capabilityTags || []).map((skillKey) => ({
       id: `skill_${skillKey}`,
       skillKey,
@@ -137,6 +157,24 @@ export function mapApiSkill(skill: AgentSkill, options: AgentDomainOptions): Man
     description: skill.description || tr("agents.common.noDescription"),
     path: skill.skillPath ? normalizePath(skill.skillPath, options.nomoclawRootDir) : joinPath(options.skillsRootDir, key),
     enabled: skill.enabled
+  };
+}
+
+export function mapApiGlobalSkill(skill: GlobalSkill, options: AgentDomainOptions): ManagedGlobalSkill {
+  const key = skill.skillKey || skill.displayName;
+  return {
+    id: `skill_${key}`,
+    skillKey: key,
+    name: skill.displayName || key,
+    description: skill.description || tr("agents.common.noDescription"),
+    path: skill.skillPath ? normalizePath(skill.skillPath, options.nomoclawRootDir) : joinPath(options.skillsRootDir, key),
+    enabled: (skill.status || "").toUpperCase() === "ACTIVE",
+    status: skill.status || "UNKNOWN",
+    linkedAgents: (skill.linkedAgents || []).map((agent) => ({
+      agentUid: agent.agentUid,
+      agentName: agent.agentName,
+      displayName: agent.displayName
+    }))
   };
 }
 

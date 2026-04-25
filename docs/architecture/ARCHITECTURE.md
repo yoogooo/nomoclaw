@@ -307,9 +307,36 @@ Agent loop 的详细控制流、round/retry 区分、审批暂停、失败重规
 
 持久化目录约定：
 
-- `~/.nomoclaw/browser-profiles/<agent-key>/`
+- `~/.nomoclaw/runtime/browser-profiles/<agent-key>/`
+- `~/.nomoclaw/runtime/plugins/browser/`
+- `~/.nomoclaw/runtime/tmp/`
+- `~/.nomoclaw/runtime/logs/backend-YYYYMMDD.log`
+
+Playwright 浏览器二进制缓存目录（下载目录）采用以下优先级：
+
+1. `NOMOCLAW_PLAYWRIGHT_BROWSERS_PATH`（应用级显式覆盖，最高优先级）
+2. `PLAYWRIGHT_BROWSERS_PATH`（用户级显式覆盖；若值为 `0` 表示不显式指定缓存目录，交给 Playwright 默认逻辑）
+3. 平台默认回退：
+   - macOS：若 `~/Library/Caches/ms-playwright` 已存在，优先复用该目录
+   - 其他情况（含 Linux/Windows）：`~/.nomoclaw/runtime/playwright-browsers/`
+
+在 Windows 上，若未配置上述环境变量，默认目录等价于：
+
+- `C:\Users\<username>\.nomoclaw\runtime\playwright-browsers`
 
 其中 `<agent-key>` 会做字符规范化，只保留 `[a-zA-Z0-9._-]`。
+
+迁移说明（硬迁移）：
+
+- 旧目录 `~/.nomoclaw/{browser-profiles,playwright-browsers,plugins,tmp,logs}` 不再自动兼容。
+- 升级后如需保留历史数据，请手工迁移到 `~/.nomoclaw/runtime/*`。
+
+下载与进度上报说明：
+
+- 启动阶段默认设置 `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`，避免每次创建上下文都触发安装。
+- 检测到本地缺失可执行 Chromium 时，才调用 Playwright CLI 安装，并在安装环境中临时切换为 `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=0`。
+- 进度优先解析 Playwright CLI stdout 中的真实百分比（如 `90% of ...`）；若无法可靠解析，前端以“不确定进度”样式展示，避免误导性固定百分比。
+- 下载链路中断（例如 `server closed connection`）时，安装器会重试并可能从 0% 重新开始，通常不保证断点续传。
 
 ### 6.4 `cron_tool`
 
@@ -618,8 +645,9 @@ Agent loop 的详细控制流、round/retry 区分、审批暂停、失败重规
 
 后续可扩展方向包括但不限于：
 
-- 增加真正的锦囊模块
+- 修正锦囊
 - 增加命令和文件的沙箱、白名单或作用域限制
+- 引入 Flyway/Liquibase 管理数据库版本迁移，替代分散的启动期 schema upgrader
 - 增加 Memory 模块，支持工具结果的结构化记忆和检索
 - 支持并行步骤或更复杂的执行图
 - 将当前调试型前端升级为更完整的任务工作台

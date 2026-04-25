@@ -9,6 +9,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "update:modelValue", value: string): void;
   (e: "keydown", event: KeyboardEvent): void;
+  (e: "compositionstart"): void;
+  (e: "compositionend"): void;
 }>();
 
 const { t } = useI18n();
@@ -69,6 +71,8 @@ watch(
     :placeholder="t('chat.composer.placeholder')"
     @input="onInput"
     @keydown="emit('keydown', $event)"
+    @compositionstart="emit('compositionstart')"
+    @compositionend="emit('compositionend')"
   />
 </template>
 

@@ -1,0 +1,22 @@
+llm:
+  qwen:
+    api-key: "${DASHSCOPE_API_KEY:sk-c4a715f37f104dbbbd638da2f601bff0}"
+    model-name: qwen3.6-plus
+
+spring:
+  datasource:
+    url: "${MYSQL_URL:jdbc:mysql://localhost:3306/bot?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}"
+    username: "${MYSQL_USER:}"
+    password: "${MYSQL_PASSWORD:}"
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      initialization-fail-timeout: 0
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    locations: classpath:db/migration/mysql
+  quartz:
+    job-store-type: jdbc
+    jdbc:
+      initialize-schema: never

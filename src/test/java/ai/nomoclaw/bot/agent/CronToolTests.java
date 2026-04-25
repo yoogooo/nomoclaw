@@ -44,7 +44,9 @@ class CronToolTests {
                 workspace.resolve("tmp"),
                 workspace.resolve("report"),
                 args,
-                1000
+                1000,
+                progress -> {
+                }
         ));
 
         ArgumentCaptor<AgentCronJobEntity> captor = ArgumentCaptor.forClass(AgentCronJobEntity.class);

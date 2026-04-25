@@ -1,16 +1,32 @@
 package ai.nomoclaw.bot.api;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import ai.nomoclaw.bot.util.LocalizedMessages;
 
 @RestControllerAdvice
 @Slf4j
 public class AgentExceptionHandler {
+
+    @Value("${spring.servlet.multipart.max-file-size:2MB}")
+    private String maxFileSize;
+
+    @Value("${spring.servlet.multipart.max-request-size:40MB}")
+    private String maxRequestSize;
+
+    private final LocalizedMessages localizedMessages;
+
+    public AgentExceptionHandler(LocalizedMessages localizedMessages) {
+        this.localizedMessages = localizedMessages;
+    }
 
     @ExceptionHandler(IllegalArgumentException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
@@ -26,10 +42,24 @@ public class AgentExceptionHandler {
         return new SimpleResponse("resource not found");
     }
 
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    @ResponseStatus(HttpStatus.PAYLOAD_TOO_LARGE)
+    public SimpleResponse handleUploadTooLarge(MaxUploadSizeExceededException ex) {
+        log.warn("[AgentAPI][413] upload too large: {}", ex.getMessage());
+        String localizedMessage = localizedMessages.get("api.error.uploadTooLarge", maxFileSize, maxRequestSize);
+        return new SimpleResponse(localizedMessage);
+    }
+
     @ExceptionHandler(AsyncRequestNotUsableException.class)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void handleAsyncRequestNotUsable(AsyncRequestNotUsableException ex) {
         log.warn("[AgentAPI][SSE] client disconnected: {}", ex.getMessage());
+    }
+
+    @ExceptionHandler(AsyncRequestTimeoutException.class)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void handleAsyncRequestTimeout(AsyncRequestTimeoutException ex) {
+        log.info("[AgentAPI][SSE] request timeout: {}", ex.getMessage());
     }
 
     @ExceptionHandler(Exception.class)

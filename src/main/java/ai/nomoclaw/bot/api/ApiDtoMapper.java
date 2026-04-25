@@ -8,7 +8,9 @@ import ai.nomoclaw.bot.application.command.ImportSkillFromUrlCommand;
 import ai.nomoclaw.bot.application.command.UpdateAgentBasicInfoCommand;
 import ai.nomoclaw.bot.application.command.UpdateAgentTipCommand;
 import ai.nomoclaw.bot.application.command.UpdateCronJobCommand;
+import ai.nomoclaw.bot.application.command.UpdateSkillBindingsCommand;
 import ai.nomoclaw.bot.application.dto.*;
+import ai.nomoclaw.bot.orchestrator.ModelCatalogStatusDto;
 import ai.nomoclaw.bot.application.dto.AgentSkillDto;
 import ai.nomoclaw.bot.application.dto.AgentTipDto;
 import ai.nomoclaw.bot.application.dto.BatchDeleteCronJobsDto;
@@ -40,6 +42,7 @@ public final class ApiDtoMapper {
                 dto.agentGroupUid(),
                 dto.agentUid(),
                 dto.title(),
+                dto.pinned(),
                 dto.createdTime(),
                 dto.updatedTime()
         );
@@ -73,6 +76,9 @@ public final class ApiDtoMapper {
                 dto.modelProvider(),
                 dto.modelName(),
                 dto.modelNames(),
+                dto.workspace(),
+                dto.reportDir(),
+                dto.tmpDir(),
                 dto.sortIndex(),
                 dto.capabilityTags(),
                 dto.memberRole(),
@@ -83,6 +89,52 @@ public final class ApiDtoMapper {
 
     public static List<AgentSkillResponse> toAgentSkills(List<AgentSkillDto> dtos) {
         return dtos.stream().map(ApiDtoMapper::toAgentSkill).toList();
+    }
+
+    public static List<GlobalSkillResponse> toGlobalSkills(List<GlobalSkillDto> dtos) {
+        return dtos.stream().map(ApiDtoMapper::toGlobalSkill).toList();
+    }
+
+    public static GlobalSkillResponse toGlobalSkill(GlobalSkillDto dto) {
+        return new GlobalSkillResponse(
+                dto.skillKey(),
+                dto.displayName(),
+                dto.description(),
+                dto.skillPath(),
+                dto.status(),
+                dto.updatedTime(),
+                dto.linkedAgents().stream().map(ApiDtoMapper::toGlobalSkillLinkedAgent).toList()
+        );
+    }
+
+    public static GlobalSkillLinkedAgentResponse toGlobalSkillLinkedAgent(SkillLinkedAgentDto dto) {
+        return new GlobalSkillLinkedAgentResponse(
+                dto.agentUid(),
+                dto.agentName(),
+                dto.displayName()
+        );
+    }
+
+    public static SkillBindingsResponse toSkillBindings(SkillBindingsDto dto) {
+        return new SkillBindingsResponse(
+                dto.skillKey(),
+                dto.displayName(),
+                dto.description(),
+                dto.skillPath(),
+                dto.status(),
+                dto.updatedTime(),
+                dto.enabledAgentCount(),
+                dto.agentBindings().stream().map(ApiDtoMapper::toSkillBindingAgent).toList()
+        );
+    }
+
+    public static SkillBindingAgentResponse toSkillBindingAgent(SkillBindingAgentDto dto) {
+        return new SkillBindingAgentResponse(
+                dto.agentUid(),
+                dto.agentName(),
+                dto.displayName(),
+                dto.enabled()
+        );
     }
 
     public static AgentSkillResponse toAgentSkill(AgentSkillDto dto) {
@@ -202,9 +254,12 @@ public final class ApiDtoMapper {
                 dto.roundIndex(),
                 dto.stepIndex(),
                 dto.status(),
+                dto.toolName(),
+                dto.toolArgs(),
                 dto.displayTitle(),
                 dto.displaySummary(),
                 dto.displayDetails(),
+                dto.policyReasonCode(),
                 dto.updatedTime()
         );
     }
@@ -278,7 +333,9 @@ public final class ApiDtoMapper {
                                                 model.contextWindow(),
                                                 model.maxInputTokens(),
                                                 model.maxOutputTokens(),
-                                                toUploadPolicy(model.uploadPolicy())
+                                                toUploadPolicy(model.uploadPolicy()),
+                                                model.catalogMatched(),
+                                                model.catalogSource()
                                         ))
                                         .toList()
                         ))
@@ -311,7 +368,9 @@ public final class ApiDtoMapper {
                                                 model.contextWindow(),
                                                 model.maxInputTokens(),
                                                 model.maxOutputTokens(),
-                                                toUploadPolicy(model.uploadPolicy())
+                                                toUploadPolicy(model.uploadPolicy()),
+                                                false,
+                                                "request"
                                         ))
                                         .toList()
                         ))
@@ -328,6 +387,8 @@ public final class ApiDtoMapper {
                 policy.allowedMimeGroups(),
                 policy.maxFilesPerMessage(),
                 policy.maxImagesPerMessage(),
+                policy.maxFileBytes(),
+                policy.maxTotalBytes(),
                 policy.singleMimeGroupOnly(),
                 policy.allowMixedImageAndFile()
         );
@@ -342,8 +403,20 @@ public final class ApiDtoMapper {
                 policy.allowedMimeGroups(),
                 policy.maxFilesPerMessage(),
                 policy.maxImagesPerMessage(),
+                policy.maxFileBytes(),
+                policy.maxTotalBytes(),
                 policy.singleMimeGroupOnly(),
                 policy.allowMixedImageAndFile()
+        );
+    }
+
+    public static ModelCatalogStatusResponse toModelCatalogStatus(ModelCatalogStatusDto dto) {
+        return new ModelCatalogStatusResponse(
+                dto.catalogVersion(),
+                dto.generatedAt(),
+                dto.source(),
+                dto.stale(),
+                dto.message()
         );
     }
 
@@ -440,7 +513,8 @@ public final class ApiDtoMapper {
                 request.avatarColor(),
                 request.modelProvider(),
                 request.modelName(),
-                request.modelNames()
+                request.modelNames(),
+                request.workspace()
         );
     }
 
@@ -453,7 +527,8 @@ public final class ApiDtoMapper {
                 request == null ? null : request.avatarColor(),
                 request == null ? null : request.modelProvider(),
                 request == null ? null : request.modelName(),
-                request == null ? null : request.modelNames()
+                request == null ? null : request.modelNames(),
+                request == null ? null : request.workspace()
         );
     }
 
@@ -503,6 +578,21 @@ public final class ApiDtoMapper {
                 request == null ? null : request.description(),
                 request == null ? null : request.purpose(),
                 request != null && Boolean.TRUE.equals(request.attachToAgent())
+        );
+    }
+
+    public static UpdateSkillBindingsCommand toCommand(UpdateSkillBindingsRequest request) {
+        return new UpdateSkillBindingsCommand(
+                request != null && Boolean.TRUE.equals(request.enabled()),
+                request == null || request.agentBindings() == null
+                        ? List.of()
+                        : request.agentBindings().stream()
+                        .filter(item -> item != null)
+                        .map(item -> new UpdateSkillBindingsCommand.SkillBindingAgentCommand(
+                                item.agentUid(),
+                                Boolean.TRUE.equals(item.enabled())
+                        ))
+                        .toList()
         );
     }
 

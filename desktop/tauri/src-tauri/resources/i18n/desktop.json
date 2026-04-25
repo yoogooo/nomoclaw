@@ -1,0 +1,23 @@
+{
+  "fallbackLocale": "zh-CN",
+  "locales": {
+    "zh-CN": {
+      "trayShowMain": "显示主窗口",
+      "trayRestartApp": "重启应用",
+      "trayQuit": "退出",
+      "quitMessage": "确认退出 NomoClaw 应用吗？",
+      "quitTitle": "退出确认",
+      "quitConfirm": "退出",
+      "quitCancel": "取消"
+    },
+    "en-US": {
+      "trayShowMain": "Show Main Window",
+      "trayRestartApp": "Restart App",
+      "trayQuit": "Quit",
+      "quitMessage": "Quit NomoClaw?",
+      "quitTitle": "Confirm Quit",
+      "quitConfirm": "Quit",
+      "quitCancel": "Cancel"
+    }
+  }
+}

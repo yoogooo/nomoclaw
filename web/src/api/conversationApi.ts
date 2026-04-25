@@ -3,16 +3,21 @@ import type {
   AgentDocFile,
   AgentCatalogGroup,
   AgentSkill,
+  GlobalSkill,
+  GlobalSkillBindings,
   AgentTip,
   AgentTool,
   CreateSkillPayload,
   ConversationMessage,
   ConversationMessageRun,
   ConversationSummary,
+  ApprovalDecisionResponse,
   CreateConversationResponse,
   ImportedSkillResponse,
   ImportSkillFromUrlPayload,
   MessageResponse,
+  PermissionRulesResponse,
+  PermissionRulePayload,
   SimpleResponse,
   SystemConfig,
   UploadFilesResponse
@@ -42,8 +47,46 @@ export const conversationApi = {
       body: JSON.stringify({ title })
     });
   },
+  updateConversationPin(conversationUid: string, pinned: boolean) {
+    return requestJson<SimpleResponse>(`/api/conversations/${conversationUid}/pin`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pinned })
+    });
+  },
   listAgentGroups() {
     return requestJson<AgentCatalogGroup[]>("/api/agent-groups");
+  },
+  listSkills() {
+    return requestJson<GlobalSkill[]>("/api/skills");
+  },
+  getSkillBindings(skillKey: string) {
+    return requestJson<GlobalSkillBindings>(`/api/skills/${skillKey}/bindings`);
+  },
+  updateSkillBindings(skillKey: string, payload: {
+    enabled: boolean;
+    agentBindings: Array<{
+      agentUid: string;
+      enabled: boolean;
+    }>;
+  }) {
+    return requestJson<GlobalSkillBindings>(`/api/skills/${skillKey}/bindings`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+  },
+  updateSkillStatus(skillKey: string, enabled: boolean) {
+    return requestJson<GlobalSkill>(`/api/skills/${skillKey}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled })
+    });
+  },
+  deleteSkill(skillKey: string) {
+    return requestJson<SimpleResponse>(`/api/skills/${skillKey}`, {
+      method: "DELETE"
+    });
   },
   updateAgentBasicInfo(agentUid: string, payload: {
     displayName: string;
@@ -53,6 +96,7 @@ export const conversationApi = {
     modelProvider: string;
     modelName: string;
     modelNames: string[];
+    workspace: string;
   }) {
     return requestJson<AgentCatalogAgent>(`/api/agents/${agentUid}/basic`, {
       method: "PATCH",
@@ -69,6 +113,7 @@ export const conversationApi = {
     modelProvider: string;
     modelName: string;
     modelNames: string[];
+    workspace: string;
   }) {
     return requestJson<AgentCatalogAgent>("/api/agents", {
       method: "POST",
@@ -215,6 +260,39 @@ export const conversationApi = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({})
+    });
+  },
+  decideStep(conversationUid: string, stepUid: string, payload: {
+    action: "allow" | "deny";
+    scope: "once" | "session" | "agent" | "user";
+    note?: string;
+  }) {
+    return requestJson<ApprovalDecisionResponse>(`/api/conversations/${conversationUid}/approvals/${stepUid}/decision`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+  },
+  getEffectivePermissions(conversationUid: string, agentUid: string) {
+    const query = new URLSearchParams();
+    if (conversationUid) query.set("conversationUid", conversationUid);
+    if (agentUid) query.set("agentUid", agentUid);
+    return requestJson<PermissionRulesResponse>(`/api/permissions/effective?${query.toString()}`);
+  },
+  updateAgentPermissions(agentUid: string, rules: PermissionRulePayload[]) {
+    return requestJson<PermissionRulesResponse>(`/api/permissions/agent-settings/${agentUid}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rules })
+    });
+  },
+  updateUserPermissions(agentUid: string, rules: PermissionRulePayload[]) {
+    const query = new URLSearchParams();
+    if (agentUid) query.set("agentUid", agentUid);
+    return requestJson<PermissionRulesResponse>(`/api/permissions/user-settings?${query.toString()}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rules })
     });
   },
   cancelConversation(conversationUid: string) {

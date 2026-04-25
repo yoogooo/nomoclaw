@@ -83,7 +83,7 @@ export const useConversationRunsStore = defineStore("conversationRuns", () => {
 
   function updateRunStep(messageUid: string, stepUid: string, patch: Partial<ConversationRunStep>) {
     const run = ensureRun(messageUid);
-    const nextStep: ConversationRunStep = {
+    const nextStep: Partial<ConversationRunStep> = {
       stepUid,
       roundIndex: Number(patch.roundIndex ?? 1),
       stepIndex: Number(patch.stepIndex ?? 1),
@@ -93,13 +93,34 @@ export const useConversationRunsStore = defineStore("conversationRuns", () => {
       displayDetails: patch.displayDetails || "",
       updatedTime: patch.updatedTime || new Date().toISOString()
     };
+    if (patch.toolName !== undefined) {
+      nextStep.toolName = patch.toolName;
+    }
+    if (patch.toolArgs !== undefined) {
+      nextStep.toolArgs = patch.toolArgs;
+    }
+    if (patch.policyReasonCode !== undefined) {
+      nextStep.policyReasonCode = patch.policyReasonCode;
+    }
 
     const steps = [...run.steps];
     const index = steps.findIndex((item) => item.stepUid === stepUid);
     if (index >= 0) {
       steps[index] = { ...steps[index], ...nextStep };
     } else {
-      steps.push(nextStep);
+      steps.push({
+        stepUid,
+        roundIndex: Number(nextStep.roundIndex ?? 1),
+        stepIndex: Number(nextStep.stepIndex ?? 1),
+        status: nextStep.status || "planned",
+        toolName: nextStep.toolName || "",
+        toolArgs: nextStep.toolArgs || {},
+        displayTitle: nextStep.displayTitle || tr("chat.runtime.processingStep"),
+        displaySummary: nextStep.displaySummary || "",
+        displayDetails: nextStep.displayDetails || "",
+        policyReasonCode: nextStep.policyReasonCode || "",
+        updatedTime: nextStep.updatedTime || new Date().toISOString()
+      });
     }
 
     upsertRun({

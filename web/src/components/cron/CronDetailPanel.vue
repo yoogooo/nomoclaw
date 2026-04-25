@@ -192,7 +192,6 @@ function openResultPreview(executedTime: string, content: string) {
       <template v-else>
         <n-flex justify="space-between" align="flex-start" class="detail-toolbar">
           <div>
-            <div class="detail-title">{{ displayCronJobTitle(cronJobsStore.currentJob) }}</div>
             <div class="detail-subtitle">
               <template v-if="shouldShowNextRun">
                 {{ fallbackAgentLabel(cronJobsStore.currentJob) }} · {{ t("cron.list.nextRunAt", { time: formatDateTime(cronJobsStore.currentJob.nextRunTime) }) }}
@@ -406,7 +405,7 @@ function openResultPreview(executedTime: string, content: string) {
 }
 
 .detail-title {
-  font-size: var(--font-size-lg);
+  font-size: var(--text-title-sm-size);
   font-weight: 600;
   letter-spacing: 0.01em;
   color: var(--color-text-primary);
@@ -415,7 +414,7 @@ function openResultPreview(executedTime: string, content: string) {
 .detail-subtitle {
   margin-top: var(--space-2);
   color: var(--color-text-cool-gray);
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   line-height: 1.65;
 }
 
@@ -441,7 +440,7 @@ function openResultPreview(executedTime: string, content: string) {
 
 .recent-result-time {
   color: var(--color-text-secondary);
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
 }
 
 .recent-result-summary {
@@ -479,7 +478,7 @@ function openResultPreview(executedTime: string, content: string) {
 }
 
 .detail-empty-title {
-  font-size: var(--font-size-lg);
+  font-size: var(--text-title-sm-size);
   font-weight: 600;
   letter-spacing: 0.01em;
   color: var(--color-text-primary);
@@ -488,7 +487,7 @@ function openResultPreview(executedTime: string, content: string) {
 .detail-empty-subtitle {
   margin-top: var(--space-2);
   color: var(--color-text-cool-gray);
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   line-height: 1.6;
 }
 
@@ -496,7 +495,7 @@ function openResultPreview(executedTime: string, content: string) {
   margin: var(--space-3_5) 0 0;
   padding-left: var(--space-4_5);
   color: var(--color-text-secondary);
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   line-height: 1.8;
 }
 
@@ -522,19 +521,19 @@ function openResultPreview(executedTime: string, content: string) {
 }
 
 .job-overview-label {
-  font-size: var(--font-size-xs);
+  font-size: var(--text-caption-size);
   color: var(--color-text-cool-gray);
 }
 
 .job-overview-value {
   margin-top: var(--space-1_5);
   color: var(--color-text-primary);
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   line-height: 1.6;
 }
 
 .job-overview-value.emph {
-  font-size: var(--font-size-md);
+  font-size: var(--text-body-size);
   font-weight: 600;
 }
 
@@ -572,18 +571,18 @@ function openResultPreview(executedTime: string, content: string) {
 
 .job-tech-key {
   color: var(--color-text-cool-gray);
-  font-size: var(--font-size-xs);
+  font-size: var(--text-caption-size);
 }
 
 .job-tech-value {
   color: var(--color-text-secondary);
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   word-break: break-all;
 }
 
 .job-tech-value.uid {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: var(--font-size-xs);
+  font-size: var(--text-caption-size);
 }
 
 .job-status-switch {
@@ -593,12 +592,12 @@ function openResultPreview(executedTime: string, content: string) {
 }
 
 .job-status-label {
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   color: var(--color-text-secondary);
 }
 
 .detail-title-sm {
-  font-size: var(--font-size-md);
+  font-size: var(--text-body-size);
 }
 
 .subscription-card {

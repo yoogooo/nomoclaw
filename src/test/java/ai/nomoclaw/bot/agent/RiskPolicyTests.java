@@ -23,7 +23,7 @@ class RiskPolicyTests {
         ObjectNode args = JsonNodeFactory.instance.objectNode();
         args.put("command", "rm -rf /tmp/test");
         PlanStep step = new PlanStep("s1", 1, 1, "danger", "command_tool", args,
-                RiskLevel.LOW, "done", StepStatus.CREATED, 0, null, ApprovalStatus.NONE);
+                RiskLevel.LOW, "done", StepStatus.CREATED, 0, null, null, ApprovalStatus.NONE);
 
         assertTrue(riskPolicy.requiresApproval(step));
     }

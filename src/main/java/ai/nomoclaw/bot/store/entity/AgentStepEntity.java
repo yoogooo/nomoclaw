@@ -25,6 +25,7 @@ public class AgentStepEntity {
     private Integer retryCount;
     private String approvalStatus;
     private String lastError;
+    private String outputText;
     private LocalDateTime createdTime;
     private LocalDateTime updatedTime;
 
@@ -146,6 +147,14 @@ public class AgentStepEntity {
 
     public void setLastError(String lastError) {
         this.lastError = lastError;
+    }
+
+    public String getOutputText() {
+        return outputText;
+    }
+
+    public void setOutputText(String outputText) {
+        this.outputText = outputText;
     }
 
     public LocalDateTime getCreatedTime() {

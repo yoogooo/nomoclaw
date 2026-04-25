@@ -2,7 +2,7 @@
   display: grid;
   align-items: start;
   grid-template-columns: 1fr;
-  gap: var(--size-18);
+  gap: var(--space-4_5);
 }
 
 .cron-form-main {
@@ -13,13 +13,13 @@
   display: grid;
   min-width: 0;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--size-18);
+  gap: var(--space-4_5);
 }
 
 .basic-card,
 .schedule-card,
 .preview-card {
-  padding: var(--size-18);
+  padding: var(--space-4_5);
   border: var(--size-1) solid var(--color-border-panel);
   border-radius: var(--size-20);
   background: var(--color-bg-surface-soft);
@@ -54,7 +54,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   font-weight: 600;
   color: var(--color-text-heading);
 }
@@ -73,8 +73,8 @@
   margin-top: var(--space-2);
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--size-2);
-  padding: var(--size-2);
+  gap: var(--space-0_5);
+  padding: var(--space-0_5);
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--color-bg-surface-soft) 90%, var(--color-bg-surface));
 }
@@ -89,7 +89,7 @@
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--color-bg-surface-soft) 82%, var(--color-bg-surface));
   color: var(--color-text-secondary);
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   font-weight: 400;
   cursor: pointer;
   transition: background-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
@@ -110,7 +110,7 @@
   display: block;
   margin-bottom: var(--space-2);
   color: var(--color-text-heading);
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   font-weight: 500;
 }
 
@@ -121,13 +121,13 @@
 .field-hint {
   margin-top: var(--space-2);
   color: var(--color-text-cool-gray);
-  font-size: var(--font-size-xs);
+  font-size: var(--text-caption-size);
 }
 
 .field-error {
   margin-top: 0;
   color: var(--color-semantic-danger, #dc2626);
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
 }
 
 .inline-fields {
@@ -140,9 +140,9 @@
 .native-time-input {
   width: 100%;
   min-height: var(--size-44);
-  padding: 0 var(--size-14);
+  padding: 0 var(--space-3_5);
   border: var(--size-1) solid var(--color-border-panel);
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-md);
   background: var(--color-bg-surface);
   color: var(--color-text-primary);
   font: inherit;
@@ -160,7 +160,7 @@
   border-radius: var(--radius-pill);
   background: var(--color-bg-surface);
   color: var(--color-text-cool-gray);
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   cursor: pointer;
 }
 
@@ -183,7 +183,7 @@
 
 .preview-summary {
   margin-top: var(--space-3);
-  font-size: var(--font-size-lg);
+  font-size: var(--text-title-sm-size);
   font-weight: 600;
   color: var(--color-text-heading-deep);
 }
@@ -195,7 +195,7 @@
   background: var(--color-bg-panel-soft);
   color: var(--color-text-runtime);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   word-break: break-all;
 }
 
@@ -204,7 +204,7 @@
 }
 
 .preview-next-title {
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   color: var(--color-text-secondary);
 }
 
@@ -227,7 +227,7 @@
 .preview-timeline-item {
   position: relative;
   display: grid;
-  grid-template-columns: var(--size-16) 1fr;
+  grid-template-columns: var(--space-4) 1fr;
   column-gap: var(--space-2_5);
   align-items: center;
   min-height: var(--size-30);
@@ -245,7 +245,7 @@
 
 .preview-timeline-text {
   color: var(--color-text-secondary);
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   line-height: 1.6;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
@@ -253,13 +253,13 @@
 .preview-next-empty {
   margin-top: var(--space-2);
   color: var(--color-text-cool-gray);
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
 }
 
 .preview-once-time {
   margin-top: var(--space-2);
   color: var(--color-text-secondary);
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 

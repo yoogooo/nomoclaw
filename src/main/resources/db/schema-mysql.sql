@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS agent_definition (
     sort_index INT NOT NULL DEFAULT 0 COMMENT '排序值，越小越靠前',
     is_group_entry TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否为群组入口节点：0否 1是',
     status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE' COMMENT '状态：ACTIVE / DISABLED',
+    workspace VARCHAR(1024) NOT NULL DEFAULT '' COMMENT 'Agent 工作区绝对路径',
     ext_config JSON NULL COMMENT '扩展配置JSON',
     created_time DATETIME(3) NOT NULL COMMENT '创建时间',
     updated_time DATETIME(3) NOT NULL COMMENT '更新时间',
@@ -200,6 +201,7 @@ CREATE TABLE IF NOT EXISTS agent_conversation (
     agent_uid VARCHAR(64) NOT NULL DEFAULT '' COMMENT '归属 Agent 业务ID',
     channel VARCHAR(32) NOT NULL DEFAULT 'web' COMMENT '会话来源渠道：web/feishu/dingtalk/noop',
     title VARCHAR(255) NOT NULL DEFAULT '' COMMENT '对话标题',
+    pinned TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否置顶',
     input_tokens INT NOT NULL DEFAULT 0 COMMENT '对话累计输入 token 数',
     output_tokens INT NOT NULL DEFAULT 0 COMMENT '对话累计输出 token 数',
     total_tokens INT NOT NULL DEFAULT 0 COMMENT '对话累计总 token 数',
@@ -336,6 +338,7 @@ CREATE TABLE IF NOT EXISTS agent_step (
     retry_count INT NOT NULL DEFAULT 0 COMMENT '重试次数',
     approval_status VARCHAR(32) NOT NULL DEFAULT 'NONE' COMMENT '审批状态',
     last_error TEXT NULL COMMENT '最后一次错误信息',
+    output_text LONGTEXT NULL COMMENT '步骤最终输出文本',
     created_time DATETIME(3) NOT NULL COMMENT '创建时间',
     updated_time DATETIME(3) NOT NULL COMMENT '更新时间',
     PRIMARY KEY (id),
@@ -391,29 +394,18 @@ CREATE TABLE IF NOT EXISTS agent_cron_job (
   COLLATE=utf8mb4_0900_ai_ci
   COMMENT='Agent 定时任务表';
 
-INSERT INTO agent_group_definition (
-    agent_group_uid, group_name, display_name, avatar, description, scene_tags,
-    collaboration_mode, min_agent_count, max_agent_count, owner_agent_uid, sort_index, status, ext_config, created_time, updated_time
-) VALUES
-    ('group_short_drama', 'short_drama_team', '短剧项目组', '🎭', '面向短剧策划、测试、舆情与营销的一体化协作群组。', JSON_ARRAY('short-drama', 'creative', 'operations'),
-     'pipeline', 2, 12, 'agent_general_assistant', 10, 'ACTIVE', JSON_OBJECT(), NOW(3), NOW(3));
-
 INSERT INTO agent_definition (
     agent_uid, agent_name, display_name, avatar, description, capability_tags, prompt_profile,
-    model_provider_id, model_id, sort_index, is_group_entry, status, ext_config, created_time, updated_time
+    model_provider_id, model_id, sort_index, is_group_entry, status, workspace, ext_config, created_time, updated_time
 ) VALUES
-    ('agent_general_assistant', 'general_assistant', '通用助手', '🤝', '负责综合规划、协调执行与最终总结。', JSON_ARRAY('planning', 'coordination', 'delivery'),
-     'generalist', '', '', 10, 0, 'ACTIVE', JSON_OBJECT(), NOW(3), NOW(3)),
+    ('agent_general_assistant', 'default_agent', '默认助手', '🤝', '负责综合规划、协调执行与最终总结。', JSON_ARRAY('planning', 'coordination', 'delivery'),
+     'generalist', '', '', 10, 0, 'ACTIVE', '', JSON_OBJECT(), NOW(3), NOW(3)),
     ('agent_test_expert', 'test_expert', '测试专家', '🧪', '负责测试设计、缺陷定位与质量把关。', JSON_ARRAY('testing', 'qa', 'review'),
-     'qa-specialist', '', '', 20, 0, 'ACTIVE', JSON_OBJECT(), NOW(3), NOW(3)),
+     'qa-specialist', '', '', 20, 0, 'ACTIVE', '', JSON_OBJECT(), NOW(3), NOW(3)),
     ('agent_public_opinion', 'public_opinion_monitor', '舆情监测', '📡', '负责舆情跟踪、热点观察与风险提示。', JSON_ARRAY('monitoring', 'trend', 'risk'),
-     'opinion-specialist', '', '', 30, 0, 'ACTIVE', JSON_OBJECT(), NOW(3), NOW(3)),
+     'opinion-specialist', '', '', 30, 0, 'ACTIVE', '', JSON_OBJECT(), NOW(3), NOW(3)),
     ('agent_marketing_assistant', 'marketing_assistant', '营销助理', '📣', '负责传播文案、活动建议与投放辅助。', JSON_ARRAY('marketing', 'campaign', 'copywriting'),
-     'marketing-specialist', '', '', 40, 0, 'ACTIVE', JSON_OBJECT(), NOW(3), NOW(3)),
-    ('agent_screenwriter', 'screenwriter', '短剧编剧', '✍️', '负责短剧剧情设定、人物弧线与分场创作。', JSON_ARRAY('screenwriting', 'story', 'character'),
-     'screenwriter-specialist', '', '', 50, 0, 'ACTIVE', JSON_OBJECT(), NOW(3), NOW(3)),
-    ('agent_director', 'director', '短剧导演', '🎬', '负责镜头节奏、视听表达与导演层决策。', JSON_ARRAY('direction', 'visual', 'production'),
-     'director-specialist', '', '', 60, 0, 'ACTIVE', JSON_OBJECT(), NOW(3), NOW(3));
+     'marketing-specialist', '', '', 40, 0, 'ACTIVE', '', JSON_OBJECT(), NOW(3), NOW(3));
 
 INSERT INTO tool_definition (
     tool_key, display_name, description, risk_level, status, sort_index, config_json, created_time, updated_time
@@ -429,22 +421,15 @@ INSERT INTO tool_definition (
     ('current_time_tool', '当前时间', 'Get the current UTC time.', 'LOW', 'ACTIVE', 90, JSON_OBJECT(), NOW(3), NOW(3)),
     ('token_usage_tool', 'Token 使用', 'Query stored token usage summary from message records.', 'LOW', 'ACTIVE', 100, JSON_OBJECT(), NOW(3), NOW(3)),
     ('memory_search_tool', '记忆搜索', 'Search historical conversation messages by keyword.', 'LOW', 'ACTIVE', 110, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('send_file_tool', '发送文件', 'Prepare a local file for sending to the user.', 'LOW', 'ACTIVE', 120, JSON_OBJECT(), NOW(3), NOW(3));
+    ('image_loader_tool', '图片加载', 'On-demand image context loader for visual analysis after tools that return image paths; supports 刚才截图/第N轮截图/文件名 and direct HTTP(S) image URL passthrough without local download.', 'LOW', 'ACTIVE', 115, JSON_OBJECT(), NOW(3), NOW(3));
 
 INSERT INTO skill_definition (
     skill_key, display_name, description, skill_path, status, sort_index, config_json, created_time, updated_time
 ) VALUES
-    ('pdf', 'pdf', 'Use this skill whenever the task involves reading or generating PDFs.', 'skills/pdf', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3));
-
-INSERT INTO agent_group_member (
-    member_uid, agent_group_uid, agent_uid, member_role, responsibility, sort_index, is_primary, status, created_time, updated_time
-) VALUES
-    ('member_short_drama_general', 'group_short_drama', 'agent_general_assistant', 'owner', '统筹项目组整体规划、协调执行与最终交付。', 10, 1, 'ACTIVE', NOW(3), NOW(3)),
-    ('member_short_drama_test', 'group_short_drama', 'agent_test_expert', 'reviewer', '负责测试方案设计、缺陷校验与质量反馈。', 20, 0, 'ACTIVE', NOW(3), NOW(3)),
-    ('member_short_drama_public', 'group_short_drama', 'agent_public_opinion', 'analyst', '负责舆情监测、风险发现与热点观察。', 30, 0, 'ACTIVE', NOW(3), NOW(3)),
-    ('member_short_drama_marketing', 'group_short_drama', 'agent_marketing_assistant', 'strategist', '负责营销传播建议与活动辅助。', 40, 0, 'ACTIVE', NOW(3), NOW(3)),
-    ('member_short_drama_screenwriter', 'group_short_drama', 'agent_screenwriter', 'creator', '负责短剧剧本、人物与桥段创作。', 50, 0, 'ACTIVE', NOW(3), NOW(3)),
-    ('member_short_drama_director', 'group_short_drama', 'agent_director', 'director', '负责镜头、节奏与导演侧统筹。', 60, 0, 'ACTIVE', NOW(3), NOW(3));
+    ('pdf', 'pdf', 'Use this skill whenever the task involves reading or generating PDFs.', 'skills/pdf', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('xlsx', 'xlsx', 'Use this skill whenever the task involves spreadsheet files (.xlsx/.xls/.csv/.tsv).', 'skills/xlsx', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('pptx', 'pptx', 'Use this skill whenever the task involves creating or editing PowerPoint presentations.', 'skills/pptx', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('docx', 'docx', 'Use this skill whenever the task involves creating or editing Word documents with formatting fidelity.', 'skills/docx', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3));
 
 INSERT INTO agent_tool_relation (
     relation_uid, agent_uid, tool_key, status, sort_index, config_json, created_time, updated_time
@@ -459,8 +444,8 @@ INSERT INTO agent_tool_relation (
     ('rel_general_shot', 'agent_general_assistant', 'desktop_screenshot_tool', 'ACTIVE', 80, JSON_OBJECT(), NOW(3), NOW(3)),
     ('rel_general_time', 'agent_general_assistant', 'current_time_tool', 'ACTIVE', 90, JSON_OBJECT(), NOW(3), NOW(3)),
     ('rel_general_token', 'agent_general_assistant', 'token_usage_tool', 'ACTIVE', 100, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_general_image_loader', 'agent_general_assistant', 'image_loader_tool', 'ACTIVE', 115, JSON_OBJECT(), NOW(3), NOW(3)),
     ('rel_general_memory', 'agent_general_assistant', 'memory_search_tool', 'ACTIVE', 110, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_general_send', 'agent_general_assistant', 'send_file_tool', 'ACTIVE', 120, JSON_OBJECT(), NOW(3), NOW(3)),
     ('rel_test_command', 'agent_test_expert', 'command_tool', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
     ('rel_test_file', 'agent_test_expert', 'file_io_tool', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
     ('rel_test_search', 'agent_test_expert', 'file_search_tool', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
@@ -475,25 +460,27 @@ INSERT INTO agent_tool_relation (
     ('rel_market_browser', 'agent_marketing_assistant', 'browser_tool', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
     ('rel_market_search', 'agent_marketing_assistant', 'file_search_tool', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
     ('rel_market_time', 'agent_marketing_assistant', 'current_time_tool', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_market_memory', 'agent_marketing_assistant', 'memory_search_tool', 'ACTIVE', 50, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_writer_command', 'agent_screenwriter', 'command_tool', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_writer_file', 'agent_screenwriter', 'file_io_tool', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_writer_time', 'agent_screenwriter', 'current_time_tool', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_writer_memory', 'agent_screenwriter', 'memory_search_tool', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_director_command', 'agent_director', 'command_tool', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_director_browser', 'agent_director', 'browser_tool', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_director_shot', 'agent_director', 'desktop_screenshot_tool', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_director_time', 'agent_director', 'current_time_tool', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3));
+    ('rel_market_memory', 'agent_marketing_assistant', 'memory_search_tool', 'ACTIVE', 50, JSON_OBJECT(), NOW(3), NOW(3));
 
 INSERT INTO agent_skill_relation (
     relation_uid, agent_uid, skill_key, status, sort_index, config_json, created_time, updated_time
 ) VALUES
     ('rel_general_pdf', 'agent_general_assistant', 'pdf', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_general_xlsx', 'agent_general_assistant', 'xlsx', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_general_pptx', 'agent_general_assistant', 'pptx', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_general_docx', 'agent_general_assistant', 'docx', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
     ('rel_test_pdf', 'agent_test_expert', 'pdf', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_test_xlsx', 'agent_test_expert', 'xlsx', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_test_pptx', 'agent_test_expert', 'pptx', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_test_docx', 'agent_test_expert', 'docx', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
     ('rel_public_pdf', 'agent_public_opinion', 'pdf', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_public_xlsx', 'agent_public_opinion', 'xlsx', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_public_pptx', 'agent_public_opinion', 'pptx', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_public_docx', 'agent_public_opinion', 'docx', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
     ('rel_market_pdf', 'agent_marketing_assistant', 'pdf', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_writer_pdf', 'agent_screenwriter', 'pdf', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_director_pdf', 'agent_director', 'pdf', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3));
+    ('rel_market_xlsx', 'agent_marketing_assistant', 'xlsx', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_market_pptx', 'agent_marketing_assistant', 'pptx', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_market_docx', 'agent_marketing_assistant', 'docx', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3));
 
 INSERT INTO agent_tip (
     tip_uid, agent_uid, title, summary, source_content, source_conversation_uid, source_message_uid,

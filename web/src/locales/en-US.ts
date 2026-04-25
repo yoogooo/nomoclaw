@@ -16,6 +16,7 @@ const enUS = {
     chat: "Chat Console",
     cron: "Scheduled Tasks",
     agents: "Agent Management",
+    skills: "Skill Management",
     channels: "Channel Management",
     models: "Model Management",
     settings: "Settings"
@@ -34,7 +35,17 @@ const enUS = {
     themeDark: "Dark",
     language: "Language",
     languageZhCN: "简体中文",
-    languageEnUS: "English"
+    languageEnUS: "English",
+    runtimeLogVisibility: "Runtime Log",
+    runtimeLogOn: "Visible",
+    runtimeLogOff: "Hidden",
+    updateCheckNow: "Check Updates",
+    updateRetry: "Retry",
+    updateInstallNow: "Install Update",
+    updateDownloading: "Downloading update {progress}",
+    updateVersion: "New version {version}",
+    updateFailed: "Update failed",
+    updateFailedWithReason: "Update failed: {reason}"
   },
   modelGate: {
     title: "Set up a model first",
@@ -53,10 +64,18 @@ const enUS = {
       history: "Conversations",
       viewingGroup: "Viewing all conversations under {label}.",
       viewingAgent: "Viewing conversations under {label}.",
+      noAgentSelected: "No agent selected",
+      agentSelector: "Current Agent",
+      agentSelectorPlaceholder: "Select an agent",
       createConversation: "+ New Chat",
+      refreshHistory: "Refresh Conversation History",
+      refreshHistoryTooltip: "Refresh history (right-click anywhere on page: reload whole page)",
       noConversations: "No conversation history",
       unnamed: "Untitled Conversation",
       updatedAt: "Updated at {time}",
+      pin: "Pin",
+      unpin: "Unpin",
+      pinned: "Pinned",
       rename: "Rename",
       renamePrompt: "Enter a new conversation name",
       delete: "Delete"
@@ -83,15 +102,23 @@ const enUS = {
       saveTipConfirm: "Save as tip?",
       savedAsTip: "Saved as tip",
       openFile: "Open {name}",
+      expandMessage: "Expand",
+      collapseMessage: "Collapse",
       processing: "Processing...",
       runTitle: "Execution",
-      noExtraDetails: "No extra details"
+      noExtraDetails: "No extra details",
+      commandBlockLabel: "Command",
+      outputBlockLabel: "Output",
+      copyCommand: "Copy command",
+      expandOutput: "Expand",
+      collapseOutput: "Collapse"
     },
     composer: {
       placeholder: "For example: summarize the uploaded file into directly actionable conclusions and recommendations.",
       upload: "Upload",
       jinnang: "Tips",
       send: "Send",
+      sendHint: "Enter to send · Shift + Enter for newline",
       stop: "Cancel",
       modelPlaceholder: "Select a configured model",
       uploadHintUploading: "Uploading files...",
@@ -102,6 +129,8 @@ const enUS = {
       mixedTypeNotAllowed: "Images and other files cannot be mixed",
       maxImages: "At most {count} images can be uploaded",
       maxFiles: "At most {count} non-image files can be uploaded",
+      maxFileSize: "Each file must be no larger than {size}",
+      maxTotalSize: "Total attachments must be no larger than {size}",
       clearedByModelSwitch: "Draft attachments were cleared because the new model does not support them",
       sameTypeOnlyHint: "Only one file type can be uploaded per message.",
       mixedTypeHint: "Multiple file types are supported in one message.",
@@ -118,10 +147,25 @@ const enUS = {
       subtitle: "Shows planning, approvals, step execution, failure reasons, and loop termination.",
       expand: "Expand log",
       collapse: "Collapse log",
-      highRiskStep: "System is preparing a high-risk step",
+      browserRuntime: {
+        checkingTitle: "Preparing browser environment",
+        downloadingTitle: "Downloading browser runtime",
+        checkingDesc: "Checking dependencies…",
+        downloadingDescSimple: "Please wait, downloading now.",
+        elapsedNow: "just started",
+        elapsedSeconds: "about {seconds} seconds in",
+        elapsedMinutes: "about {minutes} minutes in",
+        elapsedMinutesSeconds: "about {minutes}m {seconds}s in",
+        oneTimeHint: "Usually only once. Later runs reuse local cache."
+      },
+      highRiskStep: "System is preparing a step that needs confirmation",
       processingStep: "Processing task step",
       stepNeedApproval: "Step {index} requires manual approval before continuing.",
       approvalRiskHint: "Risk notice: this action may modify local environment, page state, or trigger irreversible results. Reject if it does not match your intent.",
+      approvalRiskHintSensitiveRead: "Risk notice: reading this sensitive path may expose keys or credentials. Please confirm manually.",
+      approvalRiskHintProtectedPath: "Risk notice: the target is under a protected directory. Confirm this action matches your intent before proceeding.",
+      approvalRiskHintSystemPathDeny: "Risk notice: this targets a critical system path and is high risk. Rejecting is recommended.",
+      approvalRiskHintDefaultAsk: "Risk notice: no allow rule matched, so manual confirmation is required by default.",
       stepPrefix: "Step {index}",
       planCreatedWithoutSteps: "Plan created, but no displayable steps.",
       planCreated: "Plan created:",
@@ -140,8 +184,18 @@ const enUS = {
       messageCanceled: "Message processing canceled"
     },
     approval: {
-      waiting: "High-risk action pending confirmation",
+      waiting: "Action pending confirmation",
+      riskPrompt: "Command execution risk detected. Please confirm before continuing.",
+      riskPromptGeneric: "Tool operation risk detected. Please confirm before continuing.",
+      riskPromptScreenshot: "Desktop screenshot will be captured. Please confirm before continuing.",
+      commandLabel: "Command to Execute",
+      payloadLabel: "Parameters to Execute",
+      screenshotPathLabel: "Screenshot Output Path",
+      commandUnavailable: "No structured parameters were provided for this step",
       approve: "Continue",
+      approveSession: "Allow for this session",
+      approveAgent: "Allow for this Agent",
+      approveUser: "Allow globally",
       approving: "Continuing",
       reject: "Reject this action",
       rejecting: "Rejecting"
@@ -351,13 +405,14 @@ const enUS = {
     batchDeletePartial: "{success} tasks deleted, {failed} failed"
   },
   http: {
-    networkError: "Request was not sent successfully: network error or service unavailable. Please check and retry.",
+    networkError: "Cannot reach backend service (it may not be started). Start the service and try again.",
     withReason: "{base} Reason: {reason}",
-    400: "Invalid request parameters. Please review your input and retry.",
+    400: "The request could not be processed. Please try again.",
     401: "Session expired. Please sign in again.",
     403: "You do not have permission for this action.",
     404: "Requested resource does not exist or has been removed.",
     409: "Resource state conflict. Operation cannot be completed now.",
+    413: "Upload payload is too large: single file limit {maxFileSize}, total request limit {maxRequestSize}.",
     422: "Submitted content failed validation. Please revise and retry.",
     429: "Too many requests. Please try again later.",
     500: "Service is temporarily unavailable. Please try again later.",
@@ -373,7 +428,11 @@ const enUS = {
     deleteAgentTitle: "Delete Agent",
     deleteAgentContent: "You are about to delete “{name}”. Continue?",
     deleteAgentRiskTitle: "This action cannot be undone",
-    deleteAgentRiskContent: "Deletion will also remove this Agent's data and workspace files (conversations, steps, tips, attachments, workspace files). Continue?",
+    deleteAgentRiskContent: "Deletion will remove this Agent's database data (conversations, steps, tips, attachments, permission settings). Local workspace files are retained for audit/manual cleanup. Continue?",
+    deleteSkillTitle: "Delete Skill",
+    deleteSkillContent: "Deleting “{name}” will detach it from all Agents and remove the local skill files. Continue?",
+    disableSkillImpactTitle: "Confirm Skill Disable Impact",
+    disableSkillImpactContent: "This Skill is currently enabled by {count} Agent(s). Disabling it globally will make it unavailable to those Agents. Save anyway?",
     confirmDelete: "Delete",
     confirmContinue: "Continue",
     confirmPermanentDelete: "Delete Permanently"
@@ -397,8 +456,12 @@ const enUS = {
     basicSaved: "Basic information saved",
     agentCreated: "Agent created",
     defaultAgentDeleteDenied: "Default Agent cannot be deleted",
-    agentDeleted: "Agent deleted; related data and workspace files were cleaned up",
+    agentDeleted: "Agent deleted; related data cleaned, local workspace retained",
     skillImported: "Skill imported: {name}",
+    skillEnabled: "Skill enabled",
+    skillDisabled: "Skill disabled",
+    skillDeleted: "Skill deleted",
+    skillSaved: "Skill settings saved",
     approveSuccess: "Approved, task resumed",
     approveFailed: "Approve failed, please try again",
     rejectSuccess: "Current step rejected",
@@ -425,6 +488,9 @@ const enUS = {
       agentName: "Agent Identifier",
       agentNameHint: "Immutable after creation. Only letters, numbers, underscore, and hyphen are allowed.",
       description: "Description",
+      workspaceDir: "Workspace Directory",
+      reportDir: "Report Directory",
+      tmpDir: "Temp Directory",
       iconSelect: "Icon",
       preview: "Live Preview",
       iconStyle: "Icon Style",
@@ -432,14 +498,20 @@ const enUS = {
     },
     create: {
       title: "Create Agent",
-      displayNamePlaceholder: "e.g. General Assistant",
-      agentNamePlaceholder: "e.g. agent_general_assistant",
+      displayNamePlaceholder: "e.g. Default Assistant",
+      agentNamePlaceholder: "e.g. default_agent",
+      workspaceDirPlaceholder: "Default: <agentsRoot>/<agentName>/workspace",
+      reportDirPlaceholder: "Default: <workspace>/report",
+      tmpDirPlaceholder: "Default: <workspace>/tmp",
       submit: "Create Agent"
     },
     skills: {
       description: "Imported skills can be enabled in this Agent's system prompt as needed.",
       import: "Import Skill",
-      empty: "No skills"
+      enable: "Enable",
+      disable: "Disable",
+      empty: "No skills",
+      unlinked: "Not linked to any Agent"
     },
     tools: {
       empty: "No tools"
@@ -462,7 +534,10 @@ const enUS = {
       status: "Status",
       disabled: "Disabled",
       description: "Description",
-      path: "Full Path"
+      path: "Full Path",
+      linkedAgents: "Enabled By Agents",
+      noLinkedAgents: "Not enabled by any Agent",
+      agentBindings: "Agent Bindings"
     },
     import: {
       title: "Import Skill",
@@ -473,8 +548,12 @@ const enUS = {
       supportedSources: "Supported Sources",
       urlExamples: "URL Examples",
       urlPlaceholder: "Enter a Skill repository or resource URL",
-      archiveHint: "Upload a zip archive. The system will parse the Skill directory automatically.",
+      archiveHint: "Upload an archive. The system will parse the Skill directory automatically.",
       pickArchive: "Select archive",
+      archiveSupportFormat: "Supports .zip / .tar.gz / .tgz",
+      archiveChooseButton: "Choose file",
+      archiveSelectedLabel: "Selected file",
+      archiveNotSelected: "No file selected",
       skillKeyPlaceholder: "e.g. my-skill",
       displayNamePlaceholder: "e.g. Order Query Assistant",
       descriptionPlaceholder: "Add a brief description to identify this Skill",
@@ -587,7 +666,15 @@ const enUS = {
       allowMixedImageAndFile: "Allow mixed image and file",
       allowedFileTypes: "Allowed file types",
       maxFilesPerMessage: "Max non-image files",
-      maxImagesPerMessage: "Max images"
+      maxImagesPerMessage: "Max images",
+      catalogVersion: "Model catalog",
+      catalogSource: "Catalog source",
+      catalogGeneratedAt: "Generated",
+      catalogMatch: "Auto match",
+      catalogMatched: "Matched",
+      catalogUnknown: "Unknown",
+      uploadAutoDisabled: "Upload disabled",
+      uploadAutoSummary: "Types {types}, {maxImages} images, {maxFiles} non-image files"
     },
     editor: {
       defaultTitle: "Edit Model Provider",
@@ -629,9 +716,13 @@ const enUS = {
       tabTips: "Tips",
       tabDocs: "Config Files"
     },
+    skills: {
+      title: "Skill Management",
+      subtitle: "View global skills in one place and see which Agents have each skill enabled."
+    },
     channels: {
       title: "Channel Management",
-      subtitle: "Edit channel settings and save to ~/.nomoclaw/nomoclaw.json."
+      subtitle: "Edit channel settings."
     },
     models: {
       title: "Model Management",

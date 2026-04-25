@@ -71,7 +71,7 @@ const { t } = useI18n();
 }
 
 .tool-card-name {
-  font-size: var(--font-size-lg);
+  font-size: var(--text-title-sm-size);
   font-weight: 700;
   letter-spacing: 0.01em;
 }
@@ -80,6 +80,6 @@ const { t } = useI18n();
   margin-top: var(--space-2_5);
   color: var(--color-text-secondary);
   line-height: 1.55;
-  font-size: var(--font-size-md);
+  font-size: var(--text-body-size);
 }
 </style>

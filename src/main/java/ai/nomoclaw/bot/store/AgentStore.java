@@ -29,6 +29,8 @@ public interface AgentStore {
 
     void updateConversationTitle(String conversationUid, String title);
 
+    void updateConversationPinned(String conversationUid, boolean pinned);
+
     default AgentMessage createUserMessage(String messageUid,
                                            String conversationUid,
                                            String content,
@@ -70,7 +72,7 @@ public interface AgentStore {
 
     Optional<String> findMessageIdByStep(String stepUid);
 
-    void updateStepStatus(String stepUid, StepStatus status, int retryCount, String errorMessage);
+    void updateStepStatus(String stepUid, StepStatus status, int retryCount, String errorMessage, String outputText);
 
     void updateStepApproval(String stepUid, ApprovalStatus approvalStatus, StepStatus stepStatus);
 

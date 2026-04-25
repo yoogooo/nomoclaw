@@ -1,0 +1,163 @@
+name: release-desktop-multi-platform
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Build target"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - windows-x64
+          - windows-arm64
+          - macos-x64
+          - macos-arm64
+      version:
+        description: "Desktop version (x.y.z), e.g. 1.2.3"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  select-targets:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Select build matrix
+        id: matrix
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          TARGET_INPUT: ${{ github.event.inputs.target || 'all' }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            TARGET_INPUT="all"
+          fi
+
+          case "$TARGET_INPUT" in
+            all)
+              matrix='{"include":[{"id":"windows-x64","runs_on":"windows-latest","rust_target":"x86_64-pc-windows-msvc","run_script":"./scripts/build-desktop-windows-x64.sh","target_arch":"x64","artifact_paths":"dist/*.msi"},{"id":"windows-arm64","runs_on":"windows-11-arm","rust_target":"aarch64-pc-windows-msvc","run_script":"./scripts/build-desktop-windows-x64.sh","target_arch":"arm64","artifact_paths":"dist/*.msi"},{"id":"macos-x64","runs_on":"macos-15-intel","rust_target":"x86_64-apple-darwin","run_script":"./scripts/build-desktop-macos.sh","target_arch":"x64","artifact_paths":"dist/*.dmg\ndesktop/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app.tar.gz\ndesktop/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.sig\ndesktop/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/latest.json"},{"id":"macos-arm64","runs_on":"macos-14","rust_target":"aarch64-apple-darwin","run_script":"./scripts/build-desktop-macos.sh","target_arch":"arm64","artifact_paths":"dist/*.dmg\ndesktop/tauri/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.tar.gz\ndesktop/tauri/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.sig\ndesktop/tauri/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/latest.json"}]}'
+              ;;
+            windows-x64)
+              matrix='{"include":[{"id":"windows-x64","runs_on":"windows-latest","rust_target":"x86_64-pc-windows-msvc","run_script":"./scripts/build-desktop-windows-x64.sh","target_arch":"x64","artifact_paths":"dist/*.msi"}]}'
+              ;;
+            windows-arm64)
+              matrix='{"include":[{"id":"windows-arm64","runs_on":"windows-11-arm","rust_target":"aarch64-pc-windows-msvc","run_script":"./scripts/build-desktop-windows-x64.sh","target_arch":"arm64","artifact_paths":"dist/*.msi"}]}'
+              ;;
+            macos-x64)
+              matrix='{"include":[{"id":"macos-x64","runs_on":"macos-15-intel","rust_target":"x86_64-apple-darwin","run_script":"./scripts/build-desktop-macos.sh","target_arch":"x64","artifact_paths":"dist/*.dmg\ndesktop/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app.tar.gz\ndesktop/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.sig\ndesktop/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/latest.json"}]}'
+              ;;
+            macos-arm64)
+              matrix='{"include":[{"id":"macos-arm64","runs_on":"macos-14","rust_target":"aarch64-apple-darwin","run_script":"./scripts/build-desktop-macos.sh","target_arch":"arm64","artifact_paths":"dist/*.dmg\ndesktop/tauri/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.tar.gz\ndesktop/tauri/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.sig\ndesktop/tauri/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/latest.json"}]}'
+              ;;
+            *)
+              echo "Unsupported target: $TARGET_INPUT" >&2
+              exit 1
+              ;;
+          esac
+
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: select-targets
+    name: build-${{ matrix.id }}
+    runs-on: ${{ matrix.runs_on }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.select-targets.outputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: Setup pnpm
+        shell: bash
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.32.1 --activate
+          pnpm --version
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - name: Resolve desktop version
+        shell: bash
+        env:
+          VERSION_INPUT: ${{ github.event.inputs.version }}
+        run: |
+          set -euo pipefail
+          VERSION=""
+          if [[ "${GITHUB_REF_TYPE:-}" == "tag" && "${GITHUB_REF_NAME:-}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          elif [[ -n "${VERSION_INPUT:-}" ]]; then
+            VERSION="${VERSION_INPUT}"
+          fi
+
+          if [[ -n "$VERSION" && ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid version: $VERSION (expected x.y.z)"
+            exit 1
+          fi
+
+          if [[ -n "$VERSION" ]]; then
+            echo "DESKTOP_VERSION=$VERSION" >> "$GITHUB_ENV"
+            echo "Resolved DESKTOP_VERSION=$VERSION"
+          else
+            echo "DESKTOP_VERSION not provided, build scripts will use their default version strategy."
+          fi
+
+      - name: Build desktop bundles
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          TAURI_UPDATER_PUBKEY: ${{ secrets.TAURI_UPDATER_PUBKEY }}
+          TARGET_ARCH: ${{ matrix.target_arch }}
+          SKIP_TESTS: "true"
+          SKIP_WEB_BUILD: "false"
+          BUILD_TARGET_DMG: "true"
+          TAURI_BUILD_CI: "true"
+        run: ${{ matrix.run_script }}
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.id }}
+          path: ${{ matrix.artifact_paths }}
+          if-no-files-found: warn
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Publish GitHub Release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/**/*

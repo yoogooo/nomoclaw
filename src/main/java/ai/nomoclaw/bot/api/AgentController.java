@@ -6,6 +6,7 @@ import ai.nomoclaw.bot.orchestrator.ConversationAttachmentAppService;
 import ai.nomoclaw.bot.orchestrator.ConversationAppService;
 import ai.nomoclaw.bot.orchestrator.MessageRunAppService;
 import ai.nomoclaw.bot.orchestrator.ModelConfigAppService;
+import ai.nomoclaw.bot.orchestrator.PermissionAppService;
 import ai.nomoclaw.bot.orchestrator.SystemAppService;
 import ai.nomoclaw.bot.scheduler.CronChannelTargetDirectoryService;
 import ai.nomoclaw.bot.scheduler.CronJobApplicationService;
@@ -45,6 +46,7 @@ public class AgentController {
     private final ApprovalAppService approvalAppService;
     private final ModelConfigAppService modelConfigAppService;
     private final SystemAppService systemAppService;
+    private final PermissionAppService permissionAppService;
     private final CronJobApplicationService cronJobApplicationService;
     private final CronChannelTargetDirectoryService cronChannelTargetDirectoryService;
 
@@ -55,6 +57,7 @@ public class AgentController {
                            ApprovalAppService approvalAppService,
                            ModelConfigAppService modelConfigAppService,
                            SystemAppService systemAppService,
+                           PermissionAppService permissionAppService,
                            CronJobApplicationService cronJobApplicationService,
                            CronChannelTargetDirectoryService cronChannelTargetDirectoryService) {
         this.conversationAppService = conversationAppService;
@@ -64,6 +67,7 @@ public class AgentController {
         this.approvalAppService = approvalAppService;
         this.modelConfigAppService = modelConfigAppService;
         this.systemAppService = systemAppService;
+        this.permissionAppService = permissionAppService;
         this.cronJobApplicationService = cronJobApplicationService;
         this.cronChannelTargetDirectoryService = cronChannelTargetDirectoryService;
     }
@@ -99,10 +103,30 @@ public class AgentController {
         return new SimpleResponse("updated");
     }
 
+    @PatchMapping("/conversations/{conversationUid}/pin")
+    public SimpleResponse updateConversationPinned(@PathVariable String conversationUid,
+                                                   @Valid @RequestBody UpdateConversationPinnedRequest request) {
+        log.info("[AgentAPI] updateConversationPinned conversationUid={} pinned={}", conversationUid, request.pinned());
+        conversationAppService.updateConversationPinned(conversationUid, Boolean.TRUE.equals(request.pinned()));
+        return new SimpleResponse("updated");
+    }
+
     @GetMapping("/agent-groups")
     public List<AgentCatalogGroupResponse> listAgentGroups() {
         log.info("[AgentAPI] listAgentGroups");
         return ApiDtoMapper.toAgentCatalogGroups(agentCatalogAppService.listAgentGroups());
+    }
+
+    @GetMapping("/skills")
+    public List<GlobalSkillResponse> listSkills() {
+        log.info("[AgentAPI] listSkills");
+        return ApiDtoMapper.toGlobalSkills(agentCatalogAppService.listSkills());
+    }
+
+    @GetMapping("/skills/{skillKey}/bindings")
+    public SkillBindingsResponse getSkillBindings(@PathVariable String skillKey) {
+        log.info("[AgentAPI] getSkillBindings skillKey={}", skillKey);
+        return ApiDtoMapper.toSkillBindings(agentCatalogAppService.getSkillBindings(skillKey));
     }
 
     @GetMapping("/agents/{agentUid}/skills")
@@ -203,6 +227,18 @@ public class AgentController {
         return ApiDtoMapper.toModelConfig(modelConfigAppService.getAvailableModelConfig());
     }
 
+    @GetMapping("/system/models/catalog/status")
+    public ModelCatalogStatusResponse getModelCatalogStatus() {
+        log.info("[AgentAPI] getModelCatalogStatus");
+        return ApiDtoMapper.toModelCatalogStatus(modelConfigAppService.getCatalogStatus());
+    }
+
+    @PostMapping("/system/models/catalog/refresh")
+    public ModelCatalogStatusResponse refreshModelCatalog() {
+        log.info("[AgentAPI] refreshModelCatalog");
+        return ApiDtoMapper.toModelCatalogStatus(modelConfigAppService.refreshModelCatalog());
+    }
+
     @PutMapping("/system/channels")
     public ChannelConfigResponse updateChannelConfig(@RequestBody(required = false) UpdateChannelConfigRequest request) {
         log.info("[AgentAPI] updateChannelConfig");
@@ -240,6 +276,30 @@ public class AgentController {
         log.info("[AgentAPI] updateAgentSkillStatus agentUid={} skillKey={} enabled={}",
                 agentUid, skillKey, request.enabled());
         return ApiDtoMapper.toAgentSkill(agentCatalogAppService.updateAgentSkillStatus(agentUid, skillKey, request.enabled()));
+    }
+
+    @PatchMapping("/skills/{skillKey}")
+    public GlobalSkillResponse updateSkillStatus(@PathVariable String skillKey,
+                                                 @Valid @RequestBody UpdateSkillStatusRequest request) {
+        log.info("[AgentAPI] updateSkillStatus skillKey={} enabled={}", skillKey, request.enabled());
+        return ApiDtoMapper.toGlobalSkill(agentCatalogAppService.updateSkillStatus(skillKey, request.enabled()));
+    }
+
+    @PutMapping("/skills/{skillKey}/bindings")
+    public SkillBindingsResponse updateSkillBindings(@PathVariable String skillKey,
+                                                     @Valid @RequestBody UpdateSkillBindingsRequest request) {
+        log.info("[AgentAPI] updateSkillBindings skillKey={} enabled={} agents={}",
+                skillKey,
+                request.enabled(),
+                request.agentBindings() == null ? 0 : request.agentBindings().size());
+        return ApiDtoMapper.toSkillBindings(agentCatalogAppService.updateSkillBindings(skillKey, ApiDtoMapper.toCommand(request)));
+    }
+
+    @DeleteMapping("/skills/{skillKey}")
+    public SimpleResponse deleteSkill(@PathVariable String skillKey) {
+        log.info("[AgentAPI] deleteSkill skillKey={}", skillKey);
+        agentCatalogAppService.deleteSkill(skillKey);
+        return new SimpleResponse("deleted");
     }
 
     @PostMapping("/agents/{agentUid}/skills/import-url")
@@ -373,6 +433,42 @@ public class AgentController {
         log.info("[AgentAPI] rejectStep conversationUid={} stepUid={}", conversationUid, stepUid);
         approvalAppService.rejectStep(conversationUid, stepUid);
         return new SimpleResponse("rejected");
+    }
+
+    @PostMapping("/conversations/{conversationUid}/approvals/{stepUid}/decision")
+    public ApprovalDecisionResponse decideStep(@PathVariable String conversationUid,
+                                               @PathVariable String stepUid,
+                                               @RequestBody(required = false) ApprovalDecisionRequest request) {
+        String action = request == null ? "allow" : request.action();
+        String scope = request == null ? "once" : request.scope();
+        String note = request == null ? "" : request.note();
+        log.info("[AgentAPI] decideStep conversationUid={} stepUid={} action={} scope={}",
+                conversationUid, stepUid, action, scope);
+        var decision = approvalAppService.decideStep(conversationUid, stepUid, action, scope, note);
+        return new ApprovalDecisionResponse(decision.status(), decision.appliedScope(), decision.persisted(), decision.matchedRuleId());
+    }
+
+    @GetMapping("/permissions/effective")
+    public PermissionRulesResponse getEffectivePermissions(@RequestParam(required = false, defaultValue = "") String conversationUid,
+                                                           @RequestParam(required = false, defaultValue = "") String agentUid) {
+        log.info("[AgentAPI] getEffectivePermissions conversationUid={} agentUid={}", conversationUid, agentUid);
+        return permissionAppService.getEffectiveRules(conversationUid, agentUid);
+    }
+
+    @PutMapping("/permissions/agent-settings/{agentUid}")
+    public PermissionRulesResponse updateAgentPermissions(@PathVariable String agentUid,
+                                                          @RequestBody(required = false) UpdatePermissionRulesRequest request) {
+        log.info("[AgentAPI] updateAgentPermissions agentUid={} rules={}", agentUid,
+                request == null || request.rules() == null ? 0 : request.rules().size());
+        return permissionAppService.updateAgentRules(agentUid, request == null ? new UpdatePermissionRulesRequest(List.of()) : request);
+    }
+
+    @PutMapping("/permissions/user-settings")
+    public PermissionRulesResponse updateUserPermissions(@RequestParam(required = false, defaultValue = "") String agentUid,
+                                                         @RequestBody(required = false) UpdatePermissionRulesRequest request) {
+        log.info("[AgentAPI] updateUserPermissions agentUid={} rules={}", agentUid,
+                request == null || request.rules() == null ? 0 : request.rules().size());
+        return permissionAppService.updateUserRules(agentUid, request == null ? new UpdatePermissionRulesRequest(List.of()) : request);
     }
 
     @PostMapping("/conversations/{conversationUid}/cancel")

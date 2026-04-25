@@ -3,6 +3,7 @@ import enUS from "@/locales/en-US";
 import zhCN from "@/locales/zh-CN";
 
 export type AppLocale = "zh-CN" | "en-US";
+export const SUPPORTED_APP_LOCALES = ["zh-CN", "en-US"] as const;
 
 const LOCALE_STORAGE_KEY = "ui:locale";
 const DEFAULT_LOCALE: AppLocale = "zh-CN";
@@ -13,7 +14,7 @@ const messages = {
   "en-US": enUS
 } as const;
 
-function normalizeLocale(raw: string | null | undefined): AppLocale {
+export function normalizeAppLocale(raw: string | null | undefined): AppLocale {
   if (!raw) return DEFAULT_LOCALE;
   const value = raw.toLowerCase();
   if (value.startsWith("zh")) return "zh-CN";
@@ -27,9 +28,9 @@ function resolveInitialLocale(): AppLocale {
   }
   const cached = window.localStorage.getItem(LOCALE_STORAGE_KEY);
   if (cached) {
-    return normalizeLocale(cached);
+    return normalizeAppLocale(cached);
   }
-  return normalizeLocale(window.navigator.language);
+  return normalizeAppLocale(window.navigator.language);
 }
 
 export const i18n = createI18n({

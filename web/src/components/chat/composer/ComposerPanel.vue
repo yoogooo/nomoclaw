@@ -20,6 +20,7 @@ const appliedJinnangId = ref("");
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const isDragActive = ref(false);
 const previewImageUrl = ref("");
+const isImeComposing = ref(false);
 
 const isRunningCurrentConversation = computed(() =>
   conversationStore.runningConversationUid === conversationStore.currentConversationUid
@@ -42,10 +43,22 @@ const uploadHint = computed(() => {
 });
 
 function onKeydown(event: KeyboardEvent) {
-  if (event.metaKey && event.key === "Enter") {
+  const isCompositionEvent = event.isComposing || isImeComposing.value || event.keyCode === 229;
+  if (event.key === "Enter" && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && !isCompositionEvent) {
     event.preventDefault();
+    if (isRunningCurrentConversation.value) {
+      return;
+    }
     void conversationStore.sendMessage();
   }
+}
+
+function onCompositionStart() {
+  isImeComposing.value = true;
+}
+
+function onCompositionEnd() {
+  isImeComposing.value = false;
 }
 
 function toggleJinnangPicker() {
@@ -66,6 +79,10 @@ function removeAppliedJinnang() {
 function triggerFilePicker() {
   if (conversationStore.loading) {
     discreteMessage.info(t("chat.composer.switchingConversation"));
+    return;
+  }
+  if (!conversationStore.hasAnyConfiguredModel) {
+    conversationStore.guideToModelSetup();
     return;
   }
   if (conversationStore.uploadDisabledReason) {
@@ -114,23 +131,37 @@ async function onDrop(event: DragEvent) {
     discreteMessage.info(t("chat.composer.switchingConversation"));
     return;
   }
+  if (!conversationStore.hasAnyConfiguredModel) {
+    conversationStore.guideToModelSetup();
+    return;
+  }
   if (conversationStore.uploadDisabledReason) {
     discreteMessage.info(conversationStore.uploadDisabledReason);
     return;
   }
   const files = Array.from(event.dataTransfer?.files || []);
   if (files.length) {
-    await conversationStore.uploadFiles(files);
+    try {
+      await conversationStore.uploadFiles(files);
+    } catch {
+      // Errors are surfaced centrally by requestJson/toast; keep handler stable.
+    }
   }
 }
 
 async function onFileChange(event: Event) {
   const target = event.target as HTMLInputElement;
   const files = target.files;
-  if (files?.length) {
-    await conversationStore.uploadFiles(files);
+  try {
+    if (files?.length) {
+      await conversationStore.uploadFiles(files);
+    }
+  } catch {
+    // Errors are surfaced centrally by requestJson/toast; keep handler stable.
+  } finally {
+    // Always reset so selecting the same file again will trigger change.
+    target.value = "";
   }
-  target.value = "";
 }
 
 function onModelChange(value: string) {
@@ -201,6 +232,8 @@ onBeforeUnmount(() => {
         :model-value="conversationStore.draftMessage"
         @update:model-value="conversationStore.draftMessage = $event"
         @keydown="onKeydown"
+        @compositionstart="onCompositionStart"
+        @compositionend="onCompositionEnd"
       />
 
       <ComposerAttachmentStrip
@@ -253,6 +286,7 @@ onBeforeUnmount(() => {
 
     <div class="composer-upload-status">
       <div class="composer-upload-hint">{{ conversationStore.uploadingFiles ? t("chat.composer.uploadHintUploading") : uploadHint }}</div>
+      <div class="composer-send-hint">{{ t("chat.composer.sendHint") }}</div>
       <input ref="fileInputRef" class="composer-file-input" type="file" multiple @change="onFileChange" />
     </div>
   </div>
@@ -280,7 +314,7 @@ onBeforeUnmount(() => {
 .applied-jinnang {
   display: inline-flex;
   align-items: center;
-  gap: var(--size-8);
+  gap: var(--space-2);
   align-self: flex-start;
   width: fit-content;
   max-width: 100%;
@@ -326,7 +360,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--font-size-xs);
+  font-size: var(--text-caption-size);
   font-weight: 700;
   color: var(--color-text-brand);
 }
@@ -342,12 +376,26 @@ onBeforeUnmount(() => {
 .composer-upload-status {
   display: flex;
   width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
 }
 
 .composer-upload-hint {
-  font-size: var(--font-size-xs);
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--text-caption-size);
   color: var(--color-text-muted);
   line-height: 1.5;
+}
+
+.composer-send-hint {
+  flex: none;
+  font-size: var(--text-caption-size);
+  color: var(--color-text-faint);
+  line-height: 1.5;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .composer-file-input {
@@ -357,7 +405,7 @@ onBeforeUnmount(() => {
 @media (max-width: var(--size-breakpoint-md)) {
   .composer-spacer {
     display: block;
-    height: calc(var(--size-210) + env(safe-area-inset-bottom));
+    height: calc(var(--size-190) + var(--size-20) + env(safe-area-inset-bottom));
     flex: none;
   }
 

@@ -1,14 +1,41 @@
 # NomoClaw Bot
 
+[![GitHub Repo](https://img.shields.io/badge/GitHub-Repo-181717?logo=github)](https://github.com/yoogooo/nomoclaw) [![License](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE) [![Last Commit](https://img.shields.io/github/last-commit/yoogooo/nomoclaw)](https://github.com/yoogooo/nomoclaw/commits) [![Java](https://img.shields.io/badge/Java-21-007396?logo=openjdk)](https://openjdk.org/projects/jdk/21/) [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.x-6DB33F?logo=springboot)](https://spring.io/projects/spring-boot) [![Rust](https://img.shields.io/badge/Rust-1.8x-000000?logo=rust)](https://www.rust-lang.org/) [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript)](https://www.typescriptlang.org/) [![Vue](https://img.shields.io/badge/Vue-3-4FC08D?logo=vuedotjs)](https://vuejs.org/) [![Tauri](https://img.shields.io/badge/Tauri-2.x-24C8DB?logo=tauri)](https://tauri.app/)
+
+[中文文档](README.md) | [English Docs](README.en.md)
+
 一个本地优先的多 Agent 助手平台：把对话、工具执行、审批和定时任务放进同一个工作流，让任务更稳定地落地。
 
-## 核心能力
+## 桌面版安装（推荐）
 
-- Chat 对话与实时事件流（SSE）
-- Agent 管理（基础信息、技能、工具、锦囊、配置文件）
-- Cron 定时任务与执行报告
-- Channel 通知配置（飞书/钉钉）
-- 模型配置与本地模型发现
+- 以下安装包与打包命令仅适用于 macOS。
+- 直接下载对应平台的桌面安装包（`.dmg`），双击安装到 `Applications`。
+- 安装后可一键启动，无需手动配置额外环境。
+- 如需自行打包：
+
+```bash
+# Apple Silicon
+TARGET_ARCH=arm64 ./scripts/build-desktop-macos.sh
+
+# Intel x64
+TARGET_ARCH=x64 ./scripts/build-desktop-macos.sh
+```
+
+## 功能特性
+
+- 可追踪的执行闭环：从规划、步骤执行、审批到总结，全程带事件流与状态回放，不是“只会聊天”的黑盒。
+- 多 Agent 协作工作台：按角色管理 Agent 的技能、工具、锦囊和文档，支持持续沉淀可复用的执行能力。
+- 高风险操作可控：命令与文件写入具备策略门禁，支持人工确认，降低误操作成本。
+- 自动化任务可运营：内置 Cron 调度、执行报告与渠道通知（飞书/钉钉），适合长期例行任务。
+- 模型层解耦：统一管理多 Provider 与模型，支持本地模型发现，便于按场景切换成本与效果。
+
+## 后续功能规划
+
+- 知识库融合到 Agent 助手（从“锦囊/文档/技能”走向统一检索入口），提升回答一致性与可追溯性。
+- 工作流融合到 Agent 助手（从对话执行扩展到可编排流程），将高频任务沉淀为可复用流程。
+- 多 Agent 协作功能，支持任务拆解、分工执行与协同交付。
+- 插件功能，支持按需扩展外部系统能力与业务集成。
+- 中控中心（多 Agent 节点状态、产出摘要、Token 消耗监控），实现运行可观测与成本可管理。
 
 ## 典型使用场景
 
@@ -16,12 +43,11 @@
 - 经验沉淀与复用：将高质量回答保存为“锦囊”，用于后续任务提速
 - 自动化例行工作：定时抓取信息、生成简报并推送到通知渠道
 
-## 环境要求
+## 运行与开发环境
 
-- JDK 21+
-- Node.js 20+
-- pnpm 10+
-- MySQL 8+
+- 桌面版（推荐）：macOS，直接安装 `.dmg` 即可运行（不需要手动安装 JDK/Node/MySQL）。
+- 源码部署（后端）：JDK 21+，MySQL 8+（开发/测试可使用 H2 file 模式）。
+- 源码部署（前端）：Node.js 20+，pnpm 10+。
 
 ## 快速开始
 
@@ -40,6 +66,10 @@ cp web/.env.example web/.env
 ./mvnw spring-boot:run
 ```
 
+说明：
+- 本地 MySQL 开发默认走 Maven `prod-full`（activeByDefault），会包含 `mysql-connector-j` 与 `flyway-mysql`。
+- 桌面发版默认脚本走 `prod-lite`（H2），用于精简打包体积。
+
 默认：`http://127.0.0.1:8080`
 
 4. 启动前端
@@ -51,6 +81,32 @@ pnpm dev
 ```
 
 默认：`http://127.0.0.1:5173`
+
+## Docker 一键启动（前后端）
+
+适合希望“拉代码后直接跑起来”的场景，默认使用 H2 file 模式，不依赖 MySQL。
+
+1. （可选）在项目根目录创建 `.env`，写入你需要的变量（如 `DASHSCOPE_API_KEY`、`LLM_MODEL_CONFIG_ENCRYPTION_KEY`）。
+2. 启动前后端：
+
+```bash
+docker compose up --build -d
+```
+
+3. 打开：
+- 前端：`http://127.0.0.1:5173`
+- 后端 API：`http://127.0.0.1:8080`
+
+4. 停止：
+
+```bash
+docker compose down
+```
+
+说明：
+- 后端数据持久化到 Docker volume：`nomoclaw_data`
+- 前端容器通过 Nginx 反向代理 `/api` 到后端容器
+- 如需清空数据并重置：`docker compose down -v`
 
 ### 使用 H2（file 模式，开发/测试）
 
@@ -84,6 +140,14 @@ pnpm dev
 pnpm build
 ```
 
+桌面版（macOS, Tauri）：
+
+```bash
+./scripts/build-desktop-macos.sh
+```
+
+- 旧脚本 `scripts/build-dmg-apple-silicon.sh` / `scripts/build-dmg-macos-intel.sh` 进入 legacy 维护期，仅作为回滚路径
+
 ## 文档导航
 
 使用者：
@@ -94,6 +158,7 @@ pnpm build
 - 架构文档：[`docs/architecture/ARCHITECTURE.md`](./docs/architecture/ARCHITECTURE.md)
 - 前端架构：[`docs/architecture/FRONTEND.md`](./docs/architecture/FRONTEND.md)
 - 前端 API 设计：[`docs/architecture/FRONTEND-API.md`](./docs/architecture/FRONTEND-API.md)
+- 桌面端生命周期（Tauri）：[`docs/architecture/DESKTOP-TAURI-LIFECYCLE.md`](./docs/architecture/DESKTOP-TAURI-LIFECYCLE.md)
 
 运维与配置：
 - 核心配置：`src/main/resources/application.yml`

@@ -8,6 +8,9 @@ export interface AgentCatalogAgent {
   modelProvider: string;
   modelName: string;
   modelNames: string[];
+  workspace: string;
+  reportDir: string;
+  tmpDir: string;
   sortIndex: number;
   capabilityTags: string[];
   memberRole: string;
@@ -22,6 +25,40 @@ export interface AgentSkill {
   skillPath: string;
   enabled: boolean;
   updatedTime: string;
+}
+
+export interface GlobalSkillLinkedAgent {
+  agentUid: string;
+  agentName: string;
+  displayName: string;
+}
+
+export interface GlobalSkill {
+  skillKey: string;
+  displayName: string;
+  description: string;
+  skillPath: string;
+  status: string;
+  updatedTime: string;
+  linkedAgents: GlobalSkillLinkedAgent[];
+}
+
+export interface GlobalSkillAgentBinding {
+  agentUid: string;
+  agentName: string;
+  displayName: string;
+  enabled: boolean;
+}
+
+export interface GlobalSkillBindings {
+  skillKey: string;
+  displayName: string;
+  description: string;
+  skillPath: string;
+  status: string;
+  updatedTime: string;
+  enabledAgentCount: number;
+  agentBindings: GlobalSkillAgentBinding[];
 }
 
 export interface ImportSkillFromUrlPayload {
@@ -135,6 +172,8 @@ export interface ModelProviderOption {
   maxInputTokens: number;
   maxOutputTokens: number;
   uploadPolicy?: UploadPolicy;
+  catalogMatched?: boolean;
+  catalogSource?: string;
 }
 
 export interface ModelProvider {
@@ -170,8 +209,48 @@ export interface UploadPolicy {
   allowedMimeGroups: string[];
   maxFilesPerMessage: number;
   maxImagesPerMessage: number;
+  maxFileBytes?: number;
+  maxTotalBytes?: number;
   singleMimeGroupOnly: boolean;
   allowMixedImageAndFile: boolean;
+}
+
+export interface PermissionRulePayload {
+  ruleId: string;
+  effect: "ALLOW" | "ASK" | "DENY";
+  tool: string;
+  action: string;
+  resourceType: "FILE" | "COMMAND" | "BROWSER" | "CRON" | "ANY";
+  pathPattern: string;
+  commandPattern: string;
+  expiresAt: string;
+  enabled: boolean;
+}
+
+export interface PermissionRulesResponse {
+  agentUid: string;
+  agentName: string;
+  sessionRules: PermissionRulePayload[];
+  commandRules: PermissionRulePayload[];
+  agentSettingsRules: PermissionRulePayload[];
+  userSettingsRules: PermissionRulePayload[];
+  hardGuardProtectedNames: string[];
+  hardGuardSystemRoots: string[];
+}
+
+export interface ApprovalDecisionResponse {
+  status: string;
+  appliedScope: "once" | "session" | "agent" | "user";
+  persisted: boolean;
+  matchedRuleId?: string;
+}
+
+export interface ModelCatalogStatus {
+  catalogVersion: string;
+  generatedAt: string;
+  source: string;
+  stale: boolean;
+  message: string;
 }
 
 export interface AgentCatalogGroup {
@@ -190,6 +269,7 @@ export interface ConversationSummary {
   agentGroupUid: string;
   agentUid: string;
   title: string;
+  pinned: boolean;
   createdTime: string;
   updatedTime: string;
 }
@@ -230,9 +310,12 @@ export interface ConversationRunStep {
   roundIndex: number;
   stepIndex: number;
   status: string;
+  toolName?: string;
+  toolArgs?: Record<string, any>;
   displayTitle: string;
   displaySummary: string;
   displayDetails: string;
+  policyReasonCode?: string;
   updatedTime: string;
 }
 

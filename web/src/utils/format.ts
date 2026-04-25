@@ -97,6 +97,7 @@ function cronToNaturalText(expression?: string | null) {
     return cronstrue.toString(normalized, {
       locale: getCronLocale(),
       use24HourTimeFormat: true,
+      dayOfWeekStartIndexZero: false,
       throwExceptionOnParseError: true
     });
   } catch {

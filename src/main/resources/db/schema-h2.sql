@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS agent_definition (
     sort_index INT NOT NULL DEFAULT 0,
     is_group_entry TINYINT(1) NOT NULL DEFAULT 0,
     status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+    workspace VARCHAR(1024) NOT NULL DEFAULT '',
     ext_config CLOB NULL,
     created_time TIMESTAMP(3) NOT NULL,
     updated_time TIMESTAMP(3) NOT NULL,
@@ -176,6 +177,7 @@ CREATE TABLE IF NOT EXISTS agent_conversation (
     agent_uid VARCHAR(64) NOT NULL DEFAULT '',
     channel VARCHAR(32) NOT NULL DEFAULT 'web',
     title VARCHAR(255) NOT NULL DEFAULT '',
+    pinned BOOLEAN NOT NULL DEFAULT FALSE,
     input_tokens INT NOT NULL DEFAULT 0,
     output_tokens INT NOT NULL DEFAULT 0,
     total_tokens INT NOT NULL DEFAULT 0,
@@ -294,6 +296,7 @@ CREATE TABLE IF NOT EXISTS agent_step (
     retry_count INT NOT NULL DEFAULT 0,
     approval_status VARCHAR(32) NOT NULL DEFAULT 'NONE',
     last_error TEXT NULL,
+    output_text CLOB NULL,
     created_time TIMESTAMP(3) NOT NULL,
     updated_time TIMESTAMP(3) NOT NULL,
     PRIMARY KEY (id),
@@ -340,19 +343,12 @@ CREATE TABLE IF NOT EXISTS agent_cron_job (
     INDEX idx_agent_cron_job_next_run (status, next_run_time)
 );
 
-INSERT INTO agent_group_definition (
-    agent_group_uid, group_name, display_name, avatar, description, scene_tags,
-    collaboration_mode, min_agent_count, max_agent_count, owner_agent_uid, sort_index, status, ext_config, created_time, updated_time
-) VALUES
-    ('group_short_drama', 'short_drama_team', '短剧项目组', '🎭', '面向短剧策划、测试、舆情与营销的一体化协作群组。', '["short-drama","creative","operations"]',
-     'pipeline', 2, 12, 'agent_general_assistant', 10, 'ACTIVE', '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-
 INSERT INTO agent_definition (
     agent_uid, agent_name, display_name, avatar, description, capability_tags, prompt_profile,
-    model_provider_id, model_id, sort_index, is_group_entry, status, ext_config, created_time, updated_time
+    model_provider_id, model_id, sort_index, is_group_entry, status, workspace, ext_config, created_time, updated_time
 ) VALUES
-    ('agent_general_assistant', 'general_assistant', '通用助手', '🤝', '负责综合规划、协调执行与最终总结。', '["planning","coordination","delivery"]',
-     'generalist', '', '', 10, 0, 'ACTIVE', '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+    ('agent_general_assistant', 'default_agent', '默认助手', '🤝', '负责综合规划、协调执行与最终总结。', '["planning","coordination","delivery"]',
+     'generalist', '', '', 10, 0, 'ACTIVE', '', '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO tool_definition (
     tool_key, display_name, description, risk_level, status, sort_index, config_json, created_time, updated_time
@@ -368,17 +364,15 @@ INSERT INTO tool_definition (
     ('current_time_tool', '当前时间', 'Get the current UTC time.', 'LOW', 'ACTIVE', 90, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('token_usage_tool', 'Token 使用', 'Query stored token usage summary from message records.', 'LOW', 'ACTIVE', 100, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('memory_search_tool', '记忆搜索', 'Search historical conversation messages by keyword.', 'LOW', 'ACTIVE', 110, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('send_file_tool', '发送文件', 'Prepare a local file for sending to the user.', 'LOW', 'ACTIVE', 120, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+    ('image_loader_tool', '图片加载', 'On-demand image context loader for visual analysis after tools that return image paths; supports 刚才截图/第N轮截图/文件名 and direct HTTP(S) image URL passthrough without local download.', 'LOW', 'ACTIVE', 115, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO skill_definition (
     skill_key, display_name, description, skill_path, status, sort_index, config_json, created_time, updated_time
 ) VALUES
-    ('pdf', 'pdf', 'Use this skill whenever the task involves reading or generating PDFs.', 'skills/pdf', 'ACTIVE', 10, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-
-INSERT INTO agent_group_member (
-    member_uid, agent_group_uid, agent_uid, member_role, responsibility, sort_index, is_primary, status, created_time, updated_time
-) VALUES
-    ('member_short_drama_general', 'group_short_drama', 'agent_general_assistant', 'owner', '统筹项目组整体规划、协调执行与最终交付。', 10, 1, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+    ('pdf', 'pdf', 'Use this skill whenever the task involves reading or generating PDFs.', 'skills/pdf', 'ACTIVE', 10, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('xlsx', 'xlsx', 'Use this skill whenever the task involves spreadsheet files (.xlsx/.xls/.csv/.tsv).', 'skills/xlsx', 'ACTIVE', 20, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('pptx', 'pptx', 'Use this skill whenever the task involves creating or editing PowerPoint presentations.', 'skills/pptx', 'ACTIVE', 30, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('docx', 'docx', 'Use this skill whenever the task involves creating or editing Word documents with formatting fidelity.', 'skills/docx', 'ACTIVE', 40, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO agent_tool_relation (
     relation_uid, agent_uid, tool_key, status, sort_index, config_json, created_time, updated_time
@@ -394,12 +388,15 @@ INSERT INTO agent_tool_relation (
     ('rel_general_time', 'agent_general_assistant', 'current_time_tool', 'ACTIVE', 90, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('rel_general_token', 'agent_general_assistant', 'token_usage_tool', 'ACTIVE', 100, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('rel_general_memory', 'agent_general_assistant', 'memory_search_tool', 'ACTIVE', 110, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_general_send', 'agent_general_assistant', 'send_file_tool', 'ACTIVE', 120, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+    ('rel_general_image_loader', 'agent_general_assistant', 'image_loader_tool', 'ACTIVE', 115, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO agent_skill_relation (
     relation_uid, agent_uid, skill_key, status, sort_index, config_json, created_time, updated_time
 ) VALUES
-    ('rel_general_pdf', 'agent_general_assistant', 'pdf', 'ACTIVE', 10, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+    ('rel_general_pdf', 'agent_general_assistant', 'pdf', 'ACTIVE', 10, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('rel_general_xlsx', 'agent_general_assistant', 'xlsx', 'ACTIVE', 20, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('rel_general_pptx', 'agent_general_assistant', 'pptx', 'ACTIVE', 30, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('rel_general_docx', 'agent_general_assistant', 'docx', 'ACTIVE', 40, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO agent_tip (
     tip_uid, agent_uid, title, summary, source_content, source_conversation_uid, source_message_uid,

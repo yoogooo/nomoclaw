@@ -1,4 +1,4 @@
-import type { ModelConfig, ModelProviderTestResult, TestModelProviderRequest } from "@/types/api";
+import type { ModelCatalogStatus, ModelConfig, ModelProviderTestResult, TestModelProviderRequest } from "@/types/api";
 import { requestJson } from "@/utils/http";
 
 export const modelApi = {
@@ -13,6 +13,14 @@ export const modelApi = {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
+    });
+  },
+  getModelCatalogStatus() {
+    return requestJson<ModelCatalogStatus>("/api/system/models/catalog/status");
+  },
+  refreshModelCatalog() {
+    return requestJson<ModelCatalogStatus>("/api/system/models/catalog/refresh", {
+      method: "POST"
     });
   },
   loadLocalModels(providerId: string) {

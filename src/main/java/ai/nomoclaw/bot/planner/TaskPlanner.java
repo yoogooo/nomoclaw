@@ -172,11 +172,15 @@ public class TaskPlanner implements Planner {
         ));
 
         ChatResponse response = reason(summaryMessages, toolSpecifications, ToolChoice.NONE, promptContext);
-        String answer = response.aiMessage() == null ? "" : response.aiMessage().text();
+        String answer = response.aiMessage() == null ? "" : nullToEmpty(response.aiMessage().text());
         if (!answer.isBlank()) {
             return new SummaryResult(answer.trim(), response);
         }
         return new SummaryResult("任务已停止。停止原因=" + stopReason + "，已执行轮次=" + roundsUsed + "/" + maxRounds + "。", response);
+    }
+
+    private String nullToEmpty(String value) {
+        return value == null ? "" : value;
     }
 
     private String resolveSystemPrompt(PromptLoader.PromptContext promptContext, List<ToolSpecification> toolSpecifications) {

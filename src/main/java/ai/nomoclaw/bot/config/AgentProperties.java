@@ -56,6 +56,8 @@ public class AgentProperties {
         @Min(1)
         private int stepTimeoutSeconds = 60;
         private boolean headless = true;
+        private boolean sharedProfileEnabled = true;
+        private String sharedProfileName = "shared";
 
         public int getStepTimeoutSeconds() {
             return stepTimeoutSeconds;
@@ -71,6 +73,22 @@ public class AgentProperties {
 
         public void setHeadless(boolean headless) {
             this.headless = headless;
+        }
+
+        public boolean isSharedProfileEnabled() {
+            return sharedProfileEnabled;
+        }
+
+        public void setSharedProfileEnabled(boolean sharedProfileEnabled) {
+            this.sharedProfileEnabled = sharedProfileEnabled;
+        }
+
+        public String getSharedProfileName() {
+            return sharedProfileName;
+        }
+
+        public void setSharedProfileName(String sharedProfileName) {
+            this.sharedProfileName = sharedProfileName;
         }
     }
 

@@ -2,8 +2,8 @@ package ai.nomoclaw.bot.channel.config;
 
 import ai.nomoclaw.bot.util.JsonUtil;
 import ai.nomoclaw.bot.workspace.NomoClawPaths;
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.env.EnvironmentPostProcessor;
+import org.springframework.context.ApplicationContextInitializer;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.Ordered;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.MapPropertySource;
@@ -19,14 +19,15 @@ import java.nio.file.StandardCopyOption;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-public class ChannelConfigEnvironmentPostProcessor implements EnvironmentPostProcessor, Ordered {
+public class ChannelConfigEnvironmentPostProcessor implements ApplicationContextInitializer<ConfigurableApplicationContext>, Ordered {
 
     private static final ObjectMapper MAPPER = JsonUtil.mapper();
     private static final String PROPERTY_SOURCE_NAME = "nomoclawChannelConfig";
     private static final String CONFIG_FILE_NAME = "nomoclaw.json";
 
     @Override
-    public void postProcessEnvironment(ConfigurableEnvironment environment, SpringApplication application) {
+    public void initialize(ConfigurableApplicationContext applicationContext) {
+        ConfigurableEnvironment environment = applicationContext.getEnvironment();
         Path rootDir = resolveRootDir(environment);
         Path configFile = rootDir.resolve(CONFIG_FILE_NAME).toAbsolutePath().normalize();
         ObjectNode root = loadOrCreateConfig(configFile);

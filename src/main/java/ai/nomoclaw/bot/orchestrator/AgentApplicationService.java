@@ -1,59 +1,33 @@
 package ai.nomoclaw.bot.orchestrator;
 
-import ai.nomoclaw.bot.application.dto.ConversationMessageDto;
-import ai.nomoclaw.bot.application.dto.ConversationMessageRunDto;
-import ai.nomoclaw.bot.application.dto.ConversationRunStepDto;
-import ai.nomoclaw.bot.application.dto.ConversationSummaryDto;
-import ai.nomoclaw.bot.application.dto.ConversationAttachmentDto;
-import ai.nomoclaw.bot.application.dto.AgentCatalogAgentDto;
-import ai.nomoclaw.bot.application.dto.AgentCatalogGroupDto;
-import ai.nomoclaw.bot.application.dto.AgentDocDto;
-import ai.nomoclaw.bot.application.dto.AgentSkillDto;
-import ai.nomoclaw.bot.application.dto.AgentTipDto;
-import ai.nomoclaw.bot.application.dto.AgentToolDto;
-import ai.nomoclaw.bot.application.dto.SystemConfigDto;
-import ai.nomoclaw.bot.application.dto.ModelConfigDto;
 import ai.nomoclaw.bot.application.command.CreateAgentCommand;
 import ai.nomoclaw.bot.application.command.CreateAgentTipCommand;
-import ai.nomoclaw.bot.application.dto.MessageFileLinkDto;
 import ai.nomoclaw.bot.application.command.UpdateAgentBasicInfoCommand;
+import ai.nomoclaw.bot.application.dto.*;
 import ai.nomoclaw.bot.channel.model.ChannelMessageCompletedEvent;
 import ai.nomoclaw.bot.config.AgentProperties;
-import ai.nomoclaw.bot.llm.config.LlmProperties;
-import ai.nomoclaw.bot.workspace.NomoClawPaths;
-import ai.nomoclaw.bot.prompt.PromptLoader;
 import ai.nomoclaw.bot.domain.AgentConversation;
 import ai.nomoclaw.bot.domain.AgentMessage;
-import ai.nomoclaw.bot.model.AgentEvent;
-import ai.nomoclaw.bot.model.AgentEventType;
-import ai.nomoclaw.bot.model.ApprovalStatus;
-import ai.nomoclaw.bot.model.MessageStatus;
-import ai.nomoclaw.bot.model.PlanStep;
-import ai.nomoclaw.bot.model.RiskLevel;
-import ai.nomoclaw.bot.model.StepStatus;
-import ai.nomoclaw.bot.model.ToolResult;
+import ai.nomoclaw.bot.llm.config.LlmProperties;
+import ai.nomoclaw.bot.model.*;
 import ai.nomoclaw.bot.planner.Planner;
 import ai.nomoclaw.bot.policy.RiskPolicy;
+import ai.nomoclaw.bot.policy.tool.ToolPermissionPolicyService;
 import ai.nomoclaw.bot.policy.tool.ToolPolicyDecisionResult;
+import ai.nomoclaw.bot.policy.tool.permission.PermissionEffect;
+import ai.nomoclaw.bot.policy.tool.permission.PermissionScope;
+import ai.nomoclaw.bot.policy.tool.permission.PermissionSource;
+import ai.nomoclaw.bot.prompt.PromptLoader;
 import ai.nomoclaw.bot.store.AgentStore;
-import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
-import ai.nomoclaw.bot.store.entity.AgentGroupDefinitionEntity;
-import ai.nomoclaw.bot.store.entity.AgentGroupMemberEntity;
-import ai.nomoclaw.bot.store.entity.AgentSkillRelationEntity;
-import ai.nomoclaw.bot.store.entity.AgentToolRelationEntity;
-import ai.nomoclaw.bot.store.entity.SkillDefinitionEntity;
-import ai.nomoclaw.bot.store.entity.ToolDefinitionEntity;
-import ai.nomoclaw.bot.store.repository.AgentDefinitionRepository;
-import ai.nomoclaw.bot.store.repository.AgentGroupDefinitionRepository;
-import ai.nomoclaw.bot.store.repository.AgentGroupMemberRepository;
-import ai.nomoclaw.bot.store.repository.AgentSkillRelationRepository;
-import ai.nomoclaw.bot.store.repository.AgentToolRelationRepository;
-import ai.nomoclaw.bot.store.repository.SkillDefinitionRepository;
-import ai.nomoclaw.bot.store.repository.ToolDefinitionRepository;
+import ai.nomoclaw.bot.store.entity.*;
+import ai.nomoclaw.bot.store.repository.*;
+import ai.nomoclaw.bot.tool.PlatformSupport;
 import ai.nomoclaw.bot.tool.ToolExecutor;
 import ai.nomoclaw.bot.util.JsonUtil;
-import dev.langchain4j.agent.tool.ToolSpecification;
+import ai.nomoclaw.bot.workspace.AgentWorkspaceConfig;
+import ai.nomoclaw.bot.workspace.NomoClawPaths;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
+import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
@@ -71,32 +45,24 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
+import java.awt.*;
+import java.io.IOException;
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
-import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
-import java.nio.file.FileVisitResult;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.format.DateTimeParseException;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -119,8 +85,9 @@ public class AgentApplicationService {
 
     private static final String STOP_REASON_MAX_LOOP_REACHED = "MAX_LOOP_REACHED";
     private static final String DEFAULT_AGENT_UID = "agent_general_assistant";
-    private static final String CUSTOM_AGENT_GROUP_UID = "group_custom_agents";
-    private static final String CUSTOM_AGENT_GROUP_NAME = "custom_agents";
+    private static final String VIRTUAL_AGENT_GROUP_UID = "group_short_drama";
+    private static final String VIRTUAL_AGENT_GROUP_NAME = "all_agents";
+    private static final String VIRTUAL_AGENT_GROUP_DISPLAY_NAME = "全部 Agent";
     private static final int CONVERSATION_CONTEXT_LIMIT = 30;
     private static final Map<String, String> AGENT_DOC_FILES = new LinkedHashMap<>();
     static {
@@ -153,7 +120,10 @@ public class AgentApplicationService {
     private final AgentToolRelationRepository agentToolRelationRepository;
     private final ModelConfigAppService modelConfigAppService;
     private final ConversationAttachmentAppService conversationAttachmentAppService;
+    private final ImageLoaderContextService imageLoaderContextService;
     private final ToolExecutionPolicyGateway toolExecutionPolicyGateway;
+    private final ToolPermissionPolicyService toolPermissionPolicyService;
+    private final PermissionAppService permissionAppService;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final ConcurrentMap<String, Boolean> runningMessages = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, ExecutionState> executionStates = new ConcurrentHashMap<>();
@@ -179,7 +149,10 @@ public class AgentApplicationService {
                                    AgentToolRelationRepository agentToolRelationRepository,
                                    ModelConfigAppService modelConfigAppService,
                                    ConversationAttachmentAppService conversationAttachmentAppService,
+                                   ImageLoaderContextService imageLoaderContextService,
                                    ToolExecutionPolicyGateway toolExecutionPolicyGateway,
+                                   ToolPermissionPolicyService toolPermissionPolicyService,
+                                   PermissionAppService permissionAppService,
                                    @Qualifier("agentTaskExecutor") TaskExecutor agentTaskExecutor,
                                    ApplicationEventPublisher applicationEventPublisher) {
         this.store = store;
@@ -202,7 +175,10 @@ public class AgentApplicationService {
         this.agentToolRelationRepository = agentToolRelationRepository;
         this.modelConfigAppService = modelConfigAppService;
         this.conversationAttachmentAppService = conversationAttachmentAppService;
+        this.imageLoaderContextService = imageLoaderContextService;
         this.toolExecutionPolicyGateway = toolExecutionPolicyGateway;
+        this.toolPermissionPolicyService = toolPermissionPolicyService;
+        this.permissionAppService = permissionAppService;
         this.taskExecutor = agentTaskExecutor;
         this.applicationEventPublisher = applicationEventPublisher;
     }
@@ -214,7 +190,7 @@ public class AgentApplicationService {
     public String createConversation(String agentGroupUid, String agentUid, String channel) {
         String conversationUid = UUID.randomUUID().toString();
         String normalizedGroupUid = normalizeAgentGroupUid(agentGroupUid);
-        String normalizedAgentUid = normalizedGroupUid.isBlank() ? normalizeAgentUid(agentUid) : "";
+        String normalizedAgentUid = normalizeOptionalAgentUid(agentUid);
         String normalizedChannel = channel == null || channel.isBlank() ? "web" : channel.trim();
         store.createConversation(
                 conversationUid,
@@ -234,6 +210,7 @@ public class AgentApplicationService {
                         conversation.agentGroupUid(),
                         conversation.agentUid(),
                         conversation.title(),
+                        conversation.pinned(),
                         conversation.createdAt(),
                         conversation.updatedAt()
                 ))
@@ -241,36 +218,36 @@ public class AgentApplicationService {
     }
 
     public List<AgentCatalogGroupDto> listAgentGroups() {
-        List<AgentGroupDefinitionEntity> groups = agentGroupDefinitionRepository.listActive();
-        List<String> groupUids = groups.stream()
-                .map(AgentGroupDefinitionEntity::getAgentGroupUid)
-                .toList();
-        List<AgentGroupMemberEntity> members = agentGroupMemberRepository.listActiveByGroupUids(groupUids);
-        Map<String, List<AgentGroupMemberEntity>> membersByGroup = members.stream()
-                .collect(Collectors.groupingBy(AgentGroupMemberEntity::getAgentGroupUid, LinkedHashMap::new, Collectors.toList()));
-        List<String> agentUids = members.stream()
-                .map(AgentGroupMemberEntity::getAgentUid)
-                .distinct()
-                .toList();
-        Map<String, AgentDefinitionEntity> agentsByUid = agentDefinitionRepository.listActiveByUids(agentUids).stream()
-                .collect(Collectors.toMap(AgentDefinitionEntity::getAgentUid, agent -> agent, (left, right) -> left, LinkedHashMap::new));
-        agentsByUid.values().forEach(this::ensureWorkspaceDocsForExistingAgent);
+        List<AgentDefinitionEntity> allAgents = agentDefinitionRepository.listAllActive();
+        if (allAgents == null || allAgents.isEmpty()) {
+            return List.of();
+        }
+        allAgents.forEach(this::ensureWorkspaceDocsForExistingAgent);
 
-        return groups.stream()
-                .map(group -> new AgentCatalogGroupDto(
-                        group.getAgentGroupUid(),
-                        group.getGroupName(),
-                        group.getDisplayName(),
-                        group.getAvatar(),
-                        group.getDescription(),
-                        readStringArray(group.getSceneTags()),
-                        group.getCollaborationMode(),
-                        membersByGroup.getOrDefault(group.getAgentGroupUid(), List.of()).stream()
-                                .map(member -> toAgentCatalogItem(member, agentsByUid.get(member.getAgentUid())))
-                                .filter(Objects::nonNull)
-                                .toList()
-                ))
-                .toList();
+        List<AgentCatalogAgentDto> agentItems = new ArrayList<>();
+        for (AgentDefinitionEntity agent : allAgents) {
+            String agentUid = agent.getAgentUid();
+            AgentGroupMemberEntity member = withDefaultMember(null, VIRTUAL_AGENT_GROUP_UID, agentUid);
+            member.setMemberRole(DEFAULT_AGENT_UID.equals(agentUid) ? "owner" : "member");
+            member.setResponsibility(DEFAULT_AGENT_UID.equals(agentUid) ? "默认主 Agent" : "");
+            member.setIsPrimary(DEFAULT_AGENT_UID.equals(agentUid) ? 1 : 0);
+            AgentCatalogAgentDto item = toAgentCatalogItem(member, agent);
+            if (item == null) {
+                continue;
+            }
+            agentItems.add(item);
+        }
+
+        return List.of(new AgentCatalogGroupDto(
+                VIRTUAL_AGENT_GROUP_UID,
+                VIRTUAL_AGENT_GROUP_NAME,
+                VIRTUAL_AGENT_GROUP_DISPLAY_NAME,
+                "🧭",
+                "基于 agent_definition 自动聚合",
+                List.of("general"),
+                "single",
+                agentItems
+        ));
     }
 
     public List<ConversationMessageDto> listMessages(String conversationUid) {
@@ -372,24 +349,27 @@ public class AgentApplicationService {
         ObjectNode extConfig = JsonNodeFactory.instance.objectNode();
         extConfig.put("avatarColor", avatarColor);
         extConfig.set("modelIds", JsonUtil.fromJson(JsonUtil.toJson(modelIds), JsonNode.class));
+        AgentWorkspaceConfig workspaceConfig = resolveWorkspaceConfigForMutation(
+                agentName,
+                "",
+                request.workspace()
+        ).ensureDirectories();
+        agent.setWorkspace(workspaceConfig.workspaceDir().toString());
         agent.setExtConfig(JsonUtil.toJson(extConfig));
         agent.setCreatedTime(now);
         agent.setUpdatedTime(now);
         agentDefinitionRepository.save(agent);
+        permissionAppService.syncAgentManagedWorkspaceAllowRule(
+                agentUid,
+                agentName,
+                workspaceConfig.workspaceDir()
+        );
 
-        AgentGroupDefinitionEntity group = ensureCustomAgentGroup(now, agentUid);
         AgentGroupMemberEntity member = new AgentGroupMemberEntity();
-        member.setMemberUid("member_" + UUID.randomUUID().toString().replace("-", ""));
-        member.setAgentGroupUid(group.getAgentGroupUid());
         member.setAgentUid(agentUid);
         member.setMemberRole("成员");
         member.setResponsibility("");
-        member.setSortIndex((int) agentGroupMemberRepository.countByGroupUid(group.getAgentGroupUid()) + 1);
         member.setIsPrimary(0);
-        member.setStatus("ACTIVE");
-        member.setCreatedTime(now);
-        member.setUpdatedTime(now);
-        agentGroupMemberRepository.save(member);
         initializeAgentToolRelations(agentUid, now);
         initializeAgentWorkspaceDocs(agentName, displayName);
         return toAgentCatalogItem(member, agent);
@@ -430,8 +410,19 @@ public class AgentApplicationService {
         ObjectNode extConfig = readExtConfigObject(agent.getExtConfig());
         extConfig.put("avatarColor", avatarColor);
         extConfig.set("modelIds", JsonUtil.fromJson(JsonUtil.toJson(modelIds), JsonNode.class));
+        AgentWorkspaceConfig workspaceConfig = resolveWorkspaceConfigForMutation(
+                agent.getAgentName(),
+                agent.getWorkspace(),
+                request.workspace()
+        ).ensureDirectories();
+        agent.setWorkspace(workspaceConfig.workspaceDir().toString());
         agent.setExtConfig(JsonUtil.toJson(extConfig));
         agentDefinitionRepository.updateById(agent);
+        permissionAppService.syncAgentManagedWorkspaceAllowRule(
+                agent.getAgentUid(),
+                agent.getAgentName(),
+                workspaceConfig.workspaceDir()
+        );
 
         AgentGroupMemberEntity member = agentGroupMemberRepository.findPrimaryByAgentUid(agent.getAgentUid());
         if (member == null) {
@@ -554,7 +545,7 @@ public class AgentApplicationService {
     public List<AgentDocDto> listAgentDocs(String agentUid) {
         AgentDefinitionEntity agent = requireAgentByUid(agentUid);
         ensureWorkspaceDocsForExistingAgent(agent);
-        Path workspace = NomoClawPaths.ensureAgentWorkspace(agent.getAgentName());
+        Path workspace = NomoClawPaths.ensureAgentHome(agent.getAgentName());
         List<AgentDocDto> docs = new ArrayList<>();
         for (Map.Entry<String, String> entry : AGENT_DOC_FILES.entrySet()) {
             docs.add(readAgentDoc(workspace, entry.getKey(), entry.getValue()));
@@ -570,7 +561,7 @@ public class AgentApplicationService {
         if (fileName == null) {
             throw new IllegalArgumentException("unsupported doc key: " + normalizedDocKey);
         }
-        Path workspace = NomoClawPaths.ensureAgentWorkspace(agent.getAgentName());
+        Path workspace = NomoClawPaths.ensureAgentHome(agent.getAgentName());
         Path file = workspace.resolve(fileName).toAbsolutePath().normalize();
         try {
             Files.writeString(file, content == null ? "" : content, StandardCharsets.UTF_8);
@@ -640,34 +631,11 @@ public class AgentApplicationService {
         agentToolRelationRepository.deleteByAgentUid(normalizedAgentUid);
         agentGroupMemberRepository.deleteByAgentUid(normalizedAgentUid);
         agentDefinitionRepository.deleteByAgentUid(normalizedAgentUid);
-        deleteDirectoryRecursively(NomoClawPaths.agentWorkspace(agent.getAgentName()));
-        log.info("[Agent] deleted agentUid={} agentName={} conversations={}",
+        permissionAppService.removeAgentManagedWorkspaceRules(agent.getAgentUid(), agent.getAgentName());
+        log.info("[Agent] deleted agentUid={} agentName={} conversations={} workspaceRetained=true",
                 normalizedAgentUid,
                 agent.getAgentName(),
                 conversationUids.size());
-    }
-
-    private void deleteDirectoryRecursively(Path rootPath) {
-        if (rootPath == null || !Files.exists(rootPath)) {
-            return;
-        }
-        try {
-            Files.walkFileTree(rootPath, new SimpleFileVisitor<>() {
-                @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                    Files.deleteIfExists(file);
-                    return FileVisitResult.CONTINUE;
-                }
-
-                @Override
-                public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
-                    Files.deleteIfExists(dir);
-                    return FileVisitResult.CONTINUE;
-                }
-            });
-        } catch (IOException ex) {
-            throw new IllegalStateException("failed to delete agent workspace: " + rootPath, ex);
-        }
     }
 
     public void updateConversationTitle(String conversationUid, String title) {
@@ -680,6 +648,14 @@ public class AgentApplicationService {
         store.updateConversationTitle(conversationUid, normalizedTitle);
         log.info("[Agent] conversation title updated conversationUid={} title={} agentGroupUid={} agentUid={}",
                 conversationUid, normalizedTitle, conversation.agentGroupUid(), conversation.agentUid());
+    }
+
+    public void updateConversationPinned(String conversationUid, boolean pinned) {
+        AgentConversation conversation = store.findConversation(conversationUid)
+                .orElseThrow(() -> new IllegalArgumentException("conversation not found: " + conversationUid));
+        store.updateConversationPinned(conversationUid, pinned);
+        log.info("[Agent] conversation pin updated conversationUid={} pinned={} agentGroupUid={} agentUid={}",
+                conversationUid, pinned, conversation.agentGroupUid(), conversation.agentUid());
     }
 
     public String submitMessage(String conversationUid, String message) {
@@ -765,41 +741,92 @@ public class AgentApplicationService {
             if (!Files.exists(file)) {
                 throw new IllegalArgumentException("file not found: " + file);
             }
-            new ProcessBuilder("open", file.toString()).start();
+            if (!Files.isRegularFile(file) && !Files.isDirectory(file)) {
+                throw new IllegalArgumentException("path is not an openable file or directory: " + file);
+            }
+            openPathInHostOs(file);
             log.info("[Agent] open file path={}", file);
+        } catch (IllegalArgumentException ex) {
+            throw ex;
         } catch (Exception ex) {
             throw new IllegalStateException("failed to open file: " + path, ex);
         }
     }
 
     public void approveStep(String conversationUid, String stepUid) {
-        PlanStep step = store.findStep(stepUid)
-                .orElseThrow(() -> new IllegalArgumentException("step not found: " + stepUid));
-        String messageUid = store.findMessageIdByStep(stepUid)
-                .orElseThrow(() -> new IllegalArgumentException("message not found for step: " + stepUid));
-        store.updateStepApproval(stepUid, ApprovalStatus.APPROVED, StepStatus.CREATED);
-        log.info("[Agent] step approved conversationUid={} stepUid={} round={}", conversationUid, stepUid, step.roundIndex());
-        AgentMessage message = store.findMessage(messageUid)
-                .orElseThrow(() -> new IllegalArgumentException("message not found: " + messageUid));
-        if (message.status() == MessageStatus.WAITING_APPROVAL) {
-            executeMessageAsync(message.messageUid());
-        }
+        decideStep(conversationUid, stepUid, "allow", PermissionScope.ONCE, "");
     }
 
     public void rejectStep(String conversationUid, String stepUid) {
+        decideStep(conversationUid, stepUid, "deny", PermissionScope.ONCE, "");
+    }
+
+    public ApprovalDecisionDto decideStep(String conversationUid,
+                                          String stepUid,
+                                          String action,
+                                          PermissionScope scope,
+                                          String note) {
         PlanStep step = store.findStep(stepUid)
                 .orElseThrow(() -> new IllegalArgumentException("step not found: " + stepUid));
         String messageUid = store.findMessageIdByStep(stepUid)
                 .orElseThrow(() -> new IllegalArgumentException("message not found for step: " + stepUid));
-        store.updateStepApproval(stepUid, ApprovalStatus.REJECTED, StepStatus.FAILED);
         AgentMessage message = store.findMessage(messageUid)
                 .orElseThrow(() -> new IllegalArgumentException("message not found: " + messageUid));
+        AgentConversation conversation = requireConversation(message.conversationUid());
+        AgentDefinitionEntity executionAgent = resolveExecutionAgent(conversation);
+        String agentName = executionAgent == null ? NomoClawPaths.DEFAULT_AGENT_NAME : executionAgent.getAgentName();
+        AgentWorkspaceConfig workspaceConfig = resolveWorkspaceConfig(executionAgent);
+        String normalizedAction = action == null ? "" : action.trim().toLowerCase(Locale.ROOT);
+        PermissionScope appliedScope = scope == null ? PermissionScope.ONCE : scope;
+        String matchedRuleId = "";
+
+        if ("allow".equals(normalizedAction)) {
+            if (appliedScope != PermissionScope.ONCE) {
+                var rule = permissionAppService.ruleFromApproval(
+                        step.toolName(),
+                        step.toolArgs(),
+                        PermissionEffect.ALLOW,
+                        appliedScope == PermissionScope.SESSION ? PermissionSource.SESSION
+                                : (appliedScope == PermissionScope.AGENT ? PermissionSource.AGENT_SETTINGS : PermissionSource.USER_SETTINGS),
+                        workspaceConfig.workspaceDir()
+                );
+                matchedRuleId = rule.ruleId();
+                toolPermissionPolicyService.persistRule(appliedScope, message.conversationUid(), agentName, rule);
+            }
+            store.updateStepApproval(stepUid, ApprovalStatus.APPROVED, StepStatus.CREATED);
+            store.updateStepStatus(stepUid, StepStatus.CREATED, 0, null, null);
+            log.info("[Agent] step approved conversationUid={} stepUid={} round={} scope={} note={}",
+                    conversationUid, stepUid, step.roundIndex(), appliedScope, nullToEmpty(note));
+            boolean hasPendingSteps = store.listSteps(messageUid, step.roundIndex()).stream()
+                    .anyMatch(item -> item.status() != StepStatus.COMPLETED);
+            if (message.status() == MessageStatus.WAITING_APPROVAL
+                    || (message.status() == MessageStatus.FAILED && hasPendingSteps)) {
+                executeMessageAsync(message.messageUid());
+            }
+            return new ApprovalDecisionDto("accepted", appliedScope.name().toLowerCase(Locale.ROOT), appliedScope != PermissionScope.ONCE, matchedRuleId);
+        }
+
+        store.updateStepApproval(stepUid, ApprovalStatus.REJECTED, StepStatus.FAILED);
+        if (appliedScope != PermissionScope.ONCE) {
+            var rule = permissionAppService.ruleFromApproval(
+                    step.toolName(),
+                    step.toolArgs(),
+                    PermissionEffect.DENY,
+                    appliedScope == PermissionScope.SESSION ? PermissionSource.SESSION
+                            : (appliedScope == PermissionScope.AGENT ? PermissionSource.AGENT_SETTINGS : PermissionSource.USER_SETTINGS),
+                    workspaceConfig.workspaceDir()
+            );
+            matchedRuleId = rule.ruleId();
+            toolPermissionPolicyService.persistRule(appliedScope, message.conversationUid(), agentName, rule);
+        }
         cancellationRegistry.cancel(messageUid);
-        log.info("[Agent] step rejected conversationUid={} stepUid={} round={}", conversationUid, stepUid, step.roundIndex());
+        log.info("[Agent] step rejected conversationUid={} stepUid={} round={} scope={} note={}",
+                conversationUid, stepUid, step.roundIndex(), appliedScope, nullToEmpty(note));
         ObjectNode rejectedPayload = stepPayload(step, "approval rejected by user");
         applyUserFacingFields(rejectedPayload, step, "rejected", "已停止执行", "这一步已被你拒绝，系统不会继续执行。");
         publishEvent(AgentEventType.STEP_REJECTED, conversationUid, messageUid, stepUid, rejectedPayload);
-        failMessage(message, "主公已拒绝高风险操作，当前任务已停止。", "APPROVAL_REJECTED");
+        failMessage(message, "你已拒绝待确认操作，当前任务已停止。", "APPROVAL_REJECTED");
+        return new ApprovalDecisionDto("accepted", appliedScope.name().toLowerCase(Locale.ROOT), appliedScope != PermissionScope.ONCE, matchedRuleId);
     }
 
     public void cancelLatestMessage(String conversationUid) {
@@ -892,16 +919,17 @@ public class AgentApplicationService {
             handleLoopLimitReached(messageUid);
         } catch (Exception ex) {
             log.error("message execution failed messageUid={}", messageUid, ex);
-            store.findMessage(messageUid).ifPresent(message -> failMessage(message, toUserFriendlyFailureMessage(ex), ""));
+            store.findMessage(messageUid).ifPresent(message -> failMessage(message, toUserFriendlyFailureMessage(ex, message), ""));
         } finally {
             runningMessages.remove(messageUid);
         }
     }
 
-    private String toUserFriendlyFailureMessage(Throwable throwable) {
+    private String toUserFriendlyFailureMessage(Throwable throwable, AgentMessage agentMessage) {
         Throwable root = rootCauseOf(throwable);
         if (root instanceof ConnectException || root instanceof ClosedChannelException) {
-            return "模型服务连接失败，请检查模型服务是否已启动且地址配置正确（例如 Ollama 默认地址 http://127.0.0.1:11434）。";
+            String provider = agentMessage == null ? "" : nullToEmpty(agentMessage.provider()).trim();
+            return connectFailureHintByProvider(provider);
         }
         if (root instanceof SocketTimeoutException) {
             return "模型服务响应超时，请稍后重试或检查模型服务状态。";
@@ -914,6 +942,20 @@ public class AgentApplicationService {
             return "任务执行失败，请稍后重试。";
         }
         return message;
+    }
+
+    private String connectFailureHintByProvider(String provider) {
+        String normalized = provider == null ? "" : provider.trim().toLowerCase(Locale.ROOT);
+        if ("ollama".equals(normalized)) {
+            return "模型服务连接失败，请检查 Ollama 是否已启动，并确认地址配置正确（默认 http://127.0.0.1:11434）。";
+        }
+        if ("qwen".equals(normalized) || "dashscope".equals(normalized)) {
+            return "模型服务连接失败（Qwen/DashScope）。请检查外网连接、代理设置、API Key 及 API 地址配置是否正确。";
+        }
+        if ("openai".equals(normalized) || "gemini".equals(normalized) || "kimi".equals(normalized) || "minimax".equals(normalized)) {
+            return "模型服务连接失败。请检查外网连接、代理设置、API Key 及 API 地址配置是否正确。";
+        }
+        return "模型服务连接失败，请检查网络连通性以及模型服务地址配置。";
     }
 
     private Throwable rootCauseOf(Throwable throwable) {
@@ -980,7 +1022,7 @@ public class AgentApplicationService {
                         availableTools
                 );
                 recordRoundTokenUsage(message, summaryResult.response(), state.currentRound());
-                answer = summaryResult.answer();
+                answer = nullToEmpty(summaryResult.answer()).trim();
             }
             if (streamedResult.streamed() && !answer.isBlank() && !cancellationRegistry.isCanceled(message.messageUid())) {
                 publishMessageDelta(message, roundIndex, "", answer, true);
@@ -999,9 +1041,8 @@ public class AgentApplicationService {
     private RoundExecutionResult executeRound(AgentMessage message, ExecutionState state, List<PlanStep> steps) {
         AgentConversation conversation = requireConversation(message.conversationUid());
         AgentDefinitionEntity executionAgent = resolveExecutionAgent(conversation);
-        Path agentWorkspacePath = NomoClawPaths.ensureAgentWorkspace(
-                executionAgent == null ? NomoClawPaths.DEFAULT_AGENT_NAME : executionAgent.getAgentName()
-        );
+        AgentWorkspaceConfig workspaceConfig = resolveWorkspaceConfig(executionAgent);
+        Path agentWorkspacePath = workspaceConfig.workspaceDir();
         for (PlanStep step : steps) {
             if (cancellationRegistry.isCanceled(message.messageUid())) {
                 return RoundExecutionResult.cancelled();
@@ -1015,13 +1056,15 @@ public class AgentApplicationService {
             ToolPolicyDecisionResult policyDecision = toolExecutionPolicyGateway.evaluateStep(
                     latestStep,
                     agentWorkspacePath,
+                    executionAgent == null ? "" : executionAgent.getAgentUid(),
+                    executionAgent == null ? NomoClawPaths.DEFAULT_AGENT_NAME : executionAgent.getAgentName(),
                     conversation.channel(),
                     message.conversationUid(),
                     message.messageUid()
             );
             if (!policyDecision.denied()
                     && latestStep.approvalStatus() != ApprovalStatus.APPROVED
-                    && (riskPolicy.requiresApproval(latestStep) || policyDecision.asks())) {
+                    && policyDecision.asks()) {
                 store.updateStepApproval(latestStep.stepUid(), ApprovalStatus.PENDING, StepStatus.WAITING_APPROVAL);
                 store.updateMessageStatus(message.messageUid(), MessageStatus.WAITING_APPROVAL);
                 log.info("[Agent] waiting approval messageUid={} round={}/{} stepUid={} title={}",
@@ -1032,11 +1075,8 @@ public class AgentApplicationService {
                         latestStep.title());
                 ObjectNode approvalPayload = stepPayload(latestStep, "approval required");
                 String approvalDetails = buildStepApprovalDetails(latestStep);
-                if (policyDecision.asks()) {
-                    approvalDetails = approvalDetails + "\n\n策略提示：" + nullToEmpty(policyDecision.message());
-                }
                 applyUserFacingFields(approvalPayload, latestStep, "waiting_approval", "等待你确认", approvalDetails);
-                approvalPayload.set("toolArgs", latestStep.toolArgs());
+                approvalPayload.put("policyReasonCode", policyDecision.reasonCode().name());
                 publishEvent(AgentEventType.STEP_WAITING_APPROVAL, message.conversationUid(), message.messageUid(), latestStep.stepUid(),
                         approvalPayload);
                 return RoundExecutionResult.pendingApproval();
@@ -1046,11 +1086,15 @@ public class AgentApplicationService {
             if (outcome.canceled()) {
                 return RoundExecutionResult.cancelled();
             }
+            StepExecutionOutcome integratedOutcome = integrateImageLoaderContext(message, latestStep, outcome);
             state.memory().add(ToolExecutionResultMessage.from(
                     toolCallId(latestStep),
                     latestStep.toolName(),
-                    outcome.memoryText()
+                    integratedOutcome.memoryText()
             ));
+            if (integratedOutcome.injectedMemoryMessage() != null) {
+                state.memory().add(integratedOutcome.injectedMemoryMessage());
+            }
         }
 
         return RoundExecutionResult.success();
@@ -1074,7 +1118,7 @@ public class AgentApplicationService {
             }
 
             int currentAttempt = attempt + 1;
-            store.updateStepStatus(step.stepUid(), StepStatus.RUNNING, attempt, null);
+            store.updateStepStatus(step.stepUid(), StepStatus.RUNNING, attempt, null, null);
             log.info("[Agent] step start messageUid={} round={}/{} stepUid={} title={} tool={} attempt={}/{}",
                     message.messageUid(),
                     roundIndex,
@@ -1089,13 +1133,14 @@ public class AgentApplicationService {
             publishEvent(AgentEventType.STEP_STARTED, message.conversationUid(), message.messageUid(), step.stepUid(),
                     startedPayload);
 
-            ToolResult result = safeExecuteTool(message, step);
+            ToolResult result = safeExecuteTool(message, step, roundIndex, currentAttempt);
+            String outputText = resolveStepOutputText(step, result);
             lastResult = result;
             StepReviewer.ReviewDecision decision = stepReviewer.review(step, result);
             lastDecisionMessage = decision.message();
 
             if (decision.passed()) {
-                store.updateStepStatus(step.stepUid(), StepStatus.COMPLETED, attempt, null);
+                store.updateStepStatus(step.stepUid(), StepStatus.COMPLETED, attempt, null, outputText);
                 log.info("[Agent] step success messageUid={} round={}/{} stepUid={} attempt={} output={}",
                         message.messageUid(),
                         roundIndex,
@@ -1109,7 +1154,7 @@ public class AgentApplicationService {
             }
 
             boolean hasNextAttempt = decision.retryable() && currentAttempt < maxAttempts;
-            store.updateStepStatus(step.stepUid(), StepStatus.FAILED, currentAttempt, decision.message());
+            store.updateStepStatus(step.stepUid(), StepStatus.FAILED, currentAttempt, decision.message(), outputText);
             log.warn("[Agent] step failed messageUid={} round={}/{} stepUid={} attempt={} retryable={} err={}",
                     message.messageUid(),
                     roundIndex,
@@ -1132,6 +1177,35 @@ public class AgentApplicationService {
         return StepExecutionOutcome.failure(exhausted, buildToolResultMessage(step, exhausted, false, lastDecisionMessage));
     }
 
+    private StepExecutionOutcome integrateImageLoaderContext(AgentMessage message, PlanStep step, StepExecutionOutcome outcome) {
+        if (outcome == null || outcome.canceled()) {
+            return outcome;
+        }
+        ImageLoaderContextService.IntegrationResult integrationResult = imageLoaderContextService.integrate(message, step, outcome.toolResult());
+        if (integrationResult == null) {
+            return outcome;
+        }
+        String mergedMemoryText = appendMemoryTextLine(outcome.memoryText(), integrationResult.memoryLine());
+        return new StepExecutionOutcome(
+                false,
+                outcome.toolResult(),
+                mergedMemoryText,
+                integrationResult.injectedMessage()
+        );
+    }
+
+    private String appendMemoryTextLine(String origin, String appendix) {
+        String left = origin == null ? "" : origin.trim();
+        String right = appendix == null ? "" : appendix.trim();
+        if (right.isBlank()) {
+            return left;
+        }
+        if (left.isBlank()) {
+            return right;
+        }
+        return left + "\n" + right;
+    }
+
     /**
      * 工具执行安全入口。
      *
@@ -1141,7 +1215,7 @@ public class AgentApplicationService {
      *
      * <p>后续可抽取为 ToolExecutionPolicyChain + ToolExecutionGateway。
      */
-    private ToolResult safeExecuteTool(AgentMessage message, PlanStep step) {
+    private ToolResult safeExecuteTool(AgentMessage message, PlanStep step, int roundIndex, int currentAttempt) {
         try {
             AgentConversation conversation = requireConversation(message.conversationUid());
             // Runtime guard: even if a stale plan contains cron_tool, do not create new cron jobs in cron-triggered runs.
@@ -1154,12 +1228,13 @@ public class AgentApplicationService {
                 return ToolResult.success("定时触发执行时已禁止再次创建定时任务。", artifacts, metrics);
             }
             AgentDefinitionEntity agent = resolveExecutionAgent(conversation);
-            java.nio.file.Path agentWorkspacePath = NomoClawPaths.ensureAgentWorkspace(
-                    agent == null ? NomoClawPaths.DEFAULT_AGENT_NAME : agent.getAgentName()
-            );
+            AgentWorkspaceConfig workspaceConfig = resolveWorkspaceConfig(agent);
+            Path agentWorkspacePath = workspaceConfig.workspaceDir();
             ToolPolicyDecisionResult policyDecision = toolExecutionPolicyGateway.evaluateStep(
                     step,
                     agentWorkspacePath,
+                    agent == null ? "" : agent.getAgentUid(),
+                    agent == null ? NomoClawPaths.DEFAULT_AGENT_NAME : agent.getAgentName(),
                     conversation.channel(),
                     message.conversationUid(),
                     message.messageUid()
@@ -1175,7 +1250,9 @@ public class AgentApplicationService {
                         metrics
                 );
             }
-            if (policyDecision.asks()) {
+            // If the step has already been approved by user, do not block it again here.
+            // The approval gate is handled in executeRound before step execution.
+            if (policyDecision.asks() && step.approvalStatus() != ApprovalStatus.APPROVED) {
                 ObjectNode metrics = JsonNodeFactory.instance.objectNode();
                 metrics.put("policyRequireApproval", true);
                 metrics.put("reasonCode", policyDecision.reasonCode().name());
@@ -1192,9 +1269,12 @@ public class AgentApplicationService {
                     message.messageUid(),
                     agent == null ? "" : agent.getAgentUid(),
                     agent == null ? "" : agent.getAgentName(),
-                    agentWorkspacePath,
+                    workspaceConfig.workspaceDir(),
+                    workspaceConfig.tmpDir(),
+                    workspaceConfig.reportDir(),
                     step,
-                    timeoutMs
+                    timeoutMs,
+                    progress -> publishStepProgress(message, step, roundIndex, currentAttempt, progress)
             );
         } catch (Exception ex) {
             log.error("[ToolExecutor] tool threw exception conversationUid={} messageUid={} stepUid={} tool={}",
@@ -1203,6 +1283,39 @@ public class AgentApplicationService {
             metrics.put("exception", ex.getClass().getSimpleName());
             return ToolResult.failure("TOOL_EXECUTION_ERROR", nullToEmpty(ex.getMessage()), metrics);
         }
+    }
+
+    private String resolveStepOutputText(PlanStep step, ToolResult result) {
+        if (!"command_tool".equals(nullToEmpty(step.toolName()))) {
+            return null;
+        }
+        JsonNode artifacts = result.artifacts();
+        String stdout = artifacts == null ? "" : artifacts.path("stdout").asText("");
+        String stderr = artifacts == null ? "" : artifacts.path("stderr").asText("");
+        String resolved = result.success()
+                ? firstNonBlank(stdout, result.output())
+                : firstNonBlank(result.errorMessage(), stderr, result.output());
+        return abbreviate(nullToEmpty(resolved).trim(), 32 * 1024);
+    }
+
+    private void publishStepProgress(AgentMessage message,
+                                     PlanStep step,
+                                     int roundIndex,
+                                     int currentAttempt,
+                                     ToolProgress progress) {
+        if (progress == null) {
+            return;
+        }
+        ObjectNode payload = stepPayload(step, "attempt " + currentAttempt + " progress");
+        String summary = hasMeaningfulText(progress.summary()) ? progress.summary().trim() : "正在执行";
+        String details = hasMeaningfulText(progress.details()) ? progress.details().trim() : summary;
+        applyUserFacingFields(payload, step, "running", summary, details);
+        payload.put("roundIndex", roundIndex);
+        payload.put("silentLog", true);
+        if (progress.metrics() != null && !progress.metrics().isNull()) {
+            payload.set("progressMetrics", progress.metrics());
+        }
+        publishEvent(AgentEventType.STEP_STARTED, message.conversationUid(), message.messageUid(), step.stepUid(), payload);
     }
 
     private boolean isCronChannel(String channel) {
@@ -1226,6 +1339,7 @@ public class AgentApplicationService {
                     "",
                     StepStatus.CREATED,
                     0,
+                    null,
                     null,
                     ApprovalStatus.NONE
             ));
@@ -1259,7 +1373,7 @@ public class AgentApplicationService {
         return switch (nullToEmpty(toolName)) {
             case "command_tool" -> {
                 String command = toolArgs.path("command").asText("");
-                yield command.isBlank() ? "执行命令" : "执行命令: " + abbreviate(command, 48);
+                yield command.isBlank() ? "执行命令" : "执行命令: " + abbreviate(command, 96);
             }
             case "browser_tool", "browser_control_tool" -> {
                 String action = toolArgs.path("action").asText("");
@@ -1278,6 +1392,10 @@ public class AgentApplicationService {
                 String task = toolArgs.path("task").asText("");
                 yield task.isBlank() ? "创建定时任务" : "创建定时任务: " + abbreviate(task, 48);
             }
+            case "image_loader_tool" -> {
+                String reference = toolArgs.path("reference").asText("");
+                yield reference.isBlank() ? "分析图片" : "分析图片: " + abbreviate(reference, 48);
+            }
             default -> "执行工具: " + nullToEmpty(toolName);
         };
     }
@@ -1285,7 +1403,10 @@ public class AgentApplicationService {
     private String buildDisplayTitle(PlanStep step) {
         JsonNode toolArgs = step.toolArgs();
         return switch (nullToEmpty(step.toolName())) {
-            case "command_tool" -> "正在执行本地命令";
+            case "command_tool" -> {
+                String command = toolArgs.path("command").asText("");
+                yield command.isBlank() ? "正在执行本地命令" : "正在执行命令: " + command;
+            }
             case "browser_tool", "browser_control_tool" -> switch (toolArgs.path("action").asText("")) {
                 case "open", "navigate" -> "正在打开网页";
                 case "click" -> "正在操作网页元素";
@@ -1307,9 +1428,9 @@ public class AgentApplicationService {
                 default -> "正在处理文件";
             };
             case "cron_tool" -> "正在创建定时任务";
+            case "image_loader_tool" -> "正在分析图片";
             case "desktop_screenshot_tool" -> "正在截取桌面画面";
             case "file_search_tool" -> "正在搜索文件内容";
-            case "send_file_tool" -> "正在准备发送文件";
             default -> step.title() == null || step.title().isBlank() ? "正在处理任务步骤" : step.title();
         };
     }
@@ -1321,7 +1442,7 @@ public class AgentApplicationService {
                 String cwd = step.toolArgs().path("cwd").asText("");
                 yield command.isBlank()
                         ? "系统已规划一条本地命令，稍后会开始执行。"
-                        : "系统准备执行本地命令“" + abbreviate(command, 60) + "”" + (cwd.isBlank() ? "。" : "，工作目录为 " + abbreviate(cwd, 48) + "。");
+                        : "系统准备执行本地命令“" + command + "”" + (cwd.isBlank() ? "。" : "，工作目录为 " + cwd + "。");
             }
             case "browser_tool", "browser_control_tool" -> {
                 String action = step.toolArgs().path("action").asText("");
@@ -1342,6 +1463,12 @@ public class AgentApplicationService {
             case "cron_tool" -> {
                 String task = step.toolArgs().path("task").asText("");
                 yield task.isBlank() ? "系统准备创建一个定时任务。" : "系统准备创建定时任务：“" + abbreviate(task, 72) + "”。";
+            }
+            case "image_loader_tool" -> {
+                String reference = step.toolArgs().path("reference").asText("");
+                yield reference.isBlank()
+                        ? "系统准备加载图片并进行视觉分析。"
+                        : "系统准备根据“" + abbreviate(reference, 72) + "”加载图片并进行视觉分析。";
             }
             default -> "系统已规划这一步，稍后会开始执行。";
         };
@@ -1365,7 +1492,7 @@ public class AgentApplicationService {
             case "browser_tool", "browser_control_tool" -> {
                 String path = result.artifacts() == null ? "" : result.artifacts().path("path").asText("");
                 if (!path.isBlank()) {
-                    yield "网页操作已完成，生成的文件已保存到 " + abbreviate(path, 96) + "。";
+                    yield "网页操作已完成，生成的文件已保存到 " + path + "。";
                 }
                 yield hasMeaningfulText(result.output()) ? "网页操作已完成：" + abbreviate(result.output(), 120) : "网页操作已顺利完成。";
             }
@@ -1373,9 +1500,26 @@ public class AgentApplicationService {
                 String path = result.artifacts() == null ? "" : result.artifacts().path("path").asText("");
                 yield path.isBlank() ? "文件处理已完成。" : "文件处理已完成，目标路径为 " + abbreviate(path, 96) + "。";
             }
-            case "command_tool" -> "本地命令已执行完成。";
-            case "send_file_tool" -> "文件已准备完成，可以发送给用户。";
+            case "command_tool" -> {
+                String command = step.toolArgs().path("command").asText("");
+                String stdout = result.artifacts() == null ? "" : result.artifacts().path("stdout").asText("");
+                String stderr = result.artifacts() == null ? "" : result.artifacts().path("stderr").asText("");
+                String outputBody = hasMeaningfulText(stdout) ? stdout : (hasMeaningfulText(result.output()) ? result.output() : stderr);
+                String prefix = command.isBlank() ? "本地命令已执行完成。" : "本地命令已执行完成：\"" + command + "\"。";
+                if (!hasMeaningfulText(outputBody)) {
+                    yield prefix;
+                }
+                yield prefix + " 输出如下：\n" + abbreviate(outputBody, 1200);
+            }
             case "cron_tool" -> "定时任务已创建完成。";
+            case "image_loader_tool" -> {
+                int resolved = result.artifacts() == null ? 0 : result.artifacts().path("resolvedCount").asInt(0);
+                boolean matched = result.artifacts() != null && result.artifacts().path("matched").asBoolean(false);
+                if (!matched || resolved <= 0) {
+                    yield "未匹配到可分析的图片。";
+                }
+                yield "图片分析完成，共匹配 " + resolved + " 张图片。";
+            }
             default -> hasMeaningfulText(result.output()) ? abbreviate(result.output(), 140) : "这一步已顺利完成。";
         };
     }
@@ -1384,6 +1528,14 @@ public class AgentApplicationService {
         String message = hasMeaningfulText(result.errorMessage()) ? result.errorMessage() : result.output();
         if (!hasMeaningfulText(message)) {
             message = "执行过程中出现异常，暂时无法完成这一步。";
+        }
+        if ("command_tool".equals(nullToEmpty(step.toolName()))) {
+            String command = step.toolArgs().path("command").asText("");
+            String stderr = result.artifacts() == null ? "" : result.artifacts().path("stderr").asText("");
+            String suffix = hasMeaningfulText(stderr) ? "\nstderr:\n" + abbreviate(stderr, 800) : "";
+            if (!command.isBlank()) {
+                return abbreviate("命令执行失败：\"" + command + "\"。错误：" + message + suffix, 1600);
+            }
         }
         return abbreviate(message, 180);
     }
@@ -1413,8 +1565,8 @@ public class AgentApplicationService {
             case "command_tool" -> {
                 String command = toolArgs.path("command").asText("");
                 String cwd = toolArgs.path("cwd").asText("");
-                yield "系统将执行本地命令 " + (command.isBlank() ? "（未提供命令）" : "“" + abbreviate(command, 96) + "”")
-                        + (cwd.isBlank() ? "。" : "，工作目录为 " + abbreviate(cwd, 72) + "。");
+                yield "系统将执行本地命令 " + (command.isBlank() ? "（未提供命令）" : "“" + command + "”")
+                        + (cwd.isBlank() ? "。" : "，工作目录为 " + cwd + "。");
             }
             case "file_tool", "file_io_tool" -> {
                 String action = toolArgs.path("action").asText("处理");
@@ -1425,7 +1577,7 @@ public class AgentApplicationService {
                 String task = toolArgs.path("task").asText("");
                 yield "系统将创建定时任务" + (task.isBlank() ? "。" : "：“" + abbreviate(task, 72) + "”。");
             }
-            default -> "系统将执行一项高风险操作。";
+            default -> "系统将执行一项待确认操作。";
         };
     }
 
@@ -1484,13 +1636,19 @@ public class AgentApplicationService {
                                                           String sessionId,
                                                           String messageUid) {
         AgentGroupDefinitionEntity group = resolveConversationGroup(conversation);
+        String agentName = executionAgent == null ? NomoClawPaths.DEFAULT_AGENT_NAME : executionAgent.getAgentName();
+        AgentWorkspaceConfig workspaceConfig = resolveWorkspaceConfig(executionAgent);
         return PromptLoader.PromptContext.forAgent(
                 sessionId,
                 messageUid,
                 conversation.channel() == null || conversation.channel().isBlank() ? "web" : conversation.channel(),
                 group == null ? "" : group.getGroupName(),
-                executionAgent == null ? "" : executionAgent.getAgentName(),
-                NomoClawPaths.root()
+                agentName,
+                NomoClawPaths.root(),
+                NomoClawPaths.agentHome(agentName),
+                workspaceConfig.workspaceDir(),
+                workspaceConfig.tmpDir(),
+                workspaceConfig.reportDir()
         );
     }
 
@@ -1570,7 +1728,7 @@ public class AgentApplicationService {
                     node.put("stepIndex", step.stepIndex());
                     node.put("title", step.title());
                     node.put("toolName", step.toolName());
-                    node.set("toolArgs", step.toolArgs());
+                    node.set("toolArgs", step.toolArgs() == null ? JsonNodeFactory.instance.objectNode() : step.toolArgs());
                     node.put("riskLevel", step.riskLevel().name());
                     return node;
                 }).toList()
@@ -1590,6 +1748,7 @@ public class AgentApplicationService {
         payload.put("stepIndex", step.stepIndex());
         payload.put("title", step.title());
         payload.put("toolName", step.toolName());
+        payload.set("toolArgs", step.toolArgs() == null ? JsonNodeFactory.instance.objectNode() : step.toolArgs());
         payload.put("riskLevel", step.riskLevel().name());
         return payload;
     }
@@ -1615,6 +1774,8 @@ public class AgentApplicationService {
         node.put("roundIndex", step.roundIndex());
         node.put("stepIndex", step.stepIndex());
         node.put("status", status);
+        node.put("toolName", nullToEmpty(step.toolName()));
+        node.set("toolArgs", step.toolArgs() == null ? JsonNodeFactory.instance.objectNode() : step.toolArgs());
         node.put("displayTitle", buildDisplayTitle(step));
         node.put("displaySummary", nullToEmpty(displaySummary));
         node.put("displayDetails", nullToEmpty(displayDetails));
@@ -1689,7 +1850,7 @@ public class AgentApplicationService {
         }
         Map<String, MessageFileLinkDto> files = new LinkedHashMap<>();
         for (AgentEvent event : store.listEventsByMessage(message.parentMessageUid())) {
-            if (event.eventType() != AgentEventType.STEP_FINISHED || event.payload() == null) {
+            if (event.eventType() != AgentEventType.STEP_FINISHED || event.payload() == null || !event.payload().path("success").asBoolean(false)) {
                 continue;
             }
             String path = event.payload().path("artifacts").path("path").asText("");
@@ -1697,10 +1858,32 @@ public class AgentApplicationService {
                 continue;
             }
             Path filePath = Path.of(path).toAbsolutePath().normalize();
+            if (!Files.isRegularFile(filePath)) {
+                continue;
+            }
             String key = filePath.toString();
             files.putIfAbsent(key, new MessageFileLinkDto(filePath.getFileName().toString(), key));
         }
         return List.copyOf(files.values());
+    }
+
+    private void openPathInHostOs(Path file) throws IOException {
+        if (Desktop.isDesktopSupported()) {
+            Desktop desktop = Desktop.getDesktop();
+            if (desktop.isSupported(Desktop.Action.OPEN)) {
+                desktop.open(file.toFile());
+                return;
+            }
+        }
+        ProcessBuilder processBuilder;
+        if (PlatformSupport.isMac()) {
+            processBuilder = new ProcessBuilder("open", file.toString());
+        } else if (PlatformSupport.isWindows()) {
+            processBuilder = new ProcessBuilder("cmd", "/c", "start", "", file.toString());
+        } else {
+            processBuilder = new ProcessBuilder("xdg-open", file.toString());
+        }
+        processBuilder.start();
     }
 
     /**
@@ -1763,6 +1946,17 @@ public class AgentApplicationService {
             } else if (event.eventType() == AgentEventType.STEP_STARTED) {
                 runStatus = "running";
             }
+        }
+
+        Map<String, PlanStep> stepByUid = steps.stream()
+                .collect(Collectors.toMap(PlanStep::stepUid, Function.identity(), (left, right) -> left, LinkedHashMap::new));
+        for (Map.Entry<String, PlanStep> entry : stepByUid.entrySet()) {
+            PlanStep step = entry.getValue();
+            stepMap.computeIfAbsent(step.stepUid(), ignored -> RunStepAccumulator.fromStep(
+                    step,
+                    buildDisplayTitle(step),
+                    buildStepPlanDetails(step)
+            ));
         }
 
         List<ConversationRunStepDto> stepResponses = stepMap.values().stream()
@@ -1870,9 +2064,12 @@ public class AgentApplicationService {
         private int roundIndex;
         private int stepIndex;
         private String status = "planned";
+        private String toolName = "";
+        private JsonNode toolArgs = JsonNodeFactory.instance.objectNode();
         private String displayTitle = "";
         private String displaySummary = "";
         private String displayDetails = "";
+        private String policyReasonCode = "";
         private Instant updatedTime = Instant.now();
 
         private RunStepAccumulator(String stepUid) {
@@ -1883,6 +2080,8 @@ public class AgentApplicationService {
             RunStepAccumulator accumulator = new RunStepAccumulator(step.stepUid());
             accumulator.roundIndex = step.roundIndex();
             accumulator.stepIndex = step.stepIndex();
+            accumulator.toolName = step.toolName() == null ? "" : step.toolName();
+            accumulator.toolArgs = copyJson(step.toolArgs());
             accumulator.displayTitle = displayTitle;
             accumulator.displaySummary = "已规划，等待开始执行";
             accumulator.displayDetails = displayDetails;
@@ -1894,9 +2093,12 @@ public class AgentApplicationService {
             accumulator.roundIndex = node.path("roundIndex").asInt(1);
             accumulator.stepIndex = node.path("stepIndex").asInt(1);
             accumulator.status = node.path("status").asText("planned");
+            accumulator.toolName = node.path("toolName").asText("");
+            accumulator.toolArgs = copyJson(node.path("toolArgs"));
             accumulator.displayTitle = node.path("displayTitle").asText("");
             accumulator.displaySummary = node.path("displaySummary").asText("");
             accumulator.displayDetails = node.path("displayDetails").asText("");
+            accumulator.policyReasonCode = node.path("policyReasonCode").asText("");
             String updated = node.path("updatedTime").asText("");
             if (!updated.isBlank()) {
                 accumulator.updatedTime = Instant.parse(updated);
@@ -1929,6 +2131,12 @@ public class AgentApplicationService {
             roundIndex = node.path("roundIndex").asInt(roundIndex == 0 ? 1 : roundIndex);
             stepIndex = node.path("stepIndex").asInt(stepIndex == 0 ? 1 : stepIndex);
             status = node.path("status").asText(status == null || status.isBlank() ? "planned" : status);
+            if (!node.path("toolName").asText("").isBlank()) {
+                toolName = node.path("toolName").asText("");
+            }
+            if (node.hasNonNull("toolArgs") && node.path("toolArgs").isObject()) {
+                toolArgs = copyJson(node.path("toolArgs"));
+            }
             if (!node.path("displayTitle").asText("").isBlank()) {
                 displayTitle = node.path("displayTitle").asText("");
             }
@@ -1937,6 +2145,9 @@ public class AgentApplicationService {
             }
             if (!node.path("displayDetails").asText("").isBlank()) {
                 displayDetails = node.path("displayDetails").asText("");
+            }
+            if (!node.path("policyReasonCode").asText("").isBlank()) {
+                policyReasonCode = node.path("policyReasonCode").asText("");
             }
             updatedTime = eventTime;
         }
@@ -1955,12 +2166,23 @@ public class AgentApplicationService {
                     roundIndex,
                     stepIndex,
                     status == null || status.isBlank() ? "planned" : status,
+                    toolName == null ? "" : toolName,
+                    copyJson(toolArgs),
                     displayTitle == null || displayTitle.isBlank() ? "正在处理任务步骤" : displayTitle,
                     displaySummary == null ? "" : displaySummary,
                     displayDetails == null ? "" : displayDetails,
+                    policyReasonCode == null ? "" : policyReasonCode,
                     updatedTime
             );
         }
+
+        private static JsonNode copyJson(JsonNode node) {
+            if (node == null || node.isNull() || node.isMissingNode() || !node.isObject()) {
+                return JsonNodeFactory.instance.objectNode();
+            }
+            return node.deepCopy();
+        }
+
     }
 
     private String buildToolResultMessage(PlanStep step, ToolResult result, boolean success, String reviewMessage) {
@@ -2036,8 +2258,21 @@ public class AgentApplicationService {
     private RuntimeModelSelection resolveRuntimeModelSelection(AgentConversation conversation, String modelProvider, String modelName) {
         String providerId = modelProvider == null ? "" : modelProvider.trim();
         String modelId = modelName == null ? "" : modelName.trim();
+        // Priority 1: request-level override (web API usually passes model info explicitly).
+        // If request-level model is absent (e.g. channel inbound), fallback to conversation agent model.
         if (providerId.isBlank() || modelId.isBlank()) {
             RuntimeModelSelection fallback = resolveDefaultRuntimeModel(conversation.agentUid());
+            if (providerId.isBlank()) {
+                providerId = fallback.modelProvider();
+            }
+            if (modelId.isBlank()) {
+                modelId = fallback.modelName();
+            }
+        }
+        // Priority 2: system model config fallback.
+        // This prevents channel messages from failing when default agent model fields are empty.
+        if (providerId.isBlank() || modelId.isBlank()) {
+            RuntimeModelSelection fallback = resolveSystemDefaultRuntimeModel();
             if (providerId.isBlank()) {
                 providerId = fallback.modelProvider();
             }
@@ -2062,6 +2297,57 @@ public class AgentApplicationService {
                 agent.getModelProviderId() == null ? "" : agent.getModelProviderId().trim(),
                 resolveAgentPrimaryModelId(agent)
         );
+    }
+
+    private RuntimeModelSelection resolveSystemDefaultRuntimeModel() {
+        // Prefer user-configured and currently available providers/models.
+        RuntimeModelSelection fromAvailable = pickRuntimeModelFromConfig(modelConfigAppService.getAvailableModelConfig());
+        if (!fromAvailable.modelProvider().isBlank() && !fromAvailable.modelName().isBlank()) {
+            return fromAvailable;
+        }
+        // Then try full persisted provider config.
+        RuntimeModelSelection fromConfig = pickRuntimeModelFromConfig(modelConfigAppService.getModelConfig());
+        if (!fromConfig.modelProvider().isBlank() && !fromConfig.modelName().isBlank()) {
+            return fromConfig;
+        }
+        // Last resort: built-in provider defaults to avoid blank model selection at runtime.
+        return pickRuntimeModelFromProviders(ModelProviderDefaults.providers());
+    }
+
+    private RuntimeModelSelection pickRuntimeModelFromConfig(ModelConfigDto config) {
+        if (config == null) {
+            return new RuntimeModelSelection("", "");
+        }
+        return pickRuntimeModelFromProviders(config.providers());
+    }
+
+    private RuntimeModelSelection pickRuntimeModelFromProviders(List<ModelConfigDto.Provider> providers) {
+        if (providers == null || providers.isEmpty()) {
+            return new RuntimeModelSelection("", "");
+        }
+        for (ModelConfigDto.Provider provider : providers) {
+            if (provider == null) {
+                continue;
+            }
+            String providerId = trim(provider.id());
+            if (providerId.isBlank()) {
+                continue;
+            }
+            String modelId = trim(provider.defaultModel());
+            if (modelId.isBlank() && provider.models() != null && !provider.models().isEmpty()) {
+                for (ModelConfigDto.Model model : provider.models()) {
+                    String candidate = model == null ? "" : trim(model.id());
+                    if (!candidate.isBlank()) {
+                        modelId = candidate;
+                        break;
+                    }
+                }
+            }
+            if (!modelId.isBlank()) {
+                return new RuntimeModelSelection(providerId, modelId);
+            }
+        }
+        return new RuntimeModelSelection("", "");
     }
 
     private record RuntimeModelSelection(String modelProvider, String modelName) {
@@ -2129,6 +2415,10 @@ public class AgentApplicationService {
         return agentUid == null || agentUid.isBlank() ? DEFAULT_AGENT_UID : agentUid.trim();
     }
 
+    private String normalizeOptionalAgentUid(String agentUid) {
+        return agentUid == null || agentUid.isBlank() ? "" : agentUid.trim();
+    }
+
     /**
      * 解析本次执行 agent 的优先级：
      * conversation.agentUid -> group owner -> group primary -> default agent。
@@ -2168,6 +2458,7 @@ public class AgentApplicationService {
         if (agent == null) {
             return null;
         }
+        AgentWorkspaceConfig workspaceConfig = resolveWorkspaceConfig(agent);
         String avatarColor = readAvatarColor(agent.getExtConfig());
         List<String> modelIds = readModelIds(agent.getExtConfig(), agent.getModelId());
         return new AgentCatalogAgentDto(
@@ -2180,12 +2471,28 @@ public class AgentApplicationService {
                 nullToEmpty(agent.getModelProviderId()),
                 nullToEmpty(agent.getModelId()),
                 modelIds,
+                workspaceConfig.workspaceDir().toString(),
+                workspaceConfig.reportDir().toString(),
+                workspaceConfig.tmpDir().toString(),
                 agent.getSortIndex() == null ? 0 : agent.getSortIndex(),
                 readStringArray(agent.getCapabilityTags()),
                 member.getMemberRole(),
                 member.getResponsibility(),
                 member.getIsPrimary() != null && member.getIsPrimary() == 1
         );
+    }
+
+    private AgentGroupMemberEntity withDefaultMember(AgentGroupMemberEntity member, String groupUid, String agentUid) {
+        if (member != null) {
+            return member;
+        }
+        AgentGroupMemberEntity fallback = new AgentGroupMemberEntity();
+        fallback.setAgentGroupUid(groupUid == null ? "" : groupUid);
+        fallback.setAgentUid(agentUid == null ? "" : agentUid);
+        fallback.setMemberRole("成员");
+        fallback.setResponsibility("");
+        fallback.setIsPrimary(0);
+        return fallback;
     }
 
     private ObjectNode readExtConfigObject(String extConfigRaw) {
@@ -2266,6 +2573,39 @@ public class AgentApplicationService {
         return List.copyOf(modelIds);
     }
 
+    private AgentWorkspaceConfig resolveWorkspaceConfig(AgentDefinitionEntity agent) {
+        if (agent == null) {
+            return AgentWorkspaceConfig.defaults(NomoClawPaths.DEFAULT_AGENT_NAME).ensureDirectories();
+        }
+        return AgentWorkspaceConfig.resolve(agent.getAgentName(), agent.getWorkspace()).ensureDirectories();
+    }
+
+    private AgentWorkspaceConfig resolveWorkspaceConfigForMutation(String agentName,
+                                                                   String currentWorkspaceRaw,
+                                                                   String workspaceRaw) {
+        AgentWorkspaceConfig current = AgentWorkspaceConfig.resolve(agentName, currentWorkspaceRaw);
+        Path workspace = parseAbsolutePathOrDefault(workspaceRaw, current.workspaceDir(), "workspace");
+        return AgentWorkspaceConfig.fromWorkspacePath(workspace);
+    }
+
+    private Path parseAbsolutePathOrDefault(String rawValue, Path fallback, String fieldName) {
+        if (rawValue == null || rawValue.trim().isBlank()) {
+            return fallback.toAbsolutePath().normalize();
+        }
+        String trimmed = rawValue.trim();
+        try {
+            Path parsed = Path.of(trimmed);
+            if (!parsed.isAbsolute()) {
+                throw new IllegalArgumentException(fieldName + " must be an absolute path: " + trimmed);
+            }
+            return parsed.toAbsolutePath().normalize();
+        } catch (IllegalArgumentException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("invalid " + fieldName + ": " + trimmed, ex);
+        }
+    }
+
     private int nextAgentSortIndex() {
         return agentDefinitionRepository.listAllActive().stream()
                 .map(AgentDefinitionEntity::getSortIndex)
@@ -2274,37 +2614,8 @@ public class AgentApplicationService {
                 .orElse(0) + 10;
     }
 
-    private AgentGroupDefinitionEntity ensureCustomAgentGroup(LocalDateTime now, String ownerAgentUid) {
-        AgentGroupDefinitionEntity existing = agentGroupDefinitionRepository.findActiveByUid(CUSTOM_AGENT_GROUP_UID);
-        if (existing != null) {
-            return existing;
-        }
-        AgentGroupDefinitionEntity byName = agentGroupDefinitionRepository.findByName(CUSTOM_AGENT_GROUP_NAME);
-        if (byName != null) {
-            return byName;
-        }
-        AgentGroupDefinitionEntity group = new AgentGroupDefinitionEntity();
-        group.setAgentGroupUid(CUSTOM_AGENT_GROUP_UID);
-        group.setGroupName(CUSTOM_AGENT_GROUP_NAME);
-        group.setDisplayName("自定义 Agent");
-        group.setAvatar("🧩");
-        group.setDescription("用户在管理页中新建的自定义 Agent。");
-        group.setSceneTags("[\"custom\",\"user\"]");
-        group.setCollaborationMode("manual");
-        group.setMinAgentCount(1);
-        group.setMaxAgentCount(0);
-        group.setOwnerAgentUid(ownerAgentUid);
-        group.setSortIndex(999);
-        group.setStatus("ACTIVE");
-        group.setExtConfig("{}");
-        group.setCreatedTime(now);
-        group.setUpdatedTime(now);
-        agentGroupDefinitionRepository.save(group);
-        return group;
-    }
-
     private void initializeAgentWorkspaceDocs(String agentName, String displayName) {
-        Path workspace = NomoClawPaths.ensureAgentWorkspace(agentName);
+        Path workspace = NomoClawPaths.ensureAgentHome(agentName);
         Map<String, String> defaults = new LinkedHashMap<>();
         String name = (displayName == null || displayName.isBlank()) ? agentName : displayName.trim();
         defaults.put("SOUL.md", "# SOUL\n\n你是 " + name + " 的内核人格，保持清晰、稳健、可执行。\n");
@@ -2377,6 +2688,7 @@ public class AgentApplicationService {
         if (agent == null) {
             return;
         }
+        resolveWorkspaceConfig(agent);
         initializeAgentWorkspaceDocs(agent.getAgentName(), agent.getDisplayName());
     }
 
@@ -2425,6 +2737,18 @@ public class AgentApplicationService {
         return text == null ? "" : text.trim();
     }
 
+    private String firstNonBlank(String... values) {
+        if (values == null || values.length == 0) {
+            return "";
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return "";
+    }
+
     private String abbreviate(String text, int maxLength) {
         if (text == null) {
             return "";
@@ -2456,19 +2780,20 @@ public class AgentApplicationService {
         }
     }
 
-    private record StepExecutionOutcome(boolean canceled, ToolResult toolResult, String memoryText) {
+    private record StepExecutionOutcome(boolean canceled, ToolResult toolResult, String memoryText, ChatMessage injectedMemoryMessage) {
         static StepExecutionOutcome success(ToolResult result, String memoryText) {
-            return new StepExecutionOutcome(false, result, memoryText);
+            return new StepExecutionOutcome(false, result, memoryText, null);
         }
 
         static StepExecutionOutcome failure(ToolResult result, String memoryText) {
-            return new StepExecutionOutcome(false, result, memoryText);
+            return new StepExecutionOutcome(false, result, memoryText, null);
         }
 
         static StepExecutionOutcome cancelled() {
             return new StepExecutionOutcome(true,
                     ToolResult.failure("CANCELLED", "message canceled", JsonNodeFactory.instance.objectNode()),
-                    "errorCode=CANCELLED\nerrorMessage=message canceled");
+                    "errorCode=CANCELLED\nerrorMessage=message canceled",
+                    null);
         }
     }
 

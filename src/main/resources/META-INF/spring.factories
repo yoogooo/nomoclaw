@@ -1,2 +1,2 @@
-org.springframework.boot.env.EnvironmentPostProcessor=\
+org.springframework.context.ApplicationContextInitializer=\
 ai.nomoclaw.bot.channel.config.ChannelConfigEnvironmentPostProcessor

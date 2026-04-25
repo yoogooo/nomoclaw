@@ -34,12 +34,12 @@ public final class ModelProviderDefaults {
                         false,
                         true,
                         true,
-                        "https://coding.dashscope.aliyuncs.com/v1",
-                        "",
-                        "qwen3.5-plus",
-                        List.of(
-                                model("qwen3.5-plus", "Qwen3.5 Plus", List.of("text"), true, 0, 0, 0,
-                                        new ModelConfigDto.UploadPolicy(true, List.of("image", "pdf", "text"), 1, 5, true, false)),
+                                "https://coding.dashscope.aliyuncs.com/v1",
+                                "",
+                                "qwen3.5-plus",
+                                List.of(
+                                        model("qwen3.5-plus", "Qwen3.5 Plus", List.of("text"), true, 0, 0, 0,
+                                        new ModelConfigDto.UploadPolicy(true, List.of("image", "pdf", "text"), 1, 5, 20971520L, 104857600L, true, false)),
                                 model("glm-5", "GLM-5", List.of("text"), true, 0, 0, 0, disabledUpload()),
                                 model("glm-4.7", "GLM-4.7", List.of("text"), true, 0, 0, 0, disabledUpload()),
                                 model("MiniMax-M2.5", "MiniMax M2.5", List.of("text"), true, 0, 0, 0, disabledUpload()),
@@ -142,10 +142,10 @@ public final class ModelProviderDefaults {
                                               int maxInputTokens,
                                               int maxOutputTokens,
                                               ModelConfigDto.UploadPolicy uploadPolicy) {
-        return new ModelConfigDto.Model(id, name, capabilities, reasoning, contextWindow, maxInputTokens, maxOutputTokens, uploadPolicy);
+        return new ModelConfigDto.Model(id, name, capabilities, reasoning, contextWindow, maxInputTokens, maxOutputTokens, uploadPolicy, false, "builtin");
     }
 
     private static ModelConfigDto.UploadPolicy disabledUpload() {
-        return new ModelConfigDto.UploadPolicy(false, List.of(), 0, 0, false, false);
+        return new ModelConfigDto.UploadPolicy(false, List.of(), 0, 0, 0L, 0L, false, false);
     }
 }

@@ -69,9 +69,9 @@ const detailMessage = computed(() => {
 
 .forbidden-subtitle {
   margin: var(--space-4_5) 0 0;
-  max-width: var(--size-620);
+  max-width: var(--container-sm);
   color: var(--color-text-body-muted);
-  font-size: var(--font-size-lg);
+  font-size: var(--text-title-sm-size);
   line-height: 1.8;
 }
 
@@ -86,7 +86,7 @@ const detailMessage = computed(() => {
 .panel-message {
   margin-top: var(--space-2_5);
   color: var(--color-text-danger-body);
-  font-size: var(--font-size-lg);
+  font-size: var(--text-title-sm-size);
   line-height: 1.75;
   word-break: break-word;
 }
@@ -101,7 +101,7 @@ const detailMessage = computed(() => {
   padding: var(--space-3_5) var(--space-5_5);
   background: var(--color-gradient-forbidden-cta);
   color: var(--color-text-inverse);
-  font-size: var(--font-size-md);
+  font-size: var(--text-body-size);
   font-weight: 700;
   cursor: pointer;
   transition: transform 140ms ease, box-shadow 140ms ease;

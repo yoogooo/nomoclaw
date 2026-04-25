@@ -1,4 +1,3 @@
-HELP.md
 target/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
@@ -58,17 +57,55 @@ build/macos/
 hs_err_pid*
 replay_pid*
 
-
+### Runtime / Temp ###
 tmp/
 
+### Local Config (Sensitive) ###
 application-local.properties
 application-local.yml
+src/main/resources/application-local.yml
+
+### Env Files ###
 .env
 .env.local
 web/.env
 web/.env.local
+
+### Frontend ###
 web/node_modules/
+desktop/tauri/node_modules/
 web/.pnpm-store/
 web/dist/
 
+### Static Build Output ###
 src/main/resources/static/nomoclaw
+
+### Rust / Cargo ###
+# Common build outputs
+target/
+**/target/
+
+# Rust toolchains & cache
+**/.cargo/
+**/.rustup/
+**/.rustc_info.json
+
+# Backup files
+**/*.rs.bk
+
+# Debug symbols
+*.pdb
+
+# Lock file (keep if application, ignore if library)
+Cargo.lock
+
+### Tauri ###
+desktop/tauri/node_modules/
+desktop/tauri/src-tauri/target/
+desktop/tauri/src-tauri/gen/
+desktop/tauri/src-tauri/resources/backend/*
+!desktop/tauri/src-tauri/resources/backend/.gitkeep
+
+### RustRover / JetBrains ###
+# https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
+#.idea/

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { Bot, Brain, CalendarClock, MessageCircleMore, Moon, Settings, Sun, PlugZap } from "lucide-vue-next";
+import { Bot, Brain, CalendarClock, MessageCircleMore, Moon, Settings, Sun, PlugZap, Puzzle } from "lucide-vue-next";
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import UiInstantTooltip from "@/components/UiInstantTooltip.vue";
@@ -15,6 +15,7 @@ const navItems = computed(() => [
   { key: "chat", label: t("nav.chat"), icon: MessageCircleMore, to: "/" },
   { key: "cron", label: t("nav.cron"), icon: CalendarClock, to: "/cron" },
   { key: "agents", label: t("nav.agents"), icon: Bot, to: "/agents" },
+  { key: "skills", label: t("nav.skills"), icon: Puzzle, to: "/skills" },
   { key: "channels", label: t("nav.channels"), icon: PlugZap, to: "/channels" },
   { key: "models", label: t("nav.models"), icon: Brain, to: "/models" },
   { key: "settings", label: t("nav.settings"), icon: Settings, to: "/settings" }
@@ -123,6 +124,7 @@ function toggleThemeMode() {
   display: flex;
   width: var(--size-54);
   height: var(--size-54);
+  position: relative;
   align-items: center;
   justify-content: center;
   border: 0;
@@ -133,7 +135,9 @@ function toggleThemeMode() {
 }
 
 .rail-brand {
-  border: var(--size-2) solid var(--color-border-rail-brand);
+  width: var(--size-48);
+  height: var(--size-48);
+  border: var(--size-1) solid var(--color-border-rail-brand);
   background: var(--color-bg-rail-brand);
   color: var(--color-text-rail-brand);
 }
@@ -145,9 +149,24 @@ function toggleThemeMode() {
 }
 
 .rail-item.active {
-  background: var(--color-bg-rail-active);
+  background: transparent;
   color: var(--color-text-inverse);
+  box-shadow: none;
+}
+
+.rail-item.active::before {
+  content: "";
+  position: absolute;
+  inset: var(--space-1);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-rail-active);
   box-shadow: var(--color-shadow-rail-active);
+  z-index: 0;
+}
+
+.rail-item.active .rail-icon {
+  position: relative;
+  z-index: 1;
 }
 
 .rail-theme-toggle {
@@ -163,15 +182,15 @@ function toggleThemeMode() {
 
 .rail-avatar {
   display: flex;
-  width: var(--size-54);
-  height: var(--size-54);
+  width: var(--size-42);
+  height: var(--size-42);
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-pill);
   background: var(--color-bg-rail-avatar);
   border: var(--size-1) solid var(--color-border-rail-avatar);
   color: var(--color-text-rail-avatar);
-  font-size: var(--font-size-md);
+  font-size: var(--text-body-size);
   font-weight: 700;
   letter-spacing: 0.01em;
 }
@@ -204,7 +223,7 @@ function toggleThemeMode() {
   .rail-item {
     width: var(--size-44);
     height: var(--size-44);
-    border-radius: var(--radius-m-lg);
+    border-radius: var(--radius-md);
   }
 
   .rail-brand-mark {

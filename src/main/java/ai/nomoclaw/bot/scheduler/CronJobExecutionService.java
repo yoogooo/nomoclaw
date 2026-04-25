@@ -2,6 +2,7 @@ package ai.nomoclaw.bot.scheduler;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import ai.nomoclaw.bot.application.dto.ConversationMessageDto;
+import ai.nomoclaw.bot.workspace.AgentWorkspaceConfig;
 import ai.nomoclaw.bot.workspace.NomoClawPaths;
 import ai.nomoclaw.bot.domain.AgentMessage;
 import ai.nomoclaw.bot.orchestrator.AgentApplicationService;
@@ -101,7 +102,10 @@ public class CronJobExecutionService {
     }
 
     private Path writeReport(AgentCronJobEntity job, String content, Instant executedAt, String status) throws Exception {
-        Path reportDir = NomoClawPaths.agentReport(resolveAgentWorkspaceName(job))
+        AgentDefinitionEntity agent = resolveAgent(job);
+        String agentName = resolveAgentName(agent);
+        Path reportDir = AgentWorkspaceConfig.resolve(agentName, agent == null ? "" : agent.getWorkspace())
+                .reportDir()
                 .resolve("cron")
                 .resolve(job.getJobUid())
                 .toAbsolutePath()
@@ -127,7 +131,7 @@ public class CronJobExecutionService {
                 """.formatted(
                 job.getJobUid(),
                 job.getTitle() == null ? "" : job.getTitle(),
-                resolveAgentWorkspaceName(job),
+                agentName,
                 executedAt,
                 status,
                 job.getTaskContent(),
@@ -199,11 +203,14 @@ public class CronJobExecutionService {
         extConfig.set("executionResults", next);
     }
 
-    private String resolveAgentWorkspaceName(AgentCronJobEntity job) {
+    private AgentDefinitionEntity resolveAgent(AgentCronJobEntity job) {
         if (job.getAgentUid() == null || job.getAgentUid().isBlank()) {
-            return NomoClawPaths.DEFAULT_AGENT_NAME;
+            return null;
         }
-        AgentDefinitionEntity agent = agentDefinitionRepository.findActiveByUid(job.getAgentUid());
+        return agentDefinitionRepository.findActiveByUid(job.getAgentUid());
+    }
+
+    private String resolveAgentName(AgentDefinitionEntity agent) {
         if (agent == null || agent.getAgentName() == null || agent.getAgentName().isBlank()) {
             return NomoClawPaths.DEFAULT_AGENT_NAME;
         }

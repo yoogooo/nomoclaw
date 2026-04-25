@@ -30,6 +30,7 @@ class StepReviewerTests {
                 StepStatus.CREATED,
                 0,
                 null,
+                null,
                 ApprovalStatus.NONE
         );
         ToolResult result = ToolResult.failure("ERR", "failed", JsonNodeFactory.instance.objectNode());
@@ -54,6 +55,7 @@ class StepReviewerTests {
                 "output should mention disk0",
                 StepStatus.CREATED,
                 0,
+                null,
                 null,
                 ApprovalStatus.NONE
         );

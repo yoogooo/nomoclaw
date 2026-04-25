@@ -3,7 +3,6 @@ package ai.nomoclaw.bot.scheduler;
 import ai.nomoclaw.bot.store.entity.AgentCronJobEntity;
 import ai.nomoclaw.bot.store.repository.AgentCronJobRepository;
 import ai.nomoclaw.bot.util.JsonUtil;
-import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.CronScheduleBuilder;
 import org.quartz.CronTrigger;
@@ -16,6 +15,11 @@ import org.quartz.SchedulerException;
 import org.quartz.Trigger;
 import org.quartz.TriggerBuilder;
 import org.quartz.TriggerKey;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.JsonNodeFactory;
@@ -24,6 +28,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
 @Slf4j
@@ -32,21 +37,39 @@ public class CronJobSchedulerService {
     private static final String JOB_GROUP = "agent-cron-jobs";
     private static final String TRIGGER_GROUP = "agent-cron-triggers";
 
-    private final Scheduler scheduler;
+    private final ObjectProvider<Scheduler> schedulerProvider;
     private final AgentCronJobRepository agentCronJobRepository;
+    private final int restoreDelaySeconds;
+    private final AtomicBoolean restoreStarted = new AtomicBoolean(false);
 
-    public CronJobSchedulerService(Scheduler scheduler,
-                                   AgentCronJobRepository agentCronJobRepository) {
-        this.scheduler = scheduler;
+    public CronJobSchedulerService(ObjectProvider<Scheduler> schedulerProvider,
+                                   AgentCronJobRepository agentCronJobRepository,
+                                   @Value("${nomoclaw.quartz.restore-delay-seconds:0}") int restoreDelaySeconds) {
+        this.schedulerProvider = schedulerProvider;
         this.agentCronJobRepository = agentCronJobRepository;
+        this.restoreDelaySeconds = Math.max(restoreDelaySeconds, 0);
     }
 
-    @PostConstruct
-    public void restoreJobs() {
+    @Async
+    @EventListener(ApplicationReadyEvent.class)
+    public void restoreJobsAfterReady() {
+        if (!restoreStarted.compareAndSet(false, true)) {
+            return;
+        }
+        long startedAt = System.nanoTime();
         try {
+            if (restoreDelaySeconds > 0) {
+                log.info("[Quartz] restore deferred delaySeconds={}", restoreDelaySeconds);
+                Thread.sleep(restoreDelaySeconds * 1000L);
+            }
             for (AgentCronJobEntity job : agentCronJobRepository.listActive()) {
                 scheduleJob(job);
             }
+            long elapsedMs = (System.nanoTime() - startedAt) / 1_000_000;
+            log.info("[Quartz] restore completed elapsedMs={}", elapsedMs);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            log.warn("[Quartz] restore interrupted");
         } catch (Exception ex) {
             log.warn("[Quartz] failed to restore cron jobs err={}", ex.toString());
         }
@@ -54,6 +77,7 @@ public class CronJobSchedulerService {
 
     public LocalDateTime scheduleJob(AgentCronJobEntity cronJob) {
         try {
+            Scheduler scheduler = scheduler();
             JobKey jobKey = jobKey(cronJob.getJobUid());
             TriggerKey triggerKey = triggerKey(cronJob.getJobUid());
             JobDataMap dataMap = new JobDataMap();
@@ -90,6 +114,7 @@ public class CronJobSchedulerService {
 
     public LocalDateTime pauseJob(String jobUid, String timezone) {
         try {
+            Scheduler scheduler = scheduler();
             scheduler.pauseJob(jobKey(jobUid));
             return nextRunTime(jobUid, timezone);
         } catch (SchedulerException ex) {
@@ -99,6 +124,7 @@ public class CronJobSchedulerService {
 
     public LocalDateTime resumeJob(AgentCronJobEntity cronJob) {
         try {
+            Scheduler scheduler = scheduler();
             scheduleJob(cronJob);
             scheduler.resumeJob(jobKey(cronJob.getJobUid()));
             return nextRunTime(cronJob.getJobUid(), cronJob.getTimezone());
@@ -109,6 +135,7 @@ public class CronJobSchedulerService {
 
     public void runNow(String jobUid) {
         try {
+            Scheduler scheduler = scheduler();
             scheduler.triggerJob(jobKey(jobUid));
         } catch (SchedulerException ex) {
             throw new IllegalStateException("failed to run cron job now: " + jobUid, ex);
@@ -117,6 +144,7 @@ public class CronJobSchedulerService {
 
     public LocalDateTime nextRunTime(String jobUid, String timezone) {
         try {
+            Scheduler scheduler = scheduler();
             Trigger trigger = scheduler.getTrigger(triggerKey(jobUid));
             return trigger == null ? null : toLocalDateTime(trigger.getNextFireTime(), timezone);
         } catch (SchedulerException ex) {
@@ -126,6 +154,7 @@ public class CronJobSchedulerService {
 
     public void deleteJob(String jobUid) {
         try {
+            Scheduler scheduler = scheduler();
             scheduler.deleteJob(jobKey(jobUid));
         } catch (SchedulerException ex) {
             throw new IllegalStateException("failed to delete cron job: " + jobUid, ex);
@@ -134,6 +163,7 @@ public class CronJobSchedulerService {
 
     public boolean isRegistered(String jobUid) {
         try {
+            Scheduler scheduler = scheduler();
             return scheduler.checkExists(jobKey(jobUid)) || scheduler.checkExists(triggerKey(jobUid));
         } catch (SchedulerException ex) {
             throw new IllegalStateException("failed to check cron job registration: " + jobUid, ex);
@@ -142,6 +172,7 @@ public class CronJobSchedulerService {
 
     public String triggerState(String jobUid) {
         try {
+            Scheduler scheduler = scheduler();
             Trigger.TriggerState state = scheduler.getTriggerState(triggerKey(jobUid));
             return state == null ? "NONE" : state.name();
         } catch (SchedulerException ex) {
@@ -155,6 +186,14 @@ public class CronJobSchedulerService {
 
     private TriggerKey triggerKey(String jobUid) {
         return TriggerKey.triggerKey(jobUid, TRIGGER_GROUP);
+    }
+
+    private Scheduler scheduler() {
+        Scheduler scheduler = schedulerProvider.getIfAvailable();
+        if (scheduler == null) {
+            throw new IllegalStateException("quartz scheduler is not available");
+        }
+        return scheduler;
     }
 
     private CronTrigger buildTrigger(AgentCronJobEntity cronJob, JobKey jobKey, TriggerKey triggerKey) {

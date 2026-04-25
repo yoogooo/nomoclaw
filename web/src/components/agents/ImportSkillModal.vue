@@ -36,18 +36,8 @@ const supportedSources = [
   "https://skills.sh/",
   "https://clawhub.ai/",
   "https://skillsmp.com/",
-  "https://lobehub.com/",
-  "https://market.lobehub.com/",
   "https://github.com/",
   "https://modelscope.cn/skills/"
-];
-
-const urlExamples = [
-  "https://skills.sh/vercel-labs/skills/find-skills",
-  "https://lobehub.com/zh/skills/openclaw-skills-cli-developer",
-  "https://market.lobehub.com/api/v1/skills/openclaw-skills-cli-developer/download",
-  "https://github.com/anthropics/skills/tree/main/skills/skill-creator",
-  "https://modelscope.cn/skills/@anthropics/skill-creator"
 ];
 
 const canSubmit = computed(() => {
@@ -115,31 +105,34 @@ function handleFileChange(event: Event) {
     <n-tabs v-model:value="activeTab" type="segment" animated>
       <n-tab-pane name="archive" :tab="t('agents.import.tabArchive')">
         <div class="import-skill-panel">
-          <div class="ui-note-card">
-            {{ t("agents.import.archiveHint") }}
-          </div>
-          <label class="ui-upload-trigger">
+          <div class="import-hint-text">{{ t("agents.import.archiveHint") }}</div>
+          <label class="ui-upload-card" role="button" :aria-label="t('agents.import.pickArchive')">
             <input
-              class="ui-upload-trigger-input"
+              class="ui-upload-card-input"
               type="file"
               accept=".zip,.tar.gz,.tgz,application/zip,application/gzip"
               @change="handleFileChange"
             >
-            <span>{{ archiveFile ? archiveFile.name : t("agents.import.pickArchive") }}</span>
+            <div class="ui-upload-card-visual">
+              <div class="ui-upload-icon" aria-hidden="true">↑</div>
+              <div class="ui-upload-main">{{ t("agents.import.pickArchive") }}</div>
+              <div class="ui-upload-sub">{{ t("agents.import.archiveSupportFormat") }}</div>
+              <span class="ui-upload-cta">{{ t("agents.import.archiveChooseButton") }}</span>
+            </div>
           </label>
+          <div class="ui-upload-file-status">
+            <span class="ui-upload-file-label">{{ t("agents.import.archiveSelectedLabel") }}</span>
+            <span class="ui-upload-file-name">{{ archiveFile ? archiveFile.name : t("agents.import.archiveNotSelected") }}</span>
+          </div>
         </div>
       </n-tab-pane>
 
       <n-tab-pane name="url" :tab="t('agents.import.tabUrl')">
         <div class="import-skill-panel">
-          <div class="ui-note-card">
+          <div class="ui-note-card import-source-card">
             <div class="ui-note-title">{{ t("agents.import.supportedSources") }}</div>
-            <ul class="ui-list-compact">
+            <ul class="ui-list-compact import-source-list">
               <li v-for="source in supportedSources" :key="source">{{ source }}</li>
-            </ul>
-            <div class="ui-note-title">{{ t("agents.import.urlExamples") }}</div>
-            <ul class="ui-list-compact">
-              <li v-for="example in urlExamples" :key="example">{{ example }}</li>
             </ul>
           </div>
 
@@ -204,5 +197,105 @@ function handleFileChange(event: Event) {
 
 .import-url-form {
   margin-top: var(--space-4);
+}
+
+.import-source-list {
+  margin-bottom: 0;
+}
+
+.import-hint-text {
+  margin-bottom: var(--space-3);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-base);
+}
+
+.ui-upload-card {
+  position: relative;
+  display: block;
+  margin-top: var(--space-4);
+  border-radius: var(--radius-xl);
+  border: 1px dashed var(--color-border-brand-soft);
+  background: linear-gradient(180deg, var(--color-bg-surface-soft), var(--color-bg-surface-mute));
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.ui-upload-card:focus-within {
+  border-color: var(--color-border-active);
+  box-shadow: 0 0 0 var(--size-4) var(--color-bg-brand-soft);
+}
+
+.ui-upload-card-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.ui-upload-card-visual {
+  padding: var(--space-7) var(--space-6);
+  text-align: center;
+}
+
+.ui-upload-icon {
+  width: 36px;
+  height: 36px;
+  margin: 0 auto var(--space-3);
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-accent-brand);
+  background: var(--color-bg-brand-soft);
+}
+
+.ui-upload-main {
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.ui-upload-sub {
+  margin-top: var(--space-2);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+}
+
+.ui-upload-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: var(--space-4);
+  min-width: 132px;
+  height: 34px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border-brand-light);
+  background: var(--color-bg-brand-soft);
+  color: var(--color-text-brand-strong);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+}
+
+.ui-upload-file-status {
+  margin-top: var(--space-3);
+  display: flex;
+  gap: var(--space-3);
+  align-items: baseline;
+  flex-wrap: wrap;
+  color: var(--color-text-secondary);
+}
+
+.ui-upload-file-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+}
+
+.ui-upload-file-name {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  font-weight: 600;
+  word-break: break-all;
 }
 </style>

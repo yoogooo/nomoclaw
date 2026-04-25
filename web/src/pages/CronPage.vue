@@ -42,69 +42,68 @@ onMounted(() => {
 
 <template>
   <div class="page-frame app-page-shell">
-    <div class="app-layout">
+    <div class="app-layout app-layout-responsive">
       <DirectoryRail />
-      <div class="cron-page-content">
-        <AppPageHeader
-          :title="t('pages.cron.title')"
-          :subtitle="t('pages.cron.subtitle')"
-        >
-          <template #actions>
-            <n-button :loading="cronJobsStore.loading" @click="refreshJobs">{{ t("common.refresh") }}</n-button>
-          </template>
-        </AppPageHeader>
+      <main class="app-main-content">
+        <div class="app-page-content cron-page-content">
+          <AppPageHeader
+            :title="t('pages.cron.title')"
+            :subtitle="t('pages.cron.subtitle')"
+          >
+            <template #actions>
+              <n-button :loading="cronJobsStore.loading" @click="refreshJobs">{{ t("common.refresh") }}</n-button>
+            </template>
+          </AppPageHeader>
 
-        <div v-if="hasJobs" class="grid-cron cron-page-grid">
-          <CronListPanel @create="openCreateModal()" />
-          <CronDetailPanel />
-        </div>
+          <div v-if="hasJobs" class="grid-cron cron-page-grid">
+            <CronListPanel @create="openCreateModal()" />
+            <CronDetailPanel />
+          </div>
 
-        <div v-else class="panel cron-empty-layout">
-          <div class="cron-empty-head">
-            <div class="panel-title ui-title-xl">{{ t("cron.empty.title") }}</div>
-            <div class="panel-subtitle ui-subtitle">{{ t("cron.empty.subtitle") }}</div>
-          </div>
-          <div class="cron-empty-template-grid">
-            <button
-              v-for="template in cronTaskTemplates"
-              :key="template.id"
-              class="cron-empty-template-card"
-              type="button"
-              @click="openCreateModal(template.id)"
-            >
-              <div class="cron-empty-template-icon" :style="{ color: String(template.accent) }">
-                <component :is="template.icon" :size="18" />
-              </div>
-              <div class="cron-empty-template-copy">
-                <div class="cron-empty-template-title">{{ template.label }}</div>
-                <div class="cron-empty-template-description">{{ template.description }}</div>
-              </div>
-            </button>
-          </div>
-          <div class="cron-empty-actions">
-            <n-button type="primary" @click="openCreateModal()">{{ t("cron.empty.createBlank") }}</n-button>
+          <div v-else class="panel cron-empty-layout">
+            <div class="cron-empty-head">
+              <div class="panel-title ui-title-xl">{{ t("cron.empty.title") }}</div>
+              <div class="panel-subtitle ui-subtitle">{{ t("cron.empty.subtitle") }}</div>
+            </div>
+            <div class="cron-empty-template-grid">
+              <button
+                v-for="template in cronTaskTemplates"
+                :key="template.id"
+                class="cron-empty-template-card"
+                type="button"
+                @click="openCreateModal(template.id)"
+              >
+                <div class="cron-empty-template-icon" :style="{ color: String(template.accent) }">
+                  <component :is="template.icon" :size="18" />
+                </div>
+                <div class="cron-empty-template-copy">
+                  <div class="cron-empty-template-title">{{ template.label }}</div>
+                  <div class="cron-empty-template-description">{{ template.description }}</div>
+                </div>
+              </button>
+            </div>
+            <div class="cron-empty-actions">
+              <n-button type="primary" @click="openCreateModal()">{{ t("cron.empty.createBlank") }}</n-button>
+            </div>
           </div>
         </div>
-      </div>
+      </main>
     </div>
-
-    <CronCreateModal
-      :show="showCreateModal"
-      :initial-template-id="createTemplateId"
-      @update:show="showCreateModal = $event; if (!$event) createTemplateId = null"
-    />
   </div>
+
+  <CronCreateModal
+    :show="showCreateModal"
+    :initial-template-id="createTemplateId"
+    @update:show="showCreateModal = $event; if (!$event) createTemplateId = null"
+  />
 </template>
 
 <style scoped>
 .cron-page-content {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: var(--size-16);
+  gap: var(--space-5);
   min-height: 0;
-  height: 100vh;
-  padding: var(--size-24) var(--size-28) var(--size-28);
-  overflow: hidden;
 }
 
 .cron-page-grid {
@@ -136,9 +135,9 @@ onMounted(() => {
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
-  padding: var(--size-16);
+  padding: var(--space-4);
   border: var(--size-1) solid var(--color-border-panel);
-  border-radius: var(--size-18);
+  border-radius: var(--space-4_5);
   background: var(--color-bg-surface-soft);
   text-align: left;
   cursor: pointer;
@@ -157,7 +156,7 @@ onMounted(() => {
   justify-content: center;
   width: var(--size-40);
   height: var(--size-40);
-  border-radius: var(--radius-round);
+  border-radius: var(--radius-pill);
   background: transparent;
   flex-shrink: 0;
 }
@@ -167,7 +166,7 @@ onMounted(() => {
 }
 
 .cron-empty-template-title {
-  font-size: var(--font-size-lg);
+  font-size: var(--text-title-sm-size);
   font-weight: 700;
   color: var(--color-text-heading);
 }
@@ -175,7 +174,7 @@ onMounted(() => {
 .cron-empty-template-description {
   margin-top: var(--space-2);
   color: var(--color-text-cool-gray);
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   line-height: 1.7;
 }
 
@@ -184,13 +183,6 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
-  .cron-page-content {
-    height: auto;
-    min-height: 100dvh;
-    padding: var(--size-16);
-    overflow: visible;
-  }
-
   .cron-empty-layout {
     padding: var(--space-4);
   }

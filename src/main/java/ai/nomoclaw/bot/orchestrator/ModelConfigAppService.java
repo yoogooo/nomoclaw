@@ -10,7 +10,6 @@ import ai.nomoclaw.bot.util.JsonUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.JsonNode;
 
 import java.net.URI;
@@ -33,15 +32,18 @@ public class ModelConfigAppService {
     private final LlmProviderConfigRepository providerConfigRepository;
     private final LlmProviderModelRepository providerModelRepository;
     private final ModelConfigCryptoService cryptoService;
+    private final ModelCatalogService modelCatalogService;
     private final HttpClient httpClient;
 
     public ModelConfigAppService(LlmProviderConfigRepository providerConfigRepository,
                                  LlmProviderModelRepository providerModelRepository,
                                  ModelConfigCryptoService cryptoService,
+                                 ModelCatalogService modelCatalogService,
                                  HttpClient appHttpClient) {
         this.providerConfigRepository = providerConfigRepository;
         this.providerModelRepository = providerModelRepository;
         this.cryptoService = cryptoService;
+        this.modelCatalogService = modelCatalogService;
         this.httpClient = appHttpClient;
     }
 
@@ -167,7 +169,7 @@ public class ModelConfigAppService {
                 entity.setContextWindow(0);
                 entity.setMaxInputTokens(0);
                 entity.setMaxOutputTokens(0);
-                entity.setUploadPolicyJson(JsonUtil.toJson(new ModelConfigDto.UploadPolicy(false, List.of(), 0, 0, false, false)));
+                entity.setUploadPolicyJson(JsonUtil.toJson(new ModelConfigDto.UploadPolicy(false, List.of(), 0, 0, 0L, 0L, false, false)));
                 entity.setCreatedTime(now);
             }
             entity.setSortIndex(i);
@@ -185,6 +187,15 @@ public class ModelConfigAppService {
             providerConfigRepository.updateById(provider);
         }
         return getModelConfig();
+    }
+
+    @Transactional(readOnly = true)
+    public ModelCatalogStatusDto getCatalogStatus() {
+        return modelCatalogService.getCatalogStatus();
+    }
+
+    public ModelCatalogStatusDto refreshModelCatalog() {
+        return modelCatalogService.refreshFromRemote();
     }
 
     @Transactional(readOnly = true)
@@ -284,29 +295,37 @@ public class ModelConfigAppService {
             if (id.isBlank()) {
                 continue;
             }
-            deduped.put(id, new ModelConfigDto.Model(
-                    id,
-                    trim(model.name()).isBlank() ? id : trim(model.name()),
-                    sanitizeCapabilities(model.capabilities()),
-                    model.reasoning(),
-                    sanitizeNonNegative(model.contextWindow()),
-                    sanitizeNonNegative(model.maxInputTokens()),
-                    sanitizeNonNegative(model.maxOutputTokens()),
-                    sanitizeUploadPolicy(model.uploadPolicy())
-            ));
+            deduped.put(id, userConfiguredModel(id, trim(model.name()).isBlank() ? id : trim(model.name())));
         }
         return List.copyOf(deduped.values());
     }
 
+    private ModelConfigDto.Model userConfiguredModel(String id, String name) {
+        return new ModelConfigDto.Model(
+                id,
+                trim(name).isBlank() ? id : trim(name),
+                List.of(),
+                false,
+                0,
+                0,
+                0,
+                new ModelConfigDto.UploadPolicy(false, List.of(), 0, 0, 0L, 0L, false, false),
+                false,
+                "user"
+        );
+    }
+
     private ModelConfigDto.UploadPolicy sanitizeUploadPolicy(ModelConfigDto.UploadPolicy uploadPolicy) {
         if (uploadPolicy == null) {
-            return new ModelConfigDto.UploadPolicy(false, List.of(), 0, 0, false, false);
+            return new ModelConfigDto.UploadPolicy(false, List.of(), 0, 0, 0L, 0L, false, false);
         }
         return new ModelConfigDto.UploadPolicy(
                 uploadPolicy.enabled(),
                 sanitizeCapabilities(uploadPolicy.allowedMimeGroups()),
                 sanitizeNonNegative(uploadPolicy.maxFilesPerMessage()),
                 sanitizeNonNegative(uploadPolicy.maxImagesPerMessage()),
+                sanitizeNonNegative(uploadPolicy.maxFileBytes()),
+                sanitizeNonNegative(uploadPolicy.maxTotalBytes()),
                 uploadPolicy.singleMimeGroupOnly(),
                 uploadPolicy.allowMixedImageAndFile()
         );
@@ -329,6 +348,13 @@ public class ModelConfigAppService {
     private Integer sanitizeNonNegative(Integer value) {
         if (value == null || value < 0) {
             return 0;
+        }
+        return value;
+    }
+
+    private Long sanitizeNonNegative(Long value) {
+        if (value == null || value < 0) {
+            return 0L;
         }
         return value;
     }
@@ -379,16 +405,17 @@ public class ModelConfigAppService {
         List<LlmProviderModelEntity> models = new ArrayList<>();
         for (int i = 0; i < provider.models().size(); i++) {
             ModelConfigDto.Model model = provider.models().get(i);
+            ModelMetadata metadata = modelCatalogService.resolve(provider.id(), model.id());
             LlmProviderModelEntity entity = new LlmProviderModelEntity();
             entity.setProviderId(provider.id());
             entity.setModelId(model.id());
             entity.setModelName(model.name());
-            entity.setCapabilitiesJson(JsonUtil.toJson(model.capabilities()));
-            entity.setReasoning(model.reasoning() ? 1 : 0);
-            entity.setContextWindow(sanitizeNonNegative(model.contextWindow()));
-            entity.setMaxInputTokens(sanitizeNonNegative(model.maxInputTokens()));
-            entity.setMaxOutputTokens(sanitizeNonNegative(model.maxOutputTokens()));
-            entity.setUploadPolicyJson(JsonUtil.toJson(sanitizeUploadPolicy(model.uploadPolicy())));
+            entity.setCapabilitiesJson(JsonUtil.toJson(metadata.inputModalities()));
+            entity.setReasoning(metadata.reasoning() ? 1 : 0);
+            entity.setContextWindow(sanitizeNonNegative(metadata.contextWindowTokens()));
+            entity.setMaxInputTokens(sanitizeNonNegative(metadata.maxInputTokens()));
+            entity.setMaxOutputTokens(sanitizeNonNegative(metadata.maxOutputTokens()));
+            entity.setUploadPolicyJson(JsonUtil.toJson(sanitizeUploadPolicy(metadata.uploadPolicy())));
             entity.setSortIndex(i);
             entity.setStatus("ACTIVE");
             entity.setCreatedTime(now);
@@ -409,7 +436,7 @@ public class ModelConfigAppService {
                 defaultString(config.getBaseUrl()),
                 safeDecryptApiKey(config.getProviderId(), config.getApiKeyCiphertext()),
                 defaultString(config.getDefaultModel()),
-                models.stream().map(this::toModelDto).toList()
+                models.stream().map(model -> toModelDto(config.getProviderId(), model)).toList()
         );
     }
 
@@ -426,18 +453,22 @@ public class ModelConfigAppService {
         }
     }
 
-    private ModelConfigDto.Model toModelDto(LlmProviderModelEntity entity) {
+    private ModelConfigDto.Model toModelDto(String providerId, LlmProviderModelEntity entity) {
+        ModelMetadata metadata = modelCatalogService.resolve(providerId, entity.getModelId());
+        String name = trim(entity.getModelName()).isBlank()
+                ? trim(metadata.displayName()).isBlank() ? entity.getModelId() : metadata.displayName()
+                : entity.getModelName();
         return new ModelConfigDto.Model(
                 entity.getModelId(),
-                entity.getModelName(),
-                JsonUtil.fromJsonQuietly(entity.getCapabilitiesJson(), new TypeReference<List<String>>() {
-                }).orElse(List.of()),
-                entity.getReasoning() != null && entity.getReasoning() == 1,
-                sanitizeNonNegative(entity.getContextWindow()),
-                sanitizeNonNegative(entity.getMaxInputTokens()),
-                sanitizeNonNegative(entity.getMaxOutputTokens()),
-                JsonUtil.fromJsonQuietly(entity.getUploadPolicyJson(), ModelConfigDto.UploadPolicy.class)
-                        .orElse(new ModelConfigDto.UploadPolicy(false, List.of(), 0, 0, false, false))
+                name,
+                metadata.inputModalities(),
+                metadata.reasoning(),
+                metadata.contextWindowTokens(),
+                metadata.maxInputTokens(),
+                metadata.maxOutputTokens(),
+                metadata.uploadPolicy(),
+                metadata.matched(),
+                metadata.source()
         );
     }
 

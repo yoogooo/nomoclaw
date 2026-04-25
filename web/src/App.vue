@@ -72,7 +72,7 @@ function dismissModelGate() {
 .model-gate-overlay {
   position: fixed;
   z-index: 999;
-  inset: 0 0 0 var(--size-96);
+  inset: 0 0 0 var(--size-80);
   display: grid;
   place-items: center;
   padding: var(--space-6);
@@ -81,7 +81,7 @@ function dismissModelGate() {
 }
 
 .model-gate-panel {
-  width: min(var(--size-620), calc(100vw - var(--size-96) - var(--size-48)));
+  width: min(var(--container-sm), calc(100vw - var(--size-80) - var(--size-48)));
   padding: var(--space-6);
   border-radius: var(--radius-xl);
   border: var(--size-1) solid var(--color-border-strong);
@@ -90,7 +90,7 @@ function dismissModelGate() {
 }
 
 .model-gate-title {
-  font-size: var(--font-size-title-lg);
+  font-size: var(--text-title-md-size);
   font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
 }
@@ -104,7 +104,7 @@ function dismissModelGate() {
 .model-gate-status {
   margin-top: var(--space-3);
   color: var(--color-warning-500);
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
 }
 
 .model-gate-actions {
@@ -117,7 +117,7 @@ function dismissModelGate() {
   border: 0;
   border-radius: var(--radius-pill);
   padding: var(--space-2_5) var(--space-4_5);
-  font-size: var(--font-size-sm);
+  font-size: var(--text-body-size);
   font-weight: var(--font-weight-semibold);
   cursor: pointer;
 }
@@ -142,7 +142,7 @@ function dismissModelGate() {
   }
 
   .model-gate-panel {
-    width: min(var(--size-620), calc(100vw - var(--size-32)));
+    width: min(var(--container-sm), calc(100vw - var(--size-32)));
   }
 }
 </style>

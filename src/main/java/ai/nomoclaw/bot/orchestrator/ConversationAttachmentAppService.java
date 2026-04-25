@@ -5,6 +5,7 @@ import ai.nomoclaw.bot.application.dto.ModelConfigDto;
 import ai.nomoclaw.bot.store.AgentStore;
 import ai.nomoclaw.bot.store.entity.AgentMessageAttachmentEntity;
 import ai.nomoclaw.bot.store.repository.AgentMessageAttachmentRepository;
+import ai.nomoclaw.bot.util.LocalizedMessages;
 import ai.nomoclaw.bot.workspace.NomoClawPaths;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import dev.langchain4j.data.message.AudioContent;
@@ -13,10 +14,13 @@ import dev.langchain4j.data.message.ImageContent;
 import dev.langchain4j.data.message.PdfFileContent;
 import dev.langchain4j.data.message.TextContent;
 import dev.langchain4j.data.message.VideoContent;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.util.unit.DataSize;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -38,7 +42,6 @@ import java.util.stream.Collectors;
 @Service
 public class ConversationAttachmentAppService {
 
-    private static final long MAX_REQUEST_SIZE_BYTES = 100L * 1024 * 1024;
     private static final List<String> TEXT_MIME_TYPES = List.of(
             "application/json",
             "application/xml",
@@ -50,13 +53,25 @@ public class ConversationAttachmentAppService {
     private final AgentStore store;
     private final AgentMessageAttachmentRepository attachmentRepository;
     private final ModelConfigAppService modelConfigAppService;
+    private final ModelCatalogService modelCatalogService;
+    private final LocalizedMessages localizedMessages;
+    private final long maxChatUploadFileBytes;
+    private final long maxChatUploadRequestBytes;
 
     public ConversationAttachmentAppService(AgentStore store,
                                             AgentMessageAttachmentRepository attachmentRepository,
-                                            ModelConfigAppService modelConfigAppService) {
+                                            ModelConfigAppService modelConfigAppService,
+                                            ModelCatalogService modelCatalogService,
+                                            LocalizedMessages localizedMessages,
+                                            @Value("${agent.api.chat-upload.max-file-size:2MB}") DataSize maxChatUploadFileSize,
+                                            @Value("${agent.api.chat-upload.max-request-size:100MB}") DataSize maxChatUploadRequestSize) {
         this.store = store;
         this.attachmentRepository = attachmentRepository;
         this.modelConfigAppService = modelConfigAppService;
+        this.modelCatalogService = modelCatalogService;
+        this.localizedMessages = localizedMessages;
+        this.maxChatUploadFileBytes = maxChatUploadFileSize.toBytes();
+        this.maxChatUploadRequestBytes = maxChatUploadRequestSize.toBytes();
     }
 
     public List<ConversationAttachmentDto> uploadFiles(String conversationUid,
@@ -207,6 +222,100 @@ public class ConversationAttachmentAppService {
         return contents;
     }
 
+    public List<Content> attachExistingImageFilesToMessage(String conversationUid,
+                                                           String messageUid,
+                                                           Collection<String> imagePaths) {
+        store.findConversation(conversationUid)
+                .orElseThrow(() -> new IllegalArgumentException("conversation not found: " + conversationUid));
+        if (messageUid == null || messageUid.isBlank()) {
+            throw new IllegalArgumentException("messageUid must not be blank");
+        }
+        List<Path> resolvedPaths = resolveExistingImagePaths(imagePaths);
+        if (resolvedPaths.isEmpty()) {
+            return List.of();
+        }
+
+        List<AgentMessageAttachmentEntity> boundEntities = new ArrayList<>();
+        LocalDateTime now = LocalDateTime.now();
+        for (Path file : resolvedPaths) {
+            String name = file.getFileName() == null ? "" : file.getFileName().toString();
+            String contentType = normalizeContentType(detectImageContentType(file));
+
+            AgentMessageAttachmentEntity existing = attachmentRepository.findActiveByMessageUidAndFilePath(messageUid, file.toString());
+            if (existing != null) {
+                boundEntities.add(existing);
+                continue;
+            }
+
+            AgentMessageAttachmentEntity entity = new AgentMessageAttachmentEntity();
+            entity.setUploadUid(UUID.randomUUID().toString());
+            entity.setConversationUid(conversationUid);
+            entity.setMessageUid(messageUid);
+            entity.setOriginalName(name.isBlank() ? "image" : name);
+            entity.setContentType(contentType);
+            entity.setMimeGroup("image");
+            entity.setFilePath(file.toString());
+            entity.setFileUrl(buildFileUrl(conversationUid, entity.getUploadUid()));
+            try {
+                entity.setSizeBytes(Files.size(file));
+            } catch (IOException ex) {
+                throw new IllegalStateException("failed to read image size: " + file, ex);
+            }
+            entity.setPreviewable(1);
+            entity.setStatus("ACTIVE");
+            entity.setCreatedTime(now);
+            entity.setUpdatedTime(now);
+            attachmentRepository.save(entity);
+            boundEntities.add(entity);
+        }
+
+        List<Content> contents = new ArrayList<>();
+        for (AgentMessageAttachmentEntity attachment : boundEntities) {
+            contents.add(toContent(attachment));
+        }
+        return contents;
+    }
+
+    public List<Content> loadExistingImageFilesAsContents(Collection<String> imagePaths) {
+        List<Path> resolvedPaths = resolveExistingImagePaths(imagePaths);
+        if (resolvedPaths.isEmpty()) {
+            return List.of();
+        }
+        List<Content> contents = new ArrayList<>();
+        for (Path file : resolvedPaths) {
+            String contentType = normalizeContentType(detectImageContentType(file));
+            contents.add(ImageContent.from(file, contentType));
+        }
+        return contents;
+    }
+
+    private List<Path> resolveExistingImagePaths(Collection<String> imagePaths) {
+        List<String> normalizedPaths = imagePaths == null ? List.of() : imagePaths.stream()
+                .map(path -> path == null ? "" : path.trim())
+                .filter(path -> !path.isBlank())
+                .map(path -> Path.of(path).toAbsolutePath().normalize().toString())
+                .distinct()
+                .toList();
+        if (normalizedPaths.isEmpty()) {
+            return List.of();
+        }
+        List<Path> resolved = new ArrayList<>();
+        for (String normalizedPath : normalizedPaths) {
+            Path file = Path.of(normalizedPath).toAbsolutePath().normalize();
+            if (!Files.isRegularFile(file)) {
+                throw new IllegalArgumentException("image file not found: " + normalizedPath);
+            }
+            String name = file.getFileName() == null ? "" : file.getFileName().toString();
+            String contentType = normalizeContentType(detectImageContentType(file));
+            String mimeGroup = classifyMimeGroup(contentType, name);
+            if (!"image".equals(mimeGroup)) {
+                throw new IllegalArgumentException("unsupported image file type: " + normalizedPath);
+            }
+            resolved.add(file);
+        }
+        return resolved;
+    }
+
     private Content toContent(AgentMessageAttachmentEntity attachment) {
         Path path = Path.of(attachment.getFilePath()).toAbsolutePath().normalize();
         String mimeGroup = normalizeMimeGroup(attachment.getMimeGroup());
@@ -228,36 +337,39 @@ public class ConversationAttachmentAppService {
     private void validateAttachments(ModelConfigDto.UploadPolicy policy,
                                      List<PendingAttachment> incoming) {
         if (!policy.enabled()) {
-            throw new IllegalArgumentException("current model does not allow file upload");
+            throw new IllegalArgumentException(localizedMessages.get("api.error.uploadDisabled"));
         }
         long totalBytes = incoming.stream().mapToLong(PendingAttachment::sizeBytes).sum();
-        if (totalBytes > MAX_REQUEST_SIZE_BYTES) {
-            throw new IllegalArgumentException("upload size exceeds 100MB");
+        long maxTotalBytes = sanitizeNonNegative(policy.maxTotalBytes());
+        long effectiveMaxTotalBytes = maxTotalBytes > 0 ? maxTotalBytes : maxChatUploadRequestBytes;
+        if (totalBytes > effectiveMaxTotalBytes) {
+            throw new IllegalArgumentException(localizedMessages.get("api.error.uploadTotalSizeExceeded", formatBytes(effectiveMaxTotalBytes)));
+        }
+        long policyMaxFileBytes = sanitizeNonNegative(policy.maxFileBytes());
+        long effectiveMaxFileBytes = minPositive(policyMaxFileBytes, maxChatUploadFileBytes);
+        if (effectiveMaxFileBytes > 0 && incoming.stream().anyMatch(item -> item.sizeBytes() > effectiveMaxFileBytes)) {
+            throw new IllegalArgumentException(localizedMessages.get("api.error.uploadFileSizeExceeded", formatBytes(effectiveMaxFileBytes)));
         }
         if (incoming.isEmpty()) {
             return;
         }
         LinkedHashSet<String> groups = incoming.stream().map(PendingAttachment::mimeGroup).collect(Collectors.toCollection(LinkedHashSet::new));
         if (policy.singleMimeGroupOnly() && groups.size() > 1) {
-            throw new IllegalArgumentException("all files in one message must share the same type");
+            throw new IllegalArgumentException(localizedMessages.get("api.error.uploadSingleMimeGroupOnly"));
         }
-        String firstGroup = incoming.get(0).mimeGroup();
-        if (!policy.allowedMimeGroups().isEmpty() && !policy.allowedMimeGroups().contains(firstGroup)) {
-            throw new IllegalArgumentException("current model does not allow this file type");
-        }
-        if (policy.singleMimeGroupOnly() && !policy.allowedMimeGroups().isEmpty() && groups.stream().anyMatch(group -> !policy.allowedMimeGroups().contains(group))) {
-            throw new IllegalArgumentException("current model does not allow this file type");
+        if (!policy.allowedMimeGroups().isEmpty() && groups.stream().anyMatch(group -> !policy.allowedMimeGroups().contains(group))) {
+            throw new IllegalArgumentException(localizedMessages.get("api.error.uploadMimeGroupNotAllowed"));
         }
         long imageCount = incoming.stream().filter(item -> "image".equals(item.mimeGroup())).count();
         long nonImageCount = incoming.size() - imageCount;
         if (imageCount > 0 && nonImageCount > 0 && !policy.allowMixedImageAndFile()) {
-            throw new IllegalArgumentException("image and non-image files cannot be mixed");
+            throw new IllegalArgumentException(localizedMessages.get("api.error.uploadMixedImageAndFileNotAllowed"));
         }
         if (imageCount > sanitizeNonNegative(policy.maxImagesPerMessage())) {
-            throw new IllegalArgumentException("too many images for current model");
+            throw new IllegalArgumentException(localizedMessages.get("api.error.uploadTooManyImages"));
         }
         if (nonImageCount > sanitizeNonNegative(policy.maxFilesPerMessage())) {
-            throw new IllegalArgumentException("too many files for current model");
+            throw new IllegalArgumentException(localizedMessages.get("api.error.uploadTooManyFiles"));
         }
     }
 
@@ -268,7 +380,7 @@ public class ConversationAttachmentAppService {
         String contentType = normalizeContentType(file.getContentType());
         String mimeGroup = classifyMimeGroup(contentType, originalName);
         if ("other".equals(mimeGroup)) {
-            throw new IllegalArgumentException("unsupported file type: " + originalName);
+            throw new IllegalArgumentException(localizedMessages.get("api.error.uploadUnsupportedFileType", originalName));
         }
         return new PendingAttachment(
                 originalName,
@@ -287,13 +399,22 @@ public class ConversationAttachmentAppService {
             }
             for (ModelConfigDto.Model model : provider.models()) {
                 if (model.id().equals(trim(modelName))) {
-                    return model.uploadPolicy() == null
-                            ? new ModelConfigDto.UploadPolicy(false, List.of(), 0, 0, false, false)
-                            : model.uploadPolicy();
+                    ModelMetadata metadata = modelCatalogService.resolve(provider.id(), model.id());
+                    return metadata.uploadPolicy() == null
+                            ? new ModelConfigDto.UploadPolicy(false, List.of(), 0, 0, 0L, 0L, false, false)
+                            : metadata.uploadPolicy();
                 }
             }
         }
         throw new IllegalArgumentException("model not configured: " + modelProvider + "/" + modelName);
+    }
+
+    private String formatBytes(long bytes) {
+        long mb = bytes / (1024L * 1024L);
+        if (mb > 0) {
+            return mb + "MB";
+        }
+        return bytes + " bytes";
     }
 
     private Path ensureConversationUploadRoot(String conversationUid) {
@@ -371,6 +492,20 @@ public class ConversationAttachmentAppService {
         return value == null || value < 0 ? 0 : value;
     }
 
+    private long sanitizeNonNegative(Long value) {
+        return value == null || value < 0 ? 0L : value;
+    }
+
+    private long minPositive(long left, long right) {
+        if (left <= 0) {
+            return right;
+        }
+        if (right <= 0) {
+            return left;
+        }
+        return Math.min(left, right);
+    }
+
     private String trim(String value) {
         return value == null ? "" : value.trim();
     }
@@ -384,6 +519,28 @@ public class ConversationAttachmentAppService {
             return "";
         }
         return fileName.substring(idx + 1).replaceAll("[^A-Za-z0-9]", "").toLowerCase(Locale.ROOT);
+    }
+
+    private String detectImageContentType(Path file) {
+        try {
+            String detected = Files.probeContentType(file);
+            if (detected != null && !detected.isBlank()) {
+                return detected;
+            }
+        } catch (IOException ignored) {
+            // fallback to extension based detection
+        }
+        String byName = URLConnection.guessContentTypeFromName(file.getFileName() == null ? "" : file.getFileName().toString());
+        if (byName != null && !byName.isBlank()) {
+            return byName;
+        }
+        String extension = extensionOf(file.getFileName() == null ? "" : file.getFileName().toString());
+        return switch (extension) {
+            case "png" -> "image/png";
+            case "jpg", "jpeg" -> "image/jpeg";
+            case "webp" -> "image/webp";
+            default -> "application/octet-stream";
+        };
     }
 
     private record PendingAttachment(String name, String contentType, String mimeGroup, long sizeBytes, boolean previewable) {

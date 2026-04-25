@@ -11,6 +11,7 @@ public record UpdateAgentBasicInfoRequest(
         String avatarColor,
         @NotBlank String modelProvider,
         @NotBlank String modelName,
-        List<String> modelNames
+        List<String> modelNames,
+        String workspace
 ) {
 }

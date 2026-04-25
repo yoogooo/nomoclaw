@@ -19,6 +19,7 @@ import {
   mapApiTool,
   normalizeAvatarColor,
   normalizeAvatarIcon,
+  resolveDefaultWorkspacePaths,
   resolveFallbackModelSelection,
   toManagedAgent
 } from "@/components/agents/domain/agentManagementDomain";
@@ -44,7 +45,8 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
     agentName: "",
     description: "",
     avatar: options.defaultAvatarIcon,
-    avatarColor: options.defaultAvatarColor
+    avatarColor: options.defaultAvatarColor,
+    workspace: ""
   });
 
   const tipForm = reactive({
@@ -65,11 +67,13 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
     displayName: "",
     description: "",
     avatar: options.defaultAvatarIcon,
-    avatarColor: options.defaultAvatarColor
+    avatarColor: options.defaultAvatarColor,
+    workspace: ""
   });
 
   const domainOptions = computed(() => ({
     nomoclawRootDir: nomoclawRootDir.value,
+    agentsRootDir: agentsRootDir.value,
     skillsRootDir: skillsRootDir.value,
     avatarIconKeys: options.avatarIconOptions.map((item) => item.key),
     avatarColorOptions: options.avatarColorOptions,
@@ -91,6 +95,7 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
     createForm.description = "";
     createForm.avatar = options.defaultAvatarIcon;
     createForm.avatarColor = options.defaultAvatarColor;
+    createForm.workspace = "";
   }
 
   function ensureSelectedAgent(selectedAgentUid: string) {
@@ -124,12 +129,15 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
       basicForm.description = "";
       basicForm.avatar = options.defaultAvatarIcon;
       basicForm.avatarColor = options.defaultAvatarColor;
+      basicForm.workspace = "";
       return;
     }
+    const defaultPaths = resolveDefaultWorkspacePaths(agentsRootDir.value, selectedAgent.agentName);
     basicForm.displayName = selectedAgent.displayName || "";
     basicForm.description = selectedAgent.description || "";
     basicForm.avatar = normalizeAvatarIcon(selectedAgent.avatar, domainOptions.value);
     basicForm.avatarColor = normalizeAvatarColor(selectedAgent.avatarColor, domainOptions.value);
+    basicForm.workspace = (selectedAgent.workspace || defaultPaths.workspace || "").trim();
   }
 
   async function reloadAgentsFromCatalog() {
@@ -205,6 +213,7 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
       message.warning(tr("errors.noAvailableModel"));
       return "";
     }
+    const defaultPaths = resolveDefaultWorkspacePaths(agentsRootDir.value, agentName);
     const payload = {
       displayName,
       agentName,
@@ -213,7 +222,8 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
       avatarColor: normalizeAvatarColor(createForm.avatarColor, domainOptions.value),
       modelProvider: fallbackModel.modelProvider,
       modelName: fallbackModel.modelName,
-      modelNames: [...fallbackModel.modelNames]
+      modelNames: [...fallbackModel.modelNames],
+      workspace: createForm.workspace.trim() || defaultPaths.workspace
     };
     const created = await conversationApi.createAgent(payload);
     await reloadAgentsFromCatalog();
@@ -447,6 +457,7 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
       message.warning(tr("errors.noModelForAgent"));
       return;
     }
+    const defaultPaths = resolveDefaultWorkspacePaths(agentsRootDir.value, selectedAgent.agentName);
     const payload = {
       displayName,
       description: basicForm.description.trim(),
@@ -454,8 +465,12 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
       avatarColor: normalizeAvatarColor(basicForm.avatarColor, domainOptions.value),
       modelProvider,
       modelName,
-      modelNames
+      modelNames,
+      workspace: basicForm.workspace.trim() || defaultPaths.workspace
     };
+    const workspace = payload.workspace;
+    const reportDir = `${workspace.replace(/[\\/]+$/, "")}/report`;
+    const tmpDir = `${workspace.replace(/[\\/]+$/, "")}/tmp`;
     const updated = await conversationApi.updateAgentBasicInfo(selectedAgent.agentUid, payload);
     updateAgent(selectedAgent.agentUid, (agent) => ({
       ...agent,
@@ -465,7 +480,10 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
       avatarColor: normalizeAvatarColor(updated.avatarColor || payload.avatarColor, domainOptions.value),
       modelProvider: updated.modelProvider || payload.modelProvider,
       modelName: updated.modelName || payload.modelName,
-      modelNames: updated.modelNames && updated.modelNames.length ? updated.modelNames : payload.modelNames
+      modelNames: updated.modelNames && updated.modelNames.length ? updated.modelNames : payload.modelNames,
+      workspace: updated.workspace || workspace,
+      reportDir: updated.reportDir || reportDir,
+      tmpDir: updated.tmpDir || tmpDir
     }));
     await agentCatalogStore.loadCatalog();
     message.success(tr("toast.basicSaved"));

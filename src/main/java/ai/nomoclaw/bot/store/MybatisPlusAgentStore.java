@@ -31,6 +31,8 @@ import java.util.Optional;
 public class MybatisPlusAgentStore implements AgentStore {
 
     private static final ZoneId SYSTEM_ZONE = ZoneId.systemDefault();
+    private static final int MAX_STEP_TITLE_LENGTH = 255;
+    private static final int MAX_STEP_DONE_CRITERIA_LENGTH = 512;
 
     private final AgentConversationRepository conversationRepository;
     private final AgentMessageRepository messageRepository;
@@ -61,13 +63,14 @@ public class MybatisPlusAgentStore implements AgentStore {
         entity.setAgentUid(agentUid);
         entity.setChannel(channel == null || channel.isBlank() ? "web" : channel.trim());
         entity.setTitle("");
+        entity.setPinned(false);
         entity.setInputTokens(0);
         entity.setOutputTokens(0);
         entity.setTotalTokens(0);
         entity.setCreatedTime(toLocalDateTime(now));
         entity.setUpdatedTime(toLocalDateTime(now));
         conversationRepository.save(entity);
-        return new AgentConversation(conversationUid, agentGroupUid, agentUid, entity.getChannel(), "", 0, 0, 0, now, now);
+        return new AgentConversation(conversationUid, agentGroupUid, agentUid, entity.getChannel(), "", false, 0, 0, 0, now, now);
     }
 
     @Override
@@ -105,6 +108,13 @@ public class MybatisPlusAgentStore implements AgentStore {
                 .eq(AgentConversationEntity::getConversationUid, conversationUid)
                 .set(AgentConversationEntity::getTitle, title)
                 .set(AgentConversationEntity::getUpdatedTime, LocalDateTime.now()));
+    }
+
+    @Override
+    public void updateConversationPinned(String conversationUid, boolean pinned) {
+        conversationRepository.update(new LambdaUpdateWrapper<AgentConversationEntity>()
+                .eq(AgentConversationEntity::getConversationUid, conversationUid)
+                .set(AgentConversationEntity::getPinned, pinned));
     }
 
     @Override
@@ -245,19 +255,33 @@ public class MybatisPlusAgentStore implements AgentStore {
             entity.setConversationUid(conversationUid);
             entity.setRoundIndex(step.roundIndex());
             entity.setStepIndex(step.stepIndex());
-            entity.setTitle(step.title());
+            entity.setTitle(truncate(step.title(), MAX_STEP_TITLE_LENGTH));
             entity.setToolName(step.toolName());
             entity.setToolArgs(JsonUtil.toJson(step.toolArgs()));
-            entity.setDoneCriteria(step.doneCriteria());
+            entity.setDoneCriteria(truncate(step.doneCriteria(), MAX_STEP_DONE_CRITERIA_LENGTH));
             entity.setRiskLevel(step.riskLevel().name());
             entity.setStatus(step.status().name());
             entity.setRetryCount(step.retryCount());
             entity.setApprovalStatus(step.approvalStatus().name());
             entity.setLastError(step.lastError());
+            entity.setOutputText(step.outputText());
             entity.setCreatedTime(now);
             entity.setUpdatedTime(now);
             stepRepository.save(entity);
         }
+    }
+
+    private String truncate(String value, int maxLength) {
+        if (value == null) {
+            return "";
+        }
+        if (maxLength <= 0 || value.length() <= maxLength) {
+            return value;
+        }
+        if (maxLength <= 3) {
+            return value.substring(0, maxLength);
+        }
+        return value.substring(0, maxLength - 3) + "...";
     }
 
     @Override
@@ -291,13 +315,17 @@ public class MybatisPlusAgentStore implements AgentStore {
     }
 
     @Override
-    public void updateStepStatus(String stepUid, StepStatus status, int retryCount, String errorMessage) {
-        stepRepository.update(new LambdaUpdateWrapper<AgentStepEntity>()
+    public void updateStepStatus(String stepUid, StepStatus status, int retryCount, String errorMessage, String outputText) {
+        LambdaUpdateWrapper<AgentStepEntity> update = new LambdaUpdateWrapper<AgentStepEntity>()
                 .eq(AgentStepEntity::getStepUid, stepUid)
                 .set(AgentStepEntity::getStatus, status.name())
                 .set(AgentStepEntity::getRetryCount, retryCount)
                 .set(AgentStepEntity::getLastError, errorMessage)
-                .set(AgentStepEntity::getUpdatedTime, LocalDateTime.now()));
+                .set(AgentStepEntity::getUpdatedTime, LocalDateTime.now());
+        if (outputText != null) {
+            update.set(AgentStepEntity::getOutputText, outputText);
+        }
+        stepRepository.update(update);
     }
 
     @Override
@@ -336,6 +364,7 @@ public class MybatisPlusAgentStore implements AgentStore {
                 entity.getAgentUid(),
                 entity.getChannel() == null || entity.getChannel().isBlank() ? "web" : entity.getChannel(),
                 entity.getTitle(),
+                Boolean.TRUE.equals(entity.getPinned()),
                 entity.getInputTokens() == null ? 0 : entity.getInputTokens(),
                 entity.getOutputTokens() == null ? 0 : entity.getOutputTokens(),
                 entity.getTotalTokens() == null ? 0 : entity.getTotalTokens(),
@@ -392,6 +421,7 @@ public class MybatisPlusAgentStore implements AgentStore {
                 StepStatus.valueOf(entity.getStatus()),
                 entity.getRetryCount() == null ? 0 : entity.getRetryCount(),
                 entity.getLastError(),
+                entity.getOutputText(),
                 ApprovalStatus.valueOf(entity.getApprovalStatus())
         );
     }

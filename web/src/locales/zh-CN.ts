@@ -16,6 +16,7 @@ const zhCN = {
     chat: "对话控制台",
     cron: "定时任务管理",
     agents: "Agent 管理",
+    skills: "技能管理",
     channels: "Channel 管理",
     models: "模型管理",
     settings: "个人配置"
@@ -34,7 +35,17 @@ const zhCN = {
     themeDark: "深色",
     language: "语言",
     languageZhCN: "简体中文",
-    languageEnUS: "English"
+    languageEnUS: "English",
+    runtimeLogVisibility: "运行时日志",
+    runtimeLogOn: "显示",
+    runtimeLogOff: "隐藏",
+    updateCheckNow: "检查更新",
+    updateRetry: "重试检查",
+    updateInstallNow: "立即更新",
+    updateDownloading: "更新下载中 {progress}",
+    updateVersion: "新版本 {version}",
+    updateFailed: "更新失败",
+    updateFailedWithReason: "更新失败：{reason}"
   },
   modelGate: {
     title: "先配置一个可用模型",
@@ -53,10 +64,18 @@ const zhCN = {
       history: "历史对话",
       viewingGroup: "正在查看 {label} 下的全部对话。",
       viewingAgent: "正在查看 {label} 下的对话记录。",
+      noAgentSelected: "未选择 Agent",
+      agentSelector: "当前 Agent",
+      agentSelectorPlaceholder: "选择 Agent",
       createConversation: "+ 新建对话",
+      refreshHistory: "刷新历史对话",
+      refreshHistoryTooltip: "刷新历史对话（右键页面任意位置：刷新整个页面）",
       noConversations: "暂无历史对话",
       unnamed: "未命名对话",
       updatedAt: "更新于 {time}",
+      pin: "置顶",
+      unpin: "取消置顶",
+      pinned: "已置顶",
       rename: "修改名称",
       renamePrompt: "请输入新的对话名称",
       delete: "删除"
@@ -83,15 +102,23 @@ const zhCN = {
       saveTipConfirm: "保存为锦囊？",
       savedAsTip: "已保存为锦囊",
       openFile: "打开 {name}",
+      expandMessage: "展开",
+      collapseMessage: "收起",
       processing: "处理进行中…",
       runTitle: "执行过程",
-      noExtraDetails: "无附加详情"
+      noExtraDetails: "无附加详情",
+      commandBlockLabel: "执行命令",
+      outputBlockLabel: "输出结果",
+      copyCommand: "复制命令",
+      expandOutput: "展开更多",
+      collapseOutput: "收起"
     },
     composer: {
       placeholder: "例如：请结合我上传的文件，整理出一版可直接使用的结论和建议。",
       upload: "上传文件",
       jinnang: "锦囊",
       send: "发送",
+      sendHint: "Enter 发送 · Shift + Enter 换行",
       stop: "取消",
       modelPlaceholder: "选择已配置模型",
       uploadHintUploading: "文件上传中...",
@@ -102,6 +129,8 @@ const zhCN = {
       mixedTypeNotAllowed: "图片和其他文件不能混合上传",
       maxImages: "当前模型最多上传 {count} 张图片",
       maxFiles: "当前模型最多上传 {count} 个非图片文件",
+      maxFileSize: "单个文件不能超过 {size}",
+      maxTotalSize: "本条消息附件总大小不能超过 {size}",
       clearedByModelSwitch: "已清空当前草稿附件，新模型不支持这些文件",
       sameTypeOnlyHint: "同一条消息只能上传同一类型文件。",
       mixedTypeHint: "支持同一条消息上传多种类型文件。",
@@ -118,10 +147,25 @@ const zhCN = {
       subtitle: "统一展示计划生成、审批入口、步骤执行、失败原因和循环终止。",
       expand: "展开日志",
       collapse: "收起日志",
-      highRiskStep: "系统准备执行高风险步骤",
+      browserRuntime: {
+        checkingTitle: "正在准备浏览器环境",
+        downloadingTitle: "浏览器依赖下载中",
+        checkingDesc: "正在检查依赖，请稍候…",
+        downloadingDescSimple: "请稍候，正在下载。",
+        elapsedNow: "刚刚开始",
+        elapsedSeconds: "大约 {seconds} 秒了",
+        elapsedMinutes: "大约 {minutes} 分钟了",
+        elapsedMinutesSeconds: "大约 {minutes} 分 {seconds} 秒",
+        oneTimeHint: "仅首次下载，后续会复用本地缓存。"
+      },
+      highRiskStep: "系统准备执行待确认步骤",
       processingStep: "正在处理任务步骤",
       stepNeedApproval: "步骤 {index} 需要人工确认后才能继续执行。",
       approvalRiskHint: "风险说明：此操作可能改动本地环境、页面状态或产生不可逆结果。若与当前意图不符，请直接拒绝。",
+      approvalRiskHintSensitiveRead: "风险说明：检测到敏感信息路径读取，可能导致密钥或凭据泄露，请手动确认。",
+      approvalRiskHintProtectedPath: "风险说明：目标位于受保护目录，继续执行前请确认本次操作符合你的预期。",
+      approvalRiskHintSystemPathDeny: "风险说明：目标涉及系统关键路径，存在高风险，建议拒绝本次操作。",
+      approvalRiskHintDefaultAsk: "风险说明：未命中放行规则，系统默认要求人工确认。",
       stepPrefix: "步骤 {index}",
       planCreatedWithoutSteps: "计划已生成，但没有可展示的步骤。",
       planCreated: "计划已生成:",
@@ -140,8 +184,18 @@ const zhCN = {
       messageCanceled: "消息处理已取消"
     },
     approval: {
-      waiting: "高风险操作待确认",
+      waiting: "操作审批",
+      riskPrompt: "检测到命令执行风险，请确认后继续",
+      riskPromptGeneric: "检测到工具操作风险，请确认后继续",
+      riskPromptScreenshot: "即将截取桌面画面，请确认后继续",
+      commandLabel: "待执行命令",
+      payloadLabel: "待执行参数",
+      screenshotPathLabel: "截图保存路径",
+      commandUnavailable: "当前步骤未提供结构化参数",
       approve: "继续执行",
+      approveSession: "允许并记住到本会话",
+      approveAgent: "始终允许",
+      approveUser: "允许并记住到全局",
       approving: "继续执行中",
       reject: "拒绝本次操作",
       rejecting: "拒绝中"
@@ -351,13 +405,14 @@ const zhCN = {
     batchDeletePartial: "成功删除 {success} 个任务，失败 {failed} 个"
   },
   http: {
-    networkError: "请求未发送成功：网络连接异常或服务不可达，请检查网络/服务后重试。",
+    networkError: "无法连接后端服务（可能未启动）。请先启动服务后重试。",
     withReason: "{base} 原因：{reason}",
-    400: "请求参数有误，请检查输入后重试。",
+    400: "请求未能处理，请稍后重试。",
     401: "登录状态已失效，请重新登录后重试。",
     403: "当前没有该操作权限。",
     404: "请求的资源不存在或已被删除。",
     409: "资源状态冲突，暂时无法完成操作。",
+    413: "上传内容过大：单文件上限 {maxFileSize}，总请求上限 {maxRequestSize}。",
     422: "提交内容未通过校验，请修改后重试。",
     429: "请求过于频繁，请稍后再试。",
     500: "服务暂时不可用，请稍后重试。",
@@ -373,7 +428,11 @@ const zhCN = {
     deleteAgentTitle: "删除 Agent",
     deleteAgentContent: "你即将删除“{name}”，确认继续操作么？",
     deleteAgentRiskTitle: "删除后数据不可恢复",
-    deleteAgentRiskContent: "删除后将同时清理该 Agent 的数据与工作目录文件（含会话、步骤、锦囊、附件、工作区文件）。此操作不可恢复，确认继续吗？",
+    deleteAgentRiskContent: "删除后将清理该 Agent 的数据库数据（含会话、步骤、锦囊、附件、权限设置）。本地工作目录会保留，便于后续审计与手动处理。此操作不可恢复，确认继续吗？",
+    deleteSkillTitle: "删除 Skill",
+    deleteSkillContent: "删除“{name}”后，将解除所有 Agent 关联并删除本地技能文件。此操作不可恢复，确认继续吗？",
+    disableSkillImpactTitle: "关闭 Skill 影响确认",
+    disableSkillImpactContent: "当前有 {count} 个 Agent 启用了该 Skill。全局关闭后，这些 Agent 将无法继续使用该 Skill。确认保存吗？",
     confirmDelete: "删除",
     confirmContinue: "继续",
     confirmPermanentDelete: "确认彻底删除"
@@ -397,8 +456,12 @@ const zhCN = {
     basicSaved: "基本信息已保存到数据库",
     agentCreated: "Agent 已创建",
     defaultAgentDeleteDenied: "默认 Agent 不支持删除",
-    agentDeleted: "Agent 已删除，相关数据与工作目录已清理",
+    agentDeleted: "Agent 已删除，相关数据已清理，工作目录已保留",
     skillImported: "Skill 已导入：{name}",
+    skillEnabled: "Skill 已启用",
+    skillDisabled: "Skill 已禁用",
+    skillDeleted: "Skill 已删除",
+    skillSaved: "Skill 配置已保存",
     approveSuccess: "已批准，任务继续执行",
     approveFailed: "批准失败，请重试",
     rejectSuccess: "已拒绝当前步骤",
@@ -425,6 +488,9 @@ const zhCN = {
       agentName: "Agent 标识",
       agentNameHint: "创建后不可修改，仅允许字母/数字/下划线/中划线。",
       description: "描述",
+      workspaceDir: "工作区目录",
+      reportDir: "产出目录",
+      tmpDir: "临时目录",
       iconSelect: "Icon 选择",
       preview: "实时预览",
       iconStyle: "图标样式",
@@ -432,14 +498,20 @@ const zhCN = {
     },
     create: {
       title: "新建 Agent",
-      displayNamePlaceholder: "例如：通用助手",
-      agentNamePlaceholder: "例如：agent_general_assistant",
+      displayNamePlaceholder: "例如：默认助手",
+      agentNamePlaceholder: "例如：default_agent",
+      workspaceDirPlaceholder: "默认：<agentsRoot>/<agentName>/workspace",
+      reportDirPlaceholder: "默认：<workspace>/report",
+      tmpDirPlaceholder: "默认：<workspace>/tmp",
       submit: "创建 Agent"
     },
     skills: {
       description: "导入后可在该 Agent 的系统提示词中按需启用 Skills。",
       import: "导入 Skill",
-      empty: "暂无技能"
+      enable: "启用",
+      disable: "禁用",
+      empty: "暂无技能",
+      unlinked: "当前未关联任何 Agent"
     },
     tools: {
       empty: "暂无工具"
@@ -462,7 +534,10 @@ const zhCN = {
       status: "状态",
       disabled: "已关闭",
       description: "描述",
-      path: "完整路径"
+      path: "完整路径",
+      linkedAgents: "已启用 Agent",
+      noLinkedAgents: "当前未被任何 Agent 启用",
+      agentBindings: "Agent 绑定"
     },
     import: {
       title: "导入 Skill",
@@ -473,8 +548,12 @@ const zhCN = {
       supportedSources: "支持来源",
       urlExamples: "URL 示例",
       urlPlaceholder: "请输入 Skill 仓库或资源地址",
-      archiveHint: "请上传 zip 压缩包，系统会自动解析 Skill 目录结构。",
+      archiveHint: "请上传压缩包，系统会自动解析 Skill 目录结构。",
       pickArchive: "选择压缩包",
+      archiveSupportFormat: "支持 .zip / .tar.gz / .tgz",
+      archiveChooseButton: "点击选择文件",
+      archiveSelectedLabel: "当前文件",
+      archiveNotSelected: "未选择",
       skillKeyPlaceholder: "例如：my-skill",
       displayNamePlaceholder: "例如：订单查询助手",
       descriptionPlaceholder: "输入简要描述，帮助识别该 Skill 的用途",
@@ -587,7 +666,15 @@ const zhCN = {
       allowMixedImageAndFile: "允许图片与文件混传",
       allowedFileTypes: "允许的文件类型",
       maxFilesPerMessage: "非图片文件上限",
-      maxImagesPerMessage: "图片上限"
+      maxImagesPerMessage: "图片上限",
+      catalogVersion: "模型目录版本",
+      catalogSource: "目录来源",
+      catalogGeneratedAt: "生成时间",
+      catalogMatch: "自动识别",
+      catalogMatched: "已匹配",
+      catalogUnknown: "未识别",
+      uploadAutoDisabled: "不支持上传",
+      uploadAutoSummary: "类型 {types}，图片 {maxImages} 张，非图片文件 {maxFiles} 个"
     },
     editor: {
       defaultTitle: "编辑模型 Provider",
@@ -629,9 +716,13 @@ const zhCN = {
       tabTips: "锦囊",
       tabDocs: "配置文件"
     },
+    skills: {
+      title: "技能管理",
+      subtitle: "统一查看全局 Skill，并查看分别被哪些 Agent 关联启用。"
+    },
     channels: {
       title: "Channel 管理",
-      subtitle: "点击卡片编辑通道信息，保存后写入 ~/.nomoclaw/nomoclaw.json。"
+      subtitle: "点击卡片编辑通道信息。"
     },
     models: {
       title: "模型管理",

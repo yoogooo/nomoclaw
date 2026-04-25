@@ -681,8 +681,8 @@ function formatPreviewTime(value: Date) {
 }
 
 .cron-create-empty {
-  margin-top: var(--size-22);
-  padding: var(--size-28) 0;
+  margin-top: var(--space-5_5);
+  padding: var(--space-7) 0;
 }
 
 .cron-create-actions {

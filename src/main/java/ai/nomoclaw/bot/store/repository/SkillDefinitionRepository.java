@@ -37,6 +37,12 @@ public class SkillDefinitionRepository extends CrudRepository<SkillDefinitionMap
                 .list();
     }
 
+    public List<SkillDefinitionEntity> listAll() {
+        return lambdaQuery()
+                .orderByAsc(SkillDefinitionEntity::getSortIndex, SkillDefinitionEntity::getDisplayName)
+                .list();
+    }
+
     public List<SkillDefinitionEntity> listActiveByKeys(Collection<String> skillKeys) {
         if (skillKeys == null || skillKeys.isEmpty()) {
             return List.of();
@@ -46,5 +52,14 @@ public class SkillDefinitionRepository extends CrudRepository<SkillDefinitionMap
                 .eq(SkillDefinitionEntity::getStatus, "ACTIVE")
                 .orderByAsc(SkillDefinitionEntity::getSortIndex, SkillDefinitionEntity::getDisplayName)
                 .list();
+    }
+
+    public void deleteBySkillKey(String skillKey) {
+        if (skillKey == null || skillKey.isBlank()) {
+            return;
+        }
+        lambdaUpdate()
+                .eq(SkillDefinitionEntity::getSkillKey, skillKey)
+                .remove();
     }
 }
