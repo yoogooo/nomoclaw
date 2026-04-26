@@ -5,7 +5,6 @@ import ai.nomoclaw.bot.model.ToolResult;
 import ai.nomoclaw.bot.scheduler.CronJobSchedulerService;
 import ai.nomoclaw.bot.store.entity.AgentCronJobEntity;
 import ai.nomoclaw.bot.store.repository.AgentCronJobRepository;
-import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.node.ObjectNode;
 import tools.jackson.databind.node.JsonNodeFactory;
@@ -13,7 +12,8 @@ import tools.jackson.databind.node.JsonNodeFactory;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.ZonedDateTime;
+import java.util.Date;
+import java.util.TimeZone;
 import java.util.UUID;
 
 @Component
@@ -96,13 +96,21 @@ public class CronCreateTool implements Tool {
         if (fields == 6) {
             return trimmed;
         }
-        throw new IllegalArgumentException("unsupported cron expression fields=" + fields + ", expected 5 or 6");
+        if (fields == 7) {
+            return trimmed;
+        }
+        throw new IllegalArgumentException("unsupported cron expression fields=" + fields + ", expected 5, 6 or 7");
     }
 
     private LocalDateTime nextRunTime(String expression, ZoneId zoneId) {
-        CronExpression cronExpression = CronExpression.parse(expression);
-        ZonedDateTime next = cronExpression.next(ZonedDateTime.now(zoneId));
-        return next == null ? null : next.toLocalDateTime();
+        try {
+            org.quartz.CronExpression cronExpression = new org.quartz.CronExpression(expression);
+            cronExpression.setTimeZone(TimeZone.getTimeZone(zoneId));
+            Date next = cronExpression.getNextValidTimeAfter(Date.from(Instant.now()));
+            return next == null ? null : LocalDateTime.ofInstant(next.toInstant(), zoneId);
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("invalid cron expression: " + ex.getMessage(), ex);
+        }
     }
 
     private String buildExtConfig(ToolRequest request, String normalizedCron, ZoneId zoneId) {

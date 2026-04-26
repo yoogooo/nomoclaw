@@ -59,6 +59,7 @@ const form = reactive({
   time: "08:30",
   weekdays: ["2"] as string[],
   monthlyDay: 1,
+  monthField: "*",
   minuteInterval: 30,
   hourInterval: 1,
   hourlyMinute: 0,
@@ -98,12 +99,12 @@ const scheduleExpression = computed(() => {
       if (!form.weekdays.length) {
         return "";
       }
-      return `0 ${minute} ${hour} ? * ${normalizeWeekdaysForCron(form.weekdays).join(",")}`;
+      return `0 ${minute} ${hour} ? ${normalizeMonthField(form.monthField)} ${normalizeWeekdaysForCron(form.weekdays).join(",")}`;
     case "month":
-      return `0 ${minute} ${hour} ${normalizeInteger(form.monthlyDay, 1, 31)} * ?`;
+      return `0 ${minute} ${hour} ${normalizeInteger(form.monthlyDay, 1, 31)} ${normalizeMonthField(form.monthField)} ?`;
     case "day":
     default:
-      return `0 ${minute} ${hour} * * ?`;
+      return `0 ${minute} ${hour} * ${normalizeMonthField(form.monthField)} ?`;
   }
 });
 
@@ -122,7 +123,7 @@ const firstRunAt = computed(() => {
     case "week":
       return computeNextWeekRun(now, form.weekdays, form.time);
     case "month":
-      return computeNextMonthRun(now, normalizeInteger(form.monthlyDay, 1, 31), form.time);
+      return computeNextMonthRun(now, normalizeInteger(form.monthlyDay, 1, 31), form.time, form.monthField);
     case "day":
     default:
       return computeNextDayRun(now, form.time);
@@ -206,6 +207,7 @@ watch(
 );
 
 function applyScheduleFromExpression(expression: string) {
+  form.monthField = "*";
   const normalized = (expression || "").trim().replace(/\s+/g, " ");
   const parts = normalized.split(" ");
   if (parts.length === 7 && /^\d+$/.test(parts[6])) {
@@ -220,7 +222,8 @@ function applyScheduleFromExpression(expression: string) {
     form.recurringMode = "day";
     return;
   }
-  const [, minute, hour, dayOfMonth, , dayOfWeek] = parts;
+  const [, minute, hour, dayOfMonth, month, dayOfWeek] = parts;
+  form.monthField = normalizeMonthField(month);
   if (/^0\/\d+$/.test(minute) && hour === "*" && dayOfMonth === "*" && dayOfWeek === "?") {
     form.recurringMode = "minute";
     form.minuteInterval = normalizeInteger(Number(minute.split("/")[1]), 1, 59);
@@ -305,6 +308,33 @@ function normalizeInteger(value: number | null, min: number, max: number) {
   return Math.min(max, Math.max(min, Math.round(next)));
 }
 
+function normalizeMonthField(value: string) {
+  const normalized = (value || "*").trim().toUpperCase();
+  if (normalized === "?" || normalized === "") {
+    return "*";
+  }
+  if (normalized === "*") {
+    return normalized;
+  }
+  if (/^\d{1,2}$/.test(normalized)) {
+    return String(normalizeInteger(Number(normalized), 1, 12));
+  }
+  if (/^\d{1,2}(?:,\d{1,2})+$/.test(normalized)) {
+    return Array.from(new Set(normalized.split(",").map((item) => String(normalizeInteger(Number(item), 1, 12)))))
+      .sort((left, right) => Number(left) - Number(right))
+      .join(",");
+  }
+  return "*";
+}
+
+function allowedMonthIndexes(monthField: string) {
+  const normalized = normalizeMonthField(monthField);
+  if (normalized === "*") {
+    return null;
+  }
+  return new Set(normalized.split(",").map((item) => Number(item) - 1));
+}
+
 function normalizeWeekdaysForCron(values: string[]) {
   return Array.from(new Set(values))
     .filter((item) => /^(?:[1-7])$/.test(item))
@@ -319,6 +349,13 @@ function toggleWeekday(value: string) {
     next.add(value);
   }
   form.weekdays = normalizeWeekdaysForCron(Array.from(next));
+}
+
+function selectRecurringMode(value: RecurringMode) {
+  if (form.recurringMode !== value) {
+    form.monthField = "*";
+  }
+  form.recurringMode = value;
 }
 
 function toLocalDateTimeInput(value: string) {
@@ -346,7 +383,7 @@ function computeNextRunAfter(from: Date) {
     case "week":
       return computeNextWeekRun(from, form.weekdays, form.time);
     case "month":
-      return computeNextMonthRun(from, normalizeInteger(form.monthlyDay, 1, 31), form.time);
+      return computeNextMonthRun(from, normalizeInteger(form.monthlyDay, 1, 31), form.time, form.monthField);
     case "day":
     default:
       return computeNextDayRun(from, form.time);
@@ -386,10 +423,21 @@ function computeNextHourRun(from: Date, hourInterval: number, minute: number) {
 
 function computeNextDayRun(from: Date, time: string) {
   const [hour, minute] = parseTime(time).map((item) => Number(item));
+  const allowedMonths = allowedMonthIndexes(form.monthField);
   const candidate = new Date(from);
   candidate.setHours(hour, minute, 0, 0);
   if (candidate.getTime() <= from.getTime()) {
     candidate.setDate(candidate.getDate() + 1);
+  }
+  if (allowedMonths) {
+    for (let i = 0; i < 370; i += 1) {
+      if (allowedMonths.has(candidate.getMonth()) && candidate.getTime() > from.getTime()) {
+        return candidate;
+      }
+      candidate.setDate(candidate.getDate() + 1);
+      candidate.setHours(hour, minute, 0, 0);
+    }
+    return null;
   }
   return candidate;
 }
@@ -406,25 +454,30 @@ function computeNextWeekRun(from: Date, weekdayValues: string[], time: string) {
   if (!targets.size) {
     return null;
   }
+  const allowedMonths = allowedMonthIndexes(form.monthField);
   const [hour, minute] = parseTime(time).map((item) => Number(item));
   const candidate = new Date(from);
   candidate.setSeconds(0, 0);
-  for (let i = 0; i < 14; i += 1) {
+  for (let i = 0; i < 370; i += 1) {
     const dayCandidate = new Date(candidate);
     dayCandidate.setDate(candidate.getDate() + i);
     dayCandidate.setHours(hour, minute, 0, 0);
-    if (targets.has(dayCandidate.getDay()) && dayCandidate.getTime() > from.getTime()) {
+    if ((!allowedMonths || allowedMonths.has(dayCandidate.getMonth())) && targets.has(dayCandidate.getDay()) && dayCandidate.getTime() > from.getTime()) {
       return dayCandidate;
     }
   }
   return null;
 }
 
-function computeNextMonthRun(from: Date, monthlyDay: number, time: string) {
+function computeNextMonthRun(from: Date, monthlyDay: number, time: string, monthField = "*") {
   const [hour, minute] = parseTime(time).map((item) => Number(item));
+  const allowedMonths = allowedMonthIndexes(monthField);
   const candidate = new Date(from);
-  for (let i = 0; i < 24; i += 1) {
+  for (let i = 0; i < 120; i += 1) {
     const monthDate = new Date(candidate.getFullYear(), candidate.getMonth() + i, 1, hour, minute, 0, 0);
+    if (allowedMonths && !allowedMonths.has(monthDate.getMonth())) {
+      continue;
+    }
     const days = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
     if (monthlyDay > days) {
       continue;
@@ -531,7 +584,7 @@ function formatPreviewTime(value: Date) {
                       type="button"
                       class="segmented-item"
                       :class="{ active: form.recurringMode === option.value }"
-                      @click="form.recurringMode = option.value"
+                      @click="selectRecurringMode(option.value)"
                     >
                       {{ option.label }}
                     </button>

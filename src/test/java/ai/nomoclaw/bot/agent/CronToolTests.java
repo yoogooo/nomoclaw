@@ -67,6 +67,28 @@ class CronToolTests {
     }
 
     @Test
+    void shouldAcceptSevenFieldCronForOneTimeSchedule() {
+        AgentCronJobRepository repository = mock(AgentCronJobRepository.class);
+        CronJobSchedulerService schedulerService = mock(CronJobSchedulerService.class);
+        when(schedulerService.scheduleJob(any())).thenReturn(java.time.LocalDateTime.of(2099, 4, 26, 22, 36));
+
+        CronCreateTool cronTool = new CronCreateTool(repository, schedulerService);
+        ObjectNode args = JsonNodeFactory.instance.objectNode();
+        args.put("expression", "0 36 22 26 4 ? 2099");
+        args.put("timezone", "Asia/Shanghai");
+        args.put("task", "one time reminder");
+
+        var result = cronTool.execute(request(args));
+
+        ArgumentCaptor<AgentCronJobEntity> captor = ArgumentCaptor.forClass(AgentCronJobEntity.class);
+        verify(repository).save(captor.capture());
+        AgentCronJobEntity saved = captor.getValue();
+        assertTrue(result.success());
+        assertEquals("0 36 22 26 4 ? 2099", saved.getExpression());
+        assertEquals("0 36 22 26 4 ? 2099", result.artifacts().path("expression").asText());
+    }
+
+    @Test
     void shouldDeleteCronJobAndSubscriptions() {
         AgentCronJobRepository repository = mock(AgentCronJobRepository.class);
         CronJobSchedulerService schedulerService = mock(CronJobSchedulerService.class);

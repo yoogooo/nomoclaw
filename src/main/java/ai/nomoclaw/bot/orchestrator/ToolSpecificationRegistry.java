@@ -104,11 +104,11 @@ public class ToolSpecificationRegistry {
                         .build(),
                 ToolSpecification.builder()
                         .name("CronCreateTool")
-                        .description("Create a persisted scheduled task using Quartz cron syntax. The expression must be a valid Quartz cron expression. Relative-time requests such as 'in 5 minutes' must be calculated strictly from the current local time and local timezone provided in the environment context. Do not execute the task immediately unless the user explicitly asks for both scheduling and immediate execution. Each run will execute the task with the current agent, write a markdown report under report/cron, and invoke the notification interface. To modify an existing scheduled task, first use CronListTool to find the old jobUid, then CronDeleteTool, then CronCreateTool with the replacement schedule.")
+                        .description("Create a persisted scheduled task using Quartz cron syntax. Use 6 fields for recurring schedules and 7 fields with an explicit year for a one-time schedule, for example `0 30 19 26 4 ? 2026`; never drop the year when the user asks to run only once. Relative-time requests such as 'in 5 minutes' must be calculated strictly from the current local time and local timezone provided in the environment context. Do not execute the task immediately unless the user explicitly asks for both scheduling and immediate execution. Each run will execute the task with the current agent, write a markdown report under report/cron, and invoke the notification interface. To modify an existing scheduled task, first use CronListTool to find the old jobUid, then CronDeleteTool, then CronCreateTool with the replacement schedule.")
                         .parameters(JsonObjectSchema.builder()
                                 .description("Cron create arguments")
                                 .addStringProperty("title", "Short task title for display in the management UI. Omit to derive a title from task.")
-                                .addStringProperty("expression", "A valid Quartz cron expression, for example `0 0 6 ? * *`.")
+                                .addStringProperty("expression", "A valid Quartz cron expression. Use 6 fields for recurring schedules, for example `0 0 6 ? * *`; use 7 fields with year for one-time schedules, for example `0 30 19 26 4 ? 2026`.")
                                 .addStringProperty("timezone", "IANA timezone, such as Asia/Shanghai")
                                 .addStringProperty("task", "The task to execute when the schedule triggers. Do not use this tool if the user only wants immediate execution.")
                                 .required("expression", "timezone", "task")
