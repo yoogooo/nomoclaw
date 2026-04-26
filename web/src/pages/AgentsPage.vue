@@ -426,10 +426,15 @@ watch([selectedAgentUid, detailTab], ([agentUid, tab]) => {
 </template>
 
 <style scoped>
+.agents-page {
+  height: 100%;
+}
+
 .agent-main-grid {
   display: grid;
   grid-template-columns: var(--size-320) minmax(0, 1fr);
   gap: var(--space-4);
+  flex: 1;
   min-height: 0;
 }
 

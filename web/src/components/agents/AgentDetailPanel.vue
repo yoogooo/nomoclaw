@@ -22,7 +22,7 @@ const { t } = useI18n();
 
 <style scoped>
 .agent-detail-column {
-  max-height: calc(100vh - 250px);
+  height: 100%;
   min-height: 0;
   overflow: auto;
   display: flex;

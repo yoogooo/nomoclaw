@@ -77,7 +77,6 @@ function avatarFallbackText(agent: ManagedAgent) {
 
 .agent-list-pane {
   height: 100%;
-  max-height: calc(100vh - 250px);
   min-height: 0;
   overflow: auto;
 }
