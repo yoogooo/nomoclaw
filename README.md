@@ -6,21 +6,6 @@
 
 一个本地优先的多 Agent 助手平台：把对话、工具执行、审批和定时任务放进同一个工作流，让任务更稳定地落地。
 
-## 桌面版安装（推荐）
-
-- 以下安装包与打包命令仅适用于 macOS。
-- 直接下载对应平台的桌面安装包（`.dmg`），双击安装到 `Applications`。
-- 安装后可一键启动，无需手动配置额外环境。
-- 如需自行打包：
-
-```bash
-# Apple Silicon
-TARGET_ARCH=arm64 ./scripts/build-desktop-macos.sh
-
-# Intel x64
-TARGET_ARCH=x64 ./scripts/build-desktop-macos.sh
-```
-
 ## 功能特性
 
 - 可追踪的执行闭环：从规划、步骤执行、审批到总结，全程带事件流与状态回放，不是“只会聊天”的黑盒。
@@ -29,64 +14,34 @@ TARGET_ARCH=x64 ./scripts/build-desktop-macos.sh
 - 自动化任务可运营：内置 Cron 调度、执行报告与渠道通知（飞书/钉钉），适合长期例行任务。
 - 模型层解耦：统一管理多 Provider 与模型，支持本地模型发现，便于按场景切换成本与效果。
 
-## 后续功能规划
+## 安装与运行
 
-- 知识库融合到 Agent 助手（从“锦囊/文档/技能”走向统一检索入口），提升回答一致性与可追溯性。
-- 工作流融合到 Agent 助手（从对话执行扩展到可编排流程），将高频任务沉淀为可复用流程。
-- 多 Agent 协作功能，支持任务拆解、分工执行与协同交付。
-- 插件功能，支持按需扩展外部系统能力与业务集成。
-- 中控中心（多 Agent 节点状态、产出摘要、Token 消耗监控），实现运行可观测与成本可管理。
+推荐优先使用桌面版；需要本地体验服务时使用 Docker；需要开发或调试时使用源码启动。
 
-## 典型使用场景
+### 方式一：桌面版（推荐）
 
-- 复杂任务拆解与执行：先规划步骤，再按步骤执行，必要时人工审批
-- 经验沉淀与复用：将高质量回答保存为“锦囊”，用于后续任务提速
-- 自动化例行工作：定时抓取信息、生成简报并推送到通知渠道
+- 下载对应平台的桌面安装包并安装。
+- macOS 使用 `.dmg`，Windows 使用 `.msi`。
+- 安装后可一键启动，无需手动配置 JDK、Node.js 或 MySQL。
 
-## 运行与开发环境
-
-- 桌面版（推荐）：macOS，直接安装 `.dmg` 即可运行（不需要手动安装 JDK/Node/MySQL）。
-- 源码部署（后端）：JDK 21+，MySQL 8+（开发/测试可使用 H2 file 模式）。
-- 源码部署（前端）：Node.js 20+，pnpm 10+。
-
-## 快速开始
-
-1. 配置环境变量
+本地打包：
 
 ```bash
-cp .env.example .env
-cp web/.env.example web/.env
+# macOS Apple Silicon
+TARGET_ARCH=arm64 ./scripts/build-desktop-macos.sh
+
+# macOS Intel x64
+TARGET_ARCH=x64 ./scripts/build-desktop-macos.sh
+
+# Windows x64
+TARGET_ARCH=x64 ./scripts/build-desktop-windows-x64.sh
 ```
 
-2. 初始化数据库：执行 `src/main/resources/db/schema-mysql.sql`
-
-3. 启动后端
-
-```bash
-./mvnw spring-boot:run
-```
-
-说明：
-- 本地 MySQL 开发默认走 Maven `prod-full`（activeByDefault），会包含 `mysql-connector-j` 与 `flyway-mysql`。
-- 桌面发版默认脚本走 `prod-lite`（H2），用于精简打包体积。
-
-默认：`http://127.0.0.1:8080`
-
-4. 启动前端
-
-```bash
-cd web
-pnpm install
-pnpm dev
-```
-
-默认：`http://127.0.0.1:5173`
-
-## Docker 一键启动（前后端）
+### 方式二：Docker 本地体验
 
 适合希望“拉代码后直接跑起来”的场景，默认使用 H2 file 模式，不依赖 MySQL。
 
-1. （可选）在项目根目录创建 `.env`，写入你需要的变量（如 `DASHSCOPE_API_KEY`、`LLM_MODEL_CONFIG_ENCRYPTION_KEY`）。
+1. 可选：在项目根目录创建 `.env`，写入你需要的变量，例如 `DASHSCOPE_API_KEY`、`LLM_MODEL_CONFIG_ENCRYPTION_KEY`。
 2. 启动前后端：
 
 ```bash
@@ -108,7 +63,44 @@ docker compose down
 - 前端容器通过 Nginx 反向代理 `/api` 到后端容器
 - 如需清空数据并重置：`docker compose down -v`
 
-### 使用 H2（file 模式，开发/测试）
+### 方式三：源码开发
+
+环境要求：
+- 后端：JDK 21+，MySQL 8+（开发/测试可使用 H2 file 模式）
+- 前端：Node.js 20+，pnpm 10+
+
+1. 配置环境变量：
+
+```bash
+cp .env.example .env
+cp web/.env.example web/.env
+```
+
+2. 初始化数据库：执行 `src/main/resources/db/schema-mysql.sql`
+
+3. 启动后端：
+
+```bash
+./mvnw spring-boot:run
+```
+
+默认：`http://127.0.0.1:8080`
+
+4. 启动前端：
+
+```bash
+cd web
+pnpm install
+pnpm dev
+```
+
+默认：`http://127.0.0.1:5173`
+
+说明：
+- 本地 MySQL 开发默认走 Maven `prod-full`（activeByDefault），会包含 `mysql-connector-j` 与 `flyway-mysql`。
+- 桌面发版默认脚本走 `prod-lite`（H2），用于精简打包体积。
+
+使用 H2 file 模式：
 
 ```bash
 SPRING_PROFILES_ACTIVE=h2 ./mvnw spring-boot:run
@@ -118,6 +110,8 @@ SPRING_PROFILES_ACTIVE=h2 ./mvnw spring-boot:run
 - 本模式用于开发/测试兼容验证，不作为生产主库建议
 
 ## 1 分钟体验
+
+启动桌面版或前后端服务后：
 
 1. 打开 `http://127.0.0.1:5173`，进入 `/` 发起一条聊天消息。
 2. 进入 `/agents`，为当前 Agent 保存一条锦囊并查看内容。
@@ -140,13 +134,12 @@ pnpm dev
 pnpm build
 ```
 
-桌面版（macOS, Tauri）：
+桌面版：
 
 ```bash
 ./scripts/build-desktop-macos.sh
+./scripts/build-desktop-windows-x64.sh
 ```
-
-- 旧脚本 `scripts/build-dmg-apple-silicon.sh` / `scripts/build-dmg-macos-intel.sh` 进入 legacy 维护期，仅作为回滚路径
 
 ## 文档导航
 
@@ -164,15 +157,23 @@ pnpm build
 - 核心配置：`src/main/resources/application.yml`
 - 常用环境变量：`MYSQL_URL`、`MYSQL_USER`、`MYSQL_PASSWORD`、`NOMOCLAW_ROOT_DIR`、`DASHSCOPE_API_KEY`、`LLM_MODEL_CONFIG_ENCRYPTION_KEY`、`FEISHU_APP_ID`、`FEISHU_APP_SECRET`、`DINGTALK_CLIENT_ID`、`DINGTALK_CLIENT_SECRET`、`DINGTALK_ROBOT_CODE`
 
+## 后续功能规划
+
+- 知识库融合到 Agent 助手（从“锦囊/文档/技能”走向统一检索入口），提升回答一致性与可追溯性。
+- 工作流融合到 Agent 助手（从对话执行扩展到可编排流程），将高频任务沉淀为可复用流程。
+- 多 Agent 协作功能，支持任务拆解、分工执行与协同交付。
+- 插件功能，支持按需扩展外部系统能力与业务集成。
+- 中控中心（多 Agent 节点状态、产出摘要、Token 消耗监控），实现运行可观测与成本可管理。
+
 ## 安全说明
 
 - 默认仅允许本机访问 `/api`（`agent.api.local-only-enabled: true`）。
 - 生产环境建议配置 `LLM_MODEL_CONFIG_ENCRYPTION_KEY`，避免模型 API Key 明文存储。
 
-## 许可证
-
-[MIT License](./LICENSE)
-
 ## 贡献
 
 请先阅读 [CONTRIBUTING.md](./CONTRIBUTING.md)。
+
+## 许可证
+
+[MIT License](./LICENSE)
