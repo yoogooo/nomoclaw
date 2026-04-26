@@ -47,7 +47,7 @@ class ToolSpecificationRegistryTests {
         List<String> toolNames = registry.listForAgent("demo").stream().map(spec -> spec.name()).toList();
         assertEquals(List.of("command_tool"), toolNames);
         assertTrue(registry.isToolAllowed("demo", "command_tool"));
-        assertFalse(registry.isToolAllowed("demo", "cron_tool"));
+        assertFalse(registry.isToolAllowed("demo", "CronCreateTool"));
     }
 
     @Test
@@ -63,7 +63,15 @@ class ToolSpecificationRegistryTests {
         );
 
         assertTrue(registry.listForAgent("unknown").size() > 3);
-        assertTrue(registry.isToolAllowed("unknown", "cron_tool"));
+        List<String> toolNames = registry.listForAgent("unknown").stream().map(spec -> spec.name()).toList();
+        assertTrue(toolNames.contains("CronCreateTool"));
+        assertTrue(toolNames.contains("CronDeleteTool"));
+        assertTrue(toolNames.contains("CronListTool"));
+        assertFalse(toolNames.contains("cron_tool"));
+        assertTrue(registry.isToolAllowed("unknown", "CronCreateTool"));
+        assertTrue(registry.isToolAllowed("unknown", "CronDeleteTool"));
+        assertTrue(registry.isToolAllowed("unknown", "CronListTool"));
+        assertFalse(registry.isToolAllowed("unknown", "cron_tool"));
         assertTrue(registry.isToolAllowed("unknown", "image_loader_tool"));
     }
 }

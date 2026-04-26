@@ -972,7 +972,7 @@ public class AgentApplicationService {
     private RoundPlanningResult reasonNextAction(AgentMessage message, ExecutionState state) {
         AgentConversation conversation = requireConversation(message.conversationUid());
         AgentDefinitionEntity executionAgent = resolveExecutionAgent(conversation);
-        // For scheduled runs, hide cron_tool from the model to prevent recursive job creation.
+        // For scheduled runs, hide cron management tools from the model to prevent recursive scheduling.
         List<ToolSpecification> availableTools = availableToolsForConversation(conversation, executionAgent);
         streamingAnswerBuffers.remove(message.messageUid());
         int roundIndex = state.currentRound();
@@ -1218,14 +1218,14 @@ public class AgentApplicationService {
     private ToolResult safeExecuteTool(AgentMessage message, PlanStep step, int roundIndex, int currentAttempt) {
         try {
             AgentConversation conversation = requireConversation(message.conversationUid());
-            // Runtime guard: even if a stale plan contains cron_tool, do not create new cron jobs in cron-triggered runs.
-            if ("cron_tool".equals(step.toolName()) && isCronChannel(conversation.channel())) {
+            // Runtime guard: even if a stale plan contains cron management tools, do not manage schedules in cron-triggered runs.
+            if (isCronTool(step.toolName()) && isCronChannel(conversation.channel())) {
                 ObjectNode artifacts = JsonNodeFactory.instance.objectNode();
                 artifacts.put("skipped", true);
-                artifacts.put("reason", "cron_tool is disabled during scheduled executions");
+                artifacts.put("reason", "cron management tools are disabled during scheduled executions");
                 ObjectNode metrics = JsonNodeFactory.instance.objectNode();
                 metrics.put("skipped", true);
-                return ToolResult.success("定时触发执行时已禁止再次创建定时任务。", artifacts, metrics);
+                return ToolResult.success("定时触发执行时已禁止管理定时任务。", artifacts, metrics);
             }
             AgentDefinitionEntity agent = resolveExecutionAgent(conversation);
             AgentWorkspaceConfig workspaceConfig = resolveWorkspaceConfig(agent);
@@ -1322,6 +1322,13 @@ public class AgentApplicationService {
         return channel != null && "cron".equalsIgnoreCase(channel.trim());
     }
 
+    private boolean isCronTool(String toolName) {
+        return switch (nullToEmpty(toolName)) {
+            case "CronCreateTool", "CronDeleteTool", "CronListTool" -> true;
+            default -> false;
+        };
+    }
+
     private List<PlanStep> toPlanSteps(String messageUid, int roundIndex, List<ToolExecutionRequest> toolCalls) {
         List<PlanStep> steps = new ArrayList<>();
         int stepIndex = 1;
@@ -1388,10 +1395,15 @@ public class AgentApplicationService {
                 String path = toolArgs.path("path").asText("");
                 yield "文件" + (action.isBlank() ? "操作" : action) + (path.isBlank() ? "" : ": " + abbreviate(path, 48));
             }
-            case "cron_tool" -> {
+            case "CronCreateTool" -> {
                 String task = toolArgs.path("task").asText("");
                 yield task.isBlank() ? "创建定时任务" : "创建定时任务: " + abbreviate(task, 48);
             }
+            case "CronDeleteTool" -> {
+                String jobUid = toolArgs.path("jobUid").asText("");
+                yield jobUid.isBlank() ? "删除定时任务" : "删除定时任务: " + abbreviate(jobUid, 48);
+            }
+            case "CronListTool" -> "查询定时任务";
             case "image_loader_tool" -> {
                 String reference = toolArgs.path("reference").asText("");
                 yield reference.isBlank() ? "分析图片" : "分析图片: " + abbreviate(reference, 48);
@@ -1427,7 +1439,9 @@ public class AgentApplicationService {
                 case "edit" -> "正在修改文件";
                 default -> "正在处理文件";
             };
-            case "cron_tool" -> "正在创建定时任务";
+            case "CronCreateTool" -> "正在创建定时任务";
+            case "CronDeleteTool" -> "正在删除定时任务";
+            case "CronListTool" -> "正在查询定时任务";
             case "image_loader_tool" -> "正在分析图片";
             case "desktop_screenshot_tool" -> "正在截取桌面画面";
             case "file_search_tool" -> "正在搜索文件内容";
@@ -1460,9 +1474,17 @@ public class AgentApplicationService {
                         ? "系统已规划一个文件处理步骤，稍后会开始执行。"
                         : "系统准备对文件执行“" + (action.isBlank() ? "处理" : action) + "”，目标路径为 " + abbreviate(path, 72) + "。";
             }
-            case "cron_tool" -> {
+            case "CronCreateTool" -> {
                 String task = step.toolArgs().path("task").asText("");
                 yield task.isBlank() ? "系统准备创建一个定时任务。" : "系统准备创建定时任务：“" + abbreviate(task, 72) + "”。";
+            }
+            case "CronDeleteTool" -> {
+                String jobUid = step.toolArgs().path("jobUid").asText("");
+                yield jobUid.isBlank() ? "系统准备删除一个定时任务。" : "系统准备删除定时任务 " + abbreviate(jobUid, 72) + "。";
+            }
+            case "CronListTool" -> {
+                String jobUid = step.toolArgs().path("jobUid").asText("");
+                yield jobUid.isBlank() ? "系统准备查询定时任务列表。" : "系统准备查询定时任务 " + abbreviate(jobUid, 72) + "。";
             }
             case "image_loader_tool" -> {
                 String reference = step.toolArgs().path("reference").asText("");
@@ -1476,7 +1498,7 @@ public class AgentApplicationService {
 
     private String buildStepStartedDetails(PlanStep step) {
         return switch (nullToEmpty(step.toolName())) {
-            case "command_tool", "browser_tool", "browser_control_tool", "file_tool", "file_io_tool", "cron_tool" -> buildStepPlanDetails(step)
+            case "command_tool", "browser_tool", "browser_control_tool", "file_tool", "file_io_tool", "CronCreateTool", "CronDeleteTool", "CronListTool" -> buildStepPlanDetails(step)
                     .replace("系统准备", "系统正在")
                     .replace("已规划", "正在执行");
             default -> "系统正在执行这一步。";
@@ -1511,7 +1533,9 @@ public class AgentApplicationService {
                 }
                 yield prefix + " 输出如下：\n" + abbreviate(outputBody, 1200);
             }
-            case "cron_tool" -> "定时任务已创建完成。";
+            case "CronCreateTool" -> "定时任务已创建完成。";
+            case "CronDeleteTool" -> "定时任务已删除。";
+            case "CronListTool" -> "定时任务查询已完成。";
             case "image_loader_tool" -> {
                 int resolved = result.artifacts() == null ? 0 : result.artifacts().path("resolvedCount").asInt(0);
                 boolean matched = result.artifacts() != null && result.artifacts().path("matched").asBoolean(false);
@@ -1573,10 +1597,15 @@ public class AgentApplicationService {
                 String path = toolArgs.path("path").asText("");
                 yield "系统将对文件执行“" + action + "”操作" + (path.isBlank() ? "。" : "，目标路径为 " + abbreviate(path, 96) + "。");
             }
-            case "cron_tool" -> {
+            case "CronCreateTool" -> {
                 String task = toolArgs.path("task").asText("");
                 yield "系统将创建定时任务" + (task.isBlank() ? "。" : "：“" + abbreviate(task, 72) + "”。");
             }
+            case "CronDeleteTool" -> {
+                String jobUid = toolArgs.path("jobUid").asText("");
+                yield "系统将删除定时任务" + (jobUid.isBlank() ? "。" : " " + abbreviate(jobUid, 72) + "。");
+            }
+            case "CronListTool" -> "系统将查询定时任务。";
             default -> "系统将执行一项待确认操作。";
         };
     }
@@ -1656,7 +1685,7 @@ public class AgentApplicationService {
      * 返回当前会话可用工具清单。
      *
      * <p>特殊规则：
-     * - cron channel 执行时禁用 cron_tool，避免调度递归创建。
+     * - cron channel 执行时禁用 cron 管理工具，避免调度递归创建。
      */
     private List<ToolSpecification> availableToolsForConversation(AgentConversation conversation,
                                                                   AgentDefinitionEntity executionAgent) {
@@ -1669,7 +1698,7 @@ public class AgentApplicationService {
         }
         // Scheduled execution should only run task content; scheduling operations are disabled in this context.
         return tools.stream()
-                .filter(specification -> !"cron_tool".equals(specification.name()))
+                .filter(specification -> !isCronTool(specification.name()))
                 .toList();
     }
 

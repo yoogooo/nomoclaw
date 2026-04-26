@@ -17,20 +17,20 @@ import java.time.ZonedDateTime;
 import java.util.UUID;
 
 @Component
-public class CronTool implements Tool {
+public class CronCreateTool implements Tool {
 
     private final AgentCronJobRepository agentCronJobRepository;
     private final CronJobSchedulerService cronJobSchedulerService;
 
-    public CronTool(AgentCronJobRepository agentCronJobRepository,
-                    CronJobSchedulerService cronJobSchedulerService) {
+    public CronCreateTool(AgentCronJobRepository agentCronJobRepository,
+                          CronJobSchedulerService cronJobSchedulerService) {
         this.agentCronJobRepository = agentCronJobRepository;
         this.cronJobSchedulerService = cronJobSchedulerService;
     }
 
     @Override
     public String name() {
-        return "cron_tool";
+        return "CronCreateTool";
     }
 
     @Override

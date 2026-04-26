@@ -79,7 +79,7 @@ public class StepReviewer {
 
     private boolean allowsArtifactOnlySuccess(PlanStep step, ToolResult result) {
         String toolName = safe(step.toolName());
-        if ("cron_tool".equals(toolName)) {
+        if ("CronCreateTool".equals(toolName) || "CronDeleteTool".equals(toolName) || "CronListTool".equals(toolName)) {
             return hasUsefulArtifacts(result);
         }
         if ("answer_tool".equals(toolName)) {

@@ -401,6 +401,8 @@ public class PermissionEngine {
 
     private boolean isCronBaselineAllowed(ToolPolicyContext context) {
         String tool = normalize(context.toolName());
-        return "cron_tool".equals(tool);
+        return "croncreatetool".equals(tool)
+                || "crondeletetool".equals(tool)
+                || "cronlisttool".equals(tool);
     }
 }

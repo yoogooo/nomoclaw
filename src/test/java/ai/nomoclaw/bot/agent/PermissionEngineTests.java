@@ -249,7 +249,7 @@ class PermissionEngineTests {
     }
 
     @Test
-    void cronToolShouldAllowByBaseline() {
+    void splitCronToolsShouldAllowByBaseline() {
         StubSettingsStore settings = new StubSettingsStore();
         SessionPermissionStore sessionStore = new SessionPermissionStore();
         PermissionEngine engine = new PermissionEngine(settings, sessionStore, new CommandRuleResolver(), new HardGuardService());
@@ -258,20 +258,23 @@ class PermissionEngineTests {
         args.put("task", "提醒用户观看新闻联播");
         args.put("expression", "0 30 19 * * ?");
 
-        PermissionDecision decision = engine.evaluate(new ToolPolicyContext(
-                "cron_tool",
-                args,
-                Path.of(".").toAbsolutePath().normalize(),
-                "agent-uid",
-                "default",
-                "local",
-                "c11",
-                "m1",
-                "s1"
-        ));
+        for (String toolName : List.of("CronCreateTool", "CronDeleteTool", "CronListTool")) {
+            PermissionDecision decision = engine.evaluate(toolContext(toolName, args));
+            assertEquals(PermissionEffect.ALLOW, decision.effect());
+            assertEquals("builtin-cron-allow", decision.matchedRuleId());
+        }
+    }
 
-        assertEquals(PermissionEffect.ALLOW, decision.effect());
-        assertEquals("builtin-cron-allow", decision.matchedRuleId());
+    @Test
+    void legacyCronToolShouldNotAllowByBaseline() {
+        StubSettingsStore settings = new StubSettingsStore();
+        SessionPermissionStore sessionStore = new SessionPermissionStore();
+        PermissionEngine engine = new PermissionEngine(settings, sessionStore, new CommandRuleResolver(), new HardGuardService());
+
+        PermissionDecision decision = engine.evaluate(toolContext("cron_tool", JsonNodeFactory.instance.objectNode()));
+
+        assertEquals(PermissionEffect.ASK, decision.effect());
+        assertEquals(ToolPolicyReasonCode.DEFAULT_REQUIRE_APPROVAL, decision.reasonCode());
     }
 
     private PermissionRule rule(String id, PermissionSource source, PermissionEffect effect) {
@@ -300,6 +303,20 @@ class PermissionEngineTests {
                 "default",
                 "local",
                 conversationUid,
+                "m1",
+                "s1"
+        );
+    }
+
+    private ToolPolicyContext toolContext(String toolName, ObjectNode args) {
+        return new ToolPolicyContext(
+                toolName,
+                args,
+                Path.of(".").toAbsolutePath().normalize(),
+                "agent-uid",
+                "default",
+                "local",
+                "c11",
                 "m1",
                 "s1"
         );
