@@ -251,14 +251,14 @@ NomoClaw-1.0.0-windows-x64.msi
 
 | 位置       | 示例                                |
 | ---------- | ----------------------------------- |
-| 日志       | `Build Version: 1.0.0+260415.42305` |
-| About 页面 | `Version: 1.0.0 (260415.42305)`     |
+| 日志       | `Build Version: 1.0.0 (g1a2b3c4)`   |
+| About 页面 | `Version: 1.0.0 (g1a2b3c4)`         |
 | 文件       | `build/version.txt`                 |
 
 内容：
 
 ```
-1.0.0+260415.42305
+1.0.0 (g1a2b3c4)
 ```
 
 ------
@@ -278,19 +278,12 @@ NomoClaw-1.0.0-windows-x64.msi
 
 ```bash
 APP_VERSION="1.0.0"
+GIT_SHORT_SHA="$(git rev-parse --short=7 HEAD)"
 
-BUILD_DATE="$(date +%y%m%d)"
-HOUR="$(date +%H)"
-MINUTE="$(date +%M)"
-SECOND="$(date +%S)"
-
-SECONDS_OF_DAY=$((10#$HOUR * 3600 + 10#$MINUTE * 60 + 10#$SECOND))
-
-BUILD_NO="${BUILD_DATE}.${SECONDS_OF_DAY}"
-FULL_VERSION="${APP_VERSION}+${BUILD_NO}"
+FULL_VERSION="${APP_VERSION} (g${GIT_SHORT_SHA})"
 
 echo "APP_VERSION=${APP_VERSION}"
-echo "BUILD_NO=${BUILD_NO}"
+echo "GIT_SHORT_SHA=${GIT_SHORT_SHA}"
 echo "FULL_VERSION=${FULL_VERSION}"
 ```
 
@@ -301,7 +294,6 @@ echo "FULL_VERSION=${FULL_VERSION}"
 | 项目       | 示例                             |
 | ---------- | -------------------------------- |
 | 对外版本号 | `1.0.0`                          |
-| build 号   | `260415.42305`                   |
-| 完整版本号 | `1.0.0+260415.42305`             |
+| build 号   | `g1a2b3c4`                       |
+| 完整版本号 | `1.0.0 (g1a2b3c4)`               |
 | 安装包     | `NomoClaw-1.0.0-windows-x64.msi` |
-
