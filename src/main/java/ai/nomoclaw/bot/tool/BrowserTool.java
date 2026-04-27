@@ -111,7 +111,7 @@ public class BrowserTool implements Tool {
 
     @Override
     public String name() {
-        return "browser_tool";
+        return "BrowserTool";
     }
 
     @Override

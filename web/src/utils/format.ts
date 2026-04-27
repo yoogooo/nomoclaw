@@ -118,10 +118,10 @@ export function displayCronJobTitle(job: CronJob) {
 }
 
 export function approvalActionSummary(payload: Record<string, any>) {
-  const toolName = payload.toolName || tr("format.approval.tool");
+  const toolName = String(payload.toolName || "").trim() || tr("format.approval.tool");
   const args = payload.toolArgs || {};
 
-  if (toolName === "browser_tool" || toolName === "browser_control_tool") {
+  if (toolName === "BrowserTool") {
     const action = args.action || tr("format.approval.action");
     if (action === "open" || action === "navigate") return tr("format.approval.browser.open", { url: args.url || tr("format.approval.urlMissing") });
     if (action === "click") return tr("format.approval.browser.click", { selector: args.selector || tr("format.approval.selectorMissing") });
@@ -136,21 +136,21 @@ export function approvalActionSummary(payload: Record<string, any>) {
     return tr("format.approval.browser.generic", { action });
   }
 
-  if (toolName === "command_tool") {
+  if (toolName === "CommandTool") {
     return tr("format.approval.command", {
       command: args.command || tr("format.approval.commandMissing"),
       cwd: args.cwd ? `\n${tr("format.approval.workingDirectory")}：${args.cwd}` : ""
     });
   }
 
-  if (toolName === "file_tool" || toolName === "file_io_tool") {
+  if (toolName === "FileTool") {
     return tr("format.approval.file", {
       action: args.action || tr("format.approval.action"),
       path: args.path || tr("format.approval.pathMissing")
     });
   }
 
-  if (toolName === "cron_tool") {
+  if (toolName === "CronCreateTool") {
     return tr("format.approval.cron", {
       task: args.task || tr("format.approval.taskMissing"),
       expression: args.expression || tr("format.approval.cronMissing")

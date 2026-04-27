@@ -1,11 +1,3 @@
-UPDATE tool_definition
-SET status = 'DISABLED', updated_time = CURRENT_TIMESTAMP
-WHERE tool_key = 'cron_tool';
-
-UPDATE agent_tool_relation
-SET status = 'DISABLED', updated_time = CURRENT_TIMESTAMP
-WHERE tool_key = 'cron_tool';
-
 MERGE INTO tool_definition (
     tool_key, display_name, description, risk_level, status, sort_index, config_json, created_time, updated_time
 ) KEY (tool_key) VALUES

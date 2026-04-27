@@ -29,7 +29,7 @@ public class FileSearchTool implements Tool {
 
     @Override
     public String name() {
-        return "file_search_tool";
+        return "FileSearchTool";
     }
 
     @Override

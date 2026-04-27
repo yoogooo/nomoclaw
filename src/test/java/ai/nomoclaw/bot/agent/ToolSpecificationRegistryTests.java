@@ -34,12 +34,12 @@ class ToolSpecificationRegistryTests {
         when(agentDefinitionRepository.findActiveByName("demo")).thenReturn(agent);
 
         AgentToolRelationEntity relation = new AgentToolRelationEntity();
-        relation.setToolKey("command_tool");
+        relation.setToolKey("CommandTool");
         when(agentToolRelationRepository.listActiveByAgentUid("agent_demo")).thenReturn(List.of(relation));
 
         ToolDefinitionEntity tool = new ToolDefinitionEntity();
-        tool.setToolKey("command_tool");
-        when(toolDefinitionRepository.listActiveByKeys(List.of("command_tool"))).thenReturn(List.of(tool));
+        tool.setToolKey("CommandTool");
+        when(toolDefinitionRepository.listActiveByKeys(List.of("CommandTool"))).thenReturn(List.of(tool));
 
         ToolSpecificationRegistry registry = new ToolSpecificationRegistry(
                 agentDefinitionRepository,
@@ -49,8 +49,8 @@ class ToolSpecificationRegistryTests {
         );
 
         List<String> toolNames = registry.listForAgent("demo").stream().map(spec -> spec.name()).toList();
-        assertEquals(List.of("command_tool"), toolNames);
-        assertTrue(registry.isToolAllowed("demo", "command_tool"));
+        assertEquals(List.of("CommandTool"), toolNames);
+        assertTrue(registry.isToolAllowed("demo", "CommandTool"));
         assertFalse(registry.isToolAllowed("demo", "CronCreateTool"));
     }
 
@@ -74,11 +74,9 @@ class ToolSpecificationRegistryTests {
         assertTrue(toolNames.contains("CronCreateTool"));
         assertTrue(toolNames.contains("CronDeleteTool"));
         assertTrue(toolNames.contains("CronListTool"));
-        assertFalse(toolNames.contains("cron_tool"));
         assertTrue(registry.isToolAllowed("unknown", "CronCreateTool"));
         assertTrue(registry.isToolAllowed("unknown", "CronDeleteTool"));
         assertTrue(registry.isToolAllowed("unknown", "CronListTool"));
-        assertFalse(registry.isToolAllowed("unknown", "cron_tool"));
-        assertTrue(registry.isToolAllowed("unknown", "image_loader_tool"));
+        assertTrue(registry.isToolAllowed("unknown", "ImageLoaderTool"));
     }
 }

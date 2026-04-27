@@ -58,7 +58,7 @@
 - 任一命中立即返回 `ALLOW`。
 
 5. 默认决策
-- 内置只读工具白名单：`memory_search_tool`、`current_time_tool`、`token_usage_tool`、`file_search_tool`，默认 `ALLOW`。
+- 内置只读工具白名单：`MemorySearchTool`、`CurrentTimeTool`、`TokenUsageTool`、`FileSearchTool`，默认 `ALLOW`。
 - 其他工具默认 `ASK`（`DEFAULT_REQUIRE_APPROVAL`）。
 
 ## 5. hard guard 设计
@@ -145,7 +145,7 @@ UI 仅暴露 3 个动作：
 
 规则生成策略：
 
-1. `command_tool` 记忆规则优先生成可复用 `pathPattern`。
+1. `CommandTool` 记忆规则优先生成可复用 `pathPattern`。
 2. 默认不写完整 `commandPattern`，避免生成不可复用的超具体规则。
 
 ## 9. 存储设计
@@ -216,7 +216,7 @@ UI 仅暴露 3 个动作：
 
 3. 工具专项
 - 只读工具默认放行。
-- `command_tool` 目标路径提取准确。
+- `CommandTool` 目标路径提取准确。
 - 解析失败场景 fail-safe 到 `ASK`。
 
 4. 端到端

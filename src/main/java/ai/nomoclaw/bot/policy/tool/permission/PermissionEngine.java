@@ -19,11 +19,11 @@ import java.util.regex.Pattern;
 @Component
 public class PermissionEngine {
     private static final Set<String> BUILTIN_READONLY_TOOLS = Set.of(
-            "memory_search_tool",
-            "current_time_tool",
-            "token_usage_tool",
-            "file_search_tool",
-            "image_loader_tool"
+            "memorysearchtool",
+            "currenttimetool",
+            "tokenusagetool",
+            "filesearchtool",
+            "imageloadertool"
     );
 
     private final PermissionSettingsStore settingsStore;
@@ -254,8 +254,7 @@ public class PermissionEngine {
             return toolName.startsWith(prefix);
         }
         if ("file_*".equals(ruleTool)) {
-            return "file_tool".equals(toolName)
-                    || "file_io_tool".equals(toolName);
+            return "filetool".equals(toolName);
         }
         return ruleTool.equals(toolName);
     }
@@ -382,13 +381,12 @@ public class PermissionEngine {
     }
 
     private boolean isBuiltinReadonlyTool(String toolName) {
-        String normalized = normalize(toolName);
-        return BUILTIN_READONLY_TOOLS.contains(normalized);
+        return BUILTIN_READONLY_TOOLS.contains(normalize(toolName));
     }
 
     private boolean isCommandReadonlyBaselineAllowed(ToolPolicyContext context, PermissionContextDetails details) {
         String tool = normalize(context.toolName());
-        if (!"command_tool".equals(tool)) {
+        if (!"commandtool".equals(tool)) {
             return false;
         }
         return commandRuleResolver.isReadonlyCommand(context, details) == CommandRuleResolver.ReadonlyCommandVerdict.READ_ONLY;
@@ -396,7 +394,7 @@ public class PermissionEngine {
 
     private boolean isBrowserBaselineAllowed(ToolPolicyContext context) {
         String tool = normalize(context.toolName());
-        return "browser_tool".equals(tool) || "browser_control_tool".equals(tool);
+        return "browsertool".equals(tool);
     }
 
     private boolean isCronBaselineAllowed(ToolPolicyContext context) {

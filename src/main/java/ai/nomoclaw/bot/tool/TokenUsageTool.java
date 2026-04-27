@@ -27,7 +27,7 @@ public class TokenUsageTool implements Tool {
 
     @Override
     public String name() {
-        return "token_usage_tool";
+        return "TokenUsageTool";
     }
 
     @Override

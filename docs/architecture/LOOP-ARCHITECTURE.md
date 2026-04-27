@@ -285,7 +285,7 @@ flowchart TD
 
 - 编排层在 round 开始前、步骤开始前、步骤重试前都会检查取消状态
 - `ToolExecutor` 分发前也会做一次取消检查
-- `command_tool` 在命令执行期间会轮询取消状态，并在取消后强制销毁子进程
+- `CommandTool` 在命令执行期间会轮询取消状态，并在取消后强制销毁子进程
 
 这意味着：
 
@@ -330,7 +330,7 @@ Loop 相关关键事件包括：
 
 ## 15. Cron 与启动恢复
 
-当前 `cron_tool` 已从“纯内存任务”升级为“数据库持久化 + 启动恢复”：
+当前 `CronCreateTool`、`CronDeleteTool`、`CronListTool` 已从“纯内存任务”升级为“数据库持久化 + 启动恢复”：
 
 - 创建 cron 时，先写 `agent_cron_job`
 - 然后注册到当前进程内的 `ThreadPoolTaskScheduler`

@@ -128,7 +128,7 @@ public class PermissionSettingsStore {
                     "legacy-cmd-" + UUID.randomUUID(),
                     source,
                     PermissionEffect.ASK,
-                    "command_tool",
+                    "CommandTool",
                     "*",
                     PermissionResourceType.COMMAND,
                     "",
@@ -217,6 +217,9 @@ public class PermissionSettingsStore {
         String value = normalizeStar(tool);
         if ("file_*".equals(value)) {
             return "file_*";
+        }
+        if ("*".equals(value)) {
+            return value;
         }
         return value;
     }

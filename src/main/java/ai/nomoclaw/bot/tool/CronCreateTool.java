@@ -88,10 +88,12 @@ public class CronCreateTool implements Tool {
 
     private String normalizeCron(String expression) {
         String trimmed = expression.trim().replaceAll("\\s+", " ");
-        int fields = trimmed.isEmpty() ? 0 : trimmed.split(" ").length;
+        String[] parts = trimmed.isEmpty() ? new String[0] : trimmed.split(" ");
+        int fields = parts.length;
         if (fields == 5) {
-            // Convert Unix-style 5-field cron to Spring 6-field cron with second=0.
-            return "0 " + trimmed;
+            // Convert Unix-style minute hour day-of-month month day-of-week to Quartz.
+            String dayOfWeek = "*".equals(parts[4]) ? "?" : parts[4];
+            return "0 %s %s %s %s %s".formatted(parts[0], parts[1], parts[2], parts[3], dayOfWeek);
         }
         if (fields == 6) {
             return trimmed;

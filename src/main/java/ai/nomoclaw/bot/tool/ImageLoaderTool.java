@@ -46,7 +46,7 @@ public class ImageLoaderTool implements Tool {
 
     @Override
     public String name() {
-        return "image_loader_tool";
+        return "ImageLoaderTool";
     }
 
     @Override
@@ -250,11 +250,11 @@ public class ImageLoaderTool implements Tool {
     }
 
     private boolean isScreenshotStep(String toolName, JsonNode toolArgs) {
-        String normalizedTool = nullToEmpty(toolName).trim();
-        if ("desktop_screenshot_tool".equals(normalizedTool)) {
+        String normalizedTool = toolName == null ? "" : toolName.trim();
+        if ("DesktopScreenshotTool".equals(normalizedTool)) {
             return true;
         }
-        if (!"browser_tool".equals(normalizedTool) && !"browser_control_tool".equals(normalizedTool)) {
+        if (!"BrowserTool".equals(normalizedTool)) {
             return false;
         }
         return "screenshot".equals(nullToEmpty(toolArgs.path("action").asText("")));

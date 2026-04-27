@@ -103,10 +103,10 @@ public class PermissionAppService {
         String action = toolArgs == null ? "*" : toolArgs.path("action").asText("*");
         String path = toolArgs == null ? "" : toolArgs.path("path").asText("");
         String command = toolArgs == null ? "" : toolArgs.path("command").asText("");
-        String normalizedTool = toolName == null || toolName.isBlank() ? "*" : toolName;
+        String normalizedTool = toolName == null || toolName.isBlank() ? "*" : toolName.trim();
         String pathPattern = path == null ? "" : path;
         String commandPattern = command.isBlank() ? "" : command;
-        if ("command_tool".equalsIgnoreCase(normalizedTool)) {
+        if ("CommandTool".equalsIgnoreCase(normalizedTool)) {
             pathPattern = resolveCommandScopePath(
                     command,
                     toolArgs == null ? "" : toolArgs.path("cwd").asText(""),
@@ -133,12 +133,12 @@ public class PermissionAppService {
     }
 
     private boolean isScreenshotApproval(String normalizedTool, String action) {
-        String tool = normalizedTool == null ? "" : normalizedTool.trim().toLowerCase(Locale.ROOT);
+        String tool = normalizedTool == null ? "" : normalizedTool.trim();
         String normalizedAction = action == null ? "" : action.trim().toLowerCase(Locale.ROOT);
-        if ("desktop_screenshot_tool".equals(tool)) {
+        if ("DesktopScreenshotTool".equals(tool)) {
             return true;
         }
-        return ("browser_tool".equals(tool) || "browser_control_tool".equals(tool))
+        return "BrowserTool".equals(tool)
                 && "screenshot".equals(normalizedAction);
     }
 
@@ -156,7 +156,7 @@ public class PermissionAppService {
         String key = managedRuleKey(agentUid, normalizedAgentName);
         existing.removeIf(rule -> isManagedRule(rule, key));
         addManagedRule(existing, key, "file", "file_*", "*", PermissionResourceType.FILE, workspace.toString(), 0);
-        addManagedRule(existing, key, "command", "command_tool", "execute", PermissionResourceType.COMMAND, workspace.toString(), 0);
+        addManagedRule(existing, key, "command", "CommandTool", "execute", PermissionResourceType.COMMAND, workspace.toString(), 0);
 
         Path skillsRoot = NomoClawPaths.skillsRoot();
         addManagedRule(existing, key, "skills-read", "file_*", "read", PermissionResourceType.FILE, skillsRoot.toString(), 0);

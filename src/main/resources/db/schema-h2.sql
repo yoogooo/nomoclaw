@@ -395,20 +395,18 @@ INSERT INTO agent_definition (
 INSERT INTO tool_definition (
     tool_key, display_name, description, risk_level, status, sort_index, config_json, created_time, updated_time
 ) VALUES
-    ('command_tool', '命令执行', 'Execute a local shell command on the current machine.', 'HIGH', 'ACTIVE', 10, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('browser_tool', '浏览器工具', 'Operate a browser page to open URLs, click, type, extract text, or take screenshots.', 'HIGH', 'ACTIVE', 20, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('browser_control_tool', '浏览器控制', 'Operate the browser with action-based controls.', 'HIGH', 'ACTIVE', 30, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('file_tool', '文件工具', 'Read, list, or write local files.', 'HIGH', 'ACTIVE', 40, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('file_io_tool', '文件IO', 'Read, write, append, edit, or list local files.', 'HIGH', 'ACTIVE', 50, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('CommandTool', '命令执行', 'Execute a local shell command on the current machine.', 'HIGH', 'ACTIVE', 10, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('BrowserTool', '浏览器工具', 'Operate a browser page to open URLs, click, type, extract text, or take screenshots.', 'HIGH', 'ACTIVE', 20, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('FileTool', '文件工具', 'Read, write, append, edit, or list local files.', 'HIGH', 'ACTIVE', 40, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('CronCreateTool', '创建定时任务', 'Create a scheduled cron-like automation task.', 'HIGH', 'ACTIVE', 60, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('CronDeleteTool', '删除定时任务', 'Delete a scheduled cron-like automation task.', 'HIGH', 'ACTIVE', 61, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('CronListTool', '查询定时任务', 'List or query scheduled cron-like automation tasks.', 'HIGH', 'ACTIVE', 62, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('file_search_tool', '文件搜索', 'Search files by text grep or glob pattern.', 'LOW', 'ACTIVE', 70, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('desktop_screenshot_tool', '桌面截图', 'Capture a desktop screenshot on the local machine.', 'LOW', 'ACTIVE', 80, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('current_time_tool', '当前时间', 'Get the current UTC time.', 'LOW', 'ACTIVE', 90, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('token_usage_tool', 'Token 使用', 'Query stored token usage summary from message records.', 'LOW', 'ACTIVE', 100, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('memory_search_tool', '记忆搜索', 'Search historical conversation messages by keyword.', 'LOW', 'ACTIVE', 110, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('image_loader_tool', '图片加载', 'On-demand image context loader for visual analysis after tools that return image paths; supports 刚才截图/第N轮截图/文件名 and direct HTTP(S) image URL passthrough without local download.', 'LOW', 'ACTIVE', 115, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+    ('FileSearchTool', '文件搜索', 'Search files by text grep or glob pattern.', 'LOW', 'ACTIVE', 70, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('DesktopScreenshotTool', '桌面截图', 'Capture a desktop screenshot on the local machine.', 'LOW', 'ACTIVE', 80, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('CurrentTimeTool', '当前时间', 'Get the current UTC time.', 'LOW', 'ACTIVE', 90, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('TokenUsageTool', 'Token 使用', 'Query stored token usage summary from message records.', 'LOW', 'ACTIVE', 100, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('MemorySearchTool', '记忆搜索', 'Search historical conversation messages by keyword.', 'LOW', 'ACTIVE', 110, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('ImageLoaderTool', '图片加载', 'On-demand image context loader for visual analysis after tools that return image paths; supports 刚才截图/第N轮截图/文件名 and direct HTTP(S) image URL passthrough without local download.', 'LOW', 'ACTIVE', 115, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO skill_definition (
     skill_key, display_name, description, skill_path, status, sort_index, config_json, created_time, updated_time
@@ -421,20 +419,18 @@ INSERT INTO skill_definition (
 INSERT INTO agent_tool_relation (
     relation_uid, agent_uid, tool_key, status, sort_index, config_json, created_time, updated_time
 ) VALUES
-    ('rel_general_command', 'agent_general_assistant', 'command_tool', 'ACTIVE', 10, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_general_browser', 'agent_general_assistant', 'browser_tool', 'ACTIVE', 20, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_general_browser_control', 'agent_general_assistant', 'browser_control_tool', 'ACTIVE', 30, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_general_file', 'agent_general_assistant', 'file_tool', 'ACTIVE', 40, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_general_file_io', 'agent_general_assistant', 'file_io_tool', 'ACTIVE', 50, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('rel_general_command', 'agent_general_assistant', 'CommandTool', 'ACTIVE', 10, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('rel_general_browser', 'agent_general_assistant', 'BrowserTool', 'ACTIVE', 20, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('rel_general_file', 'agent_general_assistant', 'FileTool', 'ACTIVE', 40, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('rel_general_cron_create', 'agent_general_assistant', 'CronCreateTool', 'ACTIVE', 60, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('rel_general_cron_delete', 'agent_general_assistant', 'CronDeleteTool', 'ACTIVE', 61, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('rel_general_cron_list', 'agent_general_assistant', 'CronListTool', 'ACTIVE', 62, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_general_search', 'agent_general_assistant', 'file_search_tool', 'ACTIVE', 70, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_general_shot', 'agent_general_assistant', 'desktop_screenshot_tool', 'ACTIVE', 80, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_general_time', 'agent_general_assistant', 'current_time_tool', 'ACTIVE', 90, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_general_token', 'agent_general_assistant', 'token_usage_tool', 'ACTIVE', 100, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_general_memory', 'agent_general_assistant', 'memory_search_tool', 'ACTIVE', 110, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('rel_general_image_loader', 'agent_general_assistant', 'image_loader_tool', 'ACTIVE', 115, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+    ('rel_general_search', 'agent_general_assistant', 'FileSearchTool', 'ACTIVE', 70, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('rel_general_shot', 'agent_general_assistant', 'DesktopScreenshotTool', 'ACTIVE', 80, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('rel_general_time', 'agent_general_assistant', 'CurrentTimeTool', 'ACTIVE', 90, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('rel_general_token', 'agent_general_assistant', 'TokenUsageTool', 'ACTIVE', 100, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('rel_general_memory', 'agent_general_assistant', 'MemorySearchTool', 'ACTIVE', 110, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('rel_general_image_loader', 'agent_general_assistant', 'ImageLoaderTool', 'ACTIVE', 115, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO agent_skill_relation (
     relation_uid, agent_uid, skill_key, status, sort_index, config_json, created_time, updated_time

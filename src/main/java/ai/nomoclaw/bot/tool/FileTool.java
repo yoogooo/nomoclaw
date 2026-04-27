@@ -26,7 +26,7 @@ public class FileTool implements Tool {
 
     @Override
     public String name() {
-        return "file_tool";
+        return "FileTool";
     }
 
     @Override

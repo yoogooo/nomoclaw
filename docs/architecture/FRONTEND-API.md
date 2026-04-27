@@ -178,7 +178,7 @@
       "roundIndex": 1,
       "stepIndex": 1,
       "title": "读取文件",
-      "toolName": "file_tool",
+      "toolName": "FileTool",
       "toolArgs": {},
       "riskLevel": "LOW"
     }

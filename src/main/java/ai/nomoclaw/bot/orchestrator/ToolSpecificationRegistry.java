@@ -39,7 +39,7 @@ public class ToolSpecificationRegistry {
         this.mcpApplicationService = mcpApplicationService;
         this.toolSpecifications = List.of(
                 ToolSpecification.builder()
-                        .name("command_tool")
+                        .name("CommandTool")
                         .description("Execute a local shell command on the current machine. Relative cwd values are resolved from the current agent workspace.")
                         .parameters(JsonObjectSchema.builder()
                                 .description("Command execution arguments")
@@ -51,51 +51,25 @@ public class ToolSpecificationRegistry {
                                 .build())
                         .build(),
                 ToolSpecification.builder()
-                        .name("browser_tool")
+                        .name("BrowserTool")
                         .description("Operate a browser page to open URLs, click, type, extract text, or take screenshots. Screenshot and download output paths default to the current agent tmp directory.")
                         .parameters(JsonObjectSchema.builder()
                                 .description("Browser action arguments")
-                                .addEnumProperty("action", List.of("open", "click", "type", "extract_text", "screenshot", "download"), "Browser action name")
-                                .addStringProperty("url", "URL to open for action=open")
-                                .addStringProperty("selector", "Target selector for click, type, extract_text, screenshot, download")
-                                .addStringProperty("text", "Input text for action=type")
-                                .addStringProperty("output", "Output path or directory for screenshot/download. Relative paths are resolved from the current agent workspace. Omit to save into tmp/.")
-                                .required("action")
-                                .additionalProperties(true)
-                                .build())
-                        .build(),
-                ToolSpecification.builder()
-                        .name("browser_control_tool")
-                        .description("Operate the browser with action-based controls. Screenshot and download output paths default to the current agent tmp directory.")
-                        .parameters(JsonObjectSchema.builder()
-                                .description("Browser control arguments")
                                 .addEnumProperty("action", List.of("open", "navigate", "navigate_back", "click", "type", "extract_text", "screenshot", "download", "snapshot", "wait_for", "press_key", "close"), "Browser action name")
                                 .addStringProperty("url", "URL for open or navigate")
                                 .addStringProperty("selector", "Target selector")
-                                .addStringProperty("text", "Input text")
+                                .addStringProperty("text", "Input text for action=type")
                                 .addStringProperty("output", "Output path or directory for screenshot/download. Relative paths are resolved from the current agent workspace. Omit to save into tmp/.")
                                 .addStringProperty("key", "Keyboard key")
-                                .additionalProperties(true)
                                 .required("action")
-                                .build())
-                        .build(),
-                ToolSpecification.builder()
-                        .name("file_tool")
-                        .description("Read, list, or write local files. Relative paths are resolved from the current agent workspace; final deliverables should be written under report/.")
-                        .parameters(JsonObjectSchema.builder()
-                                .description("File tool arguments")
-                                .addEnumProperty("action", List.of("read", "list", "write", "append", "edit"), "File action name")
-                                .addStringProperty("path", "File or directory path")
-                                .addStringProperty("content", "Content to write for action=write")
-                                .required("action", "path")
                                 .additionalProperties(true)
                                 .build())
                         .build(),
                 ToolSpecification.builder()
-                        .name("file_io_tool")
+                        .name("FileTool")
                         .description("Read, write, append, edit, or list local files. Relative paths are resolved from the current agent workspace; final deliverables should be written under report/.")
                         .parameters(JsonObjectSchema.builder()
-                                .description("File I/O arguments")
+                                .description("File tool arguments")
                                 .addEnumProperty("action", List.of("read", "list", "write", "append", "edit"), "File action name")
                                 .addStringProperty("path", "File or directory path")
                                 .addStringProperty("content", "Content to write or append")
@@ -142,7 +116,7 @@ public class ToolSpecificationRegistry {
                                 .build())
                         .build(),
                 ToolSpecification.builder()
-                        .name("file_search_tool")
+                        .name("FileSearchTool")
                         .description("Search files by text grep or glob pattern. Relative paths and default search roots use the current agent workspace.")
                         .parameters(JsonObjectSchema.builder()
                                 .description("File search arguments")
@@ -155,7 +129,7 @@ public class ToolSpecificationRegistry {
                                 .build())
                         .build(),
                 ToolSpecification.builder()
-                        .name("desktop_screenshot_tool")
+                        .name("DesktopScreenshotTool")
                         .description("Capture a desktop screenshot on the local machine. Output defaults to the current agent tmp directory.")
                         .parameters(JsonObjectSchema.builder()
                                 .description("Desktop screenshot arguments")
@@ -165,7 +139,7 @@ public class ToolSpecificationRegistry {
                                 .build())
                         .build(),
                 ToolSpecification.builder()
-                        .name("image_loader_tool")
+                        .name("ImageLoaderTool")
                         .description("按需加载图片上下文，仅在需要视觉分析时使用。适用于截图、浏览器等返回图片路径的工具步骤之后；支持“刚才截图”“第 N 轮截图”“文件名”引用，以及直接传入 HTTP(S) 图片链接（仅透传，不本地下载）。")
                         .parameters(JsonObjectSchema.builder()
                                 .description("图片加载参数")
@@ -176,7 +150,7 @@ public class ToolSpecificationRegistry {
                                 .build())
                         .build(),
                 ToolSpecification.builder()
-                        .name("current_time_tool")
+                        .name("CurrentTimeTool")
                         .description("Get the current UTC time.")
                         .parameters(JsonObjectSchema.builder()
                                 .description("No arguments required")
@@ -184,7 +158,7 @@ public class ToolSpecificationRegistry {
                                 .build())
                         .build(),
                 ToolSpecification.builder()
-                        .name("token_usage_tool")
+                        .name("TokenUsageTool")
                         .description("Query stored token usage summary from message records.")
                         .parameters(JsonObjectSchema.builder()
                                 .description("Token usage query arguments")
@@ -195,7 +169,7 @@ public class ToolSpecificationRegistry {
                                 .build())
                         .build(),
                 ToolSpecification.builder()
-                        .name("memory_search_tool")
+                        .name("MemorySearchTool")
                         .description("Search historical conversation messages by keyword.")
                         .parameters(JsonObjectSchema.builder()
                                 .description("Memory search arguments")
@@ -230,11 +204,12 @@ public class ToolSpecificationRegistry {
         if (toolName == null || toolName.isBlank()) {
             return false;
         }
+        String normalizedToolName = toolName.trim();
         List<String> enabledToolKeys = enabledToolKeys(agentName);
         if (enabledToolKeys == null) {
-            return allToolSpecificationsByName().containsKey(toolName);
+            return allToolSpecificationsByName().containsKey(normalizedToolName);
         }
-        return enabledToolKeys.contains(toolName);
+        return enabledToolKeys.contains(normalizedToolName);
     }
 
     public boolean isMcpTool(String toolName) {
@@ -254,14 +229,15 @@ public class ToolSpecificationRegistry {
         }
 
         Set<String> knownKeys = allToolSpecificationsByName().keySet();
-        Set<String> activeDefinitionKeys = toolDefinitionRepository.listActiveByKeys(
-                        relations.stream().map(AgentToolRelationEntity::getToolKey).toList())
+        List<String> relationToolKeys = relations.stream()
+                .map(AgentToolRelationEntity::getToolKey)
+                .toList();
+        Set<String> activeDefinitionKeys = toolDefinitionRepository.listActiveByKeys(relationToolKeys)
                 .stream()
-                .map(ToolDefinitionEntity::getToolKey)
+                .map(definition -> definition.getToolKey())
                 .collect(Collectors.toSet());
 
-        return relations.stream()
-                .map(AgentToolRelationEntity::getToolKey)
+        return relationToolKeys.stream()
                 .filter(activeDefinitionKeys::contains)
                 .filter(knownKeys::contains)
                 .distinct()
