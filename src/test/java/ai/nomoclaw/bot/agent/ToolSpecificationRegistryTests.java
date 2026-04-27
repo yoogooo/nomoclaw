@@ -1,6 +1,7 @@
 package ai.nomoclaw.bot.agent;
 
 import ai.nomoclaw.bot.orchestrator.ToolSpecificationRegistry;
+import ai.nomoclaw.bot.mcp.McpApplicationService;
 import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
 import ai.nomoclaw.bot.store.entity.AgentToolRelationEntity;
 import ai.nomoclaw.bot.store.entity.ToolDefinitionEntity;
@@ -24,6 +25,8 @@ class ToolSpecificationRegistryTests {
         AgentDefinitionRepository agentDefinitionRepository = mock(AgentDefinitionRepository.class);
         ToolDefinitionRepository toolDefinitionRepository = mock(ToolDefinitionRepository.class);
         AgentToolRelationRepository agentToolRelationRepository = mock(AgentToolRelationRepository.class);
+        McpApplicationService mcpApplicationService = mock(McpApplicationService.class);
+        when(mcpApplicationService.listActiveToolSnapshots()).thenReturn(List.of());
 
         AgentDefinitionEntity agent = new AgentDefinitionEntity();
         agent.setAgentUid("agent_demo");
@@ -41,7 +44,8 @@ class ToolSpecificationRegistryTests {
         ToolSpecificationRegistry registry = new ToolSpecificationRegistry(
                 agentDefinitionRepository,
                 toolDefinitionRepository,
-                agentToolRelationRepository
+                agentToolRelationRepository,
+                mcpApplicationService
         );
 
         List<String> toolNames = registry.listForAgent("demo").stream().map(spec -> spec.name()).toList();
@@ -55,11 +59,14 @@ class ToolSpecificationRegistryTests {
         AgentDefinitionRepository agentDefinitionRepository = mock(AgentDefinitionRepository.class);
         ToolDefinitionRepository toolDefinitionRepository = mock(ToolDefinitionRepository.class);
         AgentToolRelationRepository agentToolRelationRepository = mock(AgentToolRelationRepository.class);
+        McpApplicationService mcpApplicationService = mock(McpApplicationService.class);
+        when(mcpApplicationService.listActiveToolSnapshots()).thenReturn(List.of());
 
         ToolSpecificationRegistry registry = new ToolSpecificationRegistry(
                 agentDefinitionRepository,
                 toolDefinitionRepository,
-                agentToolRelationRepository
+                agentToolRelationRepository,
+                mcpApplicationService
         );
 
         assertTrue(registry.listForAgent("unknown").size() > 3);

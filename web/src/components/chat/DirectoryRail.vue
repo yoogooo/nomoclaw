@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { Bot, Brain, CalendarClock, MessageCircleMore, Moon, Settings, Sun, PlugZap, Puzzle } from "lucide-vue-next";
+import { Bot, Brain, CalendarClock, MessageCircleMore, Moon, Settings, Sun, PlugZap, Puzzle, Workflow } from "lucide-vue-next";
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import UiInstantTooltip from "@/components/UiInstantTooltip.vue";
@@ -18,6 +18,7 @@ const navItems = computed(() => [
   { key: "skills", label: t("nav.skills"), icon: Puzzle, to: "/skills" },
   { key: "channels", label: t("nav.channels"), icon: PlugZap, to: "/channels" },
   { key: "models", label: t("nav.models"), icon: Brain, to: "/models" },
+  { key: "mcp", label: t("nav.mcp"), icon: Workflow, to: "/mcp" },
   { key: "settings", label: t("nav.settings"), icon: Settings, to: "/settings" }
 ]);
 

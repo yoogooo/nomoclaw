@@ -27,6 +27,9 @@ public class RiskPolicy {
 
     public RiskLevel evaluateRisk(String toolName, JsonNode toolArgs) {
         String tool = toolName == null ? "" : toolName.toLowerCase();
+        if (tool.startsWith("mcp_")) {
+            return RiskLevel.HIGH;
+        }
         if (tool.contains("command")) {
             String cmd = toolArgs == null ? "" : toolArgs.path("command").asText("").toLowerCase();
             return cmd.contains("rm ") || cmd.contains("sudo ") || cmd.contains("chmod -r") || cmd.contains("mv ")

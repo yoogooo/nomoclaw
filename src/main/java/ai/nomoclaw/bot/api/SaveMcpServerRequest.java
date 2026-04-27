@@ -1,0 +1,21 @@
+package ai.nomoclaw.bot.api;
+
+import jakarta.validation.constraints.NotBlank;
+
+import java.util.List;
+import java.util.Map;
+
+public record SaveMcpServerRequest(
+        @NotBlank String serverName,
+        String displayName,
+        @NotBlank String transport,
+        Integer timeoutSeconds,
+        Boolean autoStart,
+        String endpoint,
+        Map<String, String> headers,
+        String command,
+        List<String> args,
+        Map<String, String> env,
+        String cwd
+) {
+}

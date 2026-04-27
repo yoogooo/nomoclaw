@@ -10,6 +10,9 @@ import ai.nomoclaw.bot.application.command.UpdateAgentTipCommand;
 import ai.nomoclaw.bot.application.command.UpdateCronJobCommand;
 import ai.nomoclaw.bot.application.command.UpdateSkillBindingsCommand;
 import ai.nomoclaw.bot.application.dto.*;
+import ai.nomoclaw.bot.mcp.McpServerDto;
+import ai.nomoclaw.bot.mcp.McpToolDto;
+import ai.nomoclaw.bot.mcp.SaveMcpServerCommand;
 import ai.nomoclaw.bot.orchestrator.ModelCatalogStatusDto;
 import ai.nomoclaw.bot.application.dto.AgentSkillDto;
 import ai.nomoclaw.bot.application.dto.AgentTipDto;
@@ -30,6 +33,65 @@ import java.util.List;
 public final class ApiDtoMapper {
 
     private ApiDtoMapper() {
+    }
+
+    public static SaveMcpServerCommand toCommand(SaveMcpServerRequest request) {
+        return new SaveMcpServerCommand(
+                request.serverName(),
+                request.displayName(),
+                request.transport(),
+                request.timeoutSeconds(),
+                request.autoStart(),
+                request.endpoint(),
+                request.headers(),
+                request.command(),
+                request.args(),
+                request.env(),
+                request.cwd()
+        );
+    }
+
+    public static List<McpServerResponse> toMcpServers(List<McpServerDto> dtos) {
+        return dtos.stream().map(ApiDtoMapper::toMcpServer).toList();
+    }
+
+    public static McpServerResponse toMcpServer(McpServerDto dto) {
+        return new McpServerResponse(
+                dto.serverUid(),
+                dto.serverName(),
+                dto.displayName(),
+                dto.transport(),
+                dto.status(),
+                dto.timeoutSeconds(),
+                dto.autoStart(),
+                dto.endpoint(),
+                dto.headers(),
+                dto.command(),
+                dto.args(),
+                dto.env(),
+                dto.cwd(),
+                dto.lastConnectedTime(),
+                dto.lastError(),
+                dto.toolCount(),
+                dto.createdTime(),
+                dto.updatedTime()
+        );
+    }
+
+    public static List<McpToolResponse> toMcpTools(List<McpToolDto> dtos) {
+        return dtos.stream().map(ApiDtoMapper::toMcpTool).toList();
+    }
+
+    public static McpToolResponse toMcpTool(McpToolDto dto) {
+        return new McpToolResponse(
+                dto.toolKey(),
+                dto.serverUid(),
+                dto.originalToolName(),
+                dto.displayName(),
+                dto.description(),
+                dto.status(),
+                dto.lastSyncedTime()
+        );
     }
 
     public static List<ConversationSummaryResponse> toConversationSummaries(List<ConversationSummaryDto> dtos) {

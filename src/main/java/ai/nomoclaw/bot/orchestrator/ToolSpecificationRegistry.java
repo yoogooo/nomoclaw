@@ -2,7 +2,9 @@ package ai.nomoclaw.bot.orchestrator;
 
 import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
 import ai.nomoclaw.bot.store.entity.AgentToolRelationEntity;
+import ai.nomoclaw.bot.store.entity.McpToolSnapshotEntity;
 import ai.nomoclaw.bot.store.entity.ToolDefinitionEntity;
+import ai.nomoclaw.bot.mcp.McpApplicationService;
 import ai.nomoclaw.bot.store.repository.AgentDefinitionRepository;
 import ai.nomoclaw.bot.store.repository.AgentToolRelationRepository;
 import ai.nomoclaw.bot.store.repository.ToolDefinitionRepository;
@@ -25,13 +27,16 @@ public class ToolSpecificationRegistry {
     private final AgentDefinitionRepository agentDefinitionRepository;
     private final ToolDefinitionRepository toolDefinitionRepository;
     private final AgentToolRelationRepository agentToolRelationRepository;
+    private final McpApplicationService mcpApplicationService;
 
     public ToolSpecificationRegistry(AgentDefinitionRepository agentDefinitionRepository,
                                      ToolDefinitionRepository toolDefinitionRepository,
-                                     AgentToolRelationRepository agentToolRelationRepository) {
+                                     AgentToolRelationRepository agentToolRelationRepository,
+                                     McpApplicationService mcpApplicationService) {
         this.agentDefinitionRepository = agentDefinitionRepository;
         this.toolDefinitionRepository = toolDefinitionRepository;
         this.agentToolRelationRepository = agentToolRelationRepository;
+        this.mcpApplicationService = mcpApplicationService;
         this.toolSpecifications = List.of(
                 ToolSpecification.builder()
                         .name("command_tool")
@@ -206,16 +211,17 @@ public class ToolSpecificationRegistry {
     }
 
     public List<ToolSpecification> listAll() {
-        return toolSpecifications;
+        return allToolSpecificationsByName().values().stream().toList();
     }
 
     public List<ToolSpecification> listForAgent(String agentName) {
         List<String> enabledToolKeys = enabledToolKeys(agentName);
         if (enabledToolKeys == null) {
-            return toolSpecifications;
+            return listAll();
         }
+        Map<String, ToolSpecification> allTools = allToolSpecificationsByName();
         return enabledToolKeys.stream()
-                .map(toolSpecificationsByName::get)
+                .map(allTools::get)
                 .filter(Objects::nonNull)
                 .toList();
     }
@@ -226,9 +232,13 @@ public class ToolSpecificationRegistry {
         }
         List<String> enabledToolKeys = enabledToolKeys(agentName);
         if (enabledToolKeys == null) {
-            return toolSpecificationsByName.containsKey(toolName);
+            return allToolSpecificationsByName().containsKey(toolName);
         }
         return enabledToolKeys.contains(toolName);
+    }
+
+    public boolean isMcpTool(String toolName) {
+        return mcpApplicationService.isMcpTool(toolName);
     }
 
     private List<String> enabledToolKeys(String agentName) {
@@ -243,7 +253,7 @@ public class ToolSpecificationRegistry {
             return List.of();
         }
 
-        Set<String> builtinKeys = toolSpecificationsByName.keySet();
+        Set<String> knownKeys = allToolSpecificationsByName().keySet();
         Set<String> activeDefinitionKeys = toolDefinitionRepository.listActiveByKeys(
                         relations.stream().map(AgentToolRelationEntity::getToolKey).toList())
                 .stream()
@@ -253,8 +263,27 @@ public class ToolSpecificationRegistry {
         return relations.stream()
                 .map(AgentToolRelationEntity::getToolKey)
                 .filter(activeDefinitionKeys::contains)
-                .filter(builtinKeys::contains)
+                .filter(knownKeys::contains)
                 .distinct()
                 .toList();
+    }
+
+    private Map<String, ToolSpecification> allToolSpecificationsByName() {
+        Map<String, ToolSpecification> all = new LinkedHashMap<>(toolSpecificationsByName);
+        for (McpToolSnapshotEntity snapshot : mcpApplicationService.listActiveToolSnapshots()) {
+            all.put(snapshot.getToolKey(), toMcpToolSpecification(snapshot));
+        }
+        return all;
+    }
+
+    private ToolSpecification toMcpToolSpecification(McpToolSnapshotEntity snapshot) {
+        return ToolSpecification.builder()
+                .name(snapshot.getToolKey())
+                .description(snapshot.getDescription())
+                .parameters(JsonObjectSchema.builder()
+                        .description("Arguments for MCP tool " + snapshot.getOriginalToolName())
+                        .additionalProperties(true)
+                        .build())
+                .build();
     }
 }

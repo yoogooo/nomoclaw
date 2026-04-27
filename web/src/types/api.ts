@@ -84,6 +84,51 @@ export interface AgentTool {
   updatedTime: string;
 }
 
+export interface McpServer {
+  serverUid: string;
+  serverName: string;
+  displayName: string;
+  transport: "HTTP" | "STDIO";
+  status: string;
+  timeoutSeconds: number;
+  autoStart: boolean;
+  endpoint: string;
+  headers: Record<string, string>;
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+  cwd: string;
+  lastConnectedTime?: string | null;
+  lastError?: string | null;
+  toolCount: number;
+  createdTime: string;
+  updatedTime: string;
+}
+
+export interface McpTool {
+  toolKey: string;
+  serverUid: string;
+  originalToolName: string;
+  displayName: string;
+  description: string;
+  status: string;
+  lastSyncedTime: string;
+}
+
+export interface SaveMcpServerPayload {
+  serverName: string;
+  displayName?: string;
+  transport: "HTTP" | "STDIO";
+  timeoutSeconds: number;
+  autoStart: boolean;
+  endpoint?: string;
+  headers?: Record<string, string>;
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  cwd?: string;
+}
+
 export interface AgentTip {
   tipUid: string;
   agentUid: string;

@@ -19,6 +19,7 @@ const zhCN = {
     skills: "技能管理",
     channels: "Channel 管理",
     models: "模型管理",
+    mcp: "MCP 管理",
     settings: "个人配置"
   },
   settings: {

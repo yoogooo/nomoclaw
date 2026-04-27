@@ -6,6 +6,7 @@ import SkillsPage from "@/pages/SkillsPage.vue";
 import SettingsPage from "@/pages/SettingsPage.vue";
 import ChannelsPage from "@/pages/ChannelsPage.vue";
 import ModelsPage from "@/pages/ModelsPage.vue";
+import McpPage from "@/pages/McpPage.vue";
 import ForbiddenPage from "@/pages/ForbiddenPage.vue";
 import DesignSystemPage from "@/pages/design-system/DesignSystemPage.vue";
 
@@ -50,6 +51,11 @@ export const router = createRouter({
       path: "/models",
       name: "models",
       component: ModelsPage
+    },
+    {
+      path: "/mcp",
+      name: "mcp",
+      component: McpPage
     },
     {
       path: "/design-system",

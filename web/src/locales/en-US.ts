@@ -19,6 +19,7 @@ const enUS = {
     skills: "Skill Management",
     channels: "Channel Management",
     models: "Model Management",
+    mcp: "MCP Management",
     settings: "Settings"
   },
   settings: {

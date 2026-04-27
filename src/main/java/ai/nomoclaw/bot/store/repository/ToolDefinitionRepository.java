@@ -21,6 +21,15 @@ public class ToolDefinitionRepository extends CrudRepository<ToolDefinitionMappe
                 .one();
     }
 
+    public ToolDefinitionEntity findByKey(String toolKey) {
+        if (toolKey == null || toolKey.isBlank()) {
+            return null;
+        }
+        return lambdaQuery()
+                .eq(ToolDefinitionEntity::getToolKey, toolKey)
+                .one();
+    }
+
     public List<ToolDefinitionEntity> listAllActive() {
         return lambdaQuery()
                 .eq(ToolDefinitionEntity::getStatus, "ACTIVE")

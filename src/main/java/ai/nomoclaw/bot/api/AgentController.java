@@ -8,6 +8,7 @@ import ai.nomoclaw.bot.orchestrator.MessageRunAppService;
 import ai.nomoclaw.bot.orchestrator.ModelConfigAppService;
 import ai.nomoclaw.bot.orchestrator.PermissionAppService;
 import ai.nomoclaw.bot.orchestrator.SystemAppService;
+import ai.nomoclaw.bot.mcp.McpApplicationService;
 import ai.nomoclaw.bot.scheduler.CronChannelTargetDirectoryService;
 import ai.nomoclaw.bot.scheduler.CronJobApplicationService;
 import jakarta.validation.Valid;
@@ -49,6 +50,7 @@ public class AgentController {
     private final PermissionAppService permissionAppService;
     private final CronJobApplicationService cronJobApplicationService;
     private final CronChannelTargetDirectoryService cronChannelTargetDirectoryService;
+    private final McpApplicationService mcpApplicationService;
 
     public AgentController(ConversationAppService conversationAppService,
                            ConversationAttachmentAppService conversationAttachmentAppService,
@@ -59,7 +61,8 @@ public class AgentController {
                            SystemAppService systemAppService,
                            PermissionAppService permissionAppService,
                            CronJobApplicationService cronJobApplicationService,
-                           CronChannelTargetDirectoryService cronChannelTargetDirectoryService) {
+                           CronChannelTargetDirectoryService cronChannelTargetDirectoryService,
+                           McpApplicationService mcpApplicationService) {
         this.conversationAppService = conversationAppService;
         this.conversationAttachmentAppService = conversationAttachmentAppService;
         this.agentCatalogAppService = agentCatalogAppService;
@@ -70,6 +73,51 @@ public class AgentController {
         this.permissionAppService = permissionAppService;
         this.cronJobApplicationService = cronJobApplicationService;
         this.cronChannelTargetDirectoryService = cronChannelTargetDirectoryService;
+        this.mcpApplicationService = mcpApplicationService;
+    }
+
+    @GetMapping("/mcp/servers")
+    public List<McpServerResponse> listMcpServers() {
+        log.info("[AgentAPI] listMcpServers");
+        return ApiDtoMapper.toMcpServers(mcpApplicationService.listServers());
+    }
+
+    @PostMapping("/mcp/servers")
+    public McpServerResponse createMcpServer(@Valid @RequestBody SaveMcpServerRequest request) {
+        log.info("[AgentAPI] createMcpServer serverName={} transport={}", request.serverName(), request.transport());
+        return ApiDtoMapper.toMcpServer(mcpApplicationService.createServer(ApiDtoMapper.toCommand(request)));
+    }
+
+    @PutMapping("/mcp/servers/{serverUid}")
+    public McpServerResponse updateMcpServer(@PathVariable String serverUid,
+                                             @Valid @RequestBody SaveMcpServerRequest request) {
+        log.info("[AgentAPI] updateMcpServer serverUid={} serverName={} transport={}", serverUid, request.serverName(), request.transport());
+        return ApiDtoMapper.toMcpServer(mcpApplicationService.updateServer(serverUid, ApiDtoMapper.toCommand(request)));
+    }
+
+    @DeleteMapping("/mcp/servers/{serverUid}")
+    public SimpleResponse deleteMcpServer(@PathVariable String serverUid) {
+        log.info("[AgentAPI] deleteMcpServer serverUid={}", serverUid);
+        mcpApplicationService.deleteServer(serverUid);
+        return new SimpleResponse("deleted");
+    }
+
+    @PostMapping("/mcp/servers/{serverUid}/test")
+    public McpServerResponse testMcpServer(@PathVariable String serverUid) {
+        log.info("[AgentAPI] testMcpServer serverUid={}", serverUid);
+        return ApiDtoMapper.toMcpServer(mcpApplicationService.testServer(serverUid));
+    }
+
+    @PostMapping("/mcp/servers/{serverUid}/refresh-tools")
+    public List<McpToolResponse> refreshMcpTools(@PathVariable String serverUid) {
+        log.info("[AgentAPI] refreshMcpTools serverUid={}", serverUid);
+        return ApiDtoMapper.toMcpTools(mcpApplicationService.refreshTools(serverUid));
+    }
+
+    @GetMapping("/mcp/servers/{serverUid}/tools")
+    public List<McpToolResponse> listMcpTools(@PathVariable String serverUid) {
+        log.info("[AgentAPI] listMcpTools serverUid={}", serverUid);
+        return ApiDtoMapper.toMcpTools(mcpApplicationService.listTools(serverUid));
     }
 
     @PostMapping("/conversations")
