@@ -1,5 +1,5 @@
 import { createDiscreteApi, darkTheme } from "naive-ui";
-import type { DialogApi, MessageApi } from "naive-ui";
+import type { DialogApi, MessageApi, NotificationApi } from "naive-ui";
 import type { DialogOptions } from "naive-ui";
 import { resolveThemeOverrides } from "@/theme";
 import type { UiThemeMode } from "@/stores/uiPreferences";
@@ -7,6 +7,7 @@ import type { UiThemeMode } from "@/stores/uiPreferences";
 interface DiscreteApis {
   message: MessageApi;
   dialog: DialogApi;
+  notification: NotificationApi;
 }
 
 let cachedMode: UiThemeMode | null = null;
@@ -24,10 +25,14 @@ function resolveApis(): DiscreteApis {
   if (cachedApis && cachedMode === mode) {
     return cachedApis;
   }
-  const apis = createDiscreteApi(["message", "dialog"], {
+  const apis = createDiscreteApi(["message", "dialog", "notification"], {
     messageProviderProps: {
       placement: "top",
       duration: 2200,
+      max: 3
+    },
+    notificationProviderProps: {
+      placement: "top-right",
       max: 3
     },
     configProviderProps: {
@@ -60,6 +65,7 @@ function createProxy<T extends object>(key: keyof DiscreteApis): T {
 
 export const message = createProxy<MessageApi>("message");
 export const dialog = createProxy<DialogApi>("dialog");
+export const notification = createProxy<NotificationApi>("notification");
 
 export function warningDialogPreset(): Pick<DialogOptions, "showIcon" | "positiveButtonProps" | "negativeButtonProps"> {
   if (resolveThemeMode() === "dark") {

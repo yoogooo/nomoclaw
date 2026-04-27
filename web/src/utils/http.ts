@@ -5,13 +5,24 @@ import { tr } from "@/i18n";
 const ERROR_TOAST_DEDUP_WINDOW_MS = 2500;
 const errorToastLastShownAt = new Map<string, number>();
 
-export async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
+export interface RequestJsonOptions {
+  suppressErrorToast?: boolean;
+}
+
+export async function requestJson<T>(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  options?: RequestJsonOptions
+): Promise<T> {
+  const suppressErrorToast = Boolean(options?.suppressErrorToast);
   let response: Response;
   try {
     response = await fetch(input, init);
   } catch (error) {
     const errorMessage = tr("http.networkError");
-    showErrorToastDedup(errorMessage);
+    if (!suppressErrorToast) {
+      showErrorToastDedup(errorMessage);
+    }
     throw new Error(errorMessage, { cause: error });
   }
 
@@ -26,7 +37,7 @@ export async function requestJson<T>(input: RequestInfo | URL, init?: RequestIni
           message: userFriendlyMessage
         }
       });
-    } else {
+    } else if (!suppressErrorToast) {
       showErrorToastDedup(userFriendlyMessage);
     }
     throw new Error(userFriendlyMessage);

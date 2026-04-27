@@ -57,6 +57,7 @@ export const useJinnangStore = defineStore("jinnang", () => {
     sourceTime: string;
     conversationUid: string;
     generateBestPractice?: boolean;
+    suppressErrorToast?: boolean;
   }) {
     const targetAgentUid = (params.agentUid || "").trim();
     if (!targetAgentUid) {
@@ -70,6 +71,8 @@ export const useJinnangStore = defineStore("jinnang", () => {
       sourceMessageUid: params.messageUid,
       sourceTime: params.sourceTime,
       generateBestPractice: params.generateBestPractice
+    }, {
+      suppressErrorToast: params.suppressErrorToast
     });
     if (loadedAgentUid.value !== targetAgentUid || !loaded.value) {
       await restoreTips(targetAgentUid);

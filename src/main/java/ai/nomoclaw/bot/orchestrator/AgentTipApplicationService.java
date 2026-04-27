@@ -215,7 +215,7 @@ public class AgentTipApplicationService {
                 .sorted(Comparator.comparingInt(PlanStep::roundIndex).thenComparingInt(PlanStep::stepIndex))
                 .toList();
         AgentDefinitionEntity executionAgent = resolveExecutionAgent(conversation);
-        String modelOutput = tipSummaryChatService.summarize(
+        TipSummaryChatService.TipEvaluationResult evaluation = tipSummaryChatService.evaluate(
                 buildPromptContext(conversation, executionAgent, sourceConversationUid, sourceMessageUid),
                 recentMessages.stream()
                         .map(item -> new TipSummaryChatService.RecentMessage(item.role(), item.content()))
@@ -234,22 +234,26 @@ public class AgentTipApplicationService {
                         .toList(),
                 finalMessage.content()
         );
-        return parseGeneratedBestPractice(modelOutput, recentMessages, finalMessage, steps);
-    }
-
-    private BestPracticeTip parseGeneratedBestPractice(String modelOutput,
-                                                       List<AgentMessage> recentMessages,
-                                                       AgentMessage finalMessage,
-                                                       List<PlanStep> steps) {
-        BestPracticeTip fallback = buildFallbackBestPractice(recentMessages, finalMessage, steps);
-        if (modelOutput == null || modelOutput.isBlank()) {
-            return fallback;
+        if (!evaluation.shouldSave()) {
+            String reason = normalizeText(evaluation.reason());
+            if (reason.isBlank()) {
+                reason = "本次记录缺少足够的可复用价值，暂不保存为锦囊";
+            }
+            throw new IllegalArgumentException(reason);
         }
-        String sourceContent = truncateByChars(normalizeText(modelOutput), 1000);
-        if (sourceContent.isBlank()) return fallback;
-        String title = buildTipTitle(sourceContent);
-        String summary = truncateByChars(buildTipSummary(sourceContent), 300);
-        return new BestPracticeTip(title, summary, sourceContent);
+        String sourceContent = normalizeText(evaluation.content());
+        if (sourceContent.isBlank()) {
+            sourceContent = buildFallbackBestPractice(recentMessages, finalMessage, steps).sourceContent();
+        }
+        String title = normalizeText(evaluation.title());
+        if (title.isBlank()) {
+            title = buildTipTitle(sourceContent);
+        }
+        String summary = normalizeText(evaluation.summary());
+        if (summary.isBlank()) {
+            summary = buildTipSummary(sourceContent);
+        }
+        return new BestPracticeTip(title, truncateByChars(summary, 300), truncateByChars(sourceContent, 1000));
     }
 
     private BestPracticeTip buildFallbackBestPractice(List<AgentMessage> recentMessages,

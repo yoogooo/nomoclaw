@@ -58,6 +58,19 @@ function buildLightThemeOverrides(): GlobalThemeOverrides {
       borderRadiusMedium: themeTokens.radius.base,
       borderRadiusLarge: themeTokens.radius.base
     },
+    Notification: {
+      width: "336px",
+      padding: "14px 16px",
+      borderRadius: "22px",
+      titleFontSize: "15px",
+      descriptionFontSize: "13px",
+      color: "rgba(58, 63, 72, 0.96)",
+      textColor: "#e5eaf1",
+      headerTextColor: "#fbfcfd",
+      descriptionTextColor: "#d2dae4",
+      iconColor: "#c0c9d6",
+      boxShadow: "0 10px 26px rgba(15, 23, 42, 0.12)"
+    },
     Tag: {
       borderRadius: themeTokens.radius.base
     }
@@ -117,6 +130,19 @@ function buildDarkThemeOverrides(): GlobalThemeOverrides {
       borderRadiusSmall: themeTokens.radius.base,
       borderRadiusMedium: themeTokens.radius.base,
       borderRadiusLarge: themeTokens.radius.base
+    },
+    Notification: {
+      width: "348px",
+      padding: "15px 16px",
+      borderRadius: "22px",
+      titleFontSize: "15px",
+      descriptionFontSize: "13px",
+      color: "rgba(241, 244, 248, 0.94)",
+      textColor: "#556070",
+      headerTextColor: "#18212e",
+      descriptionTextColor: "#5f6b7b",
+      iconColor: "#7b8796",
+      boxShadow: "0 14px 34px rgba(0, 0, 0, 0.18)"
     },
     Tag: {
       borderRadius: themeTokens.radius.base

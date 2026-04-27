@@ -23,6 +23,7 @@ import type {
   UploadFilesResponse
 } from "@/types/api";
 import { requestJson } from "@/utils/http";
+import type { RequestJsonOptions } from "@/utils/http";
 
 export const conversationApi = {
   createConversation(agentGroupUid?: string, agentUid?: string) {
@@ -153,12 +154,12 @@ export const conversationApi = {
     sourceMessageUid?: string;
     sourceTime?: string;
     generateBestPractice?: boolean;
-  }) {
+  }, options?: RequestJsonOptions) {
     return requestJson<AgentTip>(`/api/agents/${agentUid}/tips`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
-    });
+    }, options);
   },
   deleteAgentTip(agentUid: string, tipUid: string) {
     return requestJson<SimpleResponse>(`/api/agents/${agentUid}/tips/${tipUid}`, {

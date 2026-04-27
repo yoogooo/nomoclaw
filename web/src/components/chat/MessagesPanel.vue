@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, h, nextTick, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { ArrowDown, ArrowUp, Check, ChevronsDown, ChevronsUp, Copy, Sparkles } from "lucide-vue-next";
-import { NButton, NCard, NCollapse, NCollapseItem, NFlex, NPopconfirm, NTag } from "naive-ui";
+import { NButton, NCard, NCollapse, NCollapseItem, NFlex, NTag } from "naive-ui";
 import ApprovalBanner from "./ApprovalBanner.vue";
 import ComposerPanel from "./composer/ComposerPanel.vue";
 import UiInstantTooltip from "@/components/UiInstantTooltip.vue";
 import { message as discreteMessage } from "@/discrete";
+import { notification as discreteNotification } from "@/discrete";
 import { useConversationStore } from "@/stores/conversation";
 import { useConversationRunsStore } from "@/stores/conversationRuns";
 import { useAgentCatalogStore } from "@/stores/agentCatalog";
@@ -254,6 +255,46 @@ function messageActionKey(messageItem: ConversationMessage) {
   return messageItem.messageUid || `${messageItem.createdTime}-${messageItem.content}`;
 }
 
+function humanizeTipSaveError(message: string) {
+  const normalized = (message || "").trim();
+  if (!normalized) {
+    return t("chat.messages.saveTipFailed");
+  }
+  if (/单次资讯报告|单次.*结果展示|缺失具体执行步骤|缺少可复用|无法复用|信息不足/.test(normalized)) {
+    return t("chat.messages.saveTipRejectedNoReusableFlow");
+  }
+  if (/source message must be assistant role|source message not found|conversation not found/.test(normalized)) {
+    return t("chat.messages.saveTipRejectedUnavailable");
+  }
+  return normalized;
+}
+
+function tipSaveNotificationAvatar(type: "success" | "warning") {
+  return () => h(
+    "span",
+    {
+      class: ["tip-save-notification-avatar", `tip-save-notification-avatar--${type}`]
+    },
+    [
+      h(type === "success" ? Check : Sparkles, {
+        size: 14,
+        strokeWidth: 2.1
+      })
+    ]
+  );
+}
+
+function showTipSaveNotification(type: "success" | "warning", title: string, content: string) {
+  discreteNotification[type]({
+    title,
+    description: content,
+    avatar: tipSaveNotificationAvatar(type),
+    duration: 0,
+    keepAliveOnHover: true,
+    closable: true
+  });
+}
+
 function runHasWaitingApprovalStep(messageItem: ConversationMessage) {
   if (!messageItem.messageUid) return false;
   const run = conversationRunsStore.runsByMessageUid[messageItem.messageUid];
@@ -300,7 +341,7 @@ async function saveJinnang(messageItem: ConversationMessage) {
   const conversationAgentUid = conversationStore.conversations.find((item) => item.conversationUid === conversationStore.currentConversationUid)?.agentUid || "";
   const targetAgentUid = (conversationAgentUid || agentCatalogStore.selectedAgentUid || "").trim();
   if (!targetAgentUid) {
-    discreteMessage.warning(t("chat.messages.saveTipNoAgent"));
+    showTipSaveNotification("warning", t("chat.messages.saveTipFailureTitle"), t("chat.messages.saveTipNoAgent"));
     return;
   }
   savingTipMap.value = {
@@ -315,11 +356,14 @@ async function saveJinnang(messageItem: ConversationMessage) {
       content: messageItem.content,
       sourceTime: messageItem.createdTime,
       conversationUid: conversationStore.currentConversationUid || "",
-      generateBestPractice: true
+      generateBestPractice: true,
+      suppressErrorToast: true
     });
     saved = true;
-  } catch {
+  } catch (error) {
     saved = false;
+    const message = error instanceof Error ? humanizeTipSaveError(error.message) : t("chat.messages.saveTipFailed");
+    showTipSaveNotification("warning", t("chat.messages.saveTipFailureTitle"), message);
   } finally {
     savingTipMap.value = {
       ...savingTipMap.value,
@@ -333,6 +377,7 @@ async function saveJinnang(messageItem: ConversationMessage) {
     ...savedTipMap.value,
     [key]: true
   };
+  showTipSaveNotification("success", t("chat.messages.saveTipSuccessTitle"), t("toast.tipSavedToDb"));
 }
 
 function formatAttachmentSize(sizeBytes = 0) {
@@ -577,32 +622,22 @@ onMounted(() => {
                 </button>
               </UiInstantTooltip>
               <div class="save-tip-wrap">
-                <n-popconfirm
-                  :show-icon="false"
-                  :disabled="savingTipMap[messageActionKey(message)] || isTipSaved(message)"
-                  :positive-text="t('common.confirm')"
-                  :negative-text="t('common.cancel')"
-                  @positive-click="saveJinnang(message)"
-                >
-                  <template #trigger>
-                    <UiInstantTooltip :content="isTipSaved(message) ? t('chat.messages.tipSaved') : t('chat.messages.saveTip')">
-                      <button
-                        class="message-action-btn icon-only"
-                        :class="{
-                          loading: savingTipMap[messageActionKey(message)],
-                          saved: isTipSaved(message)
-                        }"
-                        :disabled="savingTipMap[messageActionKey(message)] || isTipSaved(message)"
-                        type="button"
-                        :aria-label="isTipSaved(message) ? t('chat.messages.tipSaved') : t('chat.messages.saveTip')"
-                      >
-                        <Check v-if="isTipSaved(message) && !savingTipMap[messageActionKey(message)]" :size="14" />
-                        <Sparkles v-else-if="!savingTipMap[messageActionKey(message)]" :size="14" />
-                      </button>
-                    </UiInstantTooltip>
-                  </template>
-                  {{ t("chat.messages.saveTipConfirm") }}
-                </n-popconfirm>
+                <UiInstantTooltip :content="isTipSaved(message) ? t('chat.messages.tipSaved') : t('chat.messages.saveTip')">
+                  <button
+                    class="message-action-btn icon-only"
+                    :class="{
+                      loading: savingTipMap[messageActionKey(message)],
+                      saved: isTipSaved(message)
+                    }"
+                    :disabled="savingTipMap[messageActionKey(message)] || isTipSaved(message)"
+                    type="button"
+                    :aria-label="isTipSaved(message) ? t('chat.messages.tipSaved') : t('chat.messages.saveTip')"
+                    @click="saveJinnang(message)"
+                  >
+                    <Check v-if="isTipSaved(message) && !savingTipMap[messageActionKey(message)]" :size="14" />
+                    <Sparkles v-else-if="!savingTipMap[messageActionKey(message)]" :size="14" />
+                  </button>
+                </UiInstantTooltip>
                 <span v-if="isTipSaved(message)" class="message-action-hint">{{ t("chat.messages.savedAsTip") }}</span>
               </div>
             </div>
