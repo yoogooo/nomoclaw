@@ -2,6 +2,26 @@ import type { GlobalThemeOverrides } from "naive-ui";
 import { themeTokens } from "@/themeTokens";
 import type { UiThemeMode } from "@/stores/uiPreferences";
 
+function notificationOverrides(mode: UiThemeMode) {
+  const tokens = themeTokens.component.notification[mode];
+  return {
+    width: "336px",
+    padding: "14px 16px",
+    borderRadius: "18px",
+    titleFontSize: "15px",
+    descriptionFontSize: "13px",
+    color: tokens.color,
+    textColor: tokens.descriptionColor,
+    headerTextColor: tokens.titleColor,
+    descriptionTextColor: tokens.descriptionColor,
+    iconColor: tokens.iconColor,
+    closeIconColor: tokens.closeColor,
+    closeIconColorHover: tokens.closeColorHover,
+    closeIconColorPressed: tokens.closeColorHover,
+    boxShadow: tokens.shadow
+  };
+}
+
 function buildLightThemeOverrides(): GlobalThemeOverrides {
   return {
     common: {
@@ -59,17 +79,7 @@ function buildLightThemeOverrides(): GlobalThemeOverrides {
       borderRadiusLarge: themeTokens.radius.base
     },
     Notification: {
-      width: "336px",
-      padding: "14px 16px",
-      borderRadius: "22px",
-      titleFontSize: "15px",
-      descriptionFontSize: "13px",
-      color: "rgba(58, 63, 72, 0.96)",
-      textColor: "#e5eaf1",
-      headerTextColor: "#fbfcfd",
-      descriptionTextColor: "#d2dae4",
-      iconColor: "#c0c9d6",
-      boxShadow: "0 10px 26px rgba(15, 23, 42, 0.12)"
+      ...notificationOverrides("light")
     },
     Tag: {
       borderRadius: themeTokens.radius.base
@@ -132,17 +142,7 @@ function buildDarkThemeOverrides(): GlobalThemeOverrides {
       borderRadiusLarge: themeTokens.radius.base
     },
     Notification: {
-      width: "348px",
-      padding: "15px 16px",
-      borderRadius: "22px",
-      titleFontSize: "15px",
-      descriptionFontSize: "13px",
-      color: "rgba(241, 244, 248, 0.94)",
-      textColor: "#556070",
-      headerTextColor: "#18212e",
-      descriptionTextColor: "#5f6b7b",
-      iconColor: "#7b8796",
-      boxShadow: "0 14px 34px rgba(0, 0, 0, 0.18)"
+      ...notificationOverrides("dark")
     },
     Tag: {
       borderRadius: themeTokens.radius.base

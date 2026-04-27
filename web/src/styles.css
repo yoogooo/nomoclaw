@@ -72,79 +72,42 @@ a {
 }
 
 .tip-save-notification-avatar--success {
-  color: #85e4cf;
+  color: #0f766e;
+  background: rgba(15, 118, 110, 0.1);
+  border-color: rgba(15, 118, 110, 0.16);
+}
+
+.tip-save-notification-avatar--warning {
+  color: #b9732f;
+  background: rgba(192, 106, 43, 0.1);
+  border-color: rgba(192, 106, 43, 0.16);
+}
+
+.n-notification-container .n-notification-main__header {
+  letter-spacing: 0.01em;
+}
+
+.n-notification-container .n-notification-main__description {
+  line-height: 1.65;
+}
+
+:root[data-theme="dark"] .tip-save-notification-avatar--success {
+  color: #6ce3c1;
   background: rgba(54, 203, 181, 0.14);
   border-color: rgba(54, 203, 181, 0.18);
 }
 
-.tip-save-notification-avatar--warning {
-  color: #f1c48a;
+:root[data-theme="dark"] .tip-save-notification-avatar--warning {
+  color: #f1ba72;
   background: rgba(240, 179, 90, 0.14);
   border-color: rgba(240, 179, 90, 0.18);
 }
 
-.n-notification-container .n-notification {
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: linear-gradient(180deg, rgba(61, 66, 75, 0.96) 0%, rgba(50, 55, 63, 0.96) 100%);
-  backdrop-filter: blur(14px);
-}
-
-:root:not([data-theme="dark"]) .n-notification-container .n-notification-main__header {
-  color: #fbfcfd;
-  letter-spacing: 0.01em;
-}
-
-:root:not([data-theme="dark"]) .n-notification-container .n-notification-main__description {
-  color: #d2dae4;
-  line-height: 1.65;
-}
-
-:root:not([data-theme="dark"]) .n-notification-container .n-notification__close {
-  color: #d3d9e2;
-  opacity: 0.78;
-}
-
-:root:not([data-theme="dark"]) .n-notification-container .n-notification__close:hover {
-  color: #ffffff;
-  opacity: 1;
-}
-
-:root[data-theme="dark"] .tip-save-notification-avatar--success {
-  color: #0f766e;
-  background: rgba(15, 118, 110, 0.12);
-  border-color: rgba(15, 118, 110, 0.16);
-}
-
-:root[data-theme="dark"] .tip-save-notification-avatar--warning {
-  color: #b9732f;
-  background: rgba(192, 106, 43, 0.12);
-  border-color: rgba(192, 106, 43, 0.16);
-}
-
-:root[data-theme="dark"] .n-notification-container .n-notification {
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  background:
-    linear-gradient(180deg, rgba(245, 247, 250, 0.95) 0%, rgba(236, 240, 245, 0.95) 100%);
-  backdrop-filter: blur(16px);
-}
-
-:root[data-theme="dark"] .n-notification-container .n-notification-main__header {
-  color: #18212e;
-  letter-spacing: 0.01em;
-}
-
-:root[data-theme="dark"] .n-notification-container .n-notification-main__description {
-  color: #5f6b7b;
-  line-height: 1.65;
-}
-
 :root[data-theme="dark"] .n-notification-container .n-notification__close {
-  color: #7b8796;
   opacity: 0.72;
 }
 
 :root[data-theme="dark"] .n-notification-container .n-notification__close:hover {
-  color: #18212e;
   opacity: 1;
 }
 

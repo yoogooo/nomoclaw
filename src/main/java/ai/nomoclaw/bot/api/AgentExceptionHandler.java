@@ -31,7 +31,7 @@ public class AgentExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public SimpleResponse handleIllegalArgument(IllegalArgumentException ex) {
-        log.warn("[AgentAPI][400] illegal argument: {}", ex.getMessage(), ex);
+        log.warn("[AgentAPI][400] illegal argument: {}", ex.getMessage());
         return new SimpleResponse(ex.getMessage());
     }
 

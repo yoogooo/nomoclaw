@@ -1,5 +1,6 @@
 import { computed, ref } from "vue";
 import { defineStore } from "pinia";
+import { syncDiscreteTheme } from "@/discrete";
 import { normalizeAppLocale, setI18nLocale } from "@/i18n";
 import type { AppLocale } from "@/i18n";
 
@@ -72,6 +73,7 @@ export const useUiPreferencesStore = defineStore("ui-preferences", () => {
       chatRuntimeLogVisible.value = window.localStorage.getItem(CHAT_RUNTIME_LOG_VISIBLE_KEY) === "1";
     }
     applyThemeAttribute(themeMode.value);
+    syncDiscreteTheme(themeMode.value);
     setI18nLocale(locale.value);
     syncBootstrapPrefs();
     ready.value = true;
@@ -83,6 +85,7 @@ export const useUiPreferencesStore = defineStore("ui-preferences", () => {
       window.localStorage.setItem(THEME_STORAGE_KEY, nextMode);
     }
     applyThemeAttribute(nextMode);
+    syncDiscreteTheme(nextMode);
     syncBootstrapPrefs();
   }
 
