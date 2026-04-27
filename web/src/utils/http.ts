@@ -1,6 +1,7 @@
 import { router } from "@/router";
 import { message } from "@/discrete";
 import { tr } from "@/i18n";
+import { getI18nLocale } from "@/i18n";
 
 const ERROR_TOAST_DEDUP_WINDOW_MS = 2500;
 const errorToastLastShownAt = new Map<string, number>();
@@ -17,7 +18,7 @@ export async function requestJson<T>(
   const suppressErrorToast = Boolean(options?.suppressErrorToast);
   let response: Response;
   try {
-    response = await fetch(input, init);
+    response = await fetch(input, withLocaleHeader(init));
   } catch (error) {
     const errorMessage = tr("http.networkError");
     if (!suppressErrorToast) {
@@ -48,6 +49,21 @@ export async function requestJson<T>(
   }
 
   return response.json() as Promise<T>;
+}
+
+function withLocaleHeader(init?: RequestInit): RequestInit {
+  const headers = new Headers(init?.headers);
+  const locale = getI18nLocale();
+  if (!headers.has("Accept-Language")) {
+    headers.set("Accept-Language", locale);
+  }
+  if (!headers.has("X-App-Locale")) {
+    headers.set("X-App-Locale", locale);
+  }
+  return {
+    ...init,
+    headers
+  };
 }
 
 function showErrorToastDedup(text: string) {

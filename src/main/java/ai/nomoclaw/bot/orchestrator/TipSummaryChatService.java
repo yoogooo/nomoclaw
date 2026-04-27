@@ -2,14 +2,20 @@ package ai.nomoclaw.bot.orchestrator;
 
 import ai.nomoclaw.bot.planner.RuntimeChatModelResolver;
 import ai.nomoclaw.bot.prompt.PromptLoader;
+import ai.nomoclaw.bot.prompt.PromptTemplateService;
 import ai.nomoclaw.bot.util.JsonUtil;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
@@ -17,7 +23,11 @@ import java.util.Locale;
 @Slf4j
 public class TipSummaryChatService {
 
-    private static final String TIP_EVALUATION_SYSTEM_PROMPT = """
+    private static final String TIP_PROMPT_NAMESPACE = "tips";
+    private static final String TIP_SYSTEM_TEMPLATE = "system";
+    private static final String TIP_USER_INTRO_TEMPLATE = "user-intro";
+    private static final List<Locale> SUPPORTED_PROMPT_LOCALES = List.of(Locale.ENGLISH, Locale.SIMPLIFIED_CHINESE);
+    private static final String DEFAULT_TIP_EVALUATION_SYSTEM_PROMPT = """
             你是“锦囊评估与提炼器”。
             你的唯一任务：判断输入是否值得沉淀为锦囊；如果值得，再提炼成可直接复用的锦囊内容。
 
@@ -38,7 +48,7 @@ public class TipSummaryChatService {
               "content": "300到1000字，decision=save 时填写，必须包含目标、关键步骤顺序、常见失败点、完成判定"
             }
             """;
-    private static final String TIP_EVALUATION_USER_PROMPT_INTRO = """
+    private static final String DEFAULT_TIP_EVALUATION_USER_PROMPT_INTRO = """
             请判断下面这段记录是否值得保存为锦囊。
 
             要求：
@@ -48,20 +58,30 @@ public class TipSummaryChatService {
             """;
 
     private final RuntimeChatModelResolver runtimeChatModelResolver;
+    private final PromptTemplateService promptTemplateService;
 
-    public TipSummaryChatService(RuntimeChatModelResolver runtimeChatModelResolver) {
+    protected TipSummaryChatService(RuntimeChatModelResolver runtimeChatModelResolver) {
+        this(runtimeChatModelResolver, null);
+    }
+
+    @Autowired
+    public TipSummaryChatService(RuntimeChatModelResolver runtimeChatModelResolver,
+                                 PromptTemplateService promptTemplateService) {
         this.runtimeChatModelResolver = runtimeChatModelResolver;
+        this.promptTemplateService = promptTemplateService;
     }
 
     public TipEvaluationResult evaluate(PromptLoader.PromptContext promptContext,
                                         List<RecentMessage> recentMessages,
                                         List<StepDigest> steps,
                                         String finalResult) {
-        String prompt = buildEvaluationPrompt(recentMessages, steps, finalResult);
+        Locale locale = resolvePromptLocale();
+        String systemPrompt = loadSystemPrompt(locale);
+        String prompt = buildEvaluationPrompt(recentMessages, steps, finalResult, locale);
         RuntimeChatModelResolver.ResolvedModel resolvedModel = runtimeChatModelResolver.resolve(promptContext);
         ChatRequest request = ChatRequest.builder()
                 .messages(List.of(
-                        SystemMessage.from(TIP_EVALUATION_SYSTEM_PROMPT),
+                        SystemMessage.from(systemPrompt),
                         UserMessage.from(prompt)
                 ))
                 .build();
@@ -70,6 +90,12 @@ public class TipSummaryChatService {
                 resolvedModel.modelId(),
                 promptContext == null ? "" : promptContext.sessionId(),
                 promptContext == null ? "" : promptContext.messageUid());
+        log.info("[TipSummaryChat] promptLocale={} acceptLanguage={} xAppLocale={}",
+                locale,
+                currentRequestHeader("Accept-Language"),
+                currentRequestHeader("X-App-Locale"));
+        log.info("[TipSummaryChat] systemPrompt:\n{}", systemPrompt);
+        log.info("[TipSummaryChat] userPrompt:\n{}", prompt);
         ChatResponse response = resolvedModel.model().chat(request);
         String output = response.aiMessage() == null ? "" : response.aiMessage().text();
         log.info("[TipSummaryChat] finish provider={} model={} outputLength={}",
@@ -81,8 +107,9 @@ public class TipSummaryChatService {
 
     private String buildEvaluationPrompt(List<RecentMessage> recentMessages,
                                          List<StepDigest> steps,
-                                         String finalResult) {
-        StringBuilder builder = new StringBuilder(TIP_EVALUATION_USER_PROMPT_INTRO);
+                                         String finalResult,
+                                         Locale locale) {
+        StringBuilder builder = new StringBuilder(loadUserPromptIntro(locale));
         builder.append("\n\n[recent_messages]\n");
         for (RecentMessage message : recentMessages) {
             builder.append("- role=").append(normalizeText(message.role()))
@@ -114,6 +141,77 @@ public class TipSummaryChatService {
                 .filter(message -> "assistant".equalsIgnoreCase(message.role()) && hasMeaningfulText(message.content()))
                 .count()).append('\n');
         return builder.toString();
+    }
+
+    private Locale resolvePromptLocale() {
+        Locale explicitLocale = parseLocaleHeader(currentRequestHeader("X-App-Locale"));
+        if (explicitLocale != null) {
+            return explicitLocale;
+        }
+        Locale acceptLanguageLocale = parseAcceptLanguageHeader(currentRequestHeader("Accept-Language"));
+        if (acceptLanguageLocale != null) {
+            return acceptLanguageLocale;
+        }
+        return LocaleContextHolder.getLocale();
+    }
+
+    private String currentRequestHeader(String name) {
+        if (!(RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes)) {
+            return "";
+        }
+        String value = attributes.getRequest().getHeader(name);
+        return value == null ? "" : value.trim();
+    }
+
+    private Locale parseLocaleHeader(String raw) {
+        String normalized = normalizeText(raw);
+        if (normalized.isBlank()) {
+            return null;
+        }
+        return normalized.toLowerCase(Locale.ROOT).startsWith("zh") ? Locale.SIMPLIFIED_CHINESE : Locale.ENGLISH;
+    }
+
+    private Locale parseAcceptLanguageHeader(String raw) {
+        String normalized = normalizeText(raw);
+        if (normalized.isBlank()) {
+            return null;
+        }
+        try {
+            return Locale.LanguageRange.parse(normalized).stream()
+                    .sorted(Comparator.comparingDouble(Locale.LanguageRange::getWeight).reversed())
+                    .map(Locale.LanguageRange::getRange)
+                    .map(this::parseLocaleHeader)
+                    .filter(locale -> locale != null && SUPPORTED_PROMPT_LOCALES.stream()
+                            .anyMatch(supported -> supported.getLanguage().equals(locale.getLanguage())))
+                    .findFirst()
+                    .orElse(null);
+        } catch (IllegalArgumentException ex) {
+            return parseLocaleHeader(normalized);
+        }
+    }
+
+    private String loadSystemPrompt(Locale locale) {
+        if (promptTemplateService == null) {
+            return DEFAULT_TIP_EVALUATION_SYSTEM_PROMPT;
+        }
+        return promptTemplateService.load(
+                TIP_PROMPT_NAMESPACE,
+                TIP_SYSTEM_TEMPLATE,
+                locale,
+                DEFAULT_TIP_EVALUATION_SYSTEM_PROMPT
+        );
+    }
+
+    private String loadUserPromptIntro(Locale locale) {
+        if (promptTemplateService == null) {
+            return DEFAULT_TIP_EVALUATION_USER_PROMPT_INTRO;
+        }
+        return promptTemplateService.load(
+                TIP_PROMPT_NAMESPACE,
+                TIP_USER_INTRO_TEMPLATE,
+                locale,
+                DEFAULT_TIP_EVALUATION_USER_PROMPT_INTRO
+        );
     }
 
     private TipEvaluationResult parseEvaluationResult(String rawOutput,

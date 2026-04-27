@@ -638,7 +638,6 @@ onMounted(() => {
                     <Sparkles v-else-if="!savingTipMap[messageActionKey(message)]" :size="14" />
                   </button>
                 </UiInstantTooltip>
-                <span v-if="isTipSaved(message)" class="message-action-hint">{{ t("chat.messages.savedAsTip") }}</span>
               </div>
             </div>
           </div>
@@ -1159,40 +1158,14 @@ onMounted(() => {
 }
 
 .message-action-btn.saved {
-  border-color: var(--color-border-spinner-soft);
-  background: var(--color-bg-brand-tint-14);
-  color: var(--color-text-brand-strong);
+  background: color-mix(in srgb, var(--color-accent-brand) 12%, transparent);
+  color: var(--color-accent-brand);
+  opacity: 1;
 }
 
 .save-tip-wrap {
   position: relative;
   display: inline-flex;
-}
-
-.message-action-hint {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + var(--space-1_5));
-  white-space: nowrap;
-  font-size: var(--text-caption-size);
-  color: var(--color-text-brand-strong);
-  background: var(--color-bg-brand-tint-12);
-  border: var(--size-1) solid var(--color-border-accent-soft);
-  border-radius: var(--radius-pill);
-  padding: var(--space-1) var(--space-2);
-  box-shadow: var(--shadow-soft-md);
-  animation: hint-in 0.16s ease-out;
-}
-
-@keyframes hint-in {
-  from {
-    opacity: 0;
-    transform: translateY(var(--space-1));
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 @keyframes copied-flash {

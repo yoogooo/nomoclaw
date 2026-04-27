@@ -211,12 +211,13 @@ public class AgentTipApplicationService {
 
         int fromIndex = Math.max(0, anchorIndex - 5);
         List<AgentMessage> recentMessages = allMessages.subList(fromIndex, anchorIndex);
-        List<PlanStep> steps = store.listSteps(sourceMessageUid).stream()
+        String executionMessageUid = resolveExecutionMessageUid(finalMessage, sourceMessageUid);
+        List<PlanStep> steps = store.listSteps(executionMessageUid).stream()
                 .sorted(Comparator.comparingInt(PlanStep::roundIndex).thenComparingInt(PlanStep::stepIndex))
                 .toList();
         AgentDefinitionEntity executionAgent = resolveExecutionAgent(conversation);
         TipSummaryChatService.TipEvaluationResult evaluation = tipSummaryChatService.evaluate(
-                buildPromptContext(conversation, executionAgent, sourceConversationUid, sourceMessageUid),
+                buildPromptContext(conversation, executionAgent, sourceConversationUid, executionMessageUid),
                 recentMessages.stream()
                         .map(item -> new TipSummaryChatService.RecentMessage(item.role(), item.content()))
                         .toList(),
@@ -254,6 +255,11 @@ public class AgentTipApplicationService {
             summary = buildTipSummary(sourceContent);
         }
         return new BestPracticeTip(title, truncateByChars(summary, 300), truncateByChars(sourceContent, 1000));
+    }
+
+    private String resolveExecutionMessageUid(AgentMessage finalMessage, String sourceMessageUid) {
+        String parentMessageUid = normalizeText(finalMessage.parentMessageUid());
+        return parentMessageUid.isBlank() ? sourceMessageUid : parentMessageUid;
     }
 
     private BestPracticeTip buildFallbackBestPractice(List<AgentMessage> recentMessages,

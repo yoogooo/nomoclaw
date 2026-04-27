@@ -116,6 +116,9 @@ class AgentTipApplicationServiceTests {
         assertEquals("高质量排障锦囊", result.title());
         assertEquals("先确认目标，再按步骤排查并恢复。", result.summary());
         assertEquals("目标：排障；路径：确认目标 -> 检查输入 -> 重试；避坑：记录错误并回看；完成判定：结果恢复并可交付。", result.sourceContent());
+        assertEquals("message-1", store.lastListStepsMessageUid);
+        assertEquals(1, tipSummaryChatService.lastSteps.size());
+        assertEquals("检查输入", tipSummaryChatService.lastSteps.getFirst().title());
 
         assertNotNull(agentTipRepository.savedTip);
         assertEquals("agent-1", agentTipRepository.savedTip.getAgentUid());
@@ -201,6 +204,7 @@ class AgentTipApplicationServiceTests {
 
     private static final class FakeTipSummaryChatService extends TipSummaryChatService {
         private TipEvaluationResult nextResult = TipEvaluationResult.reject("not set");
+        private List<StepDigest> lastSteps = List.of();
 
         private FakeTipSummaryChatService() {
             super(null);
@@ -211,6 +215,7 @@ class AgentTipApplicationServiceTests {
                                             List<RecentMessage> recentMessages,
                                             List<StepDigest> steps,
                                             String finalResult) {
+            lastSteps = steps;
             return nextResult;
         }
     }
@@ -219,6 +224,7 @@ class AgentTipApplicationServiceTests {
         private AgentConversation conversation;
         private List<AgentMessage> messages = List.of();
         private List<PlanStep> steps = List.of();
+        private String lastListStepsMessageUid = "";
 
         @Override
         public AgentConversation createConversation(String conversationUid, String agentGroupUid, String agentUid) {
@@ -297,6 +303,7 @@ class AgentTipApplicationServiceTests {
 
         @Override
         public List<PlanStep> listSteps(String messageUid) {
+            lastListStepsMessageUid = messageUid;
             return steps;
         }
 
