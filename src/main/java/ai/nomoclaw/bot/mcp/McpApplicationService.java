@@ -2,13 +2,12 @@ package ai.nomoclaw.bot.mcp;
 
 import ai.nomoclaw.bot.model.ToolRequest;
 import ai.nomoclaw.bot.model.ToolResult;
+import ai.nomoclaw.bot.store.entity.AgentMcpToolRelationEntity;
 import ai.nomoclaw.bot.store.entity.McpServerDefinitionEntity;
 import ai.nomoclaw.bot.store.entity.McpToolSnapshotEntity;
-import ai.nomoclaw.bot.store.entity.ToolDefinitionEntity;
-import ai.nomoclaw.bot.store.repository.AgentToolRelationRepository;
+import ai.nomoclaw.bot.store.repository.AgentMcpToolRelationRepository;
 import ai.nomoclaw.bot.store.repository.McpServerDefinitionRepository;
 import ai.nomoclaw.bot.store.repository.McpToolSnapshotRepository;
-import ai.nomoclaw.bot.store.repository.ToolDefinitionRepository;
 import ai.nomoclaw.bot.util.JsonUtil;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
@@ -35,27 +34,24 @@ public class McpApplicationService {
 
     private final McpServerDefinitionRepository serverRepository;
     private final McpToolSnapshotRepository toolSnapshotRepository;
-    private final ToolDefinitionRepository toolDefinitionRepository;
-    private final AgentToolRelationRepository agentToolRelationRepository;
+    private final AgentMcpToolRelationRepository agentMcpToolRelationRepository;
     private final McpClientFactory clientFactory;
     private final McpToolKeyGenerator toolKeyGenerator;
 
     public McpApplicationService(McpServerDefinitionRepository serverRepository,
                                  McpToolSnapshotRepository toolSnapshotRepository,
-                                 ToolDefinitionRepository toolDefinitionRepository,
-                                 AgentToolRelationRepository agentToolRelationRepository,
+                                 AgentMcpToolRelationRepository agentMcpToolRelationRepository,
                                  McpClientFactory clientFactory,
                                  McpToolKeyGenerator toolKeyGenerator) {
         this.serverRepository = serverRepository;
         this.toolSnapshotRepository = toolSnapshotRepository;
-        this.toolDefinitionRepository = toolDefinitionRepository;
-        this.agentToolRelationRepository = agentToolRelationRepository;
+        this.agentMcpToolRelationRepository = agentMcpToolRelationRepository;
         this.clientFactory = clientFactory;
         this.toolKeyGenerator = toolKeyGenerator;
     }
 
     public List<McpServerDto> listServers() {
-        Map<String, Long> toolCounts = toolSnapshotRepository.listActive().stream()
+        Map<String, Long> toolCounts = toolSnapshotRepository.listAll().stream()
                 .collect(Collectors.groupingBy(McpToolSnapshotEntity::getServerUid, Collectors.counting()));
         return serverRepository.listAll().stream()
                 .map(server -> toDto(server, toolCounts.getOrDefault(server.getServerUid(), 0L).intValue()))
@@ -100,12 +96,6 @@ public class McpApplicationService {
             snapshot.setStatus(nextStatus);
             snapshot.setUpdatedTime(now);
             toolSnapshotRepository.updateById(snapshot);
-            ToolDefinitionEntity tool = toolDefinitionRepository.findByKey(snapshot.getToolKey());
-            if (tool != null) {
-                tool.setStatus(nextStatus);
-                tool.setUpdatedTime(now);
-                toolDefinitionRepository.updateById(tool);
-            }
         }
         return toDto(server, toolSnapshotRepository.listByServerUid(serverUid).size());
     }
@@ -114,11 +104,7 @@ public class McpApplicationService {
     public void deleteServer(String serverUid) {
         McpServerDefinitionEntity server = requireServer(serverUid);
         for (McpToolSnapshotEntity snapshot : toolSnapshotRepository.listByServerUid(serverUid)) {
-            agentToolRelationRepository.deleteByToolKey(snapshot.getToolKey());
-            ToolDefinitionEntity tool = toolDefinitionRepository.findByKey(snapshot.getToolKey());
-            if (tool != null) {
-                toolDefinitionRepository.removeById(tool.getId());
-            }
+            agentMcpToolRelationRepository.deleteByToolKey(snapshot.getToolKey());
             toolSnapshotRepository.removeById(snapshot.getId());
         }
         serverRepository.removeById(server.getId());
@@ -141,6 +127,7 @@ public class McpApplicationService {
         McpServerDefinitionEntity server = requireServer(serverUid);
         try (McpClient client = clientFactory.create(server, readConfig(server))) {
             List<ToolSpecification> tools = client.listTools();
+            logRefreshedTools(server, tools);
             LocalDateTime now = LocalDateTime.now();
             for (ToolSpecification tool : tools) {
                 upsertToolSnapshot(server, tool, now);
@@ -155,6 +142,64 @@ public class McpApplicationService {
 
     public boolean isMcpTool(String toolKey) {
         return toolSnapshotRepository.findActiveByToolKey(toolKey) != null;
+    }
+
+    public List<AgentMcpToolDto> listAgentTools(String agentUid) {
+        Map<String, AgentMcpToolRelationEntity> relationsByToolKey = agentMcpToolRelationRepository.listByAgentUid(agentUid)
+                .stream()
+                .collect(Collectors.toMap(
+                        AgentMcpToolRelationEntity::getToolKey,
+                        relation -> relation,
+                        (left, right) -> left,
+                        LinkedHashMap::new
+                ));
+        Map<String, McpServerDefinitionEntity> serversByUid = serverRepository.listAll().stream()
+                .collect(Collectors.toMap(
+                        McpServerDefinitionEntity::getServerUid,
+                        server -> server,
+                        (left, right) -> left,
+                        LinkedHashMap::new
+                ));
+        return toolSnapshotRepository.listActive().stream()
+                .map(snapshot -> toAgentToolDto(snapshot, serversByUid.get(snapshot.getServerUid()), relationsByToolKey.get(snapshot.getToolKey())))
+                .toList();
+    }
+
+    @Transactional
+    public AgentMcpToolDto updateAgentToolStatus(String agentUid, String toolKey, boolean enabled) {
+        String normalizedAgentUid = nullToEmpty(agentUid).trim();
+        String normalizedToolKey = nullToEmpty(toolKey).trim();
+        if (normalizedAgentUid.isBlank()) {
+            throw new IllegalArgumentException("agentUid must not be blank");
+        }
+        if (normalizedToolKey.isBlank()) {
+            throw new IllegalArgumentException("toolKey must not be blank");
+        }
+        McpToolSnapshotEntity snapshot = toolSnapshotRepository.findActiveByToolKey(normalizedToolKey);
+        if (snapshot == null) {
+            throw new IllegalArgumentException("MCP tool not found: " + normalizedToolKey);
+        }
+
+        AgentMcpToolRelationEntity relation = agentMcpToolRelationRepository.findByAgentUidAndToolKey(normalizedAgentUid, normalizedToolKey);
+        LocalDateTime now = LocalDateTime.now();
+        String nextStatus = enabled ? "ACTIVE" : "DISABLED";
+        if (relation == null) {
+            relation = new AgentMcpToolRelationEntity();
+            relation.setRelationUid(UUID.randomUUID().toString());
+            relation.setAgentUid(normalizedAgentUid);
+            relation.setToolKey(normalizedToolKey);
+            relation.setSortIndex(500);
+            relation.setConfigJson("{}");
+            relation.setCreatedTime(now);
+        }
+        relation.setStatus(nextStatus);
+        relation.setUpdatedTime(now);
+        if (relation.getId() == null) {
+            agentMcpToolRelationRepository.save(relation);
+        } else {
+            agentMcpToolRelationRepository.updateById(relation);
+        }
+        return toAgentToolDto(snapshot, serverRepository.findByUid(snapshot.getServerUid()), relation);
     }
 
     public ToolResult execute(String toolKey, ToolRequest request) {
@@ -198,6 +243,33 @@ public class McpApplicationService {
         return toolSnapshotRepository.listActive();
     }
 
+    public List<McpToolSnapshotEntity> listActiveToolSnapshotsForAgent(String agentUid) {
+        List<String> toolKeys = agentMcpToolRelationRepository.listActiveByAgentUid(agentUid).stream()
+                .map(AgentMcpToolRelationEntity::getToolKey)
+                .distinct()
+                .toList();
+        return toolSnapshotRepository.listActiveByToolKeys(toolKeys);
+    }
+
+    private void logRefreshedTools(McpServerDefinitionEntity server, List<ToolSpecification> tools) {
+        String toolList = tools.stream()
+                .map(tool -> "%s(description=%s)".formatted(
+                        nullToEmpty(tool.name()),
+                        truncateForLog(nullToEmpty(tool.description()), 240)
+                ))
+                .collect(Collectors.joining(", "));
+        log.info("[MCP] refreshed tools serverUid={} serverName={} count={} tools=[{}]",
+                server.getServerUid(), server.getServerName(), tools.size(), toolList);
+    }
+
+    private String truncateForLog(String value, int maxLength) {
+        String normalized = value.replace('\n', ' ').replace('\r', ' ').trim();
+        if (normalized.length() <= maxLength) {
+            return normalized;
+        }
+        return normalized.substring(0, Math.max(0, maxLength - 3)) + "...";
+    }
+
     private void upsertToolSnapshot(McpServerDefinitionEntity server, ToolSpecification tool, LocalDateTime now) {
         String originalName = tool.name();
         McpToolSnapshotEntity snapshot = toolSnapshotRepository.findByServerUidAndOriginalToolName(server.getServerUid(), originalName);
@@ -222,32 +294,6 @@ public class McpApplicationService {
             toolSnapshotRepository.save(snapshot);
         } else {
             toolSnapshotRepository.updateById(snapshot);
-        }
-        upsertToolDefinition(snapshot, now);
-    }
-
-    private void upsertToolDefinition(McpToolSnapshotEntity snapshot, LocalDateTime now) {
-        ToolDefinitionEntity tool = toolDefinitionRepository.findByKey(snapshot.getToolKey());
-        if (tool == null) {
-            tool = new ToolDefinitionEntity();
-            tool.setToolKey(snapshot.getToolKey());
-            tool.setCreatedTime(now);
-            tool.setSortIndex(500);
-        }
-        tool.setDisplayName(snapshot.getDisplayName());
-        tool.setDescription(snapshot.getDescription());
-        tool.setRiskLevel("HIGH");
-        tool.setStatus(snapshot.getStatus());
-        tool.setConfigJson(JsonUtil.toJson(Map.of(
-                "source", "mcp",
-                "serverUid", snapshot.getServerUid(),
-                "originalToolName", snapshot.getOriginalToolName()
-        )));
-        tool.setUpdatedTime(now);
-        if (tool.getId() == null) {
-            toolDefinitionRepository.save(tool);
-        } else {
-            toolDefinitionRepository.updateById(tool);
         }
     }
 
@@ -387,6 +433,26 @@ public class McpApplicationService {
                 snapshot.getDescription(),
                 snapshot.getStatus(),
                 snapshot.getLastSyncedTime()
+        );
+    }
+
+    private AgentMcpToolDto toAgentToolDto(McpToolSnapshotEntity snapshot,
+                                           McpServerDefinitionEntity server,
+                                           AgentMcpToolRelationEntity relation) {
+        boolean enabled = relation != null && "ACTIVE".equalsIgnoreCase(relation.getStatus());
+        LocalDateTime updatedTime = relation == null ? snapshot.getUpdatedTime() : relation.getUpdatedTime();
+        String serverName = server == null ? "" : server.getServerName();
+        String serverDisplayName = server == null ? "" : server.getDisplayName();
+        return new AgentMcpToolDto(
+                snapshot.getToolKey(),
+                snapshot.getServerUid(),
+                serverName,
+                serverDisplayName,
+                snapshot.getOriginalToolName(),
+                snapshot.getDisplayName(),
+                snapshot.getDescription(),
+                enabled,
+                updatedTime
         );
     }
 

@@ -38,6 +38,12 @@ public class McpToolSnapshotRepository extends CrudRepository<McpToolSnapshotMap
                 .list();
     }
 
+    public List<McpToolSnapshotEntity> listAll() {
+        return lambdaQuery()
+                .orderByAsc(McpToolSnapshotEntity::getToolKey)
+                .list();
+    }
+
     public List<McpToolSnapshotEntity> listByServerUid(String serverUid) {
         if (serverUid == null || serverUid.isBlank()) {
             return List.of();

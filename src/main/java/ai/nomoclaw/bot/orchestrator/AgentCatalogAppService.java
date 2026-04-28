@@ -15,6 +15,8 @@ import ai.nomoclaw.bot.application.dto.AgentTipDto;
 import ai.nomoclaw.bot.application.dto.AgentToolDto;
 import ai.nomoclaw.bot.application.dto.GlobalSkillDto;
 import ai.nomoclaw.bot.application.dto.SkillBindingsDto;
+import ai.nomoclaw.bot.mcp.AgentMcpToolDto;
+import ai.nomoclaw.bot.mcp.McpApplicationService;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -27,15 +29,18 @@ public class AgentCatalogAppService {
     private final SkillImportApplicationService skillImportApplicationService;
     private final SkillCatalogApplicationService skillCatalogApplicationService;
     private final AgentTipApplicationService agentTipApplicationService;
+    private final McpApplicationService mcpApplicationService;
 
     public AgentCatalogAppService(AgentApplicationService facade,
                                   SkillImportApplicationService skillImportApplicationService,
                                   SkillCatalogApplicationService skillCatalogApplicationService,
-                                  AgentTipApplicationService agentTipApplicationService) {
+                                  AgentTipApplicationService agentTipApplicationService,
+                                  McpApplicationService mcpApplicationService) {
         this.facade = facade;
         this.skillImportApplicationService = skillImportApplicationService;
         this.skillCatalogApplicationService = skillCatalogApplicationService;
         this.agentTipApplicationService = agentTipApplicationService;
+        this.mcpApplicationService = mcpApplicationService;
     }
 
     public List<AgentCatalogGroupDto> listAgentGroups() {
@@ -100,6 +105,14 @@ public class AgentCatalogAppService {
 
     public AgentToolDto updateAgentToolStatus(String agentUid, String toolKey, boolean enabled) {
         return facade.updateAgentToolStatus(agentUid, toolKey, enabled);
+    }
+
+    public List<AgentMcpToolDto> listAgentMcpTools(String agentUid) {
+        return mcpApplicationService.listAgentTools(agentUid);
+    }
+
+    public AgentMcpToolDto updateAgentMcpToolStatus(String agentUid, String toolKey, boolean enabled) {
+        return mcpApplicationService.updateAgentToolStatus(agentUid, toolKey, enabled);
     }
 
     public List<AgentDocDto> listAgentDocs(String agentUid) {

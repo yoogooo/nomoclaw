@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { NButton, NSelect, NSwitch } from "naive-ui";
+import { RefreshCw } from "lucide-vue-next";
+import { NButton, NIcon, NSelect, NSwitch } from "naive-ui";
 import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
 import DirectoryRail from "@/components/chat/DirectoryRail.vue";
 import AppPageHeader from "@/components/layout/AppPageHeader.vue";
+import { useSystemDiagnosticsMock } from "@/composables/useSystemDiagnosticsMock";
 import { useUiPreferencesStore } from "@/stores/uiPreferences";
 import { useUpdateManagerStore } from "@/stores/updateManager";
 import type { AppLocale } from "@/i18n";
@@ -12,6 +15,8 @@ const uiPreferencesStore = useUiPreferencesStore();
 const updateManagerStore = useUpdateManagerStore();
 uiPreferencesStore.init();
 const { t } = useI18n();
+const router = useRouter();
+const { activeDiagnosticCount, diagnosticEvents, latestDiagnostic } = useSystemDiagnosticsMock();
 const localeOptions = computed(() => [
   { label: t("settings.languageZhCN"), value: "zh-CN" },
   { label: t("settings.languageEnUS"), value: "en-US" }
@@ -21,6 +26,14 @@ const downloadPercentText = computed(() => {
   if (value === null || value === undefined) return "";
   return `${Math.round(Math.min(Math.max(value, 0), 1) * 100)}%`;
 });
+const recent24hDiagnosticCount = computed(() => {
+  const now = Date.now();
+  const dayMs = 24 * 60 * 60 * 1000;
+  return diagnosticEvents.value.filter((event) => {
+    const occurredAt = new Date(event.occurredAt.replace(" ", "T")).getTime();
+    return Number.isFinite(occurredAt) && now - occurredAt <= dayMs && now >= occurredAt;
+  }).length;
+});
 onMounted(() => {
   void updateManagerStore.init();
 });
@@ -28,6 +41,10 @@ onMounted(() => {
 function onLocaleChange(value: AppLocale | null) {
   if (!value) return;
   uiPreferencesStore.setLocale(value);
+}
+
+function openDiagnosticsPage() {
+  void router.push({ name: "settings-error-logs" });
 }
 
 </script>
@@ -78,47 +95,82 @@ function onLocaleChange(value: AppLocale | null) {
             </template>
           </AppPageHeader>
           <div class="page-section-grid settings-grid">
-          <section class="surface-card">
-            <div class="surface-card-title">{{ t("settings.account") }}</div>
-            <div class="ui-detail-list">
-              <div>
-                <div class="meta-label">{{ t("settings.currentIdentity") }}</div>
-                <div class="ui-value-strong">NomoClaw Operator</div>
+            <section class="surface-card">
+              <div class="surface-card-title">{{ t("settings.account") }}</div>
+              <div class="ui-detail-list">
+                <div>
+                  <div class="meta-label">{{ t("settings.currentIdentity") }}</div>
+                  <div class="ui-value-strong">NomoClaw Operator</div>
+                </div>
+                <div>
+                  <div class="meta-label">{{ t("settings.defaultTimezone") }}</div>
+                  <div class="ui-value-strong">Asia/Shanghai</div>
+                </div>
               </div>
-              <div>
-                <div class="meta-label">{{ t("settings.defaultTimezone") }}</div>
-                <div class="ui-value-strong">Asia/Shanghai</div>
-              </div>
-            </div>
-          </section>
+            </section>
 
-          <section class="surface-card">
-            <div class="surface-card-title">{{ t("settings.preferences") }}</div>
-            <div class="ui-detail-list">
-              <div>
-                <div class="meta-label">{{ t("settings.language") }}</div>
-                <div class="ui-value-strong settings-language-select-wrap">
-                  <n-select
-                    class="settings-language-select"
-                    :value="uiPreferencesStore.locale"
-                    :options="localeOptions"
-                    :clearable="false"
-                    @update:value="onLocaleChange"
-                  />
+            <section class="surface-card">
+              <div class="surface-card-title">{{ t("settings.preferences") }}</div>
+              <div class="ui-detail-list">
+                <div>
+                  <div class="meta-label">{{ t("settings.language") }}</div>
+                  <div class="ui-value-strong settings-language-select-wrap">
+                    <n-select
+                      class="settings-language-select"
+                      :value="uiPreferencesStore.locale"
+                      :options="localeOptions"
+                      :clearable="false"
+                      @update:value="onLocaleChange"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <div class="meta-label">{{ t("settings.runtimeLogVisibility") }}</div>
+                  <div class="settings-switch-row">
+                    <n-switch
+                      :value="uiPreferencesStore.chatRuntimeLogVisible"
+                      @update:value="(value) => uiPreferencesStore.setChatRuntimeLogVisible(Boolean(value))"
+                    />
+                    <span class="settings-switch-state">{{ uiPreferencesStore.chatRuntimeLogVisible ? t("settings.runtimeLogOn") : t("settings.runtimeLogOff") }}</span>
+                  </div>
                 </div>
               </div>
-              <div>
-                <div class="meta-label">{{ t("settings.runtimeLogVisibility") }}</div>
-                <div class="settings-switch-row">
-                  <n-switch
-                    :value="uiPreferencesStore.chatRuntimeLogVisible"
-                    @update:value="(value) => uiPreferencesStore.setChatRuntimeLogVisible(Boolean(value))"
-                  />
-                  <span class="settings-switch-state">{{ uiPreferencesStore.chatRuntimeLogVisible ? t("settings.runtimeLogOn") : t("settings.runtimeLogOff") }}</span>
+            </section>
+
+            <section class="surface-card settings-diagnostics-card">
+              <div class="settings-diagnostics-title-row">
+                <div>
+                  <div class="surface-card-title">{{ t("settings.diagnostics") }}</div>
+                  <div class="settings-diagnostics-subtitle">{{ t("settings.diagnosticsSubtitle") }}</div>
                 </div>
               </div>
-            </div>
-          </section>
+              <div class="settings-diagnostics-health">
+                <div>
+                  <div class="meta-label">{{ t("settings.diagnosticsHealth") }}</div>
+                  <div class="settings-diagnostics-health-value" :class="{ 'is-warning': activeDiagnosticCount > 0 }">
+                    {{ activeDiagnosticCount > 0 ? t("settings.diagnosticsNeedsAttention") : t("settings.diagnosticsHealthy") }}
+                  </div>
+                </div>
+                <div>
+                  <div class="meta-label">{{ t("settings.diagnosticsLast24Hours") }}</div>
+                  <div class="ui-value-strong">{{ recent24hDiagnosticCount }}</div>
+                </div>
+              </div>
+              <div v-if="latestDiagnostic" class="settings-diagnostics-latest">
+                <span>{{ latestDiagnostic.occurredAt }}</span>
+              </div>
+              <div class="settings-diagnostics-actions">
+                <n-button tertiary size="small">
+                  <template #icon>
+                    <n-icon :component="RefreshCw" />
+                  </template>
+                  {{ t("settings.diagnosticsRefresh") }}
+                </n-button>
+                <n-button type="primary" size="small" @click="openDiagnosticsPage">
+                  {{ t("settings.diagnosticsViewLogs") }}
+                </n-button>
+              </div>
+            </section>
           </div>
         </div>
       </main>
@@ -128,7 +180,7 @@ function onLocaleChange(value: AppLocale | null) {
 
 <style scoped>
 .settings-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--size-300)), 1fr));
   align-items: start;
 }
 
@@ -173,15 +225,66 @@ function onLocaleChange(value: AppLocale | null) {
   color: var(--color-danger);
 }
 
-@media (max-width: var(--size-breakpoint-lg)) {
-  .settings-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+.settings-diagnostics-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
 }
 
-@media (max-width: var(--size-breakpoint-md)) {
-  .settings-grid {
-    grid-template-columns: 1fr;
-  }
+.settings-diagnostics-title-row,
+.settings-diagnostics-health,
+.settings-diagnostics-latest,
+.settings-diagnostics-actions {
+  display: flex;
+  align-items: center;
+}
+
+.settings-diagnostics-title-row,
+.settings-diagnostics-health {
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.settings-diagnostics-subtitle {
+  color: var(--color-text-secondary);
+  font-size: var(--text-caption-size);
+  line-height: 1.4;
+}
+
+.settings-diagnostics-health {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-subtle);
+}
+
+.settings-diagnostics-health-value {
+  margin-top: var(--space-1);
+  color: var(--color-success);
+  font-size: var(--text-body-size);
+  font-weight: 650;
+}
+
+.settings-diagnostics-health-value.is-warning {
+  color: var(--color-warning);
+}
+
+.settings-diagnostics-latest {
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-caption-size);
+}
+
+.settings-diagnostics-latest span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-diagnostics-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
 }
 </style>

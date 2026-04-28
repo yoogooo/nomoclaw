@@ -14,6 +14,7 @@ import type {
 import type { AgentDocFile, ImportedSkillResponse, ModelConfig } from "@/types/api";
 import {
   defaultDocs,
+  mapApiMcpTool,
   mapApiSkill,
   mapApiTip,
   mapApiTool,
@@ -177,9 +178,10 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
     const isPersisted = agentCatalogStore.allAgents.some((item) => item.agentUid === agentUid);
     if (!isPersisted) return;
     const requestSeq = ++workspaceLoadSeq;
-    const [skills, tools, tips, docs] = await Promise.all([
+    const [skills, tools, mcpTools, tips, docs] = await Promise.all([
       conversationApi.listAgentSkills(agentUid),
       conversationApi.listAgentTools(agentUid),
+      conversationApi.listAgentMcpTools(agentUid),
       conversationApi.listAgentTips(agentUid),
       conversationApi.listAgentDocs(agentUid)
     ]);
@@ -188,6 +190,7 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
       ...agent,
       managedSkills: skills.map((item) => mapApiSkill(item, domainOptions.value)),
       managedTools: tools.map(mapApiTool),
+      managedMcpTools: mcpTools.map(mapApiMcpTool),
       tips: tips.map(mapApiTip),
       docs: {
         ...agent.docs,
@@ -297,6 +300,26 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
         updateAgent(selectedAgent.agentUid, (agent) => ({
           ...agent,
           managedTools: agent.managedTools.map((item) =>
+            item.id === toolId
+              ? {
+                  ...item,
+                  enabled: updated.enabled
+                }
+              : item
+          )
+        }));
+      });
+  }
+
+  function setMcpToolEnabled(selectedAgent: ManagedAgent | null, toolId: string, enabled: boolean) {
+    if (!selectedAgent) return;
+    const tool = selectedAgent.managedMcpTools.find((item) => item.id === toolId);
+    if (!tool) return;
+    void conversationApi.updateAgentMcpToolStatus(selectedAgent.agentUid, tool.toolKey, enabled)
+      .then((updated) => {
+        updateAgent(selectedAgent.agentUid, (agent) => ({
+          ...agent,
+          managedMcpTools: agent.managedMcpTools.map((item) =>
             item.id === toolId
               ? {
                   ...item,
@@ -516,6 +539,7 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
     removeAgent,
     setSkillEnabled,
     setToolEnabled,
+    setMcpToolEnabled,
     addTip,
     updateTip,
     removeTip,

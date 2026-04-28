@@ -118,6 +118,7 @@ public class AgentApplicationService {
     private final AgentTipApplicationService agentTipApplicationService;
     private final ToolDefinitionRepository toolDefinitionRepository;
     private final AgentToolRelationRepository agentToolRelationRepository;
+    private final AgentMcpToolRelationRepository agentMcpToolRelationRepository;
     private final ModelConfigAppService modelConfigAppService;
     private final ConversationAttachmentAppService conversationAttachmentAppService;
     private final ImageLoaderContextService imageLoaderContextService;
@@ -147,6 +148,7 @@ public class AgentApplicationService {
                                    AgentTipApplicationService agentTipApplicationService,
                                    ToolDefinitionRepository toolDefinitionRepository,
                                    AgentToolRelationRepository agentToolRelationRepository,
+                                   AgentMcpToolRelationRepository agentMcpToolRelationRepository,
                                    ModelConfigAppService modelConfigAppService,
                                    ConversationAttachmentAppService conversationAttachmentAppService,
                                    ImageLoaderContextService imageLoaderContextService,
@@ -173,6 +175,7 @@ public class AgentApplicationService {
         this.agentTipApplicationService = agentTipApplicationService;
         this.toolDefinitionRepository = toolDefinitionRepository;
         this.agentToolRelationRepository = agentToolRelationRepository;
+        this.agentMcpToolRelationRepository = agentMcpToolRelationRepository;
         this.modelConfigAppService = modelConfigAppService;
         this.conversationAttachmentAppService = conversationAttachmentAppService;
         this.imageLoaderContextService = imageLoaderContextService;
@@ -629,6 +632,7 @@ public class AgentApplicationService {
         agentTipApplicationService.purgeAgentTips(normalizedAgentUid);
         agentSkillRelationRepository.deleteByAgentUid(normalizedAgentUid);
         agentToolRelationRepository.deleteByAgentUid(normalizedAgentUid);
+        agentMcpToolRelationRepository.deleteByAgentUid(normalizedAgentUid);
         agentGroupMemberRepository.deleteByAgentUid(normalizedAgentUid);
         agentDefinitionRepository.deleteByAgentUid(normalizedAgentUid);
         permissionAppService.removeAgentManagedWorkspaceRules(agent.getAgentUid(), agent.getAgentName());

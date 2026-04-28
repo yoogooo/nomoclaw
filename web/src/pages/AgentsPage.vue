@@ -47,7 +47,7 @@ import { getSortLocale } from "@/i18n";
 import { message } from "@/discrete";
 
 const AGENTS_PAGE_STATE_STORAGE_KEY = "agents-page:selection:v1";
-const AGENT_DETAIL_TABS = ["basic", "skills", "tools", "tips", "docs"] as const;
+const AGENT_DETAIL_TABS = ["basic", "skills", "tools", "mcp", "tips", "docs"] as const;
 
 interface AgentsPagePersistedState {
   selectedAgentUid: string;
@@ -228,6 +228,10 @@ function onToggleTool(toolId: string, enabled: boolean) {
   management.setToolEnabled(selectedAgent.value, toolId, enabled);
 }
 
+function onToggleMcpTool(toolId: string, enabled: boolean) {
+  management.setMcpToolEnabled(selectedAgent.value, toolId, enabled);
+}
+
 function onToggleDoc(key: string, enabled: boolean) {
   management.setDocEnabled(selectedAgent.value, key as DocKey, enabled);
 }
@@ -356,6 +360,14 @@ watch([selectedAgentUid, detailTab], ([agentUid, tab]) => {
                   <AgentToolsTab
                     :tools="selectedAgent.managedTools"
                     @toggle="onToggleTool"
+                  />
+                </n-tab-pane>
+
+                <n-tab-pane name="mcp" :tab="t('pages.agents.tabMcp')">
+                  <AgentToolsTab
+                    :tools="selectedAgent.managedMcpTools"
+                    group-by-server
+                    @toggle="onToggleMcpTool"
                   />
                 </n-tab-pane>
 

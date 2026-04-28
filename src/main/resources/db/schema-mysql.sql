@@ -5,6 +5,7 @@ DROP TABLE IF EXISTS agent_cron_subscription;
 DROP TABLE IF EXISTS agent_tip;
 DROP TABLE IF EXISTS agent_skill_relation;
 DROP TABLE IF EXISTS skill_definition;
+DROP TABLE IF EXISTS agent_mcp_tool_relation;
 DROP TABLE IF EXISTS agent_tool_relation;
 DROP TABLE IF EXISTS tool_definition;
 DROP TABLE IF EXISTS mcp_tool_snapshot;
@@ -111,6 +112,25 @@ CREATE TABLE IF NOT EXISTS agent_tool_relation (
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_0900_ai_ci
   COMMENT='Agent 与工具关联表';
+
+CREATE TABLE IF NOT EXISTS agent_mcp_tool_relation (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增主键',
+    relation_uid VARCHAR(64) NOT NULL DEFAULT '' COMMENT '关联业务ID',
+    agent_uid VARCHAR(64) NOT NULL DEFAULT '' COMMENT 'Agent 业务ID',
+    tool_key VARCHAR(64) NOT NULL DEFAULT '' COMMENT 'MCP 工具唯一标识',
+    status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE' COMMENT '状态：ACTIVE / DISABLED',
+    sort_index INT NOT NULL DEFAULT 0 COMMENT '排序值',
+    config_json JSON NULL COMMENT '扩展配置',
+    created_time DATETIME(3) NOT NULL COMMENT '创建时间',
+    updated_time DATETIME(3) NOT NULL COMMENT '更新时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_agent_mcp_tool_relation_uid (relation_uid),
+    UNIQUE KEY uk_agent_mcp_tool_relation_pair (agent_uid, tool_key),
+    KEY idx_agent_mcp_tool_relation_agent (agent_uid, status)
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_0900_ai_ci
+  COMMENT='Agent 与 MCP 工具关联表';
 
 CREATE TABLE IF NOT EXISTS mcp_server_definition (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增主键',
@@ -482,32 +502,32 @@ INSERT INTO skill_definition (
 INSERT INTO agent_tool_relation (
     relation_uid, agent_uid, tool_key, status, sort_index, config_json, created_time, updated_time
 ) VALUES
-    ('rel_general_command', 'agent_general_assistant', 'CommandTool', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_general_browser', 'agent_general_assistant', 'BrowserTool', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_general_file', 'agent_general_assistant', 'FileTool', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_general_cron_create', 'agent_general_assistant', 'CronCreateTool', 'ACTIVE', 60, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_general_cron_delete', 'agent_general_assistant', 'CronDeleteTool', 'ACTIVE', 61, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_general_cron_list', 'agent_general_assistant', 'CronListTool', 'ACTIVE', 62, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_general_search', 'agent_general_assistant', 'FileSearchTool', 'ACTIVE', 70, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_general_shot', 'agent_general_assistant', 'DesktopScreenshotTool', 'ACTIVE', 80, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_general_time', 'agent_general_assistant', 'CurrentTimeTool', 'ACTIVE', 90, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_general_token', 'agent_general_assistant', 'TokenUsageTool', 'ACTIVE', 100, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_general_image_loader', 'agent_general_assistant', 'ImageLoaderTool', 'ACTIVE', 115, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_general_memory', 'agent_general_assistant', 'MemorySearchTool', 'ACTIVE', 110, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_test_command', 'agent_test_expert', 'CommandTool', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_test_file', 'agent_test_expert', 'FileTool', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_test_search', 'agent_test_expert', 'FileSearchTool', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_test_time', 'agent_test_expert', 'CurrentTimeTool', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_test_memory', 'agent_test_expert', 'MemorySearchTool', 'ACTIVE', 50, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_public_browser', 'agent_public_opinion', 'BrowserTool', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_public_search', 'agent_public_opinion', 'FileSearchTool', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_public_time', 'agent_public_opinion', 'CurrentTimeTool', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_public_memory', 'agent_public_opinion', 'MemorySearchTool', 'ACTIVE', 50, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_market_command', 'agent_marketing_assistant', 'CommandTool', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_market_browser', 'agent_marketing_assistant', 'BrowserTool', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_market_search', 'agent_marketing_assistant', 'FileSearchTool', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_market_time', 'agent_marketing_assistant', 'CurrentTimeTool', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_market_memory', 'agent_marketing_assistant', 'MemorySearchTool', 'ACTIVE', 50, JSON_OBJECT(), NOW(3), NOW(3));
+    ('RelGeneralCommand', 'agent_general_assistant', 'CommandTool', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('RelGeneralBrowser', 'agent_general_assistant', 'BrowserTool', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('RelGeneralFile', 'agent_general_assistant', 'FileTool', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('RelGeneralCronCreate', 'agent_general_assistant', 'CronCreateTool', 'ACTIVE', 60, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('RelGeneralCronDelete', 'agent_general_assistant', 'CronDeleteTool', 'ACTIVE', 61, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('RelGeneralCronList', 'agent_general_assistant', 'CronListTool', 'ACTIVE', 62, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('RelGeneralSearch', 'agent_general_assistant', 'FileSearchTool', 'ACTIVE', 70, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('RelGeneralShot', 'agent_general_assistant', 'DesktopScreenshotTool', 'ACTIVE', 80, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('RelGeneralTime', 'agent_general_assistant', 'CurrentTimeTool', 'ACTIVE', 90, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('RelGeneralToken', 'agent_general_assistant', 'TokenUsageTool', 'ACTIVE', 100, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('RelGeneralImageLoader', 'agent_general_assistant', 'ImageLoaderTool', 'ACTIVE', 115, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('RelGeneralMemory', 'agent_general_assistant', 'MemorySearchTool', 'ACTIVE', 110, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('RelTestCommand', 'agent_test_expert', 'CommandTool', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('RelTestFile', 'agent_test_expert', 'FileTool', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('RelTestSearch', 'agent_test_expert', 'FileSearchTool', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('RelTestTime', 'agent_test_expert', 'CurrentTimeTool', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('RelTestMemory', 'agent_test_expert', 'MemorySearchTool', 'ACTIVE', 50, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('RelPublicBrowser', 'agent_public_opinion', 'BrowserTool', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('RelPublicSearch', 'agent_public_opinion', 'FileSearchTool', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('RelPublicTime', 'agent_public_opinion', 'CurrentTimeTool', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('RelPublicMemory', 'agent_public_opinion', 'MemorySearchTool', 'ACTIVE', 50, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('RelMarketCommand', 'agent_marketing_assistant', 'CommandTool', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('RelMarketBrowser', 'agent_marketing_assistant', 'BrowserTool', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('RelMarketSearch', 'agent_marketing_assistant', 'FileSearchTool', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('RelMarketTime', 'agent_marketing_assistant', 'CurrentTimeTool', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('RelMarketMemory', 'agent_marketing_assistant', 'MemorySearchTool', 'ACTIVE', 50, JSON_OBJECT(), NOW(3), NOW(3));
 
 INSERT INTO agent_skill_relation (
     relation_uid, agent_uid, skill_key, status, sort_index, config_json, created_time, updated_time

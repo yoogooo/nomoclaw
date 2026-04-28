@@ -224,6 +224,24 @@ public final class ApiDtoMapper {
         );
     }
 
+    public static List<AgentMcpToolResponse> toAgentMcpTools(List<ai.nomoclaw.bot.mcp.AgentMcpToolDto> dtos) {
+        return dtos.stream().map(ApiDtoMapper::toAgentMcpTool).toList();
+    }
+
+    public static AgentMcpToolResponse toAgentMcpTool(ai.nomoclaw.bot.mcp.AgentMcpToolDto dto) {
+        return new AgentMcpToolResponse(
+                dto.toolKey(),
+                dto.serverUid(),
+                dto.serverName(),
+                dto.serverDisplayName(),
+                dto.originalToolName(),
+                dto.displayName(),
+                dto.description(),
+                dto.enabled(),
+                dto.updatedTime()
+        );
+    }
+
     public static List<AgentTipResponse> toAgentTips(List<AgentTipDto> dtos) {
         return dtos.stream().map(ApiDtoMapper::toAgentTip).toList();
     }

@@ -3,6 +3,7 @@ import type {
   AgentSkill,
   GlobalSkill,
   AgentTip as ApiAgentTip,
+  AgentMcpTool,
   AgentTool,
   ModelConfig
 } from "@/types/api";
@@ -142,6 +143,7 @@ export function toManagedAgent(agent: AgentCatalogAgent, agentGroupUid: string, 
       enabled: true
     })),
     managedTools: [],
+    managedMcpTools: [],
     tips: [],
     docs,
     docStates: defaultDocStates()
@@ -185,6 +187,20 @@ export function mapApiTool(tool: AgentTool): ManagedTool {
     toolKey: key,
     name: tool.displayName || key,
     description: tool.description || tr("agents.common.noDescription"),
+    enabled: tool.enabled
+  };
+}
+
+export function mapApiMcpTool(tool: AgentMcpTool): ManagedTool {
+  const key = tool.toolKey || tool.displayName;
+  return {
+    id: `mcp_tool_${key}`,
+    toolKey: key,
+    name: tool.originalToolName || tool.displayName || key,
+    description: tool.description || tr("agents.common.noDescription"),
+    serverUid: tool.serverUid || "",
+    serverName: tool.serverName || "",
+    serverDisplayName: tool.serverDisplayName || tool.serverName || "",
     enabled: tool.enabled
   };
 }

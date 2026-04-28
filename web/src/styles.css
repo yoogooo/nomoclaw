@@ -451,6 +451,37 @@ a {
   overflow-y: auto;
 }
 
+.ui-card-modal-md {
+  width: clamp(560px, 52vw, 760px);
+  max-width: calc(100vw - var(--size-40));
+}
+
+.ui-card-modal-lg {
+  width: clamp(720px, 64vw, 980px);
+  max-width: calc(100vw - var(--size-40));
+}
+
+.ui-card-modal-max-90 {
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.ui-card-modal-max-90 .n-card__content {
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (max-width: 960px) {
+  .ui-card-modal-md {
+    width: min(560px, calc(100vw - var(--size-32)));
+  }
+
+  .ui-card-modal-lg {
+    width: min(720px, calc(100vw - var(--size-32)));
+  }
+}
+
 .ui-toggle-row {
   display: flex;
   align-items: center;

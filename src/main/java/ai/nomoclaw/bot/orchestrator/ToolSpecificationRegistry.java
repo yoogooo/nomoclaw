@@ -189,11 +189,13 @@ public class ToolSpecificationRegistry {
     }
 
     public List<ToolSpecification> listForAgent(String agentName) {
-        List<String> enabledToolKeys = enabledToolKeys(agentName);
-        if (enabledToolKeys == null) {
+        List<String> enabledBuiltinToolKeys = enabledBuiltinToolKeys(agentName);
+        if (enabledBuiltinToolKeys == null) {
             return listAll();
         }
         Map<String, ToolSpecification> allTools = allToolSpecificationsByName();
+        List<String> enabledToolKeys = new java.util.ArrayList<>(enabledBuiltinToolKeys);
+        enabledToolKeys.addAll(enabledMcpToolKeys(agentName));
         return enabledToolKeys.stream()
                 .map(allTools::get)
                 .filter(Objects::nonNull)
@@ -205,18 +207,18 @@ public class ToolSpecificationRegistry {
             return false;
         }
         String normalizedToolName = toolName.trim();
-        List<String> enabledToolKeys = enabledToolKeys(agentName);
-        if (enabledToolKeys == null) {
+        List<String> enabledBuiltinToolKeys = enabledBuiltinToolKeys(agentName);
+        if (enabledBuiltinToolKeys == null) {
             return allToolSpecificationsByName().containsKey(normalizedToolName);
         }
-        return enabledToolKeys.contains(normalizedToolName);
+        return enabledBuiltinToolKeys.contains(normalizedToolName) || enabledMcpToolKeys(agentName).contains(normalizedToolName);
     }
 
     public boolean isMcpTool(String toolName) {
         return mcpApplicationService.isMcpTool(toolName);
     }
 
-    private List<String> enabledToolKeys(String agentName) {
+    private List<String> enabledBuiltinToolKeys(String agentName) {
         AgentDefinitionEntity agent = agentDefinitionRepository.findActiveByName(agentName);
         if (agent == null) {
             return null;
@@ -228,7 +230,7 @@ public class ToolSpecificationRegistry {
             return List.of();
         }
 
-        Set<String> knownKeys = allToolSpecificationsByName().keySet();
+        Set<String> knownKeys = toolSpecificationsByName.keySet();
         List<String> relationToolKeys = relations.stream()
                 .map(AgentToolRelationEntity::getToolKey)
                 .toList();
@@ -240,6 +242,17 @@ public class ToolSpecificationRegistry {
         return relationToolKeys.stream()
                 .filter(activeDefinitionKeys::contains)
                 .filter(knownKeys::contains)
+                .distinct()
+                .toList();
+    }
+
+    private List<String> enabledMcpToolKeys(String agentName) {
+        AgentDefinitionEntity agent = agentDefinitionRepository.findActiveByName(agentName);
+        if (agent == null) {
+            return List.of();
+        }
+        return mcpApplicationService.listActiveToolSnapshotsForAgent(agent.getAgentUid()).stream()
+                .map(McpToolSnapshotEntity::getToolKey)
                 .distinct()
                 .toList();
     }

@@ -84,6 +84,18 @@ export interface AgentTool {
   updatedTime: string;
 }
 
+export interface AgentMcpTool {
+  toolKey: string;
+  serverUid: string;
+  serverName: string;
+  serverDisplayName: string;
+  originalToolName: string;
+  displayName: string;
+  description: string;
+  enabled: boolean;
+  updatedTime: string;
+}
+
 export interface McpServer {
   serverUid: string;
   serverName: string;

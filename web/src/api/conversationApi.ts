@@ -7,6 +7,7 @@ import type {
   GlobalSkillBindings,
   AgentTip,
   AgentTool,
+  AgentMcpTool,
   CreateSkillPayload,
   ConversationMessage,
   ConversationMessageRun,
@@ -133,6 +134,9 @@ export const conversationApi = {
   listAgentTools(agentUid: string) {
     return requestJson<AgentTool[]>(`/api/agents/${agentUid}/tools`);
   },
+  listAgentMcpTools(agentUid: string) {
+    return requestJson<AgentMcpTool[]>(`/api/agents/${agentUid}/mcp-tools`);
+  },
   listAgentDocs(agentUid: string) {
     return requestJson<AgentDocFile[]>(`/api/agents/${agentUid}/docs`);
   },
@@ -209,6 +213,13 @@ export const conversationApi = {
   },
   updateAgentToolStatus(agentUid: string, toolKey: string, enabled: boolean) {
     return requestJson<AgentTool>(`/api/agents/${agentUid}/tools/${toolKey}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled })
+    });
+  },
+  updateAgentMcpToolStatus(agentUid: string, toolKey: string, enabled: boolean) {
+    return requestJson<AgentMcpTool>(`/api/agents/${agentUid}/mcp-tools/${toolKey}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ enabled })

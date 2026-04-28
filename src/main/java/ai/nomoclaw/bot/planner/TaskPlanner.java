@@ -188,18 +188,26 @@ public class TaskPlanner implements Planner {
         String fallback = (configured != null && !configured.isBlank())
                 ? configured
                 : "You are an autonomous agent. Use tools when needed and answer naturally when finished.";
-        String builtinToolsPrompt = renderBuiltinToolsPrompt(toolSpecifications);
+        String builtinToolsPrompt = renderToolsPrompt(toolSpecifications, false);
+        String mcpToolsPrompt = renderToolsPrompt(toolSpecifications, true);
         String toolkitPrompt = skillPromptLoader.buildAgentSkillPrompt(promptContext);
-        return PromptLoader.buildSystemPrompt(promptContext, builtinToolsPrompt, toolkitPrompt, fallback);
+        return PromptLoader.buildSystemPrompt(promptContext, builtinToolsPrompt, mcpToolsPrompt, toolkitPrompt, fallback);
     }
 
-    private String renderBuiltinToolsPrompt(List<ToolSpecification> toolSpecifications) {
+    private String renderToolsPrompt(List<ToolSpecification> toolSpecifications, boolean mcpTools) {
         if (toolSpecifications == null || toolSpecifications.isEmpty()) {
             return "";
         }
         StringBuilder builder = new StringBuilder();
-        builder.append("以下为当前内置工具，请按名称直接发起 tool calls：\n");
+        builder.append(mcpTools
+                ? "以下为当前 MCP 工具，请按名称直接发起 tool calls：\n"
+                : "以下为当前内置工具，请按名称直接发起 tool calls：\n");
+        boolean hasRenderedTool = false;
         for (ToolSpecification toolSpecification : toolSpecifications) {
+            if (isMcpTool(toolSpecification) != mcpTools) {
+                continue;
+            }
+            hasRenderedTool = true;
             builder.append("- ").append(toolSpecification.name());
             if (toolSpecification.description() != null && !toolSpecification.description().isBlank()) {
                 builder.append(": ").append(toolSpecification.description());
@@ -219,7 +227,16 @@ public class TaskPlanner implements Planner {
             }
             builder.append('\n');
         }
+        if (!hasRenderedTool) {
+            return "";
+        }
         return builder.toString().trim();
+    }
+
+    private boolean isMcpTool(ToolSpecification toolSpecification) {
+        return toolSpecification != null
+                && toolSpecification.name() != null
+                && toolSpecification.name().startsWith("mcp_");
     }
 
     private String summarize(String text) {

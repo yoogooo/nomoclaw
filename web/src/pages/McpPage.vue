@@ -5,7 +5,6 @@ import {
   NButton,
   NCard,
   NDataTable,
-  NTag,
   NForm,
   NFormItem,
   NInput,
@@ -49,7 +48,7 @@ const form = reactive({
   headers: [{ key: "", value: "" }],
   command: "",
   args: [""],
-  envText: "",
+  env: [{ key: "", value: "" }],
   cwd: ""
 });
 
@@ -109,20 +108,12 @@ const serverColumns = computed<DataTableColumns<McpServer>>(() => [
 ]);
 
 const toolColumns = computed<DataTableColumns<McpTool>>(() => [
-  { title: t("mcp.toolColumns.key"), key: "toolKey" },
-  { title: t("mcp.toolColumns.name"), key: "originalToolName" },
-  { title: t("mcp.toolColumns.description"), key: "description" },
   {
-    title: t("mcp.toolColumns.status"),
-    key: "status",
-    render(row) {
-      return h(
-        NTag,
-        { size: "small", type: row.status === "ACTIVE" ? "success" : "warning" },
-        { default: () => row.status === "ACTIVE" ? t("common.enabled") : t("common.disabled") }
-      );
-    }
-  }
+    title: t("mcp.toolColumns.name"),
+    key: "originalToolName",
+    minWidth: 240
+  },
+  { title: t("mcp.toolColumns.description"), key: "description" }
 ]);
 
 function hButton(label: string, onClick: () => void, loadingValue = false) {
@@ -161,7 +152,7 @@ function openCreate() {
     headers: [{ key: "", value: "" }],
     command: "",
     args: [""],
-    envText: "",
+    env: [{ key: "", value: "" }],
     cwd: ""
   });
   showEditor.value = true;
@@ -180,7 +171,7 @@ function openEditor(server: McpServer) {
     headers: mapToRows(server.headers, ["Authorization"]),
     command: server.command || "",
     args: server.args?.length ? [...server.args] : [""],
-    envText: mapToLines(server.env),
+    env: mapToRows(server.env),
     cwd: server.cwd || ""
   });
   showEditor.value = true;
@@ -261,9 +252,13 @@ async function updateServerStatus(server: McpServer, enabled: boolean) {
 }
 
 function buildPayload(): SaveMcpServerPayload {
+  const displayName = form.displayName.trim();
+  const serverName = editingUid.value
+    ? form.serverName.trim()
+    : normalizeServerName(displayName || form.serverName);
   const payload: SaveMcpServerPayload = {
-    serverName: form.serverName.trim(),
-    displayName: form.displayName.trim(),
+    serverName,
+    displayName,
     transport: activeTab.value,
     timeoutSeconds: Number(form.timeoutSeconds) || 30,
     autoStart: true
@@ -274,10 +269,18 @@ function buildPayload(): SaveMcpServerPayload {
   } else {
     payload.command = form.command.trim();
     payload.args = form.args.map((item) => item.trim()).filter(Boolean);
-    payload.env = linesToMap(form.envText);
+    payload.env = rowsToMap(form.env);
     payload.cwd = form.cwd.trim();
   }
   return payload;
+}
+
+function normalizeServerName(value: string) {
+  const normalized = value.trim().toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64);
+  return normalized || `mcp-${Date.now().toString(36)}`;
 }
 
 function buildHttpHeaders(): Record<string, string> {
@@ -315,20 +318,24 @@ function removeArgument(index: number) {
   }
 }
 
-function linesToMap(text: string): Record<string, string> {
-  const result: Record<string, string> = {};
-  text.split("\n").forEach((line) => {
-    const index = line.indexOf("=");
-    if (index <= 0) return;
-    const key = line.slice(0, index).trim();
-    const value = line.slice(index + 1).trim();
-    if (key) result[key] = value;
-  });
-  return result;
+function addEnv() {
+  form.env.push({ key: "", value: "" });
 }
 
-function mapToLines(value: Record<string, string> | undefined) {
-  return Object.entries(value || {}).map(([key, val]) => `${key}=${val}`).join("\n");
+function removeEnv(index: number) {
+  form.env.splice(index, 1);
+  if (!form.env.length) {
+    form.env.push({ key: "", value: "" });
+  }
+}
+
+function rowsToMap(rows: Array<{ key: string; value: string }>): Record<string, string> {
+  const result: Record<string, string> = {};
+  rows.forEach((row) => {
+    const key = row.key.trim();
+    if (key) result[key] = row.value.trim();
+  });
+  return result;
 }
 
 function mapToRows(value: Record<string, string> | undefined, excludeKeys: string[] = []) {
@@ -381,16 +388,15 @@ onMounted(() => {
     <n-modal
       v-model:show="showEditor"
       preset="card"
-      class="mcp-editor-modal"
-      :style="{ width: 'clamp(560px, 52vw, 760px)', maxWidth: 'calc(100vw - var(--size-40))' }"
+      class="ui-card-modal-md"
       :title="editingUid ? t('mcp.editor.editTitle') : t('mcp.editor.createTitle')"
     >
       <n-form label-placement="top">
         <n-form-item :label="t('mcp.editor.name')">
-          <n-input v-model:value="form.serverName" :placeholder="t('mcp.editor.namePlaceholder')" />
+          <n-input v-model:value="form.displayName" :placeholder="t('mcp.editor.namePlaceholder')" />
         </n-form-item>
         <n-tabs v-model:value="activeTab" type="segment">
-          <n-tab-pane name="HTTP" tab="Streamable HTTP">
+          <n-tab-pane name="HTTP" :tab="t('mcp.editor.tabHttp')">
             <n-form-item :label="t('mcp.editor.url')">
               <n-input v-model:value="form.endpoint" placeholder="https://mcp.example.com/mcp" />
             </n-form-item>
@@ -408,7 +414,7 @@ onMounted(() => {
               </div>
             </n-form-item>
           </n-tab-pane>
-          <n-tab-pane name="STDIO" tab="STDIO">
+          <n-tab-pane name="STDIO" :tab="t('mcp.editor.tabStdio')">
             <n-form-item :label="t('mcp.editor.commandToLaunch')">
               <n-input v-model:value="form.command" placeholder="openai-dev-mcp serve-sqlite" />
             </n-form-item>
@@ -422,7 +428,14 @@ onMounted(() => {
               </div>
             </n-form-item>
             <n-form-item :label="t('mcp.editor.env')">
-              <n-input v-model:value="form.envText" type="textarea" placeholder="TOKEN=..." />
+              <div class="row-editor">
+                <div v-for="(row, index) in form.env" :key="index" class="row-editor-line row-editor-header">
+                  <n-input v-model:value="row.key" :placeholder="t('mcp.editor.envKey')" />
+                  <n-input v-model:value="row.value" :placeholder="t('mcp.editor.envValue')" />
+                  <n-button quaternary circle @click="removeEnv(index)">×</n-button>
+                </div>
+                <n-button block secondary @click="addEnv">＋ {{ t("mcp.editor.addEnv") }}</n-button>
+              </div>
             </n-form-item>
             <n-form-item :label="t('mcp.editor.cwd')">
               <n-input v-model:value="form.cwd" placeholder="/path/to/workdir" />
@@ -442,17 +455,18 @@ onMounted(() => {
     <n-modal
       v-model:show="showToolsModal"
       preset="card"
-      class="mcp-tools-modal"
-      :style="{ width: 'clamp(720px, 64vw, 980px)', maxWidth: 'calc(100vw - var(--size-40))' }"
+      class="ui-card-modal-lg ui-card-modal-max-90"
       :title="t('mcp.toolsModal.title', { name: viewingToolsServerName })"
     >
-      <n-data-table
-        :columns="toolColumns"
-        :data="tools"
-        :loading="toolsLoading"
-        :row-key="(row) => row.toolKey"
-        size="small"
-      />
+      <div class="mcp-tools-table-wrap">
+        <n-data-table
+          :columns="toolColumns"
+          :data="tools"
+          :loading="toolsLoading"
+          :row-key="(row) => row.toolKey"
+          size="small"
+        />
+      </div>
     </n-modal>
   </div>
 </template>
@@ -468,19 +482,10 @@ onMounted(() => {
   min-height: 420px;
 }
 
-.mcp-editor-modal {
-  width: clamp(560px, 52vw, 760px);
-  max-width: calc(100vw - var(--size-40));
-}
-
-:deep(.mcp-editor-modal.n-card) {
-  width: clamp(560px, 52vw, 760px) !important;
-  max-width: calc(100vw - var(--size-40)) !important;
-}
-
-:deep(.mcp-tools-modal.n-card) {
-  width: clamp(720px, 64vw, 980px) !important;
-  max-width: calc(100vw - var(--size-40)) !important;
+.mcp-tools-table-wrap {
+  max-height: calc(90vh - 150px);
+  overflow: auto;
+  min-height: 0;
 }
 
 .modal-actions {
@@ -541,18 +546,6 @@ onMounted(() => {
 @media (max-width: var(--size-breakpoint-lg)) {
   .mcp-grid {
     grid-template-columns: 1fr;
-  }
-
-  .mcp-editor-modal {
-    width: min(560px, calc(100vw - var(--size-32)));
-  }
-
-  :deep(.mcp-editor-modal.n-card) {
-    width: min(560px, calc(100vw - var(--size-32))) !important;
-  }
-
-  :deep(.mcp-tools-modal.n-card) {
-    width: min(720px, calc(100vw - var(--size-32))) !important;
   }
 }
 </style>

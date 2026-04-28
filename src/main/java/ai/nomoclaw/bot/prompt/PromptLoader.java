@@ -48,6 +48,7 @@ public final class PromptLoader {
 
     public static String buildSystemPrompt(PromptContext context,
                                            String builtinToolsPrompt,
+                                           String mcpToolsPrompt,
                                            String toolkitPrompt,
                                            String fallback) {
         StringBuilder builder = new StringBuilder();
@@ -86,6 +87,11 @@ public final class PromptLoader {
             builder.append(builtinToolsPrompt.trim()).append("\n\n");
         } else {
             builder.append("(none)\n\n");
+        }
+
+        if (mcpToolsPrompt != null && !mcpToolsPrompt.isBlank()) {
+            builder.append("[MCP 工具]\n\n");
+            builder.append(mcpToolsPrompt.trim()).append("\n\n");
         }
 
         if (toolkitPrompt != null && !toolkitPrompt.isBlank()) {

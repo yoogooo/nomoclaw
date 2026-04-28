@@ -4,6 +4,7 @@ import CronPage from "@/pages/CronPage.vue";
 import AgentsPage from "@/pages/AgentsPage.vue";
 import SkillsPage from "@/pages/SkillsPage.vue";
 import SettingsPage from "@/pages/SettingsPage.vue";
+import SettingsErrorLogsPage from "@/pages/SettingsErrorLogsPage.vue";
 import ChannelsPage from "@/pages/ChannelsPage.vue";
 import ModelsPage from "@/pages/ModelsPage.vue";
 import McpPage from "@/pages/McpPage.vue";
@@ -41,6 +42,11 @@ export const router = createRouter({
       path: "/settings",
       name: "settings",
       component: SettingsPage
+    },
+    {
+      path: "/settings/error-logs",
+      name: "settings-error-logs",
+      component: SettingsErrorLogsPage
     },
     {
       path: "/channels",

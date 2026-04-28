@@ -217,6 +217,12 @@ public class AgentController {
         return ApiDtoMapper.toAgentTools(agentCatalogAppService.listAgentTools(agentUid));
     }
 
+    @GetMapping("/agents/{agentUid}/mcp-tools")
+    public List<AgentMcpToolResponse> listAgentMcpTools(@PathVariable String agentUid) {
+        log.info("[AgentAPI] listAgentMcpTools agentUid={}", agentUid);
+        return ApiDtoMapper.toAgentMcpTools(agentCatalogAppService.listAgentMcpTools(agentUid));
+    }
+
     @GetMapping("/agents/{agentUid}/tips")
     public List<AgentTipResponse> listAgentTips(@PathVariable String agentUid) {
         log.info("[AgentAPI] listAgentTips agentUid={}", agentUid);
@@ -395,6 +401,15 @@ public class AgentController {
         log.info("[AgentAPI] updateAgentToolStatus agentUid={} toolKey={} enabled={}",
                 agentUid, toolKey, request.enabled());
         return ApiDtoMapper.toAgentTool(agentCatalogAppService.updateAgentToolStatus(agentUid, toolKey, request.enabled()));
+    }
+
+    @PatchMapping("/agents/{agentUid}/mcp-tools/{toolKey}")
+    public AgentMcpToolResponse updateAgentMcpToolStatus(@PathVariable String agentUid,
+                                                         @PathVariable String toolKey,
+                                                         @Valid @RequestBody UpdateAgentToolStatusRequest request) {
+        log.info("[AgentAPI] updateAgentMcpToolStatus agentUid={} toolKey={} enabled={}",
+                agentUid, toolKey, request.enabled());
+        return ApiDtoMapper.toAgentMcpTool(agentCatalogAppService.updateAgentMcpToolStatus(agentUid, toolKey, request.enabled()));
     }
 
     @GetMapping("/agents/{agentUid}/docs")
