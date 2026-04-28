@@ -104,7 +104,7 @@ class ImageLoaderToolTests {
         AgentEventRepository eventRepository = mock(AgentEventRepository.class);
         AgentMessageAttachmentRepository attachmentRepository = mock(AgentMessageAttachmentRepository.class);
         when(eventRepository.listByConversationUid("c5")).thenReturn(List.of(
-                stepFinishedEvent("c5", "m1", "s1", 1, "browser_tool", "extract_text", browserImage, LocalDateTime.now().minusMinutes(1))
+                stepFinishedEvent("c5", "m1", "s1", 1, "BrowserTool", "extract_text", browserImage, LocalDateTime.now().minusMinutes(1))
         ));
         when(attachmentRepository.listActiveByConversationAndMimeGroup("c5", "image")).thenReturn(List.of());
 
@@ -184,7 +184,7 @@ class ImageLoaderToolTests {
                                              LocalDateTime createdTime) {
         ObjectNode payload = JsonNodeFactory.instance.objectNode();
         payload.put("success", true);
-        payload.put("toolName", "desktop_screenshot_tool");
+        payload.put("toolName", "DesktopScreenshotTool");
         payload.put("roundIndex", roundIndex);
         payload.put("round", roundIndex);
         payload.putObject("toolArgs");
@@ -233,7 +233,7 @@ class ImageLoaderToolTests {
                                                             LocalDateTime createdTime) {
         ObjectNode payload = JsonNodeFactory.instance.objectNode();
         payload.put("success", true);
-        payload.put("toolName", "command_tool");
+        payload.put("toolName", "CommandTool");
         payload.put("roundIndex", roundIndex);
         payload.put("round", roundIndex);
         payload.putObject("toolArgs");

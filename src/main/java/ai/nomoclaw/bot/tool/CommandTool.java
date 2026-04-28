@@ -36,7 +36,7 @@ public class CommandTool implements Tool {
 
     @Override
     public String name() {
-        return "command_tool";
+        return "CommandTool";
     }
 
     @Override

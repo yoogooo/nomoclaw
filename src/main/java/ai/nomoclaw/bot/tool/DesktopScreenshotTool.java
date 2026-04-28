@@ -25,7 +25,7 @@ public class DesktopScreenshotTool implements Tool {
 
     @Override
     public String name() {
-        return "desktop_screenshot_tool";
+        return "DesktopScreenshotTool";
     }
 
     @Override

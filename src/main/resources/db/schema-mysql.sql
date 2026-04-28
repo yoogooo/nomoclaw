@@ -458,20 +458,18 @@ INSERT INTO agent_definition (
 INSERT INTO tool_definition (
     tool_key, display_name, description, risk_level, status, sort_index, config_json, created_time, updated_time
 ) VALUES
-    ('command_tool', '命令执行', 'Execute a local shell command on the current machine.', 'HIGH', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('browser_tool', '浏览器工具', 'Operate a browser page to open URLs, click, type, extract text, or take screenshots.', 'HIGH', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('browser_control_tool', '浏览器控制', 'Operate the browser with action-based controls.', 'HIGH', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('file_tool', '文件工具', 'Read, list, or write local files.', 'HIGH', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('file_io_tool', '文件IO', 'Read, write, append, edit, or list local files.', 'HIGH', 'ACTIVE', 50, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('CommandTool', '命令执行', 'Execute a local shell command on the current machine.', 'HIGH', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('BrowserTool', '浏览器工具', 'Operate a browser page to open URLs, click, type, extract text, or take screenshots.', 'HIGH', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('FileTool', '文件工具', 'Read, write, append, edit, or list local files.', 'HIGH', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
     ('CronCreateTool', '创建定时任务', 'Create a scheduled cron-like automation task.', 'HIGH', 'ACTIVE', 60, JSON_OBJECT(), NOW(3), NOW(3)),
     ('CronDeleteTool', '删除定时任务', 'Delete a scheduled cron-like automation task.', 'HIGH', 'ACTIVE', 61, JSON_OBJECT(), NOW(3), NOW(3)),
     ('CronListTool', '查询定时任务', 'List or query scheduled cron-like automation tasks.', 'HIGH', 'ACTIVE', 62, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('file_search_tool', '文件搜索', 'Search files by text grep or glob pattern.', 'LOW', 'ACTIVE', 70, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('desktop_screenshot_tool', '桌面截图', 'Capture a desktop screenshot on the local machine.', 'LOW', 'ACTIVE', 80, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('current_time_tool', '当前时间', 'Get the current UTC time.', 'LOW', 'ACTIVE', 90, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('token_usage_tool', 'Token 使用', 'Query stored token usage summary from message records.', 'LOW', 'ACTIVE', 100, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('memory_search_tool', '记忆搜索', 'Search historical conversation messages by keyword.', 'LOW', 'ACTIVE', 110, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('image_loader_tool', '图片加载', 'On-demand image context loader for visual analysis after tools that return image paths; supports 刚才截图/第N轮截图/文件名 and direct HTTP(S) image URL passthrough without local download.', 'LOW', 'ACTIVE', 115, JSON_OBJECT(), NOW(3), NOW(3));
+    ('FileSearchTool', '文件搜索', 'Search files by text grep or glob pattern.', 'LOW', 'ACTIVE', 70, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('DesktopScreenshotTool', '桌面截图', 'Capture a desktop screenshot on the local machine.', 'LOW', 'ACTIVE', 80, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('CurrentTimeTool', '当前时间', 'Get the current UTC time.', 'LOW', 'ACTIVE', 90, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('TokenUsageTool', 'Token 使用', 'Query stored token usage summary from message records.', 'LOW', 'ACTIVE', 100, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('MemorySearchTool', '记忆搜索', 'Search historical conversation messages by keyword.', 'LOW', 'ACTIVE', 110, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('ImageLoaderTool', '图片加载', 'On-demand image context loader for visual analysis after tools that return image paths; supports 刚才截图/第N轮截图/文件名 and direct HTTP(S) image URL passthrough without local download.', 'LOW', 'ACTIVE', 115, JSON_OBJECT(), NOW(3), NOW(3));
 
 INSERT INTO skill_definition (
     skill_key, display_name, description, skill_path, status, sort_index, config_json, created_time, updated_time
@@ -484,35 +482,32 @@ INSERT INTO skill_definition (
 INSERT INTO agent_tool_relation (
     relation_uid, agent_uid, tool_key, status, sort_index, config_json, created_time, updated_time
 ) VALUES
-    ('rel_general_command', 'agent_general_assistant', 'command_tool', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_general_browser', 'agent_general_assistant', 'browser_tool', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_general_browser_control', 'agent_general_assistant', 'browser_control_tool', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_general_file', 'agent_general_assistant', 'file_tool', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_general_file_io', 'agent_general_assistant', 'file_io_tool', 'ACTIVE', 50, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_general_command', 'agent_general_assistant', 'CommandTool', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_general_browser', 'agent_general_assistant', 'BrowserTool', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_general_file', 'agent_general_assistant', 'FileTool', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
     ('rel_general_cron_create', 'agent_general_assistant', 'CronCreateTool', 'ACTIVE', 60, JSON_OBJECT(), NOW(3), NOW(3)),
     ('rel_general_cron_delete', 'agent_general_assistant', 'CronDeleteTool', 'ACTIVE', 61, JSON_OBJECT(), NOW(3), NOW(3)),
     ('rel_general_cron_list', 'agent_general_assistant', 'CronListTool', 'ACTIVE', 62, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_general_search', 'agent_general_assistant', 'file_search_tool', 'ACTIVE', 70, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_general_shot', 'agent_general_assistant', 'desktop_screenshot_tool', 'ACTIVE', 80, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_general_time', 'agent_general_assistant', 'current_time_tool', 'ACTIVE', 90, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_general_token', 'agent_general_assistant', 'token_usage_tool', 'ACTIVE', 100, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_general_image_loader', 'agent_general_assistant', 'image_loader_tool', 'ACTIVE', 115, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_general_memory', 'agent_general_assistant', 'memory_search_tool', 'ACTIVE', 110, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_test_command', 'agent_test_expert', 'command_tool', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_test_file', 'agent_test_expert', 'file_io_tool', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_test_search', 'agent_test_expert', 'file_search_tool', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_test_time', 'agent_test_expert', 'current_time_tool', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_test_memory', 'agent_test_expert', 'memory_search_tool', 'ACTIVE', 50, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_public_browser', 'agent_public_opinion', 'browser_tool', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_public_browser_control', 'agent_public_opinion', 'browser_control_tool', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_public_search', 'agent_public_opinion', 'file_search_tool', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_public_time', 'agent_public_opinion', 'current_time_tool', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_public_memory', 'agent_public_opinion', 'memory_search_tool', 'ACTIVE', 50, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_market_command', 'agent_marketing_assistant', 'command_tool', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_market_browser', 'agent_marketing_assistant', 'browser_tool', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_market_search', 'agent_marketing_assistant', 'file_search_tool', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_market_time', 'agent_marketing_assistant', 'current_time_tool', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('rel_market_memory', 'agent_marketing_assistant', 'memory_search_tool', 'ACTIVE', 50, JSON_OBJECT(), NOW(3), NOW(3));
+    ('rel_general_search', 'agent_general_assistant', 'FileSearchTool', 'ACTIVE', 70, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_general_shot', 'agent_general_assistant', 'DesktopScreenshotTool', 'ACTIVE', 80, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_general_time', 'agent_general_assistant', 'CurrentTimeTool', 'ACTIVE', 90, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_general_token', 'agent_general_assistant', 'TokenUsageTool', 'ACTIVE', 100, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_general_image_loader', 'agent_general_assistant', 'ImageLoaderTool', 'ACTIVE', 115, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_general_memory', 'agent_general_assistant', 'MemorySearchTool', 'ACTIVE', 110, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_test_command', 'agent_test_expert', 'CommandTool', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_test_file', 'agent_test_expert', 'FileTool', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_test_search', 'agent_test_expert', 'FileSearchTool', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_test_time', 'agent_test_expert', 'CurrentTimeTool', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_test_memory', 'agent_test_expert', 'MemorySearchTool', 'ACTIVE', 50, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_public_browser', 'agent_public_opinion', 'BrowserTool', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_public_search', 'agent_public_opinion', 'FileSearchTool', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_public_time', 'agent_public_opinion', 'CurrentTimeTool', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_public_memory', 'agent_public_opinion', 'MemorySearchTool', 'ACTIVE', 50, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_market_command', 'agent_marketing_assistant', 'CommandTool', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_market_browser', 'agent_marketing_assistant', 'BrowserTool', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_market_search', 'agent_marketing_assistant', 'FileSearchTool', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_market_time', 'agent_marketing_assistant', 'CurrentTimeTool', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
+    ('rel_market_memory', 'agent_marketing_assistant', 'MemorySearchTool', 'ACTIVE', 50, JSON_OBJECT(), NOW(3), NOW(3));
 
 INSERT INTO agent_skill_relation (
     relation_uid, agent_uid, skill_key, status, sort_index, config_json, created_time, updated_time

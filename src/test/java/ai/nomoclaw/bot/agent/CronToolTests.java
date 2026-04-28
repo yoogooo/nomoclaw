@@ -59,7 +59,7 @@ class CronToolTests {
         AgentCronJobEntity saved = captor.getValue();
         assertEquals("CronCreateTool", cronTool.name());
         assertEquals("agent_demo", saved.getAgentUid());
-        assertEquals("0 */5 * * * *", saved.getExpression());
+        assertEquals("0 */5 * * * ?", saved.getExpression());
         assertEquals("ACTIVE", saved.getStatus());
         assertTrue(result.success());
         assertEquals("ACTIVE", result.artifacts().path("status").asText());

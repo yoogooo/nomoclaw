@@ -64,7 +64,7 @@ class PermissionEngineTests {
 
         ObjectNode args = JsonNodeFactory.instance.objectNode();
         PermissionDecision decision = engine.evaluate(new ToolPolicyContext(
-                "memory_search_tool",
+                "MemorySearchTool",
                 args,
                 Path.of(".").toAbsolutePath().normalize(),
                 "agent-uid",
@@ -87,7 +87,7 @@ class PermissionEngineTests {
         ObjectNode args = JsonNodeFactory.instance.objectNode();
         args.put("reference", "刚才截图");
         PermissionDecision decision = engine.evaluate(new ToolPolicyContext(
-                "image_loader_tool",
+                "ImageLoaderTool",
                 args,
                 Path.of(".").toAbsolutePath().normalize(),
                 "agent-uid",
@@ -171,7 +171,7 @@ class PermissionEngineTests {
                 "r-shot-allow",
                 PermissionSource.SESSION,
                 PermissionEffect.ALLOW,
-                "desktop_screenshot_tool",
+                "DesktopScreenshotTool",
                 "*",
                 PermissionResourceType.ANY,
                 "tmp/dingtalk_now.png",
@@ -183,7 +183,7 @@ class PermissionEngineTests {
         ObjectNode args = JsonNodeFactory.instance.objectNode();
         args.put("path", "tmp/dingtalk_now.png");
         PermissionDecision decision = engine.evaluate(new ToolPolicyContext(
-                "desktop_screenshot_tool",
+                "DesktopScreenshotTool",
                 args,
                 Path.of(".").toAbsolutePath().normalize(),
                 "agent-uid",
@@ -233,7 +233,7 @@ class PermissionEngineTests {
         args.put("url", "https://weather.com.cn/weather/101010100.shtml");
 
         PermissionDecision decision = engine.evaluate(new ToolPolicyContext(
-                "browser_tool",
+                "BrowserTool",
                 args,
                 Path.of(".").toAbsolutePath().normalize(),
                 "agent-uid",
@@ -265,24 +265,12 @@ class PermissionEngineTests {
         }
     }
 
-    @Test
-    void legacyCronToolShouldNotAllowByBaseline() {
-        StubSettingsStore settings = new StubSettingsStore();
-        SessionPermissionStore sessionStore = new SessionPermissionStore();
-        PermissionEngine engine = new PermissionEngine(settings, sessionStore, new CommandRuleResolver(), new HardGuardService());
-
-        PermissionDecision decision = engine.evaluate(toolContext("cron_tool", JsonNodeFactory.instance.objectNode()));
-
-        assertEquals(PermissionEffect.ASK, decision.effect());
-        assertEquals(ToolPolicyReasonCode.DEFAULT_REQUIRE_APPROVAL, decision.reasonCode());
-    }
-
     private PermissionRule rule(String id, PermissionSource source, PermissionEffect effect) {
         return new PermissionRule(
                 id,
                 source,
                 effect,
-                "command_tool",
+                "CommandTool",
                 "execute",
                 PermissionResourceType.COMMAND,
                 "",
@@ -296,7 +284,7 @@ class PermissionEngineTests {
         ObjectNode args = JsonNodeFactory.instance.objectNode();
         args.put("command", command);
         return new ToolPolicyContext(
-                "command_tool",
+                "CommandTool",
                 args,
                 Path.of(".").toAbsolutePath().normalize(),
                 "agent-uid",

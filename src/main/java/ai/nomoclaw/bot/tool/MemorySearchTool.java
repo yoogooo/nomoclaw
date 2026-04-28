@@ -23,7 +23,7 @@ public class MemorySearchTool implements Tool {
 
     @Override
     public String name() {
-        return "memory_search_tool";
+        return "MemorySearchTool";
     }
 
     @Override

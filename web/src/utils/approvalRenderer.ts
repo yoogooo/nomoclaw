@@ -80,17 +80,17 @@ function extractPath(payload: Record<string, any>) {
 }
 
 function normalizeToolName(raw: string, command: string, stepLike?: StepLike) {
-  const normalized = String(raw || "").trim().toLowerCase();
+  const normalized = String(raw || "").trim();
   if (normalized) {
     return normalized;
   }
   if (command) {
-    return "command_tool";
+    return "CommandTool";
   }
   const title = String(stepLike?.displayTitle || "").toLowerCase();
   const details = String(stepLike?.displayDetails || stepLike?.displaySummary || "").toLowerCase();
   if (title.includes("截取桌面画面") || details.includes("截取桌面画面") || title.includes("desktop screenshot")) {
-    return "desktop_screenshot_tool";
+    return "DesktopScreenshotTool";
   }
   return "";
 }
@@ -100,7 +100,7 @@ function renderByToolName(toolName: string,
                           path: string,
                           bodyFallback: string,
                           toolArgsRaw: unknown): Pick<ApprovalRenderResult, "body" | "promptKey" | "labelKey"> {
-  if (toolName === "command_tool" || command) {
+  if (toolName === "CommandTool" || command) {
     return {
       body: toBashCodeBlock(command) || toJsonCodeBlock(toolArgsRaw) || bodyFallback,
       promptKey: "chat.approval.riskPrompt",
@@ -108,7 +108,7 @@ function renderByToolName(toolName: string,
     };
   }
 
-  if (toolName === "desktop_screenshot_tool") {
+  if (toolName === "DesktopScreenshotTool") {
     return {
       body: toTextCodeBlock(path) || toJsonCodeBlock(toolArgsRaw) || bodyFallback,
       promptKey: "chat.approval.riskPromptScreenshot",

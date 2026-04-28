@@ -38,7 +38,7 @@ public class ImageLoaderContextService {
         if (message == null || step == null || result == null) {
             return IntegrationResult.noop();
         }
-        if (!"image_loader_tool".equals(step.toolName()) || !result.success()) {
+        if (!"ImageLoaderTool".equals(step.toolName()) || !result.success()) {
             return IntegrationResult.noop();
         }
         ResolvedImages resolvedImages = resolveImages(result.artifacts());

@@ -60,8 +60,8 @@ public class CommandRuleResolver {
     }
 
     public PermissionContextDetails resolve(ToolPolicyContext context) {
-        String tool = normalize(context.toolName());
-        if ("command_tool".equals(tool)) {
+        String tool = normalizeTool(context.toolName());
+        if ("commandtool".equals(tool)) {
             String command = context.toolArgs().path("command").asText("");
             Path cwd = resolveCommandCwd(context);
             List<Path> targets = extractCommandWriteTargets(command, cwd);
@@ -77,7 +77,7 @@ public class CommandRuleResolver {
             );
         }
 
-        if ("file_tool".equals(tool) || "file_io_tool".equals(tool)) {
+        if ("filetool".equals(tool)) {
             String action = context.toolArgs().path("action").asText("").trim().toLowerCase(Locale.ROOT);
             String pathRaw = context.toolArgs().path("path").asText("");
             Path base = context.agentWorkspacePath() == null ? Path.of(".").toAbsolutePath().normalize() : context.agentWorkspacePath();
@@ -124,7 +124,7 @@ public class CommandRuleResolver {
     }
 
     public List<PermissionRule> buildCommandRules(ToolPolicyContext context, PermissionContextDetails details) {
-        if (!"command_tool".equals(normalize(context.toolName()))) {
+        if (!"commandtool".equals(normalizeTool(context.toolName()))) {
             return List.of();
         }
         String command = details.commandText() == null ? "" : details.commandText().trim();
@@ -137,7 +137,7 @@ public class CommandRuleResolver {
                     "command-risk-" + UUID.randomUUID(),
                     PermissionSource.COMMAND,
                     PermissionEffect.ASK,
-                    "command_tool",
+                    "CommandTool",
                     "execute",
                     PermissionResourceType.COMMAND,
                     "",
@@ -150,7 +150,7 @@ public class CommandRuleResolver {
     }
 
     public ReadonlyCommandVerdict isReadonlyCommand(ToolPolicyContext context, PermissionContextDetails details) {
-        if (!"command_tool".equals(normalize(context.toolName()))) {
+        if (!"commandtool".equals(normalizeTool(context.toolName()))) {
             return ReadonlyCommandVerdict.UNKNOWN;
         }
         String command = details == null ? "" : details.commandText();
@@ -433,6 +433,10 @@ public class CommandRuleResolver {
     }
 
     private String normalize(String text) {
+        return text == null ? "" : text.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizeTool(String text) {
         return text == null ? "" : text.trim().toLowerCase(Locale.ROOT);
     }
 }

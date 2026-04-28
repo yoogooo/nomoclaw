@@ -85,11 +85,11 @@ public class StepReviewer {
         if ("answer_tool".equals(toolName)) {
             return hasMeaningfulOutput(result);
         }
-        if ("file_tool".equals(toolName)) {
+        if ("FileTool".equals(toolName)) {
             String action = step.toolArgs().path("action").asText("");
             return ("write".equals(action) || "list".equals(action)) && hasUsefulArtifacts(result);
         }
-        if ("browser_tool".equals(toolName)) {
+        if ("BrowserTool".equals(toolName)) {
             String action = step.toolArgs().path("action").asText("");
             return ("open".equals(action) || "click".equals(action) || "type".equals(action) || "screenshot".equals(action))
                     && hasUsefulArtifacts(result);

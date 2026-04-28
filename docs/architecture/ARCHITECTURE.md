@@ -257,7 +257,7 @@ Agent loop 的详细控制流、round/retry 区分、审批暂停、失败重规
 
 `ToolSpecificationRegistry` 会按当前 `agentName` 返回已授权的 tool specifications；`ToolExecutor` 在真正执行前也会再次校验权限。
 
-### 6.1 `file_tool`
+### 6.1 `FileTool`
 
 能力：
 
@@ -271,7 +271,7 @@ Agent loop 的详细控制流、round/retry 区分、审批暂停、失败重规
 - `write` 会写入目标路径
 - 返回内容、绝对路径、长度等信息
 
-### 6.2 `command_tool`
+### 6.2 `CommandTool`
 
 能力：
 
@@ -286,7 +286,7 @@ Agent loop 的详细控制流、round/retry 区分、审批暂停、失败重规
 
 这是当前系统中最直接的本地执行能力，也是高风险判断的重点来源之一。
 
-### 6.3 `browser_tool`
+### 6.3 `BrowserTool`
 
 能力：
 
@@ -338,7 +338,7 @@ Playwright 浏览器二进制缓存目录（下载目录）采用以下优先级
 - 进度优先解析 Playwright CLI stdout 中的真实百分比（如 `90% of ...`）；若无法可靠解析，前端以“不确定进度”样式展示，避免误导性固定百分比。
 - 下载链路中断（例如 `server closed connection`）时，安装器会重试并可能从 0% 重新开始，通常不保证断点续传。
 
-### 6.4 `cron_tool`
+### 6.4 `CronCreateTool`、`CronDeleteTool`、`CronListTool`
 
 能力：
 

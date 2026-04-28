@@ -299,8 +299,8 @@ export const useConversationStore = defineStore("conversation", () => {
   }
 
   function updateBrowserRuntimeOverlayFromStepEvent(event: AgentEvent) {
-    const toolName = String(event.payload.toolName || "");
-    if (toolName !== "browser_tool" && toolName !== "browser_control_tool") {
+    const toolName = String(event.payload.toolName || "").trim();
+    if (toolName !== "BrowserTool") {
       return;
     }
     const metrics = (event.payload.progressMetrics || {}) as Record<string, any>;

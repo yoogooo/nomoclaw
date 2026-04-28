@@ -120,7 +120,7 @@ class ImageLoaderContextServiceTests {
                 1,
                 1,
                 "加载图片",
-                "image_loader_tool",
+                "ImageLoaderTool",
                 args,
                 RiskLevel.LOW,
                 "",
