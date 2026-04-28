@@ -50,8 +50,16 @@ public class FlywayMigrationBootstrap implements ApplicationRunner {
             log.info("[Flyway] migrate finished database={} programmatic={} result={}",
                     databaseProduct, useProgrammaticFlyway, result);
         } catch (Exception ex) {
-            throw new IllegalStateException("flyway migrate failed, schema auto-upgrade is unavailable", ex);
+            if (failOnMigrateError()) {
+                throw new IllegalStateException("flyway migrate failed, schema auto-upgrade is unavailable", ex);
+            }
+            log.warn("[Flyway] migrate failed, schema auto-upgrade skipped database={} programmatic={} err={}",
+                    databaseProduct, useProgrammaticFlyway, ex.toString(), ex);
         }
+    }
+
+    private boolean failOnMigrateError() {
+        return environment.getProperty("nomoclaw.flyway.fail-on-migrate-error", Boolean.class, false);
     }
 
     private Flyway buildProgrammaticFlyway(String databaseProduct) {
