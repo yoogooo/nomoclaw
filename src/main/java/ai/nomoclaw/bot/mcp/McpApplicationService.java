@@ -57,15 +57,14 @@ public class McpApplicationService {
     public List<McpServerDto> listServers() {
         Map<String, Long> toolCounts = toolSnapshotRepository.listActive().stream()
                 .collect(Collectors.groupingBy(McpToolSnapshotEntity::getServerUid, Collectors.counting()));
-        return serverRepository.listActive().stream()
+        return serverRepository.listAll().stream()
                 .map(server -> toDto(server, toolCounts.getOrDefault(server.getServerUid(), 0L).intValue()))
                 .toList();
     }
 
     public List<McpToolDto> listTools(String serverUid) {
-        requireActiveServer(serverUid);
+        requireServer(serverUid);
         return toolSnapshotRepository.listByServerUid(serverUid).stream()
-                .filter(snapshot -> "ACTIVE".equalsIgnoreCase(snapshot.getStatus()))
                 .map(this::toToolDto)
                 .toList();
     }
@@ -83,9 +82,31 @@ public class McpApplicationService {
 
     @Transactional
     public McpServerDto updateServer(String serverUid, SaveMcpServerCommand command) {
-        McpServerDefinitionEntity server = requireActiveServer(serverUid);
+        McpServerDefinitionEntity server = requireServer(serverUid);
         applyCommand(server, command, LocalDateTime.now(), false);
         serverRepository.updateById(server);
+        return toDto(server, toolSnapshotRepository.listByServerUid(serverUid).size());
+    }
+
+    @Transactional
+    public McpServerDto updateServerStatus(String serverUid, boolean enabled) {
+        McpServerDefinitionEntity server = requireServer(serverUid);
+        String nextStatus = enabled ? "ACTIVE" : "DISABLED";
+        LocalDateTime now = LocalDateTime.now();
+        server.setStatus(nextStatus);
+        server.setUpdatedTime(now);
+        serverRepository.updateById(server);
+        for (McpToolSnapshotEntity snapshot : toolSnapshotRepository.listByServerUid(serverUid)) {
+            snapshot.setStatus(nextStatus);
+            snapshot.setUpdatedTime(now);
+            toolSnapshotRepository.updateById(snapshot);
+            ToolDefinitionEntity tool = toolDefinitionRepository.findByKey(snapshot.getToolKey());
+            if (tool != null) {
+                tool.setStatus(nextStatus);
+                tool.setUpdatedTime(now);
+                toolDefinitionRepository.updateById(tool);
+            }
+        }
         return toDto(server, toolSnapshotRepository.listByServerUid(serverUid).size());
     }
 
@@ -104,7 +125,7 @@ public class McpApplicationService {
     }
 
     public McpServerDto testServer(String serverUid) {
-        McpServerDefinitionEntity server = requireActiveServer(serverUid);
+        McpServerDefinitionEntity server = requireServer(serverUid);
         try (McpClient client = clientFactory.create(server, readConfig(server))) {
             client.checkHealth();
             markConnected(server, "");
@@ -117,7 +138,7 @@ public class McpApplicationService {
 
     @Transactional
     public List<McpToolDto> refreshTools(String serverUid) {
-        McpServerDefinitionEntity server = requireActiveServer(serverUid);
+        McpServerDefinitionEntity server = requireServer(serverUid);
         try (McpClient client = clientFactory.create(server, readConfig(server))) {
             List<ToolSpecification> tools = client.listTools();
             LocalDateTime now = LocalDateTime.now();
@@ -194,7 +215,7 @@ public class McpApplicationService {
         snapshot.setDisplayName(resolveToolDisplayName(server, tool));
         snapshot.setDescription(nullToEmpty(tool.description()));
         snapshot.setInputSchemaJson(serializeToolParameters(tool));
-        snapshot.setStatus("ACTIVE");
+        snapshot.setStatus(server.getStatus());
         snapshot.setLastSyncedTime(now);
         snapshot.setUpdatedTime(now);
         if (snapshot.getId() == null) {
@@ -254,7 +275,9 @@ public class McpApplicationService {
         server.setServerName(serverName);
         server.setDisplayName(nullToEmpty(command.displayName()).isBlank() ? serverName : command.displayName().trim());
         server.setTransport(transport);
-        server.setStatus("ACTIVE");
+        if (creating) {
+            server.setStatus("ACTIVE");
+        }
         server.setTimeoutSeconds(command.timeoutSeconds() == null || command.timeoutSeconds() <= 0 ? 30 : command.timeoutSeconds());
         server.setAutoStart(command.autoStart() == null || command.autoStart());
         server.setConfigJson(JsonUtil.toJson(new McpServerConfig(

@@ -60,6 +60,61 @@ const enUS = {
       dismissForever: "Don't show again"
     }
   },
+  mcp: {
+    title: "MCP Management",
+    subtitle: "Manage external MCP servers and connect discovered tools to Agents.",
+    serverListTitle: "MCP Servers",
+    confirmDelete: "Delete {name}?",
+    columns: {
+      name: "Name",
+      transport: "Transport",
+      status: "Status",
+      tools: "Tools",
+      actions: "Actions"
+    },
+    actions: {
+      addServer: "Add MCP Server",
+      test: "Test",
+      refreshTools: "Refresh Tools",
+      viewTools: "View Tools"
+    },
+    toolColumns: {
+      key: "Tool Key",
+      name: "Original Name",
+      description: "Description",
+      status: "Status"
+    },
+    toolsModal: {
+      title: "{name} Tools"
+    },
+    editor: {
+      createTitle: "Add MCP Server",
+      editTitle: "Edit MCP Server",
+      name: "Name",
+      namePlaceholder: "MCP server name",
+      url: "URL",
+      bearerTokenEnvVar: "Bearer token env var",
+      headers: "Headers",
+      headerKey: "Key",
+      headerValue: "Value",
+      addHeader: "Add header",
+      commandToLaunch: "Command to launch",
+      arguments: "Arguments",
+      addArgument: "Add argument",
+      env: "Env (one key=value per line)",
+      cwd: "CWD"
+    },
+    toast: {
+      created: "MCP Server created",
+      updated: "MCP Server updated",
+      deleted: "MCP Server deleted",
+      enabled: "MCP Server enabled",
+      disabled: "MCP Server disabled",
+      saveFailed: "Save failed",
+      testSuccess: "Connection test succeeded",
+      toolsRefreshed: "Tools refreshed"
+    }
+  },
   chat: {
     sidebar: {
       history: "Conversations",

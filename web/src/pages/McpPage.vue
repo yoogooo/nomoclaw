@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { computed, h, onMounted, reactive, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import {
   NButton,
   NCard,
   NDataTable,
+  NTag,
   NForm,
   NFormItem,
   NInput,
   NModal,
   NPopconfirm,
+  NSwitch,
   NTabPane,
   NTabs,
 } from "naive-ui";
@@ -21,14 +24,20 @@ import type { McpServer, McpTool, SaveMcpServerPayload } from "@/types/api";
 
 type TransportTab = "HTTP" | "STDIO";
 
+const { t } = useI18n();
 const loading = ref(false);
 const saving = ref(false);
 const testingUid = ref("");
 const refreshingUid = ref("");
+const statusUpdatingUid = ref("");
 const showEditor = ref(false);
+const showToolsModal = ref(false);
 const editingUid = ref("");
+const viewingToolsServerName = ref("");
 const activeTab = ref<TransportTab>("HTTP");
 const servers = ref<McpServer[]>([]);
+const tools = ref<McpTool[]>([]);
+const toolsLoading = ref(false);
 
 const form = reactive({
   serverName: "",
@@ -44,54 +53,77 @@ const form = reactive({
   cwd: ""
 });
 
-const serverColumns: DataTableColumns<McpServer> = [
+const serverColumns = computed<DataTableColumns<McpServer>>(() => [
   {
-    title: () => h("span", { class: "mcp-name-header" }, "名称"),
+    title: () => h("span", { class: "mcp-name-header" }, t("mcp.columns.name")),
     key: "displayName",
     render(row) {
       return h("span", { class: "mcp-name-value" }, row.displayName || row.serverName);
     }
   },
   {
-    title: "Transport",
+    title: t("mcp.columns.transport"),
     key: "transport",
     render(row) {
       return row.transport;
     }
   },
   {
-    title: "状态",
+    title: t("mcp.columns.status"),
     key: "status",
     render(row) {
-      return row.status === "ACTIVE" ? "启用" : "停用";
+      return h(NSwitch, {
+        value: row.status === "ACTIVE",
+        loading: statusUpdatingUid.value === row.serverUid,
+        size: "small",
+        onUpdateValue: (enabled: boolean) => updateServerStatus(row, enabled)
+      });
     }
   },
-  { title: "Tools", key: "toolCount" },
+  { title: t("mcp.columns.tools"), key: "toolCount" },
   {
-    title: "操作",
+    title: t("mcp.columns.actions"),
     key: "actions",
     render(row) {
       return h("div", { class: "mcp-actions" }, [
-        hButton("编辑", () => openEditor(row)),
-        hButton("测试", () => testServer(row.serverUid), testingUid.value === row.serverUid),
-        hButton("刷新工具", () => refreshTools(row.serverUid), refreshingUid.value === row.serverUid),
+        hButton(t("common.edit"), () => openEditor(row)),
+        hButton(t("mcp.actions.test"), () => testServer(row.serverUid), testingUid.value === row.serverUid),
+        hButton(t("mcp.actions.refreshTools"), () => refreshTools(row.serverUid), refreshingUid.value === row.serverUid),
+        hButton(t("mcp.actions.viewTools"), () => openTools(row)),
         h(
           NPopconfirm,
           {
-            positiveText: "删除",
-            negativeText: "取消",
+            positiveText: t("common.delete"),
+            negativeText: t("common.cancel"),
             positiveButtonProps: { type: "error" },
             onPositiveClick: () => deleteServer(row.serverUid)
           },
           {
-            trigger: () => hButton("删除", () => undefined),
-            default: () => `确认删除 ${row.displayName || row.serverName}？`
+            trigger: () => hButton(t("common.delete"), () => undefined),
+            default: () => t("mcp.confirmDelete", { name: row.displayName || row.serverName })
           }
         )
       ]);
     }
   }
-];
+]);
+
+const toolColumns = computed<DataTableColumns<McpTool>>(() => [
+  { title: t("mcp.toolColumns.key"), key: "toolKey" },
+  { title: t("mcp.toolColumns.name"), key: "originalToolName" },
+  { title: t("mcp.toolColumns.description"), key: "description" },
+  {
+    title: t("mcp.toolColumns.status"),
+    key: "status",
+    render(row) {
+      return h(
+        NTag,
+        { size: "small", type: row.status === "ACTIVE" ? "success" : "warning" },
+        { default: () => row.status === "ACTIVE" ? t("common.enabled") : t("common.disabled") }
+      );
+    }
+  }
+]);
 
 function hButton(label: string, onClick: () => void, loadingValue = false) {
   return h(
@@ -160,15 +192,15 @@ async function saveServer() {
     const payload = buildPayload();
     if (editingUid.value) {
       await mcpApi.updateServer(editingUid.value, payload);
-      message.success("MCP Server 已更新");
+      message.success(t("mcp.toast.updated"));
     } else {
       await mcpApi.createServer(payload);
-      message.success("MCP Server 已创建");
+      message.success(t("mcp.toast.created"));
     }
     showEditor.value = false;
     await loadServers();
   } catch (error) {
-    const text = error instanceof Error ? error.message : "保存失败";
+    const text = error instanceof Error ? error.message : t("mcp.toast.saveFailed");
     message.error(text);
   } finally {
     saving.value = false;
@@ -179,7 +211,7 @@ async function testServer(serverUid: string) {
   testingUid.value = serverUid;
   try {
     await mcpApi.testServer(serverUid);
-    message.success("连接测试成功");
+    message.success(t("mcp.toast.testSuccess"));
     await loadServers();
   } finally {
     testingUid.value = "";
@@ -189,18 +221,43 @@ async function testServer(serverUid: string) {
 async function refreshTools(serverUid: string) {
   refreshingUid.value = serverUid;
   try {
-    await mcpApi.refreshTools(serverUid);
-    message.success("工具已刷新");
+    tools.value = await mcpApi.refreshTools(serverUid);
+    const server = servers.value.find((item) => item.serverUid === serverUid);
+    viewingToolsServerName.value = server?.displayName || server?.serverName || "";
+    showToolsModal.value = true;
+    message.success(t("mcp.toast.toolsRefreshed"));
     await loadServers();
   } finally {
     refreshingUid.value = "";
   }
 }
 
+async function openTools(server: McpServer) {
+  viewingToolsServerName.value = server.displayName || server.serverName;
+  showToolsModal.value = true;
+  toolsLoading.value = true;
+  try {
+    tools.value = await mcpApi.listTools(server.serverUid);
+  } finally {
+    toolsLoading.value = false;
+  }
+}
+
 async function deleteServer(serverUid: string) {
   await mcpApi.deleteServer(serverUid);
-  message.success("MCP Server 已删除");
+  message.success(t("mcp.toast.deleted"));
   await loadServers();
+}
+
+async function updateServerStatus(server: McpServer, enabled: boolean) {
+  statusUpdatingUid.value = server.serverUid;
+  try {
+    await mcpApi.updateServerStatus(server.serverUid, enabled);
+    message.success(enabled ? t("mcp.toast.enabled") : t("mcp.toast.disabled"));
+    await loadServers();
+  } finally {
+    statusUpdatingUid.value = "";
+  }
 }
 
 function buildPayload(): SaveMcpServerPayload {
@@ -299,15 +356,15 @@ onMounted(() => {
       <DirectoryRail />
       <main class="app-main-content">
         <div class="app-page-content">
-          <AppPageHeader title="MCP 管理" subtitle="管理外部 MCP Server，并将发现出的工具接入 Agent。">
+          <AppPageHeader :title="t('mcp.title')" :subtitle="t('mcp.subtitle')">
             <template #actions>
-              <n-button secondary :loading="loading" @click="loadServers">刷新</n-button>
-              <n-button type="primary" @click="openCreate">新增 MCP Server</n-button>
+              <n-button secondary :loading="loading" @click="loadServers">{{ t("common.refresh") }}</n-button>
+              <n-button type="primary" @click="openCreate">{{ t("mcp.actions.addServer") }}</n-button>
             </template>
           </AppPageHeader>
 
           <div class="mcp-grid">
-            <n-card title="MCP Servers" class="mcp-card">
+            <n-card :title="t('mcp.serverListTitle')" class="mcp-card">
               <n-data-table
                 :columns="serverColumns"
                 :data="servers"
@@ -326,48 +383,48 @@ onMounted(() => {
       preset="card"
       class="mcp-editor-modal"
       :style="{ width: 'clamp(560px, 52vw, 760px)', maxWidth: 'calc(100vw - var(--size-40))' }"
-      :title="editingUid ? '编辑 MCP Server' : '新增 MCP Server'"
+      :title="editingUid ? t('mcp.editor.editTitle') : t('mcp.editor.createTitle')"
     >
       <n-form label-placement="top">
-        <n-form-item label="Name">
-          <n-input v-model:value="form.serverName" placeholder="MCP server name" />
+        <n-form-item :label="t('mcp.editor.name')">
+          <n-input v-model:value="form.serverName" :placeholder="t('mcp.editor.namePlaceholder')" />
         </n-form-item>
         <n-tabs v-model:value="activeTab" type="segment">
           <n-tab-pane name="HTTP" tab="Streamable HTTP">
-            <n-form-item label="URL">
+            <n-form-item :label="t('mcp.editor.url')">
               <n-input v-model:value="form.endpoint" placeholder="https://mcp.example.com/mcp" />
             </n-form-item>
-            <n-form-item label="Bearer token env var">
+            <n-form-item :label="t('mcp.editor.bearerTokenEnvVar')">
               <n-input v-model:value="form.bearerTokenEnvVar" placeholder="MCP_BEARER_TOKEN" />
             </n-form-item>
-            <n-form-item label="Headers">
+            <n-form-item :label="t('mcp.editor.headers')">
               <div class="row-editor">
                 <div v-for="(row, index) in form.headers" :key="index" class="row-editor-line row-editor-header">
-                  <n-input v-model:value="row.key" placeholder="Key" />
-                  <n-input v-model:value="row.value" placeholder="Value" />
+                  <n-input v-model:value="row.key" :placeholder="t('mcp.editor.headerKey')" />
+                  <n-input v-model:value="row.value" :placeholder="t('mcp.editor.headerValue')" />
                   <n-button quaternary circle @click="removeHeader(index)">×</n-button>
                 </div>
-                <n-button block secondary @click="addHeader">＋ Add header</n-button>
+                <n-button block secondary @click="addHeader">＋ {{ t("mcp.editor.addHeader") }}</n-button>
               </div>
             </n-form-item>
           </n-tab-pane>
           <n-tab-pane name="STDIO" tab="STDIO">
-            <n-form-item label="Command to launch">
+            <n-form-item :label="t('mcp.editor.commandToLaunch')">
               <n-input v-model:value="form.command" placeholder="openai-dev-mcp serve-sqlite" />
             </n-form-item>
-            <n-form-item label="Arguments">
+            <n-form-item :label="t('mcp.editor.arguments')">
               <div class="row-editor">
                 <div v-for="(_, index) in form.args" :key="index" class="row-editor-line">
                   <n-input v-model:value="form.args[index]" placeholder="" />
                   <n-button quaternary circle @click="removeArgument(index)">×</n-button>
                 </div>
-                <n-button block secondary @click="addArgument">＋ Add argument</n-button>
+                <n-button block secondary @click="addArgument">＋ {{ t("mcp.editor.addArgument") }}</n-button>
               </div>
             </n-form-item>
-            <n-form-item label="Env（每行 key=value）">
+            <n-form-item :label="t('mcp.editor.env')">
               <n-input v-model:value="form.envText" type="textarea" placeholder="TOKEN=..." />
             </n-form-item>
-            <n-form-item label="CWD">
+            <n-form-item :label="t('mcp.editor.cwd')">
               <n-input v-model:value="form.cwd" placeholder="/path/to/workdir" />
             </n-form-item>
           </n-tab-pane>
@@ -376,10 +433,26 @@ onMounted(() => {
 
       <template #footer>
         <div class="modal-actions">
-          <n-button @click="showEditor = false">取消</n-button>
-          <n-button type="primary" :loading="saving" @click="saveServer">保存</n-button>
+          <n-button @click="showEditor = false">{{ t("common.cancel") }}</n-button>
+          <n-button type="primary" :loading="saving" @click="saveServer">{{ t("common.save") }}</n-button>
         </div>
       </template>
+    </n-modal>
+
+    <n-modal
+      v-model:show="showToolsModal"
+      preset="card"
+      class="mcp-tools-modal"
+      :style="{ width: 'clamp(720px, 64vw, 980px)', maxWidth: 'calc(100vw - var(--size-40))' }"
+      :title="t('mcp.toolsModal.title', { name: viewingToolsServerName })"
+    >
+      <n-data-table
+        :columns="toolColumns"
+        :data="tools"
+        :loading="toolsLoading"
+        :row-key="(row) => row.toolKey"
+        size="small"
+      />
     </n-modal>
   </div>
 </template>
@@ -402,6 +475,11 @@ onMounted(() => {
 
 :deep(.mcp-editor-modal.n-card) {
   width: clamp(560px, 52vw, 760px) !important;
+  max-width: calc(100vw - var(--size-40)) !important;
+}
+
+:deep(.mcp-tools-modal.n-card) {
+  width: clamp(720px, 64vw, 980px) !important;
   max-width: calc(100vw - var(--size-40)) !important;
 }
 
@@ -471,6 +549,10 @@ onMounted(() => {
 
   :deep(.mcp-editor-modal.n-card) {
     width: min(560px, calc(100vw - var(--size-32))) !important;
+  }
+
+  :deep(.mcp-tools-modal.n-card) {
+    width: min(720px, calc(100vw - var(--size-32))) !important;
   }
 }
 </style>

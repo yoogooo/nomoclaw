@@ -19,6 +19,13 @@ export const mcpApi = {
       body: JSON.stringify(payload)
     });
   },
+  updateServerStatus(serverUid: string, enabled: boolean) {
+    return requestJson<McpServer>(`/api/mcp/servers/${serverUid}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled })
+    });
+  },
   deleteServer(serverUid: string) {
     return requestJson<{ status: string }>(`/api/mcp/servers/${serverUid}`, {
       method: "DELETE"

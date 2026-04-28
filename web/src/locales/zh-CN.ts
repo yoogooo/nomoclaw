@@ -60,6 +60,61 @@ const zhCN = {
       dismissForever: "不再提示"
     }
   },
+  mcp: {
+    title: "MCP 管理",
+    subtitle: "管理外部 MCP Server，并将发现出的工具接入 Agent。",
+    serverListTitle: "MCP Servers",
+    confirmDelete: "确认删除 {name}？",
+    columns: {
+      name: "名称",
+      transport: "Transport",
+      status: "状态",
+      tools: "Tools",
+      actions: "操作"
+    },
+    actions: {
+      addServer: "新增 MCP Server",
+      test: "测试",
+      refreshTools: "刷新工具",
+      viewTools: "查看工具"
+    },
+    toolColumns: {
+      key: "Tool Key",
+      name: "原始名称",
+      description: "描述",
+      status: "状态"
+    },
+    toolsModal: {
+      title: "{name} 工具"
+    },
+    editor: {
+      createTitle: "新增 MCP Server",
+      editTitle: "编辑 MCP Server",
+      name: "Name",
+      namePlaceholder: "MCP server name",
+      url: "URL",
+      bearerTokenEnvVar: "Bearer token env var",
+      headers: "Headers",
+      headerKey: "Key",
+      headerValue: "Value",
+      addHeader: "Add header",
+      commandToLaunch: "Command to launch",
+      arguments: "Arguments",
+      addArgument: "Add argument",
+      env: "Env（每行 key=value）",
+      cwd: "CWD"
+    },
+    toast: {
+      created: "MCP Server 已创建",
+      updated: "MCP Server 已更新",
+      deleted: "MCP Server 已删除",
+      enabled: "MCP Server 已启用",
+      disabled: "MCP Server 已停用",
+      saveFailed: "保存失败",
+      testSuccess: "连接测试成功",
+      toolsRefreshed: "工具已刷新"
+    }
+  },
   chat: {
     sidebar: {
       history: "历史对话",

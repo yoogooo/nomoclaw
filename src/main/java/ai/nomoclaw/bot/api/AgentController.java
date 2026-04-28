@@ -95,6 +95,13 @@ public class AgentController {
         return ApiDtoMapper.toMcpServer(mcpApplicationService.updateServer(serverUid, ApiDtoMapper.toCommand(request)));
     }
 
+    @PatchMapping("/mcp/servers/{serverUid}/status")
+    public McpServerResponse updateMcpServerStatus(@PathVariable String serverUid,
+                                                   @Valid @RequestBody UpdateMcpServerStatusRequest request) {
+        log.info("[AgentAPI] updateMcpServerStatus serverUid={} enabled={}", serverUid, request.enabled());
+        return ApiDtoMapper.toMcpServer(mcpApplicationService.updateServerStatus(serverUid, request.enabled()));
+    }
+
     @DeleteMapping("/mcp/servers/{serverUid}")
     public SimpleResponse deleteMcpServer(@PathVariable String serverUid) {
         log.info("[AgentAPI] deleteMcpServer serverUid={}", serverUid);
