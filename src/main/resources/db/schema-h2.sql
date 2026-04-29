@@ -431,7 +431,10 @@ INSERT INTO tool_definition (
 ) VALUES
     ('CommandTool', '命令执行', 'Execute a local shell command on the current machine.', 'HIGH', 'ACTIVE', 10, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('BrowserTool', '浏览器工具', 'Operate a browser page to open URLs, click, type, extract text, or take screenshots.', 'HIGH', 'ACTIVE', 20, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('FileTool', '文件工具', 'Read, write, append, edit, or list local files.', 'HIGH', 'ACTIVE', 40, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('ReadFileTool', '文件读取', 'Read local file content by path with optional line range.', 'LOW', 'ACTIVE', 40, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('ListFileTool', '目录列举', 'List direct children of a local directory by path.', 'LOW', 'ACTIVE', 41, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('CreateFileTool', '文件创建/写入', 'Create or append local file content.', 'HIGH', 'ACTIVE', 42, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('EditFileTool', '文件编辑', 'Edit local file by replacing oldText with newText.', 'HIGH', 'ACTIVE', 43, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('CronCreateTool', '创建定时任务', 'Create a scheduled cron-like automation task.', 'HIGH', 'ACTIVE', 60, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('CronDeleteTool', '删除定时任务', 'Delete a scheduled cron-like automation task.', 'HIGH', 'ACTIVE', 61, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('CronListTool', '查询定时任务', 'List or query scheduled cron-like automation tasks.', 'HIGH', 'ACTIVE', 62, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
@@ -455,7 +458,10 @@ INSERT INTO agent_tool_relation (
 ) VALUES
     ('RelGeneralCommand', 'agent_general_assistant', 'CommandTool', 'ACTIVE', 10, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('RelGeneralBrowser', 'agent_general_assistant', 'BrowserTool', 'ACTIVE', 20, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('RelGeneralFile', 'agent_general_assistant', 'FileTool', 'ACTIVE', 40, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('RelGeneralReadFile', 'agent_general_assistant', 'ReadFileTool', 'ACTIVE', 40, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('RelGeneralListFile', 'agent_general_assistant', 'ListFileTool', 'ACTIVE', 41, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('RelGeneralCreateFile', 'agent_general_assistant', 'CreateFileTool', 'ACTIVE', 42, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('RelGeneralEditFile', 'agent_general_assistant', 'EditFileTool', 'ACTIVE', 43, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('RelGeneralCronCreate', 'agent_general_assistant', 'CronCreateTool', 'ACTIVE', 60, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('RelGeneralCronDelete', 'agent_general_assistant', 'CronDeleteTool', 'ACTIVE', 61, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('RelGeneralCronList', 'agent_general_assistant', 'CronListTool', 'ACTIVE', 62, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),

@@ -36,12 +36,11 @@ public class RiskPolicy {
                     ? RiskLevel.HIGH
                     : RiskLevel.LOW;
         }
-        if (tool.contains("file")) {
-            String action = toolArgs == null ? "" : toolArgs.path("action").asText("").toLowerCase();
-            if ("write".equals(action) || "append".equals(action) || "edit".equals(action)) {
-                String pathRaw = toolArgs == null ? "" : toolArgs.path("path").asText("");
-                return isAgentWorkspacePath(pathRaw) ? RiskLevel.LOW : RiskLevel.HIGH;
-            }
+        if ("createfiletool".equals(tool) || "editfiletool".equals(tool)) {
+            String pathRaw = toolArgs == null ? "" : toolArgs.path("path").asText("");
+            return isAgentWorkspacePath(pathRaw) ? RiskLevel.LOW : RiskLevel.HIGH;
+        }
+        if ("readfiletool".equals(tool) || "listfiletool".equals(tool)) {
             return RiskLevel.LOW;
         }
         if (tool.contains("browser")) {

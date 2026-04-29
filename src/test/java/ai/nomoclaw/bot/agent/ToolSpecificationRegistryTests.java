@@ -74,9 +74,15 @@ class ToolSpecificationRegistryTests {
         assertTrue(toolNames.contains("CronCreateTool"));
         assertTrue(toolNames.contains("CronDeleteTool"));
         assertTrue(toolNames.contains("CronListTool"));
+        assertTrue(toolNames.contains("ReadFileTool"));
+        assertTrue(toolNames.contains("ListFileTool"));
+        assertTrue(toolNames.contains("CreateFileTool"));
+        assertTrue(toolNames.contains("EditFileTool"));
+        assertFalse(toolNames.contains("FileTool"));
         assertTrue(registry.isToolAllowed("unknown", "CronCreateTool"));
         assertTrue(registry.isToolAllowed("unknown", "CronDeleteTool"));
         assertTrue(registry.isToolAllowed("unknown", "CronListTool"));
         assertTrue(registry.isToolAllowed("unknown", "ImageLoaderTool"));
+        assertFalse(registry.isToolAllowed("unknown", "FileTool"));
     }
 }

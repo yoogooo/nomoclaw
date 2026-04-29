@@ -143,9 +143,16 @@ export function approvalActionSummary(payload: Record<string, any>) {
     });
   }
 
-  if (toolName === "FileTool") {
+  if (toolName === "ReadFileTool" || toolName === "ListFileTool" || toolName === "CreateFileTool" || toolName === "EditFileTool") {
+    const action = toolName === "ReadFileTool"
+      ? "read"
+      : toolName === "ListFileTool"
+        ? "list"
+        : toolName === "CreateFileTool"
+          ? (args.mode === "append" ? "append" : "write")
+          : "edit";
     return tr("format.approval.file", {
-      action: args.action || tr("format.approval.action"),
+      action,
       path: args.path || tr("format.approval.pathMissing")
     });
   }

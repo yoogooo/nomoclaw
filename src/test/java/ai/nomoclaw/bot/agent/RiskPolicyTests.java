@@ -11,6 +11,7 @@ import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class RiskPolicyTests {
 
@@ -26,5 +27,22 @@ class RiskPolicyTests {
                 RiskLevel.LOW, "done", StepStatus.CREATED, 0, null, null, ApprovalStatus.NONE);
 
         assertTrue(riskPolicy.requiresApproval(step));
+    }
+
+    @Test
+    void readFileToolShouldBeLowRisk() {
+        AgentProperties properties = new AgentProperties();
+        RiskPolicy riskPolicy = new RiskPolicy(properties);
+        assertEquals(RiskLevel.LOW, riskPolicy.evaluateRisk("ReadFileTool", JsonNodeFactory.instance.objectNode()));
+    }
+
+    @Test
+    void createFileToolOutsideWorkspaceShouldBeHighRisk() {
+        AgentProperties properties = new AgentProperties();
+        RiskPolicy riskPolicy = new RiskPolicy(properties);
+
+        ObjectNode args = JsonNodeFactory.instance.objectNode();
+        args.put("path", "/etc/hosts");
+        assertEquals(RiskLevel.HIGH, riskPolicy.evaluateRisk("CreateFileTool", args));
     }
 }

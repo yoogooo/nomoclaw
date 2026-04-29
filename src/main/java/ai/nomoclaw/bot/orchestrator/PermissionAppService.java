@@ -155,12 +155,15 @@ public class PermissionAppService {
         List<PermissionRule> existing = new ArrayList<>(settingsStore.loadAgentRules(normalizedAgentName));
         String key = managedRuleKey(agentUid, normalizedAgentName);
         existing.removeIf(rule -> isManagedRule(rule, key));
-        addManagedRule(existing, key, "file", "file_*", "*", PermissionResourceType.FILE, workspace.toString(), 0);
+        addManagedRule(existing, key, "file-read", "ReadFileTool", "*", PermissionResourceType.FILE, workspace.toString(), 0);
+        addManagedRule(existing, key, "file-list", "ListFileTool", "*", PermissionResourceType.FILE, workspace.toString(), 0);
+        addManagedRule(existing, key, "file-create", "CreateFileTool", "*", PermissionResourceType.FILE, workspace.toString(), 0);
+        addManagedRule(existing, key, "file-edit", "EditFileTool", "*", PermissionResourceType.FILE, workspace.toString(), 0);
         addManagedRule(existing, key, "command", "CommandTool", "execute", PermissionResourceType.COMMAND, workspace.toString(), 0);
 
         Path skillsRoot = NomoClawPaths.skillsRoot();
-        addManagedRule(existing, key, "skills-read", "file_*", "read", PermissionResourceType.FILE, skillsRoot.toString(), 0);
-        addManagedRule(existing, key, "skills-list", "file_*", "list", PermissionResourceType.FILE, skillsRoot.toString(), 0);
+        addManagedRule(existing, key, "skills-read", "ReadFileTool", "*", PermissionResourceType.FILE, skillsRoot.toString(), 0);
+        addManagedRule(existing, key, "skills-list", "ListFileTool", "*", PermissionResourceType.FILE, skillsRoot.toString(), 0);
         settingsStore.saveAgentRules(normalizedAgentName, existing);
     }
 

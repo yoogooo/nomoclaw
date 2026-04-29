@@ -85,9 +85,8 @@ public class StepReviewer {
         if ("answer_tool".equals(toolName)) {
             return hasMeaningfulOutput(result);
         }
-        if ("FileTool".equals(toolName)) {
-            String action = step.toolArgs().path("action").asText("");
-            return ("write".equals(action) || "list".equals(action)) && hasUsefulArtifacts(result);
+        if ("CreateFileTool".equals(toolName) || "ListFileTool".equals(toolName)) {
+            return hasUsefulArtifacts(result);
         }
         if ("BrowserTool".equals(toolName)) {
             String action = step.toolArgs().path("action").asText("");

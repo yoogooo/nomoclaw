@@ -1394,8 +1394,14 @@ public class AgentApplicationService {
                 }
                 yield "浏览器" + (action.isBlank() ? "操作" : action) + (target.isBlank() ? "" : ": " + abbreviate(target, 48));
             }
-            case "FileTool" -> {
-                String action = toolArgs.path("action").asText("");
+            case "ReadFileTool", "ListFileTool", "CreateFileTool", "EditFileTool" -> {
+                String action = switch (nullToEmpty(toolName)) {
+                    case "ReadFileTool" -> "read";
+                    case "ListFileTool" -> "list";
+                    case "CreateFileTool" -> toolArgs.path("mode").asText("create_or_truncate");
+                    case "EditFileTool" -> "edit";
+                    default -> "";
+                };
                 String path = toolArgs.path("path").asText("");
                 yield "文件" + (action.isBlank() ? "操作" : action) + (path.isBlank() ? "" : ": " + abbreviate(path, 48));
             }
@@ -1435,14 +1441,10 @@ public class AgentApplicationService {
                 case "snapshot" -> "正在整理当前页面内容";
                 default -> "正在处理网页内容";
             };
-            case "FileTool" -> switch (toolArgs.path("action").asText("")) {
-                case "read" -> "正在读取文件内容";
-                case "list" -> "正在查看文件列表";
-                case "write" -> "正在写入文件";
-                case "append" -> "正在补充文件内容";
-                case "edit" -> "正在修改文件";
-                default -> "正在处理文件";
-            };
+            case "ReadFileTool" -> "正在读取文件内容";
+            case "ListFileTool" -> "正在查看文件列表";
+            case "CreateFileTool" -> "正在写入文件";
+            case "EditFileTool" -> "正在修改文件";
             case "CronCreateTool" -> "正在创建定时任务";
             case "CronDeleteTool" -> "正在删除定时任务";
             case "CronListTool" -> "正在查询定时任务";
@@ -1471,8 +1473,17 @@ public class AgentApplicationService {
                         ? "系统已规划一个网页处理步骤，稍后会开始执行。"
                         : "系统准备在网页上执行“" + (action.isBlank() ? "操作" : action) + "”，目标为 " + target + "。";
             }
-            case "FileTool" -> {
-                String action = step.toolArgs().path("action").asText("");
+            case "ReadFileTool", "ListFileTool", "CreateFileTool", "EditFileTool" -> {
+                String action = switch (nullToEmpty(step.toolName())) {
+                    case "ReadFileTool" -> "读取";
+                    case "ListFileTool" -> "列举";
+                    case "CreateFileTool" -> {
+                        String mode = step.toolArgs().path("mode").asText("create_or_truncate");
+                        yield "append".equals(mode) ? "追加" : "写入";
+                    }
+                    case "EditFileTool" -> "编辑";
+                    default -> "处理";
+                };
                 String path = step.toolArgs().path("path").asText("");
                 yield path.isBlank()
                         ? "系统已规划一个文件处理步骤，稍后会开始执行。"
@@ -1502,7 +1513,7 @@ public class AgentApplicationService {
 
     private String buildStepStartedDetails(PlanStep step) {
         return switch (nullToEmpty(step.toolName())) {
-            case "CommandTool", "BrowserTool", "FileTool", "CronCreateTool", "CronDeleteTool", "CronListTool" -> buildStepPlanDetails(step)
+            case "CommandTool", "BrowserTool", "ReadFileTool", "ListFileTool", "CreateFileTool", "EditFileTool", "CronCreateTool", "CronDeleteTool", "CronListTool" -> buildStepPlanDetails(step)
                     .replace("系统准备", "系统正在")
                     .replace("已规划", "正在执行");
             default -> "系统正在执行这一步。";
@@ -1522,7 +1533,7 @@ public class AgentApplicationService {
                 }
                 yield hasMeaningfulText(result.output()) ? "网页操作已完成：" + abbreviate(result.output(), 120) : "网页操作已顺利完成。";
             }
-            case "FileTool" -> {
+            case "ReadFileTool", "ListFileTool", "CreateFileTool", "EditFileTool" -> {
                 String path = result.artifacts() == null ? "" : result.artifacts().path("path").asText("");
                 yield path.isBlank() ? "文件处理已完成。" : "文件处理已完成，目标路径为 " + abbreviate(path, 96) + "。";
             }
@@ -1596,8 +1607,17 @@ public class AgentApplicationService {
                 yield "系统将执行本地命令 " + (command.isBlank() ? "（未提供命令）" : "“" + command + "”")
                         + (cwd.isBlank() ? "。" : "，工作目录为 " + cwd + "。");
             }
-            case "FileTool" -> {
-                String action = toolArgs.path("action").asText("处理");
+            case "ReadFileTool", "ListFileTool", "CreateFileTool", "EditFileTool" -> {
+                String action = switch (nullToEmpty(toolName)) {
+                    case "ReadFileTool" -> "读取";
+                    case "ListFileTool" -> "列举";
+                    case "CreateFileTool" -> {
+                        String mode = toolArgs.path("mode").asText("create_or_truncate");
+                        yield "append".equals(mode) ? "追加" : "写入";
+                    }
+                    case "EditFileTool" -> "编辑";
+                    default -> "处理";
+                };
                 String path = toolArgs.path("path").asText("");
                 yield "系统将对文件执行“" + action + "”操作" + (path.isBlank() ? "。" : "，目标路径为 " + abbreviate(path, 96) + "。");
             }
