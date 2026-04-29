@@ -67,7 +67,9 @@ const zhCN = {
     diagnosticsLogContent: "日志内容",
     diagnosticsImpact: "影响",
     diagnosticsSuggestion: "建议",
-    diagnosticsTechnicalDetail: "技术详情"
+    diagnosticsTechnicalDetail: "技术详情",
+    diagnosticsCopyLog: "复制日志",
+    diagnosticsCopyLogSuccess: "日志已复制"
   },
   modelGate: {
     title: "先配置一个可用模型",

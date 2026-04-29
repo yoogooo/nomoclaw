@@ -67,7 +67,9 @@ const enUS = {
     diagnosticsLogContent: "Log Content",
     diagnosticsImpact: "Impact",
     diagnosticsSuggestion: "Suggestion",
-    diagnosticsTechnicalDetail: "Technical Details"
+    diagnosticsTechnicalDetail: "Technical Details",
+    diagnosticsCopyLog: "Copy Log",
+    diagnosticsCopyLogSuccess: "Log copied"
   },
   modelGate: {
     title: "Set up a model first",

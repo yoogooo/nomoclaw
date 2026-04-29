@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronLeft, RefreshCw } from "lucide-vue-next";
+import { ChevronLeft, Copy, RefreshCw } from "lucide-vue-next";
 import { NButton, NDataTable, NIcon, NModal } from "naive-ui";
 import type { DataTableColumns } from "naive-ui";
 import { computed, h, onMounted, ref } from "vue";
@@ -7,6 +7,7 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import DirectoryRail from "@/components/chat/DirectoryRail.vue";
 import { systemDiagnosticsApi } from "@/api/systemDiagnosticsApi";
+import { message as discreteMessage } from "@/discrete";
 import type { SystemErrorLog } from "@/types/api";
 
 const { t } = useI18n();
@@ -28,7 +29,7 @@ const logColumns = computed<DataTableColumns<SystemErrorLog>>(() => [
     key: "occurredTime",
     width: 180,
     render(row) {
-      return h("span", { class: "settings-error-log-time" }, row.occurredTime);
+      return h("span", { class: "settings-error-log-time" }, formatOccurredTime(row.occurredTime));
     }
   },
   {
@@ -56,8 +57,24 @@ function truncateLog(text: string) {
   return trimmed.length > 200 ? `${trimmed.slice(0, 200)}...` : trimmed;
 }
 
+function formatOccurredTime(value: string) {
+  return value
+    .replace(/^(.+[T ]\d{2}:\d{2}:\d{2})(?:\.\d+)?(.*)$/, "$1$2")
+    .replace(/^(\d{4}-\d{2}-\d{2})T/, "$1 ");
+}
+
 function openLogDetail(event: SystemErrorLog) {
   selectedEvent.value = event;
+}
+
+async function copySelectedLog() {
+  if (!selectedEvent.value) return;
+  try {
+    await window.navigator.clipboard.writeText(logSummary(selectedEvent.value));
+    discreteMessage.success(t("settings.diagnosticsCopyLogSuccess"));
+  } catch {
+    discreteMessage.error(t("chat.messages.copyFailed"));
+  }
 }
 
 function rowProps(row: SystemErrorLog) {
@@ -94,9 +111,6 @@ function backToSettings() {
               <n-icon :component="ChevronLeft" />
               <span>{{ t("settings.title") }}</span>
             </button>
-            <div class="settings-error-logs-heading">
-              <div class="settings-error-logs-title">{{ t("settings.diagnosticsDrawerTitle") }}</div>
-            </div>
           </header>
 
           <section class="surface-card settings-error-logs-panel">
@@ -138,11 +152,19 @@ function backToSettings() {
       v-model:show="detailModalVisible"
       preset="card"
       class="settings-error-log-modal"
-      style="width: min(var(--container-xs), calc(100vw - var(--space-8)))"
+      style="width: 70vw; max-width: calc(100vw - var(--space-8))"
       :title="selectedEvent?.title || t('settings.diagnosticsDrawerTitle')"
       :bordered="false"
     >
       <div v-if="selectedEvent" class="settings-error-log-modal-body">
+        <div class="settings-error-log-modal-actions">
+          <n-button tertiary size="small" @click="copySelectedLog">
+            <template #icon>
+              <n-icon :component="Copy" />
+            </template>
+            {{ t("settings.diagnosticsCopyLog") }}
+          </n-button>
+        </div>
         <pre class="settings-error-log-modal-content">{{ logSummary(selectedEvent) }}</pre>
       </div>
     </n-modal>
@@ -163,13 +185,6 @@ function backToSettings() {
   gap: var(--space-2);
 }
 
-.settings-error-logs-heading {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
 .settings-error-logs-back {
   display: flex;
   align-items: center;
@@ -186,13 +201,6 @@ function backToSettings() {
 
 .settings-error-logs-back:hover {
   color: var(--color-text-primary);
-}
-
-.settings-error-logs-title {
-  color: var(--color-text-primary);
-  font-size: var(--text-title-md-size);
-  font-weight: 750;
-  line-height: 1.2;
 }
 
 .settings-error-logs-panel {
@@ -243,12 +251,21 @@ function backToSettings() {
 }
 
 .settings-error-log-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
   min-height: 0;
+}
+
+.settings-error-log-modal-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .settings-error-log-modal-content {
   overflow: auto;
-  max-height: min(58vh, var(--size-420));
+  min-height: var(--size-220);
+  max-height: min(62vh, var(--size-420));
   margin: 0;
   padding: var(--space-3);
   border-radius: var(--radius-sm);
