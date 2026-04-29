@@ -14,6 +14,7 @@ import { loadChatLastViewState, saveChatLastViewState } from "@/stores/chatViewS
 import { resolveApprovalFromPayload, resolveApprovalFromStep } from "@/utils/approvalRenderer";
 import type { ApprovalLabelKey } from "@/utils/approvalRenderer";
 import type {
+  ApprovalMode,
   AgentEvent,
   ConversationAttachment,
   ConversationMessage,
@@ -24,6 +25,8 @@ import type {
   ModelProviderOption,
   UploadPolicy
 } from "@/types/api";
+
+const APPROVAL_MODE_STORAGE_KEY = "chat:approval-mode-by-conversation";
 
 interface ApprovalState {
   stepUid: string | null;
@@ -98,6 +101,12 @@ function isProviderConfigured(provider: ModelConfig["providers"][number]) {
   return Boolean(provider.apiKey?.trim());
 }
 
+function isEmbeddingModel(model: ModelProviderOption) {
+  const id = (model.id || "").toLowerCase();
+  const name = (model.name || "").toLowerCase();
+  return id.includes("embedding") || name.includes("embedding");
+}
+
 function normalizeMimeGroupFromName(fileName: string) {
   const normalized = fileName.toLowerCase();
   if (normalized.endsWith(".pdf")) {
@@ -146,6 +155,7 @@ export const useConversationStore = defineStore("conversation", () => {
   const modelConfig = ref<ModelConfig>({ providers: [] });
   const selectedModelProvider = ref("");
   const selectedModelName = ref("");
+  const approvalMode = ref<ApprovalMode>("default");
   const approval = ref<ApprovalState>({
     stepUid: null,
     title: "",
@@ -178,6 +188,47 @@ export const useConversationStore = defineStore("conversation", () => {
   let eventSource: EventSource | null = null;
   const streamingAssistantByParentUid = ref<Record<string, number>>({});
 
+  function loadApprovalModeMap(): Record<string, ApprovalMode> {
+    if (typeof window === "undefined") return {};
+    const raw = window.localStorage.getItem(APPROVAL_MODE_STORAGE_KEY);
+    if (!raw) return {};
+    try {
+      const parsed = JSON.parse(raw) as Record<string, string>;
+      const out: Record<string, ApprovalMode> = {};
+      Object.entries(parsed || {}).forEach(([key, value]) => {
+        if (!key) return;
+        out[key] = value === "full_access" ? "full_access" : "default";
+      });
+      return out;
+    } catch {
+      return {};
+    }
+  }
+
+  function saveApprovalModeMap(map: Record<string, ApprovalMode>) {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(APPROVAL_MODE_STORAGE_KEY, JSON.stringify(map));
+  }
+
+  function restoreApprovalModeForConversation(conversationUid: string | null) {
+    if (!conversationUid) {
+      approvalMode.value = "default";
+      return;
+    }
+    const map = loadApprovalModeMap();
+    approvalMode.value = map[conversationUid] || "default";
+  }
+
+  function setApprovalMode(mode: ApprovalMode) {
+    approvalMode.value = mode;
+    if (!currentConversationUid.value) {
+      return;
+    }
+    const map = loadApprovalModeMap();
+    map[currentConversationUid.value] = mode;
+    saveApprovalModeMap(map);
+  }
+
   const filteredConversations = computed(() =>
     conversations.value.filter((item) => agentCatalogStore.matchesConversation(item))
   );
@@ -193,7 +244,16 @@ export const useConversationStore = defineStore("conversation", () => {
       .filter((provider) => isProviderConfigured(provider))
       .map((provider) => ({
         ...provider,
-        models: provider.models.filter((model) => Boolean(model.id?.trim()))
+        models: provider.models.filter((model) => {
+          if (!model.id?.trim()) {
+            return false;
+          }
+          // Hide embedding models only for local providers in chat model selector.
+          if (provider.local && isEmbeddingModel(model)) {
+            return false;
+          }
+          return true;
+        })
       }))
       .filter((provider) => provider.models.length)
   );
@@ -721,6 +781,7 @@ export const useConversationStore = defineStore("conversation", () => {
     draftAttachments.value = [];
     resetRuntimePanels();
     disconnectEventSource();
+    approvalMode.value = "default";
     saveChatLastViewState({ mode: "draft", conversationUid: null });
     if (previousConversationModel) {
       selectedModelProvider.value = previousConversationModel.modelProvider;
@@ -732,6 +793,7 @@ export const useConversationStore = defineStore("conversation", () => {
 
   async function selectConversation(conversationUid: string) {
     currentConversationUid.value = conversationUid;
+    restoreApprovalModeForConversation(conversationUid);
     saveChatLastViewState({ mode: "conversation", conversationUid });
     draftAttachments.value = [];
     resetRuntimePanels();
@@ -908,7 +970,8 @@ export const useConversationStore = defineStore("conversation", () => {
         message: content,
         fileUrls: attachments.map((item) => item.fileUrl),
         modelProvider: effectiveProvider,
-        modelName: effectiveModelName
+        modelName: effectiveModelName,
+        approvalMode: approvalMode.value
       });
       tempMessage.messageUid = accepted.messageUid;
       runningConversationUid.value = conversationUid;
@@ -1217,6 +1280,8 @@ export const useConversationStore = defineStore("conversation", () => {
     currentModelOption,
     selectedModelProvider,
     selectedModelName,
+    approvalMode,
+    setApprovalMode,
     selectedModelKey,
     currentUploadPolicy,
     uploadDisabledReason,

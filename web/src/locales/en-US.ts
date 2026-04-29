@@ -231,7 +231,12 @@ const enUS = {
       closePreview: "Close preview",
       attachmentPreview: "Attachment preview",
       previewImageAttachment: "Preview image {name}",
-      removeAttachment: "Remove attachment {name}"
+      removeAttachment: "Remove attachment {name}",
+      permissionMode: {
+        label: "Permission mode",
+        default: "Default permissions",
+        fullAccess: "Full access permissions"
+      }
     },
     runtime: {
       title: "Runtime Log",

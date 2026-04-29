@@ -24,7 +24,16 @@ public class MessageRunAppService {
                                 List<String> fileUrls,
                                 String modelProvider,
                                 String modelName) {
-        return facade.submitMessage(conversationUid, message, fileUrls, modelProvider, modelName, "web", null);
+        return facade.submitMessage(conversationUid, message, fileUrls, modelProvider, modelName, "default", "web", null);
+    }
+
+    public String submitMessage(String conversationUid,
+                                String message,
+                                List<String> fileUrls,
+                                String modelProvider,
+                                String modelName,
+                                String approvalMode) {
+        return facade.submitMessage(conversationUid, message, fileUrls, modelProvider, modelName, approvalMode, "web", null);
     }
 
     public AgentMessage getMessage(String messageUid) {

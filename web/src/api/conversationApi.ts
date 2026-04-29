@@ -253,6 +253,7 @@ export const conversationApi = {
     fileUrls: string[];
     modelProvider: string;
     modelName: string;
+    approvalMode: "default" | "full_access";
   }) {
     return requestJson<MessageResponse>(`/api/conversations/${conversationUid}/messages`, {
       method: "POST",

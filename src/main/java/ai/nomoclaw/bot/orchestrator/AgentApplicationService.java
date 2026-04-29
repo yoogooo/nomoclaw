@@ -13,6 +13,7 @@ import ai.nomoclaw.bot.model.*;
 import ai.nomoclaw.bot.planner.Planner;
 import ai.nomoclaw.bot.policy.RiskPolicy;
 import ai.nomoclaw.bot.policy.tool.ToolPermissionPolicyService;
+import ai.nomoclaw.bot.policy.tool.ToolPolicyDecision;
 import ai.nomoclaw.bot.policy.tool.ToolPolicyDecisionResult;
 import ai.nomoclaw.bot.policy.tool.permission.PermissionEffect;
 import ai.nomoclaw.bot.policy.tool.permission.PermissionScope;
@@ -84,6 +85,8 @@ import java.util.stream.Collectors;
 public class AgentApplicationService {
 
     private static final String STOP_REASON_MAX_LOOP_REACHED = "MAX_LOOP_REACHED";
+    private static final String APPROVAL_MODE_DEFAULT = "default";
+    private static final String APPROVAL_MODE_FULL_ACCESS = "full_access";
     private static final String DEFAULT_AGENT_UID = "agent_general_assistant";
     private static final String VIRTUAL_AGENT_GROUP_UID = "group_short_drama";
     private static final String VIRTUAL_AGENT_GROUP_NAME = "all_agents";
@@ -129,6 +132,7 @@ public class AgentApplicationService {
     private final ConcurrentMap<String, Boolean> runningMessages = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, ExecutionState> executionStates = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, StringBuilder> streamingAnswerBuffers = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, String> messageApprovalModes = new ConcurrentHashMap<>();
 
     public AgentApplicationService(AgentStore store,
                                    Planner planner,
@@ -667,11 +671,11 @@ public class AgentApplicationService {
     }
 
     public String submitMessage(String conversationUid, String message, String channel) {
-        return submitMessage(conversationUid, message, List.of(), "", "", channel, null);
+        return submitMessage(conversationUid, message, List.of(), "", "", APPROVAL_MODE_DEFAULT, channel, null);
     }
 
     public String submitMessage(String conversationUid, String message, String channel, Consumer<String> beforeExecuteHook) {
-        return submitMessage(conversationUid, message, List.of(), "", "", channel, beforeExecuteHook);
+        return submitMessage(conversationUid, message, List.of(), "", "", APPROVAL_MODE_DEFAULT, channel, beforeExecuteHook);
     }
 
     /**
@@ -687,9 +691,11 @@ public class AgentApplicationService {
                                 List<String> fileUrls,
                                 String modelProvider,
                                 String modelName,
+                                String approvalMode,
                                 String channel,
                                 Consumer<String> beforeExecuteHook) {
         String normalizedChannel = channel == null || channel.isBlank() ? "web" : channel.trim();
+        String normalizedApprovalMode = normalizeApprovalMode(approvalMode);
         AgentConversation conversation = store.findConversation(conversationUid)
                 .orElseGet(() -> store.createConversation(conversationUid, "", DEFAULT_AGENT_UID, normalizedChannel));
         RuntimeModelSelection runtimeModel = resolveRuntimeModelSelection(conversation, modelProvider, modelName);
@@ -715,6 +721,7 @@ public class AgentApplicationService {
         }
         log.info("[Agent] message created conversationUid={} messageUid={} channel={} model={}/{} maxRounds={} message={}",
                 conversationUid, messageUid, normalizedChannel, runtimeModel.modelProvider(), runtimeModel.modelName(), maxRounds, summarize(message));
+        messageApprovalModes.put(messageUid, normalizedApprovalMode);
         if (beforeExecuteHook != null) {
             beforeExecuteHook.accept(messageUid);
         }
@@ -1066,6 +1073,7 @@ public class AgentApplicationService {
                     message.conversationUid(),
                     message.messageUid()
             );
+            policyDecision = applyApprovalModeOverride(message, policyDecision);
             if (!policyDecision.denied()
                     && latestStep.approvalStatus() != ApprovalStatus.APPROVED
                     && policyDecision.asks()) {
@@ -1243,6 +1251,7 @@ public class AgentApplicationService {
                     message.conversationUid(),
                     message.messageUid()
             );
+            policyDecision = applyApprovalModeOverride(message, policyDecision);
             if (policyDecision.denied()) {
                 ObjectNode metrics = JsonNodeFactory.instance.objectNode();
                 metrics.put("policyDenied", true);
@@ -2444,6 +2453,37 @@ public class AgentApplicationService {
         executionStates.remove(messageUid);
         cancellationRegistry.clear(messageUid);
         streamingAnswerBuffers.remove(messageUid);
+        messageApprovalModes.remove(messageUid);
+    }
+
+    private String normalizeApprovalMode(String approvalMode) {
+        String normalized = approvalMode == null ? "" : approvalMode.trim().toLowerCase(Locale.ROOT);
+        return APPROVAL_MODE_FULL_ACCESS.equals(normalized) ? APPROVAL_MODE_FULL_ACCESS : APPROVAL_MODE_DEFAULT;
+    }
+
+    private ToolPolicyDecisionResult applyApprovalModeOverride(AgentMessage message, ToolPolicyDecisionResult decision) {
+        if (decision == null || message == null) {
+            return decision;
+        }
+        String approvalMode = messageApprovalModes.getOrDefault(message.messageUid(), APPROVAL_MODE_DEFAULT);
+        if (!APPROVAL_MODE_FULL_ACCESS.equals(approvalMode)) {
+            return decision;
+        }
+        if (decision.hardGuardHit()) {
+            return decision;
+        }
+        if (decision.decision() == ToolPolicyDecision.ASK || decision.decision() == ToolPolicyDecision.DENY) {
+            return ToolPolicyDecisionResult.of(
+                    ToolPolicyDecision.ALLOW,
+                    decision.reasonCode(),
+                    decision.message(),
+                    decision.pathSummary(),
+                    decision.matchedSource(),
+                    decision.matchedRuleId(),
+                    false
+            );
+        }
+        return decision;
     }
 
     private String emptyToNull(String value) {

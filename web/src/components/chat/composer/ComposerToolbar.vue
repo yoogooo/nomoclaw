@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { ArrowUp, Lightbulb, Paperclip, Square } from "lucide-vue-next";
-import { NSelect } from "naive-ui";
+import { ArrowUp, ChevronDown, Lightbulb, Paperclip, ShieldAlert, Square } from "lucide-vue-next";
+import { NDropdown, NSelect } from "naive-ui";
 import UiInstantTooltip from "@/components/UiInstantTooltip.vue";
 
 const props = defineProps<{
   selectedModelKey: string;
   modelOptions: any[];
   showJinnangPicker: boolean;
+  approvalMode: "default" | "full_access";
   uploadDisabled: boolean;
   uploadingFiles: boolean;
   switchingContext: boolean;
@@ -22,6 +23,7 @@ const emit = defineEmits<{
   (e: "change-model", value: string): void;
   (e: "trigger-upload"): void;
   (e: "toggle-jinnang"): void;
+  (e: "change-approval-mode", value: "default" | "full_access"): void;
   (e: "submit"): void;
 }>();
 
@@ -37,6 +39,24 @@ const modelSelectWidthCh = computed(() => {
   const labelLength = selectedModelLabel.value.length;
   return Math.min(Math.max(labelLength + 6, 14), 34);
 });
+
+const approvalModeOptions = computed(() => [
+  { label: t("chat.composer.permissionMode.default"), key: "default" },
+  { label: t("chat.composer.permissionMode.fullAccess"), key: "full_access" }
+]);
+
+const approvalModeLabel = computed(() =>
+  props.approvalMode === "full_access"
+    ? t("chat.composer.permissionMode.fullAccess")
+    : t("chat.composer.permissionMode.default")
+);
+
+function onApprovalModeSelect(key: string) {
+  if (key !== "default" && key !== "full_access") {
+    return;
+  }
+  emit("change-approval-mode", key);
+}
 </script>
 
 <template>
@@ -45,6 +65,7 @@ const modelSelectWidthCh = computed(() => {
       <n-select
         :value="selectedModelKey"
         :options="modelOptions"
+        size="small"
         :placeholder="t('chat.composer.modelPlaceholder')"
         :disabled="switchingContext"
         :render-label="renderLabel"
@@ -52,6 +73,19 @@ const modelSelectWidthCh = computed(() => {
         @update:value="emit('change-model', $event)"
       />
     </div>
+
+    <n-dropdown trigger="click" :options="approvalModeOptions" @select="onApprovalModeSelect">
+      <button
+        class="composer-approval-mode-btn"
+        :class="{ 'composer-approval-mode-btn-danger': approvalMode === 'full_access' }"
+        type="button"
+        :aria-label="t('chat.composer.permissionMode.label')"
+      >
+        <ShieldAlert :size="14" />
+        <span>{{ approvalModeLabel }}</span>
+        <ChevronDown :size="14" />
+      </button>
+    </n-dropdown>
 
     <div class="composer-upload-inline">
       <div class="composer-tools">
@@ -118,6 +152,50 @@ const modelSelectWidthCh = computed(() => {
   display: flex;
   align-items: center;
   flex: none;
+}
+
+.composer-approval-mode-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1_5);
+  border: var(--size-1) solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-secondary);
+  padding: var(--space-1) var(--space-2_5);
+  font-size: var(--text-caption-size);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.18s ease, border-color 0.18s ease;
+}
+
+.composer-approval-mode-btn:hover {
+  background: transparent;
+  border-color: var(--color-border-active);
+}
+
+.composer-approval-mode-btn-danger {
+  color: color-mix(in srgb, var(--warning) 82%, #8a2e1a);
+  border-color: color-mix(in srgb, var(--warning) 52%, var(--color-border-strong));
+  background: transparent;
+}
+
+.composer-approval-mode-btn-danger:hover {
+  border-color: color-mix(in srgb, var(--warning) 66%, var(--color-border-strong));
+  background: transparent;
+}
+
+:root[data-theme="dark"] .composer-approval-mode-btn-danger {
+  color: color-mix(in srgb, var(--warning) 88%, #fff);
+  border-color: color-mix(in srgb, var(--warning) 62%, rgba(255, 255, 255, 0.22));
+  background: transparent;
+}
+
+:root[data-theme="dark"] .composer-approval-mode-btn-danger:hover {
+  color: color-mix(in srgb, var(--warning) 92%, #fff);
+  border-color: color-mix(in srgb, var(--warning) 74%, rgba(255, 255, 255, 0.24));
+  background: transparent;
 }
 
 .composer-tools {

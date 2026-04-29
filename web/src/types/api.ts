@@ -317,6 +317,8 @@ export interface ApprovalDecisionResponse {
   matchedRuleId?: string;
 }
 
+export type ApprovalMode = "default" | "full_access";
+
 export interface ModelCatalogStatus {
   catalogVersion: string;
   generatedAt: string;

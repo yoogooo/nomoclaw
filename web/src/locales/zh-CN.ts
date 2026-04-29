@@ -231,7 +231,12 @@ const zhCN = {
       closePreview: "关闭预览",
       attachmentPreview: "附件预览",
       previewImageAttachment: "预览图片 {name}",
-      removeAttachment: "移除附件 {name}"
+      removeAttachment: "移除附件 {name}",
+      permissionMode: {
+        label: "权限模式",
+        default: "默认权限",
+        fullAccess: "完全访问权限"
+      }
     },
     runtime: {
       title: "运行时日志",

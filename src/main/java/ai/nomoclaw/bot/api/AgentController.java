@@ -450,7 +450,8 @@ public class AgentController {
                 request.message(),
                 request.fileUrls() == null ? List.of() : request.fileUrls(),
                 request.modelProvider(),
-                request.modelName()
+                request.modelName(),
+                request.approvalMode()
         );
         var message = messageRunAppService.getMessage(messageUid);
         int maxRounds = messageRunAppService.maxLoopRounds();

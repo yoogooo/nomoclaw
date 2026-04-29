@@ -8,6 +8,7 @@ public record MessageRequest(
         @NotBlank String message,
         List<String> fileUrls,
         @NotBlank String modelProvider,
-        @NotBlank String modelName
+        @NotBlank String modelName,
+        String approvalMode
 ) {
 }
