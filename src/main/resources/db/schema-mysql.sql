@@ -136,8 +136,7 @@ CREATE TABLE IF NOT EXISTS agent_mcp_tool_relation (
 CREATE TABLE IF NOT EXISTS mcp_server_definition (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增主键',
     server_uid VARCHAR(64) NOT NULL DEFAULT '' COMMENT 'MCP Server 业务ID',
-    server_name VARCHAR(64) NOT NULL DEFAULT '' COMMENT 'MCP Server 唯一名称',
-    display_name VARCHAR(128) NOT NULL DEFAULT '' COMMENT '展示名称',
+    server_name VARCHAR(100) NOT NULL DEFAULT '' COMMENT 'MCP Server 唯一名称',
     transport VARCHAR(16) NOT NULL DEFAULT 'HTTP' COMMENT '传输方式：HTTP/STDIO',
     status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE' COMMENT '状态：ACTIVE / DISABLED',
     timeout_seconds INT NOT NULL DEFAULT 30 COMMENT '连接和调用超时时间',
@@ -162,7 +161,6 @@ CREATE TABLE IF NOT EXISTS mcp_tool_snapshot (
     server_uid VARCHAR(64) NOT NULL DEFAULT '' COMMENT 'MCP Server 业务ID',
     tool_key VARCHAR(64) NOT NULL DEFAULT '' COMMENT '映射到本系统的工具 key',
     original_tool_name VARCHAR(128) NOT NULL DEFAULT '' COMMENT 'MCP 原始工具名',
-    display_name VARCHAR(128) NOT NULL DEFAULT '' COMMENT '展示名称',
     description TEXT NULL COMMENT '工具描述',
     input_schema_json JSON NULL COMMENT 'MCP inputSchema',
     status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE' COMMENT '状态：ACTIVE / DISABLED',

@@ -17,7 +17,6 @@ public class McpToolSnapshotEntity {
     private String serverUid;
     private String toolKey;
     private String originalToolName;
-    private String displayName;
     private String description;
     private String inputSchemaJson;
     private String status;

@@ -254,7 +254,7 @@ function avatarBgColor(raw?: string | null, explicitColor?: string | null) {
   background: transparent;
 }
 
-@media (max-width: var(--size-breakpoint-lg)) {
+@media (max-width: 1120px) {
   .agent-brand {
     padding: var(--space-3_5) var(--space-4) var(--space-3);
   }

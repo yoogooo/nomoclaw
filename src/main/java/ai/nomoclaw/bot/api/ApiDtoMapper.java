@@ -40,7 +40,6 @@ public final class ApiDtoMapper {
     public static SaveMcpServerCommand toCommand(SaveMcpServerRequest request) {
         return new SaveMcpServerCommand(
                 request.serverName(),
-                request.displayName(),
                 request.transport(),
                 request.timeoutSeconds(),
                 request.autoStart(),
@@ -61,7 +60,6 @@ public final class ApiDtoMapper {
         return new McpServerResponse(
                 dto.serverUid(),
                 dto.serverName(),
-                dto.displayName(),
                 dto.transport(),
                 dto.status(),
                 dto.timeoutSeconds(),

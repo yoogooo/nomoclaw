@@ -196,8 +196,10 @@ function toggleThemeMode() {
   letter-spacing: 0.01em;
 }
 
-@media (max-width: var(--size-breakpoint-lg)) {
+@media (max-width: 600px) {
   .directory-rail {
+    height: auto;
+    min-height: 0;
     flex-direction: row;
     align-items: center;
     justify-content: space-between;

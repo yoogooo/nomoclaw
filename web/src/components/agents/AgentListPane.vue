@@ -153,7 +153,7 @@ function avatarFallbackText(agent: ManagedAgent) {
   box-shadow: var(--color-shadow-brand-inner);
 }
 
-@media (max-width: var(--size-breakpoint-lg)) {
+@media (max-width: 1120px) {
   .agent-list-column {
     overflow: visible;
   }

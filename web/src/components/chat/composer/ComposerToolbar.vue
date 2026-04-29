@@ -224,7 +224,7 @@ const modelSelectWidthCh = computed(() => {
   color: var(--color-text-secondary);
 }
 
-@media (max-width: var(--size-breakpoint-md)) {
+@media (max-width: 860px) {
   .composer-toolbar-row {
     align-items: stretch;
   }

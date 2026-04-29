@@ -139,6 +139,8 @@ const enUS = {
       enabled: "MCP Server enabled",
       disabled: "MCP Server disabled",
       saveFailed: "Save failed",
+      nameRequired: "MCP Server name is required",
+      nameDuplicated: "MCP Server name must be unique",
       testSuccess: "Connection test succeeded",
       toolsRefreshed: "Tools refreshed"
     }

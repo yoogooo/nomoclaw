@@ -136,7 +136,7 @@ function dismissModelGate() {
   color: var(--color-button-neutral-text-light);
 }
 
-@media (max-width: var(--size-breakpoint-lg)) {
+@media (max-width: 1120px) {
   .model-gate-overlay {
     inset: 0;
   }

@@ -1,13 +1,13 @@
 package ai.nomoclaw.bot.api;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 import java.util.List;
 import java.util.Map;
 
 public record SaveMcpServerRequest(
-        @NotBlank String serverName,
-        String displayName,
+        @NotBlank @Size(max = 100) String serverName,
         @NotBlank String transport,
         Integer timeoutSeconds,
         Boolean autoStart,

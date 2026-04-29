@@ -181,7 +181,7 @@ const { t } = useI18n();
   margin-top: var(--space-1);
 }
 
-@media (max-width: var(--size-breakpoint-lg)) {
+@media (max-width: 1120px) {
   .docs-split {
     grid-template-columns: 1fr;
   }

@@ -23,6 +23,7 @@ const renameInput = ref("");
 const renameSubmitting = ref(false);
 const renameInputRef = ref<InputInst | null>(null);
 const refreshingHistory = ref(false);
+const refreshAnimating = ref(false);
 
 const agentOptions = computed<AgentSelectOption[]>(() =>
   [...agentCatalogStore.allAgents]
@@ -120,13 +121,19 @@ async function refreshHistoryConversations() {
   if (refreshingHistory.value) {
     return;
   }
+  const startedAt = Date.now();
   refreshingHistory.value = true;
+  refreshAnimating.value = true;
   try {
     await conversationStore.refreshConversations();
   } catch {
     discreteMessage.error(t("toast.refreshFailed"));
   } finally {
     refreshingHistory.value = false;
+    const elapsed = Date.now() - startedAt;
+    window.setTimeout(() => {
+      refreshAnimating.value = false;
+    }, Math.max(0, 650 - elapsed));
   }
 }
 
@@ -155,7 +162,7 @@ function handleAgentChange(agentUid: string | number | null) {
             :disabled="refreshingHistory"
             @click="refreshHistoryConversations()"
           >
-            <RefreshCw :size="14" :class="{ spinning: refreshingHistory }" />
+            <RefreshCw :size="14" :class="{ spinning: refreshAnimating }" />
           </button>
           <button class="create-conversation-button ui-pill-btn" @click="createConversationAndFocusInput()">
             {{ t("chat.sidebar.createConversation") }}
@@ -271,15 +278,15 @@ function handleAgentChange(agentUid: string | number | null) {
   width: var(--size-32);
   height: var(--size-32);
   padding: 0;
-  border-color: var(--color-border-strong);
-  background: var(--color-bg-surface-soft);
+  border-color: transparent;
+  background: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;
   transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease;
 }
 
 .refresh-conversation-button:hover:not(:disabled) {
-  border-color: var(--color-border-active);
+  border-color: transparent;
   background: var(--color-bg-soft-hover);
   color: var(--color-text-primary);
 }
@@ -441,6 +448,7 @@ function handleAgentChange(agentUid: string | number | null) {
 }
 
 .spinning {
+  transform-origin: center;
   animation: spin 0.8s linear infinite;
 }
 
@@ -450,7 +458,7 @@ function handleAgentChange(agentUid: string | number | null) {
   }
 }
 
-@media (max-width: var(--size-breakpoint-lg)) {
+@media (max-width: 1120px) {
   .conversation-panel {
     gap: var(--space-3);
   }

@@ -99,7 +99,6 @@ export interface AgentMcpTool {
 export interface McpServer {
   serverUid: string;
   serverName: string;
-  displayName: string;
   transport: "HTTP" | "STDIO";
   status: string;
   timeoutSeconds: number;
@@ -129,7 +128,6 @@ export interface McpTool {
 
 export interface SaveMcpServerPayload {
   serverName: string;
-  displayName?: string;
   transport: "HTTP" | "STDIO";
   timeoutSeconds: number;
   autoStart: boolean;

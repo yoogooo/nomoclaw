@@ -845,7 +845,7 @@ onMounted(() => {
   min-height: calc(1.45em * 3);
 }
 
-@media (max-width: var(--size-breakpoint-lg)) {
+@media (max-width: 1120px) {
   .conversation-empty-hero {
     width: min(100%, var(--container-sm));
   }
@@ -855,7 +855,7 @@ onMounted(() => {
   }
 }
 
-@media (max-width: var(--size-breakpoint-md)) {
+@media (max-width: 860px) {
   .conversation-empty-hero {
     width: 100%;
     padding: var(--space-5);
@@ -1376,7 +1376,7 @@ onMounted(() => {
   }
 }
 
-@media (max-width: var(--size-breakpoint-lg)) {
+@media (max-width: 1120px) {
   .message-list {
     padding-bottom: calc(var(--space-chat-mobile-input-offset) + env(safe-area-inset-bottom));
     -webkit-overflow-scrolling: touch;

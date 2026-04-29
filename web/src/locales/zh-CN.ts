@@ -92,7 +92,7 @@ const zhCN = {
       name: "名称",
       transport: "Transport",
       status: "状态",
-      tools: "Tools",
+      tools: "工具数量",
       actions: "操作"
     },
     actions: {
@@ -139,6 +139,8 @@ const zhCN = {
       enabled: "MCP Server 已启用",
       disabled: "MCP Server 已停用",
       saveFailed: "保存失败",
+      nameRequired: "MCP Server 名称不能为空",
+      nameDuplicated: "MCP Server 名称不能重复",
       testSuccess: "连接测试成功",
       toolsRefreshed: "工具已刷新"
     }

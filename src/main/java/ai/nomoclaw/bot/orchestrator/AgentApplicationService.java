@@ -1867,8 +1867,8 @@ public class AgentApplicationService {
         );
         store.appendEvent(event);
         eventBus.publish(event);
-        log.info("[AgentEvent] type={} conversationUid={} messageUid={} stepUid={} payload={}",
-                type, conversationUid, messageUid, stepUid, summarize(payload.toString()));
+//        log.info("[AgentEvent] type={} conversationUid={} messageUid={} stepUid={} payload={}",
+//                type, conversationUid, messageUid, stepUid, summarize(payload.toString()));
     }
 
     private void persistAssistantReply(AgentMessage parentMessage, String content) {

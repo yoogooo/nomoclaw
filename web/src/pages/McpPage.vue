@@ -40,7 +40,6 @@ const toolsLoading = ref(false);
 
 const form = reactive({
   serverName: "",
-  displayName: "",
   timeoutSeconds: 30,
   autoStart: true,
   endpoint: "",
@@ -55,14 +54,18 @@ const form = reactive({
 const serverColumns = computed<DataTableColumns<McpServer>>(() => [
   {
     title: () => h("span", { class: "mcp-name-header" }, t("mcp.columns.name")),
-    key: "displayName",
+    key: "serverName",
+    width: 180,
+    minWidth: 180,
     render(row) {
-      return h("span", { class: "mcp-name-value" }, row.displayName || row.serverName);
+      return h("span", { class: "mcp-name-value" }, row.serverName);
     }
   },
   {
     title: t("mcp.columns.transport"),
     key: "transport",
+    width: 120,
+    minWidth: 120,
     render(row) {
       return row.transport;
     }
@@ -70,6 +73,8 @@ const serverColumns = computed<DataTableColumns<McpServer>>(() => [
   {
     title: t("mcp.columns.status"),
     key: "status",
+    width: 96,
+    minWidth: 96,
     render(row) {
       return h(NSwitch, {
         value: row.status === "ACTIVE",
@@ -79,10 +84,12 @@ const serverColumns = computed<DataTableColumns<McpServer>>(() => [
       });
     }
   },
-  { title: t("mcp.columns.tools"), key: "toolCount" },
+  { title: t("mcp.columns.tools"), key: "toolCount", width: 88, minWidth: 88 },
   {
     title: t("mcp.columns.actions"),
     key: "actions",
+    width: 300,
+    minWidth: 300,
     render(row) {
       return h("div", { class: "mcp-actions" }, [
         hButton(t("common.edit"), () => openEditor(row)),
@@ -99,7 +106,7 @@ const serverColumns = computed<DataTableColumns<McpServer>>(() => [
           },
           {
             trigger: () => hButton(t("common.delete"), () => undefined),
-            default: () => t("mcp.confirmDelete", { name: row.displayName || row.serverName })
+            default: () => t("mcp.confirmDelete", { name: row.serverName })
           }
         )
       ]);
@@ -144,7 +151,6 @@ function openCreate() {
   activeTab.value = "HTTP";
   Object.assign(form, {
     serverName: "",
-    displayName: "",
     timeoutSeconds: 30,
     autoStart: true,
     endpoint: "",
@@ -163,7 +169,6 @@ function openEditor(server: McpServer) {
   activeTab.value = server.transport;
   Object.assign(form, {
     serverName: server.serverName,
-    displayName: server.displayName,
     timeoutSeconds: server.timeoutSeconds || 30,
     autoStart: Boolean(server.autoStart),
     endpoint: server.endpoint || "",
@@ -214,7 +219,7 @@ async function refreshTools(serverUid: string) {
   try {
     tools.value = await mcpApi.refreshTools(serverUid);
     const server = servers.value.find((item) => item.serverUid === serverUid);
-    viewingToolsServerName.value = server?.displayName || server?.serverName || "";
+    viewingToolsServerName.value = server?.serverName || "";
     showToolsModal.value = true;
     message.success(t("mcp.toast.toolsRefreshed"));
     await loadServers();
@@ -224,7 +229,7 @@ async function refreshTools(serverUid: string) {
 }
 
 async function openTools(server: McpServer) {
-  viewingToolsServerName.value = server.displayName || server.serverName;
+  viewingToolsServerName.value = server.serverName;
   showToolsModal.value = true;
   toolsLoading.value = true;
   try {
@@ -252,13 +257,15 @@ async function updateServerStatus(server: McpServer, enabled: boolean) {
 }
 
 function buildPayload(): SaveMcpServerPayload {
-  const displayName = form.displayName.trim();
-  const serverName = editingUid.value
-    ? form.serverName.trim()
-    : normalizeServerName(displayName || form.serverName);
+  const serverName = normalizeServerName(form.serverName);
+  if (!serverName) {
+    throw new Error(t("mcp.toast.nameRequired"));
+  }
+  if (isDuplicateServerName(serverName)) {
+    throw new Error(t("mcp.toast.nameDuplicated"));
+  }
   const payload: SaveMcpServerPayload = {
     serverName,
-    displayName,
     transport: activeTab.value,
     timeoutSeconds: Number(form.timeoutSeconds) || 30,
     autoStart: true
@@ -276,11 +283,11 @@ function buildPayload(): SaveMcpServerPayload {
 }
 
 function normalizeServerName(value: string) {
-  const normalized = value.trim().toLowerCase()
-    .replace(/[^a-z0-9_-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 64);
-  return normalized || `mcp-${Date.now().toString(36)}`;
+  return value.trim().slice(0, 100);
+}
+
+function isDuplicateServerName(serverName: string) {
+  return servers.value.some((server) => server.serverName === serverName && server.serverUid !== editingUid.value);
 }
 
 function buildHttpHeaders(): Record<string, string> {
@@ -372,13 +379,16 @@ onMounted(() => {
 
           <div class="mcp-grid">
             <n-card :title="t('mcp.serverListTitle')" class="mcp-card">
-              <n-data-table
-                :columns="serverColumns"
-                :data="servers"
-                :loading="loading"
-                :row-key="(row) => row.serverUid"
-                size="small"
-              />
+              <div class="mcp-table-wrap">
+                <n-data-table
+                  :columns="serverColumns"
+                  :data="servers"
+                  :loading="loading"
+                  :row-key="(row) => row.serverUid"
+                  :scroll-x="784"
+                  size="small"
+                />
+              </div>
             </n-card>
           </div>
         </div>
@@ -393,7 +403,12 @@ onMounted(() => {
     >
       <n-form label-placement="top">
         <n-form-item :label="t('mcp.editor.name')">
-          <n-input v-model:value="form.displayName" :placeholder="t('mcp.editor.namePlaceholder')" />
+          <n-input
+            v-model:value="form.serverName"
+            :placeholder="t('mcp.editor.namePlaceholder')"
+            maxlength="100"
+            show-count
+          />
         </n-form-item>
         <n-tabs v-model:value="activeTab" type="segment">
           <n-tab-pane name="HTTP" :tab="t('mcp.editor.tabHttp')">
@@ -480,6 +495,17 @@ onMounted(() => {
 
 .mcp-card {
   min-height: 420px;
+  min-width: 0;
+}
+
+.mcp-table-wrap {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.mcp-table-wrap :deep(.n-data-table) {
+  min-width: 720px;
 }
 
 .mcp-tools-table-wrap {
@@ -543,9 +569,20 @@ onMounted(() => {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
 }
 
-@media (max-width: var(--size-breakpoint-lg)) {
+@media (max-width: 1120px) {
   .mcp-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 860px) {
+  .mcp-card {
+    min-height: 320px;
+  }
+
+  :deep(.mcp-name-header),
+  :deep(.mcp-name-value) {
+    padding-left: 0;
   }
 }
 </style>

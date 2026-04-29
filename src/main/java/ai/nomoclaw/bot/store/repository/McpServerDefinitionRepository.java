@@ -17,6 +17,13 @@ public class McpServerDefinitionRepository extends CrudRepository<McpServerDefin
         return lambdaQuery().eq(McpServerDefinitionEntity::getServerUid, serverUid).one();
     }
 
+    public McpServerDefinitionEntity findByServerName(String serverName) {
+        if (serverName == null || serverName.isBlank()) {
+            return null;
+        }
+        return lambdaQuery().eq(McpServerDefinitionEntity::getServerName, serverName).one();
+    }
+
     public List<McpServerDefinitionEntity> listActive() {
         return lambdaQuery()
                 .eq(McpServerDefinitionEntity::getStatus, "ACTIVE")

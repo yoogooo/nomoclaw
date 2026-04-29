@@ -11,10 +11,9 @@ import java.util.Locale;
 public class McpToolKeyGenerator {
 
     public String generate(String serverName, String originalToolName) {
-        String serverSlug = slug(serverName, 18);
         String toolSlug = slug(originalToolName, 24);
-        String hash = hash(serverName + ":" + originalToolName).substring(0, 10);
-        String key = "mcp_" + serverSlug + "_" + hash + "_" + toolSlug;
+        String hash = hash(serverName + ":" + originalToolName).substring(0, 8);
+        String key = "mcp_" + toolSlug + "_" + hash;
         return key.length() <= 64 ? key : key.substring(0, 64);
     }
 

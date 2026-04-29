@@ -15,7 +15,6 @@ public class McpServerDefinitionEntity {
     private Long id;
     private String serverUid;
     private String serverName;
-    private String displayName;
     private String transport;
     private String status;
     private Integer timeoutSeconds;

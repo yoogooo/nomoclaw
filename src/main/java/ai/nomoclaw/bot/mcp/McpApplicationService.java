@@ -63,9 +63,9 @@ public class McpApplicationService {
     }
 
     public List<McpToolDto> listTools(String serverUid) {
-        requireServer(serverUid);
+        McpServerDefinitionEntity server = requireServer(serverUid);
         return toolSnapshotRepository.listByServerUid(serverUid).stream()
-                .map(this::toToolDto)
+                .map(snapshot -> toToolDto(snapshot, server))
                 .toList();
     }
 
@@ -75,6 +75,7 @@ public class McpApplicationService {
         McpServerDefinitionEntity server = new McpServerDefinitionEntity();
         server.setServerUid(UUID.randomUUID().toString());
         applyCommand(server, command, now, true);
+        ensureServerNameAvailable(server.getServerName(), null);
         server.setCreatedTime(now);
         serverRepository.save(server);
         return toDto(server, 0);
@@ -84,6 +85,7 @@ public class McpApplicationService {
     public McpServerDto updateServer(String serverUid, SaveMcpServerCommand command) {
         McpServerDefinitionEntity server = requireServer(serverUid);
         applyCommand(server, command, LocalDateTime.now(), false);
+        ensureServerNameAvailable(server.getServerName(), server.getId());
         serverRepository.updateById(server);
         return toDto(server, toolSnapshotRepository.listByServerUid(serverUid).size());
     }
@@ -280,18 +282,17 @@ public class McpApplicationService {
     private void upsertToolSnapshot(McpServerDefinitionEntity server, ToolSpecification tool, LocalDateTime now) {
         String originalName = tool.name();
         McpToolSnapshotEntity snapshot = toolSnapshotRepository.findByServerUidAndOriginalToolName(server.getServerUid(), originalName);
-        String toolKey = snapshot == null
-                ? toolKeyGenerator.generate(server.getServerName(), originalName)
-                : snapshot.getToolKey();
+        String toolKey = toolKeyGenerator.generate(server.getServerName(), originalName);
         if (snapshot == null) {
             snapshot = new McpToolSnapshotEntity();
             snapshot.setSnapshotUid(UUID.randomUUID().toString());
             snapshot.setServerUid(server.getServerUid());
-            snapshot.setToolKey(toolKey);
             snapshot.setOriginalToolName(originalName);
             snapshot.setCreatedTime(now);
+        } else {
+            agentMcpToolRelationRepository.updateToolKey(snapshot.getToolKey(), toolKey);
         }
-        snapshot.setDisplayName(resolveToolDisplayName(server, tool));
+        snapshot.setToolKey(toolKey);
         snapshot.setDescription(nullToEmpty(tool.description()));
         snapshot.setInputSchemaJson(serializeToolParameters(tool));
         snapshot.setStatus(server.getStatus());
@@ -304,10 +305,10 @@ public class McpApplicationService {
         }
     }
 
-    private String resolveToolDisplayName(McpServerDefinitionEntity server, ToolSpecification tool) {
-        String name = nullToEmpty(tool.name());
-        String serverDisplay = nullToEmpty(server.getDisplayName()).isBlank() ? server.getServerName() : server.getDisplayName();
-        return "MCP · " + serverDisplay + " · " + name;
+    private String resolveToolDisplayName(McpServerDefinitionEntity server, String originalToolName) {
+        String name = nullToEmpty(originalToolName);
+        String serverName = server == null ? "" : server.getServerName();
+        return "MCP · " + serverName + " · " + name;
     }
 
     private String serializeToolParameters(ToolSpecification tool) {
@@ -326,7 +327,6 @@ public class McpApplicationService {
         String serverName = normalizeServerName(command.serverName());
         String transport = normalizeTransport(command.transport());
         server.setServerName(serverName);
-        server.setDisplayName(nullToEmpty(command.displayName()).isBlank() ? serverName : command.displayName().trim());
         server.setTransport(transport);
         if (creating) {
             server.setStatus("ACTIVE");
@@ -348,11 +348,18 @@ public class McpApplicationService {
     }
 
     private String normalizeServerName(String value) {
-        String normalized = nullToEmpty(value).trim().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_-]+", "-");
+        String normalized = nullToEmpty(value).trim();
         if (normalized.isBlank()) {
             throw new IllegalArgumentException("serverName is required");
         }
-        return normalized.length() <= 64 ? normalized : normalized.substring(0, 64);
+        return normalized.length() <= 100 ? normalized : normalized.substring(0, 100);
+    }
+
+    private void ensureServerNameAvailable(String serverName, Long currentId) {
+        McpServerDefinitionEntity existing = serverRepository.findByServerName(serverName);
+        if (existing != null && (currentId == null || !currentId.equals(existing.getId()))) {
+            throw new IllegalArgumentException("MCP server name already exists: " + serverName);
+        }
     }
 
     private String normalizeTransport(String value) {
@@ -412,7 +419,6 @@ public class McpApplicationService {
         return new McpServerDto(
                 server.getServerUid(),
                 server.getServerName(),
-                server.getDisplayName(),
                 server.getTransport(),
                 server.getStatus(),
                 server.getTimeoutSeconds(),
@@ -431,12 +437,12 @@ public class McpApplicationService {
         );
     }
 
-    private McpToolDto toToolDto(McpToolSnapshotEntity snapshot) {
+    private McpToolDto toToolDto(McpToolSnapshotEntity snapshot, McpServerDefinitionEntity server) {
         return new McpToolDto(
                 snapshot.getToolKey(),
                 snapshot.getServerUid(),
                 snapshot.getOriginalToolName(),
-                snapshot.getDisplayName(),
+                resolveToolDisplayName(server, snapshot.getOriginalToolName()),
                 snapshot.getDescription(),
                 snapshot.getStatus(),
                 snapshot.getLastSyncedTime()
@@ -449,14 +455,14 @@ public class McpApplicationService {
         boolean enabled = relation != null && "ACTIVE".equalsIgnoreCase(relation.getStatus());
         LocalDateTime updatedTime = relation == null ? snapshot.getUpdatedTime() : relation.getUpdatedTime();
         String serverName = server == null ? "" : server.getServerName();
-        String serverDisplayName = server == null ? "" : server.getDisplayName();
+        String serverDisplayName = serverName;
         return new AgentMcpToolDto(
                 snapshot.getToolKey(),
                 snapshot.getServerUid(),
                 serverName,
                 serverDisplayName,
                 snapshot.getOriginalToolName(),
-                snapshot.getDisplayName(),
+                resolveToolDisplayName(server, snapshot.getOriginalToolName()),
                 snapshot.getDescription(),
                 enabled,
                 updatedTime

@@ -35,7 +35,7 @@ const { t } = useI18n();
   flex-shrink: 0;
 }
 
-@media (max-width: var(--size-breakpoint-lg)) {
+@media (max-width: 1120px) {
   .agent-detail-column {
     overflow: visible;
     max-height: none;

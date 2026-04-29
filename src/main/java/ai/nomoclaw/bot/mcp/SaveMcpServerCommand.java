@@ -5,7 +5,6 @@ import java.util.Map;
 
 public record SaveMcpServerCommand(
         String serverName,
-        String displayName,
         String transport,
         Integer timeoutSeconds,
         Boolean autoStart,

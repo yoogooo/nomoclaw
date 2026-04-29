@@ -7,7 +7,6 @@ import java.util.Map;
 public record McpServerResponse(
         String serverUid,
         String serverName,
-        String displayName,
         String transport,
         String status,
         Integer timeoutSeconds,

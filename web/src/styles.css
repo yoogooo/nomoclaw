@@ -1246,6 +1246,7 @@ a {
   border-radius: var(--radius-lg);
   border: var(--size-1) solid var(--approval-body-border);
   background: var(--approval-body-bg);
+  color: var(--approval-content-color);
 }
 
 .ui-approval-body code:not(pre code) {
@@ -1330,7 +1331,7 @@ a {
   border-radius: 0 !important;
 }
 
-@media (max-width: var(--size-breakpoint-xl)) {
+@media (max-width: 1480px) {
   .grid-chat {
     grid-template-columns: var(--layout-directory-rail-width) var(--size-260) minmax(0, 1fr);
   }
@@ -1340,7 +1341,7 @@ a {
   }
 }
 
-@media (max-width: var(--size-breakpoint-lg)) {
+@media (max-width: 1120px) {
   body {
     overflow: auto;
   }
@@ -1361,8 +1362,29 @@ a {
     padding: var(--space-5_5);
   }
 
-  .grid-chat,
   .grid-cron {
+    grid-template-columns: 1fr;
+    height: auto;
+    min-height: auto;
+    max-height: none;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .app-page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .app-page-header-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+}
+
+@media (max-width: 600px) {
+  .grid-chat {
     grid-template-columns: 1fr;
     height: auto;
     min-height: auto;
@@ -1378,17 +1400,15 @@ a {
   .app-layout-responsive {
     grid-template-columns: 1fr;
     height: auto;
+    min-height: auto;
+    max-height: none;
+    overflow: visible;
   }
 
   .app-main-content {
     height: auto;
     padding: var(--layout-main-content-padding-mobile);
     overflow: visible;
-  }
-
-  .app-page-header {
-    flex-direction: column;
-    align-items: stretch;
   }
 
   .chat-page {
@@ -1432,7 +1452,7 @@ a {
   }
 }
 
-@media (max-width: var(--size-breakpoint-md)) {
+@media (max-width: 860px) {
   .ui-approval-card {
     width: 100%;
     padding: var(--space-3) var(--space-3_5);

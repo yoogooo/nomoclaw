@@ -58,4 +58,15 @@ public class AgentMcpToolRelationRepository extends CrudRepository<AgentMcpToolR
                 .eq(AgentMcpToolRelationEntity::getToolKey, toolKey)
                 .remove();
     }
+
+    public void updateToolKey(String oldToolKey, String newToolKey) {
+        if (oldToolKey == null || oldToolKey.isBlank() || newToolKey == null || newToolKey.isBlank()
+                || oldToolKey.equals(newToolKey)) {
+            return;
+        }
+        lambdaUpdate()
+                .eq(AgentMcpToolRelationEntity::getToolKey, oldToolKey)
+                .set(AgentMcpToolRelationEntity::getToolKey, newToolKey)
+                .update();
+    }
 }
