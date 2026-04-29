@@ -100,6 +100,14 @@ Windows：
 1. 路径比较使用候选集：`normalized path + realpath(存在时)`。
 2. 目录名命中在 Windows/macOS 按大小写不敏感处理。
 
+### 5.4 高危操作（full_access 不可绕过）
+
+1. 强制 `DENY`
+- 磁盘/分区破坏性操作：格式化、分区改写、设备覆盖写入。
+
+2. 强制 `ASK`
+- 隐私设备访问：摄像头、麦克风。
+
 ## 6. 规则模型
 
 `PermissionRule` 字段：
@@ -133,7 +141,7 @@ Windows：
 
 ## 8. 审批与记忆策略
 
-UI 仅暴露 3 个动作：
+UI 仅暴露 3 个动作（根据风险动态约束）：
 
 1. 允许本次（`allow + once`）
 2. 允许并记住到当前 Agent（`allow + agent`）
@@ -141,7 +149,9 @@ UI 仅暴露 3 个动作：
 
 服务端 scope 约束：
 
-- 外部请求只接受 `once / agent` 语义；其他值回退 `once`。
+- 常规审批支持 `once / session / agent / user`。
+- 命中 `HARD_GUARD_*_ASK` 时，仅允许 `once / session`；`agent/user` 自动降级到 `session`。
+- `HARD_GUARD_*_DENY` 不进入审批流程，直接拒绝。
 
 规则生成策略：
 
@@ -185,6 +195,8 @@ UI 仅暴露 3 个动作：
 
 - `HARD_GUARD_PROTECTED_PATH_ASK`
 - `HARD_GUARD_SYSTEM_PATH_DENY`
+- `HARD_GUARD_PRIVACY_DEVICE_ASK`
+- `HARD_GUARD_DISK_DESTRUCTIVE_DENY`
 - `RULE_DENY_MATCHED`
 - `RULE_ASK_MATCHED`
 - `RULE_ALLOW_MATCHED`

@@ -4,6 +4,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 public record PermissionContextDetails(
+        String toolName,
         PermissionResourceType resourceType,
         String action,
         boolean readIntent,

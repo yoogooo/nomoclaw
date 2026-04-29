@@ -67,6 +67,7 @@ public class CommandRuleResolver {
             List<Path> targets = extractCommandWriteTargets(command, cwd);
             boolean writeIntent = hasWriteIntent(command);
             return new PermissionContextDetails(
+                    context.toolName(),
                     PermissionResourceType.COMMAND,
                     "execute",
                     !writeIntent,
@@ -85,6 +86,7 @@ public class CommandRuleResolver {
             boolean write = Set.of("write", "append", "edit").contains(action);
             boolean read = Set.of("read", "list").contains(action);
             return new PermissionContextDetails(
+                    context.toolName(),
                     PermissionResourceType.FILE,
                     action.isBlank() ? "*" : action,
                     read,
@@ -96,6 +98,7 @@ public class CommandRuleResolver {
         }
 
         return new PermissionContextDetails(
+                context.toolName(),
                 PermissionResourceType.fromTool(tool),
                 context.toolArgs().path("action").asText("*"),
                 false,

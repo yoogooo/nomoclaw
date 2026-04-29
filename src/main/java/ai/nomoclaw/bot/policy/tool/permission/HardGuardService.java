@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Locale;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 @Component
 public class HardGuardService {
@@ -36,12 +37,48 @@ public class HardGuardService {
             "system volume information",
             "$recycle.bin"
     );
+    private static final Pattern DISK_DESTRUCTIVE_PATTERN = Pattern.compile(
+            "(^|\\s)(mkfs(\\.[a-z0-9_\\-]+)?|fdisk|parted|format|diskutil\\s+erase(disk|volume)|dd\\s+if=.+\\s+of=(/dev/|\\\\\\\\\\\\.\\\\physicaldrive))($|\\s)",
+            Pattern.CASE_INSENSITIVE
+    );
+    private static final Pattern PRIVACY_DEVICE_PATTERN = Pattern.compile(
+            "(camera|webcam|microphone|microphone|mic\\b|audio\\s+record|record\\s+audio|access\\s+camera|open\\s+camera)",
+            Pattern.CASE_INSENSITIVE
+    );
 
     public PermissionDecision evaluate(PermissionContextDetails details) {
         if (details == null) {
             return null;
         }
 
+        String commandText = details.commandText() == null ? "" : details.commandText().trim();
+        String actionText = details.action() == null ? "" : details.action().trim();
+        String toolName = details.toolName() == null ? "" : details.toolName().trim();
+        String joined = (toolName + " " + actionText + " " + commandText).trim();
+
+        if (!commandText.isBlank() && DISK_DESTRUCTIVE_PATTERN.matcher(commandText).find()) {
+            return new PermissionDecision(
+                    PermissionEffect.DENY,
+                    ToolPolicyReasonCode.HARD_GUARD_DISK_DESTRUCTIVE_DENY,
+                    "命中磁盘/分区破坏性操作，系统已拒绝执行。",
+                    null,
+                    "hardguard-disk-destructive",
+                    "",
+                    true
+            );
+        }
+
+        if (!joined.isBlank() && PRIVACY_DEVICE_PATTERN.matcher(joined).find()) {
+            return new PermissionDecision(
+                    PermissionEffect.ASK,
+                    ToolPolicyReasonCode.HARD_GUARD_PRIVACY_DEVICE_ASK,
+                    "命中摄像头/麦克风等隐私设备访问，请手动确认。",
+                    null,
+                    "hardguard-privacy-device",
+                    "",
+                    true
+            );
+        }
         List<Path> paths = details.resolvedPaths();
         if (paths == null || paths.isEmpty()) {
             return null;

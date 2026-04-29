@@ -13,6 +13,7 @@ import ai.nomoclaw.bot.model.*;
 import ai.nomoclaw.bot.planner.Planner;
 import ai.nomoclaw.bot.policy.RiskPolicy;
 import ai.nomoclaw.bot.policy.tool.ToolPermissionPolicyService;
+import ai.nomoclaw.bot.policy.tool.ToolPolicyReasonCode;
 import ai.nomoclaw.bot.policy.tool.ToolPolicyDecision;
 import ai.nomoclaw.bot.policy.tool.ToolPolicyDecisionResult;
 import ai.nomoclaw.bot.policy.tool.permission.PermissionEffect;
@@ -790,6 +791,11 @@ public class AgentApplicationService {
         String normalizedAction = action == null ? "" : action.trim().toLowerCase(Locale.ROOT);
         PermissionScope appliedScope = scope == null ? PermissionScope.ONCE : scope;
         String matchedRuleId = "";
+        ToolPolicyReasonCode policyReasonCode = resolveStepPolicyReasonCode(conversation, executionAgent, message, step);
+        if (isHardGuardAskReason(policyReasonCode)
+                && (appliedScope == PermissionScope.AGENT || appliedScope == PermissionScope.USER)) {
+            appliedScope = PermissionScope.SESSION;
+        }
 
         if ("allow".equals(normalizedAction)) {
             if (appliedScope != PermissionScope.ONCE) {
@@ -2484,6 +2490,42 @@ public class AgentApplicationService {
             );
         }
         return decision;
+    }
+
+    private ToolPolicyReasonCode resolveStepPolicyReasonCode(AgentConversation conversation,
+                                                             AgentDefinitionEntity executionAgent,
+                                                             AgentMessage message,
+                                                             PlanStep step) {
+        if (step == null || message == null || conversation == null) {
+            return ToolPolicyReasonCode.NONE;
+        }
+        AgentWorkspaceConfig workspaceConfig = resolveWorkspaceConfig(executionAgent);
+        ToolPolicyDecisionResult decision = toolExecutionPolicyGateway.evaluateStep(
+                step,
+                workspaceConfig.workspaceDir(),
+                executionAgent == null ? "" : executionAgent.getAgentUid(),
+                executionAgent == null ? NomoClawPaths.DEFAULT_AGENT_NAME : executionAgent.getAgentName(),
+                conversation.channel(),
+                message.conversationUid(),
+                message.messageUid()
+        );
+        return decision == null || decision.reasonCode() == null ? ToolPolicyReasonCode.NONE : decision.reasonCode();
+    }
+
+    private boolean isHardGuardAskReason(ToolPolicyReasonCode reasonCode) {
+        if (reasonCode == null) {
+            return false;
+        }
+        return switch (reasonCode) {
+            case HARD_GUARD_SENSITIVE_PATH_READ_ASK,
+                 HARD_GUARD_PROTECTED_PATH_ASK,
+                 HARD_GUARD_PRIVACY_DEVICE_ASK,
+                 HARD_GUARD_SCREEN_CAPTURE_ASK,
+                 HARD_GUARD_REMOTE_CONTROL_ASK,
+                 HARD_GUARD_PRIVILEGE_ESCALATION_ASK,
+                 HARD_GUARD_DATA_EXFILTRATION_ASK -> true;
+            default -> false;
+        };
     }
 
     private String emptyToNull(String value) {

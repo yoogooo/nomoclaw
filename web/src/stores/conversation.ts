@@ -35,6 +35,7 @@ interface ApprovalState {
   labelKey: ApprovalLabelKey;
   command: string;
   toolName: string;
+  policyReasonCode: string;
   riskLevel: string;
   submitting: boolean;
   submittingAction: "allow_once" | "allow_session" | "allow_agent" | "allow_user" | "deny_once" | null;
@@ -163,6 +164,7 @@ export const useConversationStore = defineStore("conversation", () => {
     labelKey: "chat.approval.commandLabel",
     command: "",
     toolName: "",
+    policyReasonCode: "",
     riskLevel: "HIGH",
     submitting: false,
     submittingAction: null
@@ -332,6 +334,7 @@ export const useConversationStore = defineStore("conversation", () => {
       labelKey: "chat.approval.commandLabel",
       command: "",
       toolName: "",
+      policyReasonCode: "",
       riskLevel: "HIGH",
       submitting: false,
       submittingAction: null
@@ -489,6 +492,7 @@ export const useConversationStore = defineStore("conversation", () => {
       labelKey: rendered.labelKey,
       command: rendered.command,
       toolName: rendered.toolName,
+      policyReasonCode: current.step.policyReasonCode || "",
       riskLevel: "HIGH",
       submitting: approval.value.stepUid === current.step.stepUid ? approval.value.submitting : false,
       submittingAction: approval.value.stepUid === current.step.stepUid ? approval.value.submittingAction : null
@@ -1109,6 +1113,7 @@ export const useConversationStore = defineStore("conversation", () => {
       labelKey: rendered.labelKey,
       command: rendered.command,
       toolName: rendered.toolName,
+      policyReasonCode: String(event.payload.policyReasonCode || ""),
       riskLevel: event.payload.riskLevel || "HIGH",
       submitting: approval.value.stepUid === (event.stepUid || null) ? approval.value.submitting : false,
       submittingAction: approval.value.stepUid === (event.stepUid || null) ? approval.value.submittingAction : null
