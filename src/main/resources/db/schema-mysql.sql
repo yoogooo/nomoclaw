@@ -539,24 +539,7 @@ INSERT INTO agent_tool_relation (
     ('RelGeneralTime', 'agent_general_assistant', 'CurrentTimeTool', 'ACTIVE', 90, JSON_OBJECT(), NOW(3), NOW(3)),
     ('RelGeneralToken', 'agent_general_assistant', 'TokenUsageTool', 'ACTIVE', 100, JSON_OBJECT(), NOW(3), NOW(3)),
     ('RelGeneralImageLoader', 'agent_general_assistant', 'ImageLoaderTool', 'ACTIVE', 115, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('RelGeneralMemory', 'agent_general_assistant', 'MemorySearchTool', 'ACTIVE', 110, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('RelTestCommand', 'agent_test_expert', 'CommandTool', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('RelTestReadFile', 'agent_test_expert', 'ReadFileTool', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('RelTestListFile', 'agent_test_expert', 'ListFileTool', 'ACTIVE', 21, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('RelTestCreateFile', 'agent_test_expert', 'CreateFileTool', 'ACTIVE', 22, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('RelTestEditFile', 'agent_test_expert', 'EditFileTool', 'ACTIVE', 23, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('RelTestSearch', 'agent_test_expert', 'FileSearchTool', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('RelTestTime', 'agent_test_expert', 'CurrentTimeTool', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('RelTestMemory', 'agent_test_expert', 'MemorySearchTool', 'ACTIVE', 50, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('RelPublicBrowser', 'agent_public_opinion', 'BrowserTool', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('RelPublicSearch', 'agent_public_opinion', 'FileSearchTool', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('RelPublicTime', 'agent_public_opinion', 'CurrentTimeTool', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('RelPublicMemory', 'agent_public_opinion', 'MemorySearchTool', 'ACTIVE', 50, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('RelMarketCommand', 'agent_marketing_assistant', 'CommandTool', 'ACTIVE', 10, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('RelMarketBrowser', 'agent_marketing_assistant', 'BrowserTool', 'ACTIVE', 20, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('RelMarketSearch', 'agent_marketing_assistant', 'FileSearchTool', 'ACTIVE', 30, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('RelMarketTime', 'agent_marketing_assistant', 'CurrentTimeTool', 'ACTIVE', 40, JSON_OBJECT(), NOW(3), NOW(3)),
-    ('RelMarketMemory', 'agent_marketing_assistant', 'MemorySearchTool', 'ACTIVE', 50, JSON_OBJECT(), NOW(3), NOW(3));
+    ('RelGeneralMemory', 'agent_general_assistant', 'MemorySearchTool', 'ACTIVE', 110, JSON_OBJECT(), NOW(3), NOW(3));
 
 INSERT INTO agent_skill_relation (
     relation_uid, agent_uid, skill_key, status, sort_index, config_json, created_time, updated_time
