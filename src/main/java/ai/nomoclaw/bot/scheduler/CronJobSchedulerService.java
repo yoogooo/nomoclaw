@@ -1,5 +1,6 @@
 package ai.nomoclaw.bot.scheduler;
 
+import ai.nomoclaw.bot.orchestrator.SystemErrorLogService;
 import ai.nomoclaw.bot.store.entity.AgentCronJobEntity;
 import ai.nomoclaw.bot.store.repository.AgentCronJobRepository;
 import ai.nomoclaw.bot.util.JsonUtil;
@@ -39,14 +40,17 @@ public class CronJobSchedulerService {
 
     private final ObjectProvider<Scheduler> schedulerProvider;
     private final AgentCronJobRepository agentCronJobRepository;
+    private final SystemErrorLogService systemErrorLogService;
     private final int restoreDelaySeconds;
     private final AtomicBoolean restoreStarted = new AtomicBoolean(false);
 
     public CronJobSchedulerService(ObjectProvider<Scheduler> schedulerProvider,
                                    AgentCronJobRepository agentCronJobRepository,
+                                   SystemErrorLogService systemErrorLogService,
                                    @Value("${nomoclaw.quartz.restore-delay-seconds:0}") int restoreDelaySeconds) {
         this.schedulerProvider = schedulerProvider;
         this.agentCronJobRepository = agentCronJobRepository;
+        this.systemErrorLogService = systemErrorLogService;
         this.restoreDelaySeconds = Math.max(restoreDelaySeconds, 0);
     }
 
@@ -70,8 +74,24 @@ public class CronJobSchedulerService {
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
             log.warn("[Quartz] restore interrupted");
+            systemErrorLogService.recordException(
+                    "WARN",
+                    "Quartz",
+                    "QUARTZ_RESTORE_INTERRUPTED",
+                    "Quartz 恢复任务被中断",
+                    "应用启动后恢复定时任务时线程被中断。",
+                    ex
+            );
         } catch (Exception ex) {
             log.warn("[Quartz] failed to restore cron jobs err={}", ex.toString());
+            systemErrorLogService.recordException(
+                    "ERROR",
+                    "Quartz",
+                    "QUARTZ_RESTORE_FAILED",
+                    "Quartz 恢复任务失败",
+                    "应用启动后恢复定时任务失败。",
+                    ex
+            );
         }
     }
 
@@ -104,6 +124,14 @@ public class CronJobSchedulerService {
             scheduler.scheduleJob(jobDetail, trigger);
             return toLocalDateTime(trigger.getNextFireTime(), cronJob.getTimezone());
         } catch (SchedulerException ex) {
+            systemErrorLogService.recordException(
+                    "ERROR",
+                    "Quartz",
+                    "QUARTZ_SCHEDULE_FAILED",
+                    "Quartz 调度任务失败",
+                    "定时任务注册到 Quartz Scheduler 失败，jobUid=" + cronJob.getJobUid(),
+                    ex
+            );
             throw new IllegalStateException("failed to schedule cron job: " + cronJob.getJobUid(), ex);
         }
     }

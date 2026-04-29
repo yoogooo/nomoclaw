@@ -2,17 +2,18 @@
 import { ChevronLeft, RefreshCw } from "lucide-vue-next";
 import { NButton, NDataTable, NIcon, NModal } from "naive-ui";
 import type { DataTableColumns } from "naive-ui";
-import { computed, h, ref } from "vue";
+import { computed, h, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import DirectoryRail from "@/components/chat/DirectoryRail.vue";
-import type { DiagnosticEvent } from "@/composables/useSystemDiagnosticsMock";
-import { useSystemDiagnosticsMock } from "@/composables/useSystemDiagnosticsMock";
+import { systemDiagnosticsApi } from "@/api/systemDiagnosticsApi";
+import type { SystemErrorLog } from "@/types/api";
 
 const { t } = useI18n();
 const router = useRouter();
-const { diagnosticEvents } = useSystemDiagnosticsMock();
-const selectedEvent = ref<DiagnosticEvent | null>(null);
+const errorLogs = ref<SystemErrorLog[]>([]);
+const logsLoading = ref(false);
+const selectedEvent = ref<SystemErrorLog | null>(null);
 const detailModalVisible = computed({
   get: () => selectedEvent.value !== null,
   set: (value: boolean) => {
@@ -21,13 +22,13 @@ const detailModalVisible = computed({
     }
   }
 });
-const logColumns = computed<DataTableColumns<DiagnosticEvent>>(() => [
+const logColumns = computed<DataTableColumns<SystemErrorLog>>(() => [
   {
     title: t("settings.diagnosticsOccurredAt"),
-    key: "occurredAt",
+    key: "occurredTime",
     width: 180,
     render(row) {
-      return h("span", { class: "settings-error-log-time" }, row.occurredAt);
+      return h("span", { class: "settings-error-log-time" }, row.occurredTime);
     }
   },
   {
@@ -42,7 +43,11 @@ const logColumns = computed<DataTableColumns<DiagnosticEvent>>(() => [
   }
 ]);
 
-function logSummary(event: DiagnosticEvent) {
+onMounted(() => {
+  void loadErrorLogs();
+});
+
+function logSummary(event: SystemErrorLog) {
   return [event.message, event.detail].filter(Boolean).join(" ");
 }
 
@@ -51,15 +56,26 @@ function truncateLog(text: string) {
   return trimmed.length > 200 ? `${trimmed.slice(0, 200)}...` : trimmed;
 }
 
-function openLogDetail(event: DiagnosticEvent) {
+function openLogDetail(event: SystemErrorLog) {
   selectedEvent.value = event;
 }
 
-function rowProps(row: DiagnosticEvent) {
+function rowProps(row: SystemErrorLog) {
   return {
     class: "settings-error-log-table-row",
     onClick: () => openLogDetail(row)
   };
+}
+
+async function loadErrorLogs() {
+  logsLoading.value = true;
+  try {
+    errorLogs.value = await systemDiagnosticsApi.listErrorLogs(100);
+  } catch {
+    errorLogs.value = [];
+  } finally {
+    logsLoading.value = false;
+  }
 }
 
 function backToSettings() {
@@ -88,11 +104,11 @@ function backToSettings() {
               <div>
                 <div class="surface-card-title">{{ t("settings.diagnosticsDrawerSubtitle") }}</div>
                 <div class="settings-error-logs-meta">
-                  {{ t("settings.diagnosticsDrawerMeta", { count: diagnosticEvents.length }) }}
+                  {{ t("settings.diagnosticsDrawerMeta", { count: errorLogs.length }) }}
                 </div>
               </div>
               <div class="settings-error-logs-actions">
-                <n-button tertiary>
+                <n-button tertiary :loading="logsLoading" @click="loadErrorLogs">
                   <template #icon>
                     <n-icon :component="RefreshCw" />
                   </template>
@@ -103,11 +119,16 @@ function backToSettings() {
 
             <n-data-table
               :columns="logColumns"
-              :data="diagnosticEvents"
-              :row-key="(row) => row.id"
+              :data="errorLogs"
+              :loading="logsLoading"
+              :row-key="(row) => row.logUid"
               :row-props="rowProps"
               size="small"
-            />
+            >
+              <template #empty>
+                {{ t("settings.diagnosticsEmpty") }}
+              </template>
+            </n-data-table>
           </section>
         </div>
       </main>

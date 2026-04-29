@@ -5,18 +5,24 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import DirectoryRail from "@/components/chat/DirectoryRail.vue";
 import AppPageHeader from "@/components/layout/AppPageHeader.vue";
-import { useSystemDiagnosticsMock } from "@/composables/useSystemDiagnosticsMock";
+import { systemDiagnosticsApi } from "@/api/systemDiagnosticsApi";
 import { useUiPreferencesStore } from "@/stores/uiPreferences";
 import { useUpdateManagerStore } from "@/stores/updateManager";
 import type { AppLocale } from "@/i18n";
-import { computed, onMounted } from "vue";
+import type { SystemErrorLogSummary } from "@/types/api";
+import { computed, onMounted, ref } from "vue";
 
 const uiPreferencesStore = useUiPreferencesStore();
 const updateManagerStore = useUpdateManagerStore();
 uiPreferencesStore.init();
 const { t } = useI18n();
 const router = useRouter();
-const { activeDiagnosticCount, diagnosticEvents, latestDiagnostic } = useSystemDiagnosticsMock();
+const diagnosticsSummary = ref<SystemErrorLogSummary>({
+  hasErrors: false,
+  recent24hCount: 0,
+  latestOccurredTime: null
+});
+const diagnosticsLoading = ref(false);
 const localeOptions = computed(() => [
   { label: t("settings.languageZhCN"), value: "zh-CN" },
   { label: t("settings.languageEnUS"), value: "en-US" }
@@ -26,16 +32,10 @@ const downloadPercentText = computed(() => {
   if (value === null || value === undefined) return "";
   return `${Math.round(Math.min(Math.max(value, 0), 1) * 100)}%`;
 });
-const recent24hDiagnosticCount = computed(() => {
-  const now = Date.now();
-  const dayMs = 24 * 60 * 60 * 1000;
-  return diagnosticEvents.value.filter((event) => {
-    const occurredAt = new Date(event.occurredAt.replace(" ", "T")).getTime();
-    return Number.isFinite(occurredAt) && now - occurredAt <= dayMs && now >= occurredAt;
-  }).length;
-});
+const diagnosticsHasErrors = computed(() => diagnosticsSummary.value.hasErrors);
 onMounted(() => {
   void updateManagerStore.init();
+  void loadDiagnosticsSummary();
 });
 
 function onLocaleChange(value: AppLocale | null) {
@@ -45,6 +45,21 @@ function onLocaleChange(value: AppLocale | null) {
 
 function openDiagnosticsPage() {
   void router.push({ name: "settings-error-logs" });
+}
+
+async function loadDiagnosticsSummary() {
+  diagnosticsLoading.value = true;
+  try {
+    diagnosticsSummary.value = await systemDiagnosticsApi.getErrorLogSummary();
+  } catch {
+    diagnosticsSummary.value = {
+      hasErrors: false,
+      recent24hCount: 0,
+      latestOccurredTime: null
+    };
+  } finally {
+    diagnosticsLoading.value = false;
+  }
 }
 
 </script>
@@ -147,20 +162,20 @@ function openDiagnosticsPage() {
               <div class="settings-diagnostics-health">
                 <div>
                   <div class="meta-label">{{ t("settings.diagnosticsHealth") }}</div>
-                  <div class="settings-diagnostics-health-value" :class="{ 'is-warning': activeDiagnosticCount > 0 }">
-                    {{ activeDiagnosticCount > 0 ? t("settings.diagnosticsNeedsAttention") : t("settings.diagnosticsHealthy") }}
+                  <div class="settings-diagnostics-health-value" :class="{ 'is-warning': diagnosticsHasErrors }">
+                    {{ diagnosticsHasErrors ? t("settings.diagnosticsNeedsAttention") : t("settings.diagnosticsHealthy") }}
                   </div>
                 </div>
                 <div>
                   <div class="meta-label">{{ t("settings.diagnosticsLast24Hours") }}</div>
-                  <div class="ui-value-strong">{{ recent24hDiagnosticCount }}</div>
+                  <div class="ui-value-strong">{{ diagnosticsSummary.recent24hCount }}</div>
                 </div>
               </div>
-              <div v-if="latestDiagnostic" class="settings-diagnostics-latest">
-                <span>{{ latestDiagnostic.occurredAt }}</span>
+              <div v-if="diagnosticsSummary.latestOccurredTime" class="settings-diagnostics-latest">
+                <span>{{ diagnosticsSummary.latestOccurredTime }}</span>
               </div>
               <div class="settings-diagnostics-actions">
-                <n-button tertiary size="small">
+                <n-button tertiary size="small" :loading="diagnosticsLoading" @click="loadDiagnosticsSummary">
                   <template #icon>
                     <n-icon :component="RefreshCw" />
                   </template>

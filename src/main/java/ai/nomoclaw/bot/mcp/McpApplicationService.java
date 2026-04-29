@@ -2,6 +2,7 @@ package ai.nomoclaw.bot.mcp;
 
 import ai.nomoclaw.bot.model.ToolRequest;
 import ai.nomoclaw.bot.model.ToolResult;
+import ai.nomoclaw.bot.orchestrator.SystemErrorLogService;
 import ai.nomoclaw.bot.store.entity.AgentMcpToolRelationEntity;
 import ai.nomoclaw.bot.store.entity.McpServerDefinitionEntity;
 import ai.nomoclaw.bot.store.entity.McpToolSnapshotEntity;
@@ -37,17 +38,20 @@ public class McpApplicationService {
     private final AgentMcpToolRelationRepository agentMcpToolRelationRepository;
     private final McpClientFactory clientFactory;
     private final McpToolKeyGenerator toolKeyGenerator;
+    private final SystemErrorLogService systemErrorLogService;
 
     public McpApplicationService(McpServerDefinitionRepository serverRepository,
                                  McpToolSnapshotRepository toolSnapshotRepository,
                                  AgentMcpToolRelationRepository agentMcpToolRelationRepository,
                                  McpClientFactory clientFactory,
-                                 McpToolKeyGenerator toolKeyGenerator) {
+                                 McpToolKeyGenerator toolKeyGenerator,
+                                 SystemErrorLogService systemErrorLogService) {
         this.serverRepository = serverRepository;
         this.toolSnapshotRepository = toolSnapshotRepository;
         this.agentMcpToolRelationRepository = agentMcpToolRelationRepository;
         this.clientFactory = clientFactory;
         this.toolKeyGenerator = toolKeyGenerator;
+        this.systemErrorLogService = systemErrorLogService;
     }
 
     public List<McpServerDto> listServers() {
@@ -117,6 +121,7 @@ public class McpApplicationService {
             markConnected(server, "");
         } catch (Exception ex) {
             markError(server, ex);
+            recordMcpError("MCP_TEST_FAILED", "MCP Server 测试失败", server, ex);
             throw new IllegalStateException("MCP server test failed: " + ex.getMessage(), ex);
         }
         return toDto(serverRepository.findByUid(serverUid), toolSnapshotRepository.listByServerUid(serverUid).size());
@@ -136,6 +141,7 @@ public class McpApplicationService {
             return listTools(serverUid);
         } catch (Exception ex) {
             markError(server, ex);
+            recordMcpError("MCP_REFRESH_TOOLS_FAILED", "MCP 工具刷新失败", server, ex);
             throw new IllegalStateException("MCP tools refresh failed: " + ex.getMessage(), ex);
         }
     }
@@ -228,6 +234,7 @@ public class McpApplicationService {
             return ToolResult.success(output == null ? "" : output, artifacts, JsonNodeFactory.instance.objectNode());
         } catch (Exception ex) {
             markError(server, ex);
+            recordMcpError("MCP_TOOL_EXECUTION_FAILED", "MCP 工具执行失败", server, ex);
             ObjectNode metrics = JsonNodeFactory.instance.objectNode();
             metrics.put("serverUid", server.getServerUid());
             metrics.put("toolKey", toolKey);
@@ -467,6 +474,18 @@ public class McpApplicationService {
         server.setLastError(ex == null ? "unknown error" : nullToEmpty(ex.getMessage()));
         server.setUpdatedTime(LocalDateTime.now());
         serverRepository.updateById(server);
+    }
+
+    private void recordMcpError(String code, String title, McpServerDefinitionEntity server, Exception ex) {
+        String serverName = server == null ? "" : server.getServerName();
+        systemErrorLogService.recordException(
+                "ERROR",
+                "MCP",
+                code,
+                title,
+                "MCP server failed: " + serverName + " - " + (ex == null ? "unknown error" : nullToEmpty(ex.getMessage())),
+                ex
+        );
     }
 
     private String nullToEmpty(String value) {

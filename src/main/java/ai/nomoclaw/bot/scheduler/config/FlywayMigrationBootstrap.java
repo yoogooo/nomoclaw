@@ -1,5 +1,6 @@
 package ai.nomoclaw.bot.scheduler.config;
 
+import ai.nomoclaw.bot.orchestrator.SystemErrorLogService;
 import lombok.extern.slf4j.Slf4j;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationVersion;
@@ -24,13 +25,16 @@ public class FlywayMigrationBootstrap implements ApplicationRunner {
     private final ObjectProvider<Flyway> flywayProvider;
     private final DataSource dataSource;
     private final Environment environment;
+    private final SystemErrorLogService systemErrorLogService;
 
     public FlywayMigrationBootstrap(ObjectProvider<Flyway> flywayProvider,
                                     DataSource dataSource,
-                                    Environment environment) {
+                                    Environment environment,
+                                    SystemErrorLogService systemErrorLogService) {
         this.flywayProvider = flywayProvider;
         this.dataSource = dataSource;
         this.environment = environment;
+        this.systemErrorLogService = systemErrorLogService;
     }
 
     @Override
@@ -50,6 +54,14 @@ public class FlywayMigrationBootstrap implements ApplicationRunner {
             log.info("[Flyway] migrate finished database={} programmatic={} result={}",
                     databaseProduct, useProgrammaticFlyway, result);
         } catch (Exception ex) {
+            systemErrorLogService.recordException(
+                    "ERROR",
+                    "Flyway",
+                    "FLYWAY_MIGRATE_FAILED",
+                    "Flyway 迁移失败",
+                    "schema 自动升级已跳过，应用继续启动。",
+                    ex
+            );
             if (failOnMigrateError()) {
                 throw new IllegalStateException("flyway migrate failed, schema auto-upgrade is unavailable", ex);
             }

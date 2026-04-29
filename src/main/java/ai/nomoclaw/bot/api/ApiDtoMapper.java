@@ -23,6 +23,8 @@ import ai.nomoclaw.bot.application.dto.CronJobExecutionResultDto;
 import ai.nomoclaw.bot.application.dto.CronJobReportDto;
 import ai.nomoclaw.bot.application.dto.MessageFileLinkDto;
 import ai.nomoclaw.bot.application.dto.SystemConfigDto;
+import ai.nomoclaw.bot.application.dto.SystemErrorLogDto;
+import ai.nomoclaw.bot.application.dto.SystemErrorLogSummaryDto;
 import ai.nomoclaw.bot.scheduler.CronChannelTargetDirectoryService;
 import ai.nomoclaw.bot.scheduler.CronSubscriptionRepository;
 
@@ -346,6 +348,31 @@ public final class ApiDtoMapper {
 
     public static SystemConfigResponse toSystemConfig(SystemConfigDto dto) {
         return new SystemConfigResponse(dto.nomoclawRootDir(), dto.agentsRootDir(), dto.skillsRootDir());
+    }
+
+    public static List<SystemErrorLogResponse> toSystemErrorLogs(List<SystemErrorLogDto> dtos) {
+        return dtos.stream().map(ApiDtoMapper::toSystemErrorLog).toList();
+    }
+
+    public static SystemErrorLogResponse toSystemErrorLog(SystemErrorLogDto dto) {
+        return new SystemErrorLogResponse(
+                dto.logUid(),
+                dto.level(),
+                dto.source(),
+                dto.code(),
+                dto.title(),
+                dto.message(),
+                dto.detail(),
+                dto.occurredTime()
+        );
+    }
+
+    public static SystemErrorLogSummaryResponse toSystemErrorLogSummary(SystemErrorLogSummaryDto dto) {
+        return new SystemErrorLogSummaryResponse(
+                dto.hasErrors(),
+                dto.recent24hCount(),
+                dto.latestOccurredTime()
+        );
     }
 
     public static ChannelConfigResponse toChannelConfig(ChannelConfigDto dto) {

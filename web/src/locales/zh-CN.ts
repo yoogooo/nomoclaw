@@ -67,15 +67,7 @@ const zhCN = {
     diagnosticsLogContent: "日志内容",
     diagnosticsImpact: "影响",
     diagnosticsSuggestion: "建议",
-    diagnosticsTechnicalDetail: "技术详情",
-    diagnosticsMockFlywayTitle: "Flyway 迁移失败",
-    diagnosticsMockFlywayMessage: "schema 自动升级已跳过，应用继续启动。",
-    diagnosticsMockFlywayImpact: "数据库结构可能不是当前代码期望的版本，相关功能可能在运行时失败。",
-    diagnosticsMockFlywaySuggestion: "检查 flyway_schema_history，确认后执行 repair、恢复迁移脚本或重建开发库。",
-    diagnosticsMockQuartzTitle: "Quartz 延迟启动被中断",
-    diagnosticsMockQuartzMessage: "应用关闭过程中延迟启动线程尝试启动 Scheduler。",
-    diagnosticsMockQuartzImpact: "通常是启动失败后的连带告警，定时任务服务可能未完成初始化。",
-    diagnosticsMockQuartzSuggestion: "先处理更早的启动错误；必要时将 spring.quartz.startup-delay-seconds 设置为 0。"
+    diagnosticsTechnicalDetail: "技术详情"
   },
   modelGate: {
     title: "先配置一个可用模型",

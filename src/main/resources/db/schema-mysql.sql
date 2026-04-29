@@ -13,6 +13,7 @@ DROP TABLE IF EXISTS mcp_server_definition;
 DROP TABLE IF EXISTS agent_group_member;
 DROP TABLE IF EXISTS agent_group_definition;
 DROP TABLE IF EXISTS agent_definition;
+DROP TABLE IF EXISTS system_error_log;
 DROP TABLE IF EXISTS agent_event;
 DROP TABLE IF EXISTS agent_step;
 DROP TABLE IF EXISTS agent_message_attachment;
@@ -435,6 +436,27 @@ CREATE TABLE IF NOT EXISTS agent_event (
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_0900_ai_ci
   COMMENT='智能体事件审计表';
+
+CREATE TABLE IF NOT EXISTS system_error_log (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增主键',
+    log_uid VARCHAR(64) NOT NULL DEFAULT '' COMMENT '日志业务ID',
+    level VARCHAR(16) NOT NULL DEFAULT 'ERROR' COMMENT '级别：ERROR / WARN',
+    source VARCHAR(64) NOT NULL DEFAULT '' COMMENT '来源模块',
+    code VARCHAR(128) NOT NULL DEFAULT '' COMMENT '错误代码',
+    title VARCHAR(255) NOT NULL DEFAULT '' COMMENT '错误标题',
+    message TEXT NULL COMMENT '错误摘要',
+    detail LONGTEXT NULL COMMENT '错误详情',
+    occurred_time DATETIME(3) NOT NULL COMMENT '发生时间',
+    created_time DATETIME(3) NOT NULL COMMENT '创建时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_system_error_log_uid (log_uid),
+    KEY idx_system_error_log_time (occurred_time DESC),
+    KEY idx_system_error_log_level_time (level, occurred_time DESC),
+    KEY idx_system_error_log_source_time (source, occurred_time DESC)
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_0900_ai_ci
+  COMMENT='系统关键错误日志表';
 
 CREATE TABLE IF NOT EXISTS agent_cron_job (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增主键',

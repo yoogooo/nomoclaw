@@ -141,6 +141,23 @@ export interface SaveMcpServerPayload {
   cwd?: string;
 }
 
+export interface SystemErrorLog {
+  logUid: string;
+  level: "ERROR" | "WARN";
+  source: string;
+  code: string;
+  title: string;
+  message: string;
+  detail: string;
+  occurredTime: string;
+}
+
+export interface SystemErrorLogSummary {
+  hasErrors: boolean;
+  recent24hCount: number;
+  latestOccurredTime: string | null;
+}
+
 export interface AgentTip {
   tipUid: string;
   agentUid: string;

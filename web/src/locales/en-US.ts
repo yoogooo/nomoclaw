@@ -67,15 +67,7 @@ const enUS = {
     diagnosticsLogContent: "Log Content",
     diagnosticsImpact: "Impact",
     diagnosticsSuggestion: "Suggestion",
-    diagnosticsTechnicalDetail: "Technical Details",
-    diagnosticsMockFlywayTitle: "Flyway migration failed",
-    diagnosticsMockFlywayMessage: "Schema auto-upgrade was skipped and the app continued startup.",
-    diagnosticsMockFlywayImpact: "The database schema may not match the current code, so related features can fail at runtime.",
-    diagnosticsMockFlywaySuggestion: "Check flyway_schema_history, then run repair, restore migrations, or rebuild the development database after confirmation.",
-    diagnosticsMockQuartzTitle: "Quartz delayed startup interrupted",
-    diagnosticsMockQuartzMessage: "A delayed startup thread tried to start the Scheduler while the app was shutting down.",
-    diagnosticsMockQuartzImpact: "This is usually a follow-on warning after startup failure. Scheduled tasks may not be initialized.",
-    diagnosticsMockQuartzSuggestion: "Fix the earlier startup error first. If needed, set spring.quartz.startup-delay-seconds to 0."
+    diagnosticsTechnicalDetail: "Technical Details"
   },
   modelGate: {
     title: "Set up a model first",
