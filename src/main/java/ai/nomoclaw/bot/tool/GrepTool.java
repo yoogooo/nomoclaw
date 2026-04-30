@@ -15,6 +15,7 @@ import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -29,7 +30,6 @@ import java.util.stream.Stream;
 public class GrepTool implements Tool {
 
     private static final int DEFAULT_HEAD_LIMIT = 250;
-    private static final int MAX_SCAN_FILES = 20_000;
 
     @Override
     public String name() {
@@ -59,20 +59,24 @@ public class GrepTool implements Tool {
         }
 
         Pattern pattern;
+        Pattern whitespaceTolerantLiteralPattern = null;
         try {
-            int flags = caseInsensitive ? Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE : 0;
+            int flags = (caseInsensitive ? Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE : 0)
+                    | Pattern.UNICODE_CHARACTER_CLASS;
             pattern = Pattern.compile(patternText, flags);
+            whitespaceTolerantLiteralPattern = buildWhitespaceTolerantLiteralPattern(patternText, flags);
         } catch (PatternSyntaxException ex) {
             return ToolResult.failure("INVALID_ARGS", "invalid regex pattern: " + ex.getMessage(), metrics(start));
         }
 
         try {
-            SearchOutcome outcome = search(root, pattern, glob, outputMode, withLineNumber);
+            SearchOutcome outcome = search(root, pattern, whitespaceTolerantLiteralPattern, glob, outputMode, withLineNumber);
             SliceResult sliceResult = slice(outcome.lines, headLimit, offset);
             ObjectNode artifacts = JsonNodeFactory.instance.objectNode();
             artifacts.put("mode", outputMode);
             artifacts.put("numFiles", outcome.matchedFilesCount);
             artifacts.put("numMatches", outcome.matchCount);
+            artifacts.put("scannedFiles", outcome.scannedFilesCount);
             artifacts.put("appliedOffset", offset);
             if (sliceResult.appliedLimit > 0) {
                 artifacts.put("appliedLimit", sliceResult.appliedLimit);
@@ -93,7 +97,12 @@ public class GrepTool implements Tool {
         }
     }
 
-    private SearchOutcome search(Path root, Pattern pattern, String glob, String outputMode, boolean withLineNumber) throws Exception {
+    private SearchOutcome search(Path root,
+                                 Pattern pattern,
+                                 Pattern whitespaceTolerantLiteralPattern,
+                                 String glob,
+                                 String outputMode,
+                                 boolean withLineNumber) throws Exception {
         PathMatcher matcher = buildMatcher(glob);
         List<String> lines = new ArrayList<>();
         Set<String> matchedFiles = new HashSet<>();
@@ -103,16 +112,15 @@ public class GrepTool implements Tool {
         try (Stream<Path> stream = Files.isDirectory(root) ? Files.walk(root) : Stream.of(root)) {
             stream.filter(Files::isRegularFile)
                     .filter(file -> matcher == null || matchesGlob(root, file, matcher))
-                    .limit(MAX_SCAN_FILES)
                     .forEach(file -> {
                         scannedFiles.incrementAndGet();
                         if ("files_with_matches".equals(outputMode)) {
-                            if (fileHasMatch(file, pattern)) {
+                            if (fileHasMatch(file, pattern, whitespaceTolerantLiteralPattern)) {
                                 matchedFiles.add(file.toAbsolutePath().toString());
                             }
                             return;
                         }
-                        scanFileLines(root, file, pattern, outputMode, withLineNumber, lines, matchedFiles, matchCount);
+                        scanFileLines(root, file, pattern, whitespaceTolerantLiteralPattern, outputMode, withLineNumber, lines, matchedFiles, matchCount);
                     });
         }
 
@@ -130,6 +138,7 @@ public class GrepTool implements Tool {
     private void scanFileLines(Path root,
                                Path file,
                                Pattern pattern,
+                               Pattern whitespaceTolerantLiteralPattern,
                                String outputMode,
                                boolean withLineNumber,
                                List<String> lines,
@@ -141,7 +150,7 @@ public class GrepTool implements Tool {
             while ((line = reader.readLine()) != null) {
                 lineNo++;
                 Matcher m = pattern.matcher(line);
-                if (!m.find()) {
+                if (!m.find() && !matchesWhitespaceTolerantLiteral(line, whitespaceTolerantLiteralPattern)) {
                     continue;
                 }
                 matchCount.incrementAndGet();
@@ -159,11 +168,11 @@ public class GrepTool implements Tool {
         }
     }
 
-    private boolean fileHasMatch(Path file, Pattern pattern) {
+    private boolean fileHasMatch(Path file, Pattern pattern, Pattern whitespaceTolerantLiteralPattern) {
         try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
             String line;
             while ((line = reader.readLine()) != null) {
-                if (pattern.matcher(line).find()) {
+                if (pattern.matcher(line).find() || matchesWhitespaceTolerantLiteral(line, whitespaceTolerantLiteralPattern)) {
                     return true;
                 }
             }
@@ -212,6 +221,32 @@ public class GrepTool implements Tool {
         } catch (NumberFormatException ex) {
             return defaultValue;
         }
+    }
+
+    private Pattern buildWhitespaceTolerantLiteralPattern(String patternText, int flags) {
+        if (!isLikelyLiteral(patternText) || !patternText.contains(" ")) {
+            return null;
+        }
+        String[] tokens = patternText.trim().split(" +");
+        if (tokens.length < 2) {
+            return null;
+        }
+        String joined = Arrays.stream(tokens)
+                .map(Pattern::quote)
+                .reduce((left, right) -> left + "[\\s\\u00A0\\u2007\\u202F]+" + right)
+                .orElse("");
+        if (joined.isBlank()) {
+            return null;
+        }
+        return Pattern.compile(joined, flags);
+    }
+
+    private boolean isLikelyLiteral(String text) {
+        return !text.matches(".*[.\\\\+*?\\[\\](){}|^$].*");
+    }
+
+    private boolean matchesWhitespaceTolerantLiteral(String line, Pattern pattern) {
+        return pattern != null && pattern.matcher(line).find();
     }
 
     private Path resolveRoot(String path, ToolRequest request) {
