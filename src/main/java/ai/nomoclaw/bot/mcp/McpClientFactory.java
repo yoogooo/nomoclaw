@@ -26,7 +26,7 @@ public class McpClientFactory {
                 .build();
     }
 
-    private McpTransport createTransport(McpServerDefinitionEntity server, McpServerConfig config) {
+    public McpTransport createTransport(McpServerDefinitionEntity server, McpServerConfig config) {
         String transport = server.getTransport() == null ? "" : server.getTransport().trim().toUpperCase(Locale.ROOT);
         int timeoutSeconds = server.getTimeoutSeconds() == null || server.getTimeoutSeconds() <= 0
                 ? 30

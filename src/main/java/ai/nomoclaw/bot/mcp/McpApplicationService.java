@@ -13,20 +13,34 @@ import ai.nomoclaw.bot.util.JsonUtil;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.mcp.client.McpClient;
+import dev.langchain4j.mcp.client.transport.McpOperationHandler;
+import dev.langchain4j.mcp.client.transport.McpTransport;
+import dev.langchain4j.mcp.protocol.McpClientMessage;
+import dev.langchain4j.mcp.protocol.McpClientMethod;
+import dev.langchain4j.mcp.protocol.McpImplementation;
+import dev.langchain4j.mcp.protocol.McpInitializeParams;
+import dev.langchain4j.mcp.protocol.McpInitializeRequest;
+import dev.langchain4j.mcp.protocol.McpListToolsRequest;
 import dev.langchain4j.service.tool.ToolExecutionResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.fasterxml.jackson.databind.JsonNode;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
@@ -142,10 +156,108 @@ public class McpApplicationService {
             markConnected(server, "");
             return listTools(serverUid);
         } catch (Exception ex) {
+            if (isUnsupportedToolSchemaCast(ex)) {
+                log.warn("[MCP] refresh tools fallback serverUid={} serverName={} reason={} -> keep existing snapshots",
+                        server.getServerUid(), server.getServerName(), ex.getMessage());
+                return refreshToolsWithRawProtocol(server);
+            }
             markError(server, ex);
             recordMcpError("MCP_REFRESH_TOOLS_FAILED", "MCP 工具刷新失败", server, ex);
             throw new IllegalStateException("MCP tools refresh failed: " + ex.getMessage(), ex);
         }
+    }
+
+    private List<McpToolDto> refreshToolsWithRawProtocol(McpServerDefinitionEntity server) {
+        try (McpTransport transport = clientFactory.createTransport(server, readConfig(server))) {
+            Map<Long, CompletableFuture<JsonNode>> pending = new ConcurrentHashMap<>();
+            McpOperationHandler handler = new McpOperationHandler(
+                    pending,
+                    Collections::emptyList,
+                    transport,
+                    ignored -> {
+                    },
+                    () -> {
+                    }
+            );
+            transport.start(handler);
+
+            long id = 1L;
+            McpInitializeRequest initializeRequest = new McpInitializeRequest(id++);
+            initializeRequest.setParams(buildInitializeParams());
+            transport.initialize(initializeRequest).get(30, TimeUnit.SECONDS);
+            transport.executeOperationWithoutResponse(new McpClientMessage(null, McpClientMethod.NOTIFICATION_INITIALIZED));
+
+            List<RawMcpTool> tools = new ArrayList<>();
+            String cursor = null;
+            do {
+                McpListToolsRequest request = new McpListToolsRequest(id++);
+                if (cursor != null && !cursor.isBlank()) {
+                    request.setCursor(cursor);
+                }
+                JsonNode response = transport.executeOperationWithResponse(request).get(30, TimeUnit.SECONDS);
+                JsonNode result = response == null ? null : response.path("result");
+                JsonNode toolArray = result == null ? null : result.path("tools");
+                if (toolArray != null && toolArray.isArray()) {
+                    for (JsonNode item : toolArray) {
+                        String name = item.path("name").asText("");
+                        if (name.isBlank()) {
+                            continue;
+                        }
+                        String description = item.path("description").asText("");
+                        JsonNode inputSchema = item.path("inputSchema");
+                        if (inputSchema == null || inputSchema.isMissingNode() || inputSchema.isNull()) {
+                            inputSchema = item.path("input_schema");
+                        }
+                        String inputSchemaJson = (inputSchema == null || inputSchema.isMissingNode() || inputSchema.isNull())
+                                ? "{}"
+                                : inputSchema.toString();
+                        tools.add(new RawMcpTool(name, description, inputSchemaJson));
+                    }
+                }
+                cursor = result == null ? "" : result.path("nextCursor").asText("");
+            } while (cursor != null && !cursor.isBlank());
+
+            logRefreshedRawTools(server, tools);
+            LocalDateTime now = LocalDateTime.now();
+            for (RawMcpTool tool : tools) {
+                upsertToolSnapshot(server, tool, now);
+            }
+            markConnected(server, "");
+            return listTools(server.getServerUid());
+        } catch (Exception rawEx) {
+            markError(server, rawEx);
+            recordMcpError("MCP_REFRESH_TOOLS_FAILED", "MCP 工具刷新失败", server, rawEx);
+            throw new IllegalStateException("MCP tools refresh failed: " + rawEx.getMessage(), rawEx);
+        }
+    }
+
+    private McpInitializeParams buildInitializeParams() {
+        McpInitializeParams params = new McpInitializeParams();
+        params.setProtocolVersion("2024-11-05");
+        McpImplementation clientInfo = new McpImplementation();
+        clientInfo.setName("nomoclaw");
+        clientInfo.setVersion("1.0");
+        params.setClientInfo(clientInfo);
+        McpInitializeParams.Capabilities capabilities = new McpInitializeParams.Capabilities();
+        McpInitializeParams.Capabilities.Roots roots = new McpInitializeParams.Capabilities.Roots();
+        roots.setListChanged(true);
+        capabilities.setRoots(roots);
+        params.setCapabilities(capabilities);
+        return params;
+    }
+
+    private boolean isUnsupportedToolSchemaCast(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            String message = nullToEmpty(current.getMessage());
+            if (message.contains("JsonAnyOfSchema")
+                    && message.contains("JsonObjectSchema")
+                    && message.contains("cannot be cast")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     public boolean isMcpTool(String toolKey) {
@@ -271,6 +383,17 @@ public class McpApplicationService {
                 server.getServerUid(), server.getServerName(), tools.size(), toolList);
     }
 
+    private void logRefreshedRawTools(McpServerDefinitionEntity server, List<RawMcpTool> tools) {
+        String toolList = tools.stream()
+                .map(tool -> "%s(description=%s)".formatted(
+                        nullToEmpty(tool.originalToolName()),
+                        truncateForLog(nullToEmpty(tool.description()), 240)
+                ))
+                .collect(Collectors.joining(", "));
+        log.info("[MCP] refreshed tools(raw) serverUid={} serverName={} count={} tools=[{}]",
+                server.getServerUid(), server.getServerName(), tools.size(), toolList);
+    }
+
     private String truncateForLog(String value, int maxLength) {
         String normalized = value.replace('\n', ' ').replace('\r', ' ').trim();
         if (normalized.length() <= maxLength) {
@@ -295,6 +418,32 @@ public class McpApplicationService {
         snapshot.setToolKey(toolKey);
         snapshot.setDescription(nullToEmpty(tool.description()));
         snapshot.setInputSchemaJson(serializeToolParameters(tool));
+        snapshot.setStatus(server.getStatus());
+        snapshot.setLastSyncedTime(now);
+        snapshot.setUpdatedTime(now);
+        if (snapshot.getId() == null) {
+            toolSnapshotRepository.save(snapshot);
+        } else {
+            toolSnapshotRepository.updateById(snapshot);
+        }
+    }
+
+    private void upsertToolSnapshot(McpServerDefinitionEntity server, RawMcpTool tool, LocalDateTime now) {
+        String originalName = tool.originalToolName();
+        McpToolSnapshotEntity snapshot = toolSnapshotRepository.findByServerUidAndOriginalToolName(server.getServerUid(), originalName);
+        String toolKey = toolKeyGenerator.generate(server.getServerName(), originalName);
+        if (snapshot == null) {
+            snapshot = new McpToolSnapshotEntity();
+            snapshot.setSnapshotUid(UUID.randomUUID().toString());
+            snapshot.setServerUid(server.getServerUid());
+            snapshot.setOriginalToolName(originalName);
+            snapshot.setCreatedTime(now);
+        } else {
+            agentMcpToolRelationRepository.updateToolKey(snapshot.getToolKey(), toolKey);
+        }
+        snapshot.setToolKey(toolKey);
+        snapshot.setDescription(nullToEmpty(tool.description()));
+        snapshot.setInputSchemaJson(tool.inputSchemaJson());
         snapshot.setStatus(server.getStatus());
         snapshot.setLastSyncedTime(now);
         snapshot.setUpdatedTime(now);
@@ -496,5 +645,8 @@ public class McpApplicationService {
 
     private String nullToEmpty(String value) {
         return value == null ? "" : value;
+    }
+
+    private record RawMcpTool(String originalToolName, String description, String inputSchemaJson) {
     }
 }
