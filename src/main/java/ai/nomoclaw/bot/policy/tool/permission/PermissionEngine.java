@@ -23,7 +23,9 @@ public class PermissionEngine {
             "currenttimetool",
             "tokenusagetool",
             "filesearchtool",
-            "imageloadertool"
+            "imageloadertool",
+            "websearchtool",
+            "webfetchtool"
     );
 
     private final PermissionSettingsStore settingsStore;

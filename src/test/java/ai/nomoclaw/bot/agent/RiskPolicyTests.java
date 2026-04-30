@@ -45,4 +45,12 @@ class RiskPolicyTests {
         args.put("path", "/etc/hosts");
         assertEquals(RiskLevel.HIGH, riskPolicy.evaluateRisk("CreateFileTool", args));
     }
+
+    @Test
+    void webToolsShouldBeLowRisk() {
+        AgentProperties properties = new AgentProperties();
+        RiskPolicy riskPolicy = new RiskPolicy(properties);
+        assertEquals(RiskLevel.LOW, riskPolicy.evaluateRisk("WebSearchTool", JsonNodeFactory.instance.objectNode()));
+        assertEquals(RiskLevel.LOW, riskPolicy.evaluateRisk("WebFetchTool", JsonNodeFactory.instance.objectNode()));
+    }
 }

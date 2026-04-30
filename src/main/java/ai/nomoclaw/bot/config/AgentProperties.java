@@ -4,6 +4,9 @@ import jakarta.validation.constraints.Min;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Validated
 @ConfigurationProperties(prefix = "agent")
 public class AgentProperties {
@@ -14,6 +17,7 @@ public class AgentProperties {
     private final Loop loop = new Loop();
     private final Approval approval = new Approval();
     private final Api api = new Api();
+    private final WebSearch webSearch = new WebSearch();
 
     public Command getCommand() {
         return command;
@@ -37,6 +41,10 @@ public class AgentProperties {
 
     public Api getApi() {
         return api;
+    }
+
+    public WebSearch getWebSearch() {
+        return webSearch;
     }
 
     public static class Command {
@@ -139,6 +147,25 @@ public class AgentProperties {
 
         public void setLocalOnlyEnabled(boolean localOnlyEnabled) {
             this.localOnlyEnabled = localOnlyEnabled;
+        }
+    }
+
+    public static class WebSearch {
+        /**
+         * Search endpoint templates in priority order.
+         * Supported placeholders:
+         * - {query}: URL-encoded query
+         * - {rawQuery}: raw query text
+         * If no placeholder exists, `q=<encoded query>` will be appended.
+         */
+        private List<String> endpoints = new ArrayList<>();
+
+        public List<String> getEndpoints() {
+            return endpoints;
+        }
+
+        public void setEndpoints(List<String> endpoints) {
+            this.endpoints = endpoints;
         }
     }
 

@@ -78,6 +78,8 @@ class ToolSpecificationRegistryTests {
         assertTrue(toolNames.contains("ListFileTool"));
         assertTrue(toolNames.contains("CreateFileTool"));
         assertTrue(toolNames.contains("EditFileTool"));
+        assertTrue(toolNames.contains("WebSearchTool"));
+        assertTrue(toolNames.contains("WebFetchTool"));
         assertFalse(toolNames.contains("FileTool"));
         assertTrue(registry.isToolAllowed("unknown", "CronCreateTool"));
         assertTrue(registry.isToolAllowed("unknown", "CronDeleteTool"));

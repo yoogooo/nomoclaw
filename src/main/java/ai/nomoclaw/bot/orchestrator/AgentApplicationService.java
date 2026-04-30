@@ -1433,6 +1433,14 @@ public class AgentApplicationService {
                 String reference = toolArgs.path("reference").asText("");
                 yield reference.isBlank() ? "分析图片" : "分析图片: " + abbreviate(reference, 48);
             }
+            case "WebSearchTool" -> {
+                String query = toolArgs.path("query").asText("");
+                yield query.isBlank() ? "网页搜索" : "网页搜索: " + abbreviate(query, 48);
+            }
+            case "WebFetchTool" -> {
+                String url = toolArgs.path("url").asText("");
+                yield url.isBlank() ? "网页抓取" : "网页抓取: " + abbreviate(url, 48);
+            }
             default -> "执行工具: " + nullToEmpty(toolName);
         };
     }
@@ -1466,6 +1474,8 @@ public class AgentApplicationService {
             case "ImageLoaderTool" -> "正在分析图片";
             case "DesktopScreenshotTool" -> "正在截取桌面画面";
             case "FileSearchTool" -> "正在搜索文件内容";
+            case "WebSearchTool" -> "正在搜索网页信息";
+            case "WebFetchTool" -> "正在抓取网页内容";
             default -> step.title() == null || step.title().isBlank() ? "正在处理任务步骤" : step.title();
         };
     }
@@ -1522,13 +1532,25 @@ public class AgentApplicationService {
                         ? "系统准备加载图片并进行视觉分析。"
                         : "系统准备根据“" + abbreviate(reference, 72) + "”加载图片并进行视觉分析。";
             }
+            case "WebSearchTool" -> {
+                String query = step.toolArgs().path("query").asText("");
+                yield query.isBlank()
+                        ? "系统准备执行一次网页搜索。"
+                        : "系统准备执行网页搜索，关键词为“" + abbreviate(query, 72) + "”。";
+            }
+            case "WebFetchTool" -> {
+                String url = step.toolArgs().path("url").asText("");
+                yield url.isBlank()
+                        ? "系统准备抓取网页内容。"
+                        : "系统准备抓取网页内容，目标地址为 " + abbreviate(url, 72) + "。";
+            }
             default -> "系统已规划这一步，稍后会开始执行。";
         };
     }
 
     private String buildStepStartedDetails(PlanStep step) {
         return switch (nullToEmpty(step.toolName())) {
-            case "CommandTool", "BrowserTool", "ReadFileTool", "ListFileTool", "CreateFileTool", "EditFileTool", "CronCreateTool", "CronDeleteTool", "CronListTool" -> buildStepPlanDetails(step)
+            case "CommandTool", "BrowserTool", "ReadFileTool", "ListFileTool", "CreateFileTool", "EditFileTool", "WebSearchTool", "WebFetchTool", "CronCreateTool", "CronDeleteTool", "CronListTool" -> buildStepPlanDetails(step)
                     .replace("系统准备", "系统正在")
                     .replace("已规划", "正在执行");
             default -> "系统正在执行这一步。";
@@ -1574,6 +1596,8 @@ public class AgentApplicationService {
                 }
                 yield "图片分析完成，共匹配 " + resolved + " 张图片。";
             }
+            case "WebSearchTool" -> "网页搜索已完成。";
+            case "WebFetchTool" -> "网页抓取已完成。";
             default -> hasMeaningfulText(result.output()) ? abbreviate(result.output(), 140) : "这一步已顺利完成。";
         };
     }
@@ -1645,6 +1669,14 @@ public class AgentApplicationService {
                 yield "系统将删除定时任务" + (jobUid.isBlank() ? "。" : " " + abbreviate(jobUid, 72) + "。");
             }
             case "CronListTool" -> "系统将查询定时任务。";
+            case "WebSearchTool" -> {
+                String query = toolArgs.path("query").asText("");
+                yield "系统将执行网页搜索" + (query.isBlank() ? "。" : "，关键词为“" + abbreviate(query, 72) + "”。");
+            }
+            case "WebFetchTool" -> {
+                String url = toolArgs.path("url").asText("");
+                yield "系统将抓取网页内容" + (url.isBlank() ? "。" : "，目标地址为 " + abbreviate(url, 96) + "。");
+            }
             default -> "系统将执行一项待确认操作。";
         };
     }

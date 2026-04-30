@@ -43,6 +43,9 @@ public class RiskPolicy {
         if ("readfiletool".equals(tool) || "listfiletool".equals(tool)) {
             return RiskLevel.LOW;
         }
+        if ("websearchtool".equals(tool) || "webfetchtool".equals(tool)) {
+            return RiskLevel.LOW;
+        }
         if (tool.contains("browser")) {
             return RiskLevel.LOW;
         }

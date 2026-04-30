@@ -164,5 +164,13 @@ export function approvalActionSummary(payload: Record<string, any>) {
     });
   }
 
+  if (toolName === "WebSearchTool") {
+    return tr("format.approval.generic", { toolName: `WebSearch: ${args.query || tr("format.approval.action")}` });
+  }
+
+  if (toolName === "WebFetchTool") {
+    return tr("format.approval.generic", { toolName: `WebFetch: ${args.url || tr("format.approval.urlMissing")}` });
+  }
+
   return tr("format.approval.generic", { toolName });
 }
