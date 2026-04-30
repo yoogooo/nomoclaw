@@ -99,16 +99,27 @@ const zhCN = {
       addServer: "新增 MCP Server",
       test: "测试",
       refreshTools: "刷新工具",
-      viewTools: "查看工具"
+      viewTools: "查看工具",
+      viewParams: "查看参数"
     },
     toolColumns: {
       key: "Tool Key",
       name: "名称",
       description: "描述",
+      params: "参数",
       status: "状态"
     },
     toolsModal: {
-      title: "{name} 工具"
+      title: "{name} 工具",
+      paramsTitle: "{name} 参数定义"
+    },
+    params: {
+      empty: "该工具未提供参数定义。",
+      invalid: "参数定义格式异常，无法解析。",
+      required: "必填",
+      optional: "可选",
+      noDescription: "无描述",
+      unknownType: "未知类型"
     },
     editor: {
       createTitle: "新增 MCP Server",

@@ -122,6 +122,7 @@ export interface McpTool {
   originalToolName: string;
   displayName: string;
   description: string;
+  inputSchemaJson?: string;
   status: string;
   lastSyncedTime: string;
 }

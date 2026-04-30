@@ -89,6 +89,7 @@ public final class ApiDtoMapper {
                 dto.originalToolName(),
                 dto.displayName(),
                 dto.description(),
+                dto.inputSchemaJson(),
                 dto.status(),
                 dto.lastSyncedTime()
         );

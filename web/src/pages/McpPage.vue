@@ -33,6 +33,9 @@ const showEditor = ref(false);
 const showToolsModal = ref(false);
 const editingUid = ref("");
 const viewingToolsServerName = ref("");
+const showToolParamsModal = ref(false);
+const viewingToolName = ref("");
+const viewingToolParamsText = ref("");
 const activeTab = ref<TransportTab>("HTTP");
 const servers = ref<McpServer[]>([]);
 const tools = ref<McpTool[]>([]);
@@ -120,7 +123,23 @@ const toolColumns = computed<DataTableColumns<McpTool>>(() => [
     key: "originalToolName",
     minWidth: 240
   },
-  { title: t("mcp.toolColumns.description"), key: "description" }
+  { title: t("mcp.toolColumns.description"), key: "description" },
+  {
+    title: t("mcp.toolColumns.params"),
+    key: "params",
+    width: 120,
+    render(row) {
+      return h(
+        NButton,
+        {
+          size: "small",
+          tertiary: true,
+          onClick: () => openToolParams(row)
+        },
+        { default: () => t("mcp.actions.viewParams") }
+      );
+    }
+  }
 ]);
 
 function hButton(label: string, onClick: () => void, loadingValue = false) {
@@ -237,6 +256,51 @@ async function openTools(server: McpServer) {
   } finally {
     toolsLoading.value = false;
   }
+}
+
+function openToolParams(tool: McpTool) {
+  viewingToolName.value = tool.originalToolName;
+  viewingToolParamsText.value = formatToolParams(tool.inputSchemaJson);
+  showToolParamsModal.value = true;
+}
+
+function formatToolParams(inputSchemaJson?: string) {
+  if (!inputSchemaJson || !inputSchemaJson.trim()) {
+    return t("mcp.params.empty");
+  }
+  try {
+    const schema = JSON.parse(inputSchemaJson) as {
+      properties?: Record<string, { type?: string; description?: string; enum?: unknown[] }>;
+      required?: string[];
+    };
+    const properties = schema?.properties || {};
+    const entries = Object.entries(properties);
+    if (!entries.length) {
+      return t("mcp.params.empty");
+    }
+    const required = new Set(schema.required || []);
+    return entries
+      .map(([name, def]) => {
+        const type = normalizeParamType(def);
+        const requiredText = required.has(name) ? t("mcp.params.required") : t("mcp.params.optional");
+        const desc = (def?.description || "").trim() || t("mcp.params.noDescription");
+        return `- ${name} (${type}, ${requiredText}): ${desc}`;
+      })
+      .join("\n");
+  } catch {
+    return t("mcp.params.invalid");
+  }
+}
+
+function normalizeParamType(def: { type?: string; enum?: unknown[] } | undefined) {
+  if (!def) return t("mcp.params.unknownType");
+  if (typeof def.type === "string" && def.type.trim()) {
+    return def.type.trim();
+  }
+  if (Array.isArray(def.enum) && def.enum.length > 0) {
+    return `enum(${def.enum.map((item) => String(item)).join(", ")})`;
+  }
+  return t("mcp.params.unknownType");
 }
 
 async function deleteServer(serverUid: string) {
@@ -483,6 +547,15 @@ onMounted(() => {
         />
       </div>
     </n-modal>
+
+    <n-modal
+      v-model:show="showToolParamsModal"
+      preset="card"
+      class="ui-card-modal-md"
+      :title="t('mcp.toolsModal.paramsTitle', { name: viewingToolName })"
+    >
+      <pre class="tool-params-text">{{ viewingToolParamsText }}</pre>
+    </n-modal>
   </div>
 </template>
 
@@ -512,6 +585,13 @@ onMounted(() => {
   max-height: calc(90vh - 150px);
   overflow: auto;
   min-height: 0;
+}
+
+.tool-params-text {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.6;
 }
 
 .modal-actions {

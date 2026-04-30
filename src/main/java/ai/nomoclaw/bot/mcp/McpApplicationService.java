@@ -148,6 +148,11 @@ public class McpApplicationService {
         McpServerDefinitionEntity server = requireServer(serverUid);
         try (McpClient client = clientFactory.create(server, readConfig(server))) {
             List<ToolSpecification> tools = client.listTools();
+            if (shouldUseRawToolListRefresh(tools)) {
+                log.warn("[MCP] detected empty/unsupported tool schemas from SDK listTools serverUid={} serverName={}, fallback to raw tools/list",
+                        server.getServerUid(), server.getServerName());
+                return refreshToolsWithRawProtocol(server);
+            }
             logRefreshedTools(server, tools);
             LocalDateTime now = LocalDateTime.now();
             for (ToolSpecification tool : tools) {
@@ -165,6 +170,24 @@ public class McpApplicationService {
             recordMcpError("MCP_REFRESH_TOOLS_FAILED", "MCP 工具刷新失败", server, ex);
             throw new IllegalStateException("MCP tools refresh failed: " + ex.getMessage(), ex);
         }
+    }
+
+    private boolean shouldUseRawToolListRefresh(List<ToolSpecification> tools) {
+        if (tools == null || tools.isEmpty()) {
+            return false;
+        }
+        int nonEmptySchemas = 0;
+        for (ToolSpecification tool : tools) {
+            String schemaJson = serializeToolParameters(tool);
+            if (schemaJson == null) {
+                continue;
+            }
+            String normalized = schemaJson.trim();
+            if (!normalized.isBlank() && !"{}".equals(normalized)) {
+                nonEmptySchemas++;
+            }
+        }
+        return nonEmptySchemas == 0;
     }
 
     private List<McpToolDto> refreshToolsWithRawProtocol(McpServerDefinitionEntity server) {
@@ -331,16 +354,24 @@ public class McpApplicationService {
         if (!"ACTIVE".equalsIgnoreCase(server.getStatus())) {
             return ToolResult.failure("MCP_SERVER_DISABLED", "MCP server is disabled: " + server.getServerName(), JsonNodeFactory.instance.objectNode());
         }
+        String requestArgsJson = request.args() == null ? "{}" : request.args().toString();
+        log.info("[MCP] execute toolKey={} originalToolName={} serverUid={} args={}",
+                toolKey, snapshot.getOriginalToolName(), server.getServerUid(), truncateForLog(requestArgsJson, 1600));
         try (McpClient client = clientFactory.create(server, readConfig(server))) {
             ToolExecutionRequest executionRequest = ToolExecutionRequest.builder()
                     .name(snapshot.getOriginalToolName())
-                    .arguments(request.args() == null ? "{}" : request.args().toString())
+                    .arguments(requestArgsJson)
                     .build();
             ToolExecutionResult executionResult = client.executeTool(executionRequest);
             if (executionResult != null && executionResult.isError()) {
+                String resultText = nullToEmpty(executionResult.resultText());
+                log.warn("[MCP] execute failed toolKey={} originalToolName={} serverUid={} result={}",
+                        toolKey, snapshot.getOriginalToolName(), server.getServerUid(), truncateForLog(resultText, 1600));
                 return ToolResult.failure("MCP_TOOL_EXECUTION_FAILED", executionResult.resultText(), JsonNodeFactory.instance.objectNode());
             }
             String output = executionResult == null ? "" : executionResult.resultText();
+            log.info("[MCP] execute success toolKey={} originalToolName={} serverUid={} result={}",
+                    toolKey, snapshot.getOriginalToolName(), server.getServerUid(), truncateForLog(output == null ? "" : output, 1600));
             ObjectNode artifacts = JsonNodeFactory.instance.objectNode();
             artifacts.put("serverUid", server.getServerUid());
             artifacts.put("serverName", server.getServerName());
@@ -593,6 +624,7 @@ public class McpApplicationService {
                 snapshot.getOriginalToolName(),
                 resolveToolDisplayName(server, snapshot.getOriginalToolName()),
                 snapshot.getDescription(),
+                snapshot.getInputSchemaJson(),
                 snapshot.getStatus(),
                 snapshot.getLastSyncedTime()
         );

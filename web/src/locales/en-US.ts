@@ -99,16 +99,27 @@ const enUS = {
       addServer: "Add MCP Server",
       test: "Test",
       refreshTools: "Refresh Tools",
-      viewTools: "View Tools"
+      viewTools: "View Tools",
+      viewParams: "View Params"
     },
     toolColumns: {
       key: "Tool Key",
       name: "Name",
       description: "Description",
+      params: "Params",
       status: "Status"
     },
     toolsModal: {
-      title: "{name} Tools"
+      title: "{name} Tools",
+      paramsTitle: "{name} Parameters"
+    },
+    params: {
+      empty: "No parameter schema provided by this tool.",
+      invalid: "Invalid parameter schema format.",
+      required: "required",
+      optional: "optional",
+      noDescription: "No description",
+      unknownType: "unknown"
     },
     editor: {
       createTitle: "Add MCP Server",

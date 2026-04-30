@@ -1,5 +1,6 @@
 package ai.nomoclaw.bot.orchestrator;
 
+import ai.nomoclaw.bot.util.JsonUtil;
 import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
 import ai.nomoclaw.bot.store.entity.AgentToolRelationEntity;
 import ai.nomoclaw.bot.store.entity.McpToolSnapshotEntity;
@@ -11,7 +12,11 @@ import ai.nomoclaw.bot.store.repository.ToolDefinitionRepository;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.core.type.TypeReference;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -247,7 +252,7 @@ public class ToolSpecificationRegistry {
             return listAll();
         }
         Map<String, ToolSpecification> allTools = allToolSpecificationsByName();
-        List<String> enabledToolKeys = new java.util.ArrayList<>(enabledBuiltinToolKeys);
+        List<String> enabledToolKeys = new ArrayList<>(enabledBuiltinToolKeys);
         enabledToolKeys.addAll(enabledMcpToolKeys(agentName));
         return enabledToolKeys.stream()
                 .map(allTools::get)
@@ -319,13 +324,70 @@ public class ToolSpecificationRegistry {
     }
 
     private ToolSpecification toMcpToolSpecification(McpToolSnapshotEntity snapshot) {
+        String description = buildMcpToolDescription(snapshot);
         return ToolSpecification.builder()
                 .name(snapshot.getToolKey())
-                .description(snapshot.getDescription())
+                .description(description)
                 .parameters(JsonObjectSchema.builder()
                         .description("Arguments for MCP tool " + snapshot.getOriginalToolName())
                         .additionalProperties(true)
                         .build())
                 .build();
+    }
+
+    private String buildMcpToolDescription(McpToolSnapshotEntity snapshot) {
+        String base = snapshot.getDescription() == null ? "" : snapshot.getDescription().trim();
+        String schema = snapshot.getInputSchemaJson() == null ? "" : snapshot.getInputSchemaJson().trim();
+        if (schema.isBlank()) {
+            return base;
+        }
+        try {
+            JsonNode root = JsonUtil.fromJson(schema, JsonNode.class);
+            JsonNode properties = root == null ? null : root.path("properties");
+            if (properties == null || !properties.isObject() || properties.isEmpty()) {
+                return base;
+            }
+            Set<String> required = new HashSet<>();
+            JsonNode requiredNode = root.path("required");
+            if (requiredNode.isArray()) {
+                requiredNode.forEach(item -> {
+                    String name = item.asText("").trim();
+                    if (!name.isBlank()) {
+                        required.add(name);
+                    }
+                });
+            }
+            Map<String, Map<String, Object>> propertyMap = JsonUtil.fromJsonQuietly(
+                    properties.toString(),
+                    new TypeReference<Map<String, Map<String, Object>>>() {}
+            ).orElseGet(LinkedHashMap::new);
+            List<String> paramSummaries = new ArrayList<>();
+            for (Map.Entry<String, Map<String, Object>> entry : propertyMap.entrySet()) {
+                if (paramSummaries.size() >= 8) {
+                    break;
+                }
+                String name = entry.getKey();
+                Map<String, Object> node = entry.getValue() == null ? Map.of() : entry.getValue();
+                String type = String.valueOf(node.getOrDefault("type", "any"));
+                Object descRaw = node.get("description");
+                String desc = descRaw == null ? "" : descRaw.toString().trim();
+                String requiredText = required.contains(name) ? "required" : "optional";
+                String text = name + " (" + type + ", " + requiredText + ")";
+                if (!desc.isBlank()) {
+                    text += ": " + desc;
+                }
+                paramSummaries.add(text);
+            }
+            if (paramSummaries.isEmpty()) {
+                return base;
+            }
+            String summary = "Args: " + String.join("; ", paramSummaries);
+            if (base.isBlank()) {
+                return summary;
+            }
+            return base + " " + summary;
+        } catch (Exception ignored) {
+            return base;
+        }
     }
 }
