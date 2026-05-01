@@ -24,7 +24,7 @@ const { t } = useI18n();
 .agent-detail-column {
   height: 100%;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: var(--space-3_5);
@@ -32,7 +32,10 @@ const { t } = useI18n();
 
 .detail-tabs-card {
   min-height: 0;
-  flex-shrink: 0;
+  height: 100%;
+  flex: 1 1 auto;
+  overflow: hidden;
+  box-shadow: none;
 }
 
 @media (max-width: 1120px) {

@@ -99,6 +99,7 @@ const skillDrawerVisible = ref(false);
 const selectedSkillId = ref("");
 const importSkillVisible = ref(false);
 const refreshingConfig = ref(false);
+const refreshingDocs = ref(false);
 const { t } = useI18n();
 
 const avatarIconOptions: AvatarIconOption[] = [
@@ -253,10 +254,10 @@ async function refreshAgentsConfig(notify = true) {
   try {
     await management.init();
     selectedAgentUid.value = management.ensureSelectedAgent(preferredAgentUid);
-    management.syncDocsFormFromSelection(selectedAgent.value);
     management.syncBasicFormFromSelection(selectedAgent.value);
     if (selectedAgentUid.value) {
       await management.loadAgentWorkspace(selectedAgentUid.value);
+      management.syncDocsFormFromSelection(selectedAgent.value);
     }
     if (notify) {
       message.success(t("toast.configRefreshed"));
@@ -267,6 +268,26 @@ async function refreshAgentsConfig(notify = true) {
     }
   } finally {
     refreshingConfig.value = false;
+  }
+}
+
+async function refreshSelectedAgentDocs(notify = true) {
+  if (!selectedAgentUid.value || refreshingDocs.value) {
+    return;
+  }
+  refreshingDocs.value = true;
+  try {
+    await management.loadAgentWorkspace(selectedAgentUid.value);
+    management.syncDocsFormFromSelection(selectedAgent.value);
+    if (notify) {
+      message.success(t("toast.configRefreshed"));
+    }
+  } catch {
+    if (notify) {
+      message.error(t("toast.refreshFailed"));
+    }
+  } finally {
+    refreshingDocs.value = false;
   }
 }
 
@@ -291,6 +312,13 @@ watch(selectedAgentUid, async (agentUid) => {
   if (!agentUid) return;
   await management.loadAgentWorkspace(agentUid);
   management.syncDocsFormFromSelection(selectedAgent.value);
+});
+
+watch([selectedAgentUid, detailTab], async ([agentUid, tab]) => {
+  if (!agentUid || tab !== "docs") {
+    return;
+  }
+  await refreshSelectedAgentDocs(false);
 });
 
 watch([selectedAgentUid, detailTab], ([agentUid, tab]) => {
@@ -393,9 +421,11 @@ watch([selectedAgentUid, detailTab], ([agentUid, tab]) => {
                     :selected-doc-enabled="selectedDocEnabled"
                     :doc-editable="docEditable"
                     :selected-doc-content="selectedDocContent"
+                    :refresh-loading="refreshingDocs"
                     @select-doc="selectedDocKey = $event as DocKey"
                     @toggle-doc="onToggleDoc"
                     @toggle-edit="docEditable = !docEditable"
+                    @refresh="refreshSelectedAgentDocs()"
                     @save="management.saveDocs(selectedAgent, selectedDocKey)"
                     @update-content="management.updateDocContent(selectedDocKey, $event)"
                   />
@@ -444,7 +474,7 @@ watch([selectedAgentUid, detailTab], ([agentUid, tab]) => {
 
 .agent-main-grid {
   display: grid;
-  grid-template-columns: var(--size-320) minmax(0, 1fr);
+  grid-template-columns: var(--size-260) minmax(0, 1fr);
   gap: var(--space-4);
   flex: 1;
   min-height: 0;
