@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ChevronLeft, Copy, RefreshCw } from "lucide-vue-next";
-import { NButton, NDataTable, NIcon, NModal } from "naive-ui";
+import { NButton, NDataTable, NIcon, NInput, NModal } from "naive-ui";
 import type { DataTableColumns } from "naive-ui";
 import { computed, h, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -15,6 +15,7 @@ const router = useRouter();
 const errorLogs = ref<SystemErrorLog[]>([]);
 const logsLoading = ref(false);
 const selectedEvent = ref<SystemErrorLog | null>(null);
+const searchKeyword = ref("");
 const detailModalVisible = computed({
   get: () => selectedEvent.value !== null,
   set: (value: boolean) => {
@@ -87,12 +88,16 @@ function rowProps(row: SystemErrorLog) {
 async function loadErrorLogs() {
   logsLoading.value = true;
   try {
-    errorLogs.value = await systemDiagnosticsApi.listErrorLogs(100);
+    errorLogs.value = await systemDiagnosticsApi.listErrorLogs(100, searchKeyword.value);
   } catch {
     errorLogs.value = [];
   } finally {
     logsLoading.value = false;
   }
+}
+
+function searchLogs() {
+  void loadErrorLogs();
 }
 
 function backToSettings() {
@@ -122,6 +127,13 @@ function backToSettings() {
                 </div>
               </div>
               <div class="settings-error-logs-actions">
+                <n-input
+                  v-model:value="searchKeyword"
+                  clearable
+                  :placeholder="t('settings.diagnosticsSearchPlaceholder')"
+                  class="settings-error-logs-search"
+                  @keydown.enter.prevent="searchLogs"
+                />
                 <n-button tertiary :loading="logsLoading" @click="loadErrorLogs">
                   <template #icon>
                     <n-icon :component="RefreshCw" />
@@ -230,6 +242,10 @@ function backToSettings() {
 .settings-error-logs-actions {
   justify-content: flex-end;
   gap: var(--space-2);
+}
+
+.settings-error-logs-search {
+  width: min(360px, 48vw);
 }
 
 .settings-error-log-time {

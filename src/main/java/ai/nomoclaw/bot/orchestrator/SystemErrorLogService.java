@@ -7,6 +7,7 @@ import ai.nomoclaw.bot.store.repository.SystemErrorLogRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -23,6 +24,7 @@ public class SystemErrorLogService {
     private static final int MAX_LIMIT = 200;
     private static final int RETENTION_COUNT = 1000;
     private static final int MAX_TEXT_LENGTH = 8000;
+    private static final int MAX_KEYWORD_LENGTH = 100;
 
     private final SystemErrorLogRepository repository;
 
@@ -31,9 +33,10 @@ public class SystemErrorLogService {
     }
 
     @Transactional(readOnly = true)
-    public List<SystemErrorLogDto> listLatest(Integer requestedLimit) {
+    public List<SystemErrorLogDto> listLatest(Integer requestedLimit, String keyword) {
         int limit = normalizeLimit(requestedLimit);
-        return repository.listLatest(limit).stream().map(this::toDto).toList();
+        String normalizedKeyword = normalizeKeyword(keyword);
+        return repository.listLatest(limit, normalizedKeyword).stream().map(this::toDto).toList();
     }
 
     @Transactional(readOnly = true)
@@ -85,6 +88,13 @@ public class SystemErrorLogService {
     private String normalizeLevel(String level) {
         String normalized = nullToEmpty(level).trim().toUpperCase(Locale.ROOT);
         return "WARN".equals(normalized) ? "WARN" : "ERROR";
+    }
+
+    private String normalizeKeyword(String keyword) {
+        if (!StringUtils.hasText(keyword)) {
+            return null;
+        }
+        return truncate(keyword, MAX_KEYWORD_LENGTH);
     }
 
     private SystemErrorLogDto toDto(SystemErrorLogEntity entity) {

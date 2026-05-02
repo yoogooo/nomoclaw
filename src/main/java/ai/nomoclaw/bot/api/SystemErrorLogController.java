@@ -21,9 +21,10 @@ public class SystemErrorLogController {
     }
 
     @GetMapping
-    public List<SystemErrorLogResponse> listErrorLogs(@RequestParam(name = "limit", required = false) Integer limit) {
-        log.info("[AgentAPI] listSystemErrorLogs limit={}", limit);
-        return ApiDtoMapper.toSystemErrorLogs(systemErrorLogService.listLatest(limit));
+    public List<SystemErrorLogResponse> listErrorLogs(@RequestParam(name = "limit", required = false) Integer limit,
+                                                       @RequestParam(name = "keyword", required = false) String keyword) {
+        log.info("[AgentAPI] listSystemErrorLogs limit={} keyword={}", limit, keyword);
+        return ApiDtoMapper.toSystemErrorLogs(systemErrorLogService.listLatest(limit, keyword));
     }
 
     @GetMapping("/summary")

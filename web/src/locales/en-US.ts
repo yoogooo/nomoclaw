@@ -69,7 +69,9 @@ const enUS = {
     diagnosticsSuggestion: "Suggestion",
     diagnosticsTechnicalDetail: "Technical Details",
     diagnosticsCopyLog: "Copy Log",
-    diagnosticsCopyLogSuccess: "Log copied"
+    diagnosticsCopyLogSuccess: "Log copied",
+    diagnosticsSearch: "Search",
+    diagnosticsSearchPlaceholder: "Search logs by keyword"
   },
   modelGate: {
     title: "Set up a model first",
