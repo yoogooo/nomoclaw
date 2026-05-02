@@ -71,11 +71,15 @@ function avatarFallbackText(agent: ManagedAgent) {
 
 <style scoped>
 .agent-list-column {
+  min-width: 0;
   min-height: 0;
   overflow: hidden;
 }
 
 .agent-list-pane {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   height: 100%;
   min-height: 0;
   overflow: auto;
@@ -159,7 +163,22 @@ function avatarFallbackText(agent: ManagedAgent) {
   }
 
   .agent-list-pane {
+    height: auto;
+    min-height: unset;
     max-height: none;
+    overflow: visible;
+  }
+}
+
+@media (max-width: 700px) {
+  .agent-list-column {
+    min-height: unset;
+  }
+
+  .agent-list-pane {
+    height: auto;
+    min-height: unset;
+    overflow: visible;
   }
 }
 </style>

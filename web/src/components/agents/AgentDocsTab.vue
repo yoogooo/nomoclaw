@@ -223,8 +223,69 @@ const { t } = useI18n();
 }
 
 @media (max-width: 1120px) {
+  .tab-body {
+    height: auto;
+    min-height: unset;
+  }
+
   .docs-split {
     grid-template-columns: 1fr;
+    height: auto;
+    min-height: unset;
+  }
+
+  .docs-list {
+    height: auto;
+    overflow: visible;
+  }
+
+  .docs-editor {
+    height: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .tab-body {
+    padding-top: var(--space-1);
+  }
+
+  .docs-split {
+    gap: var(--space-2_5);
+  }
+
+  .docs-list,
+  .docs-editor {
+    padding: var(--space-2);
+  }
+
+  .docs-editor-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+
+  .docs-editor-head > div:first-child {
+    width: 100%;
+  }
+
+  .docs-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .docs-actions :deep(.n-button) {
+    flex: 1 1 calc(50% - var(--space-1));
+    min-width: 0;
+  }
+
+  .docs-editor-path {
+    white-space: normal;
+    word-break: break-all;
+  }
+
+  .docs-editor-input :deep(textarea) {
+    min-height: 44vh;
   }
 }
 </style>

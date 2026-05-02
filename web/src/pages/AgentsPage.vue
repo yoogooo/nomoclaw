@@ -482,7 +482,13 @@ watch([selectedAgentUid, detailTab], ([agentUid, tab]) => {
 
 @media (max-width: 1120px) {
   .agent-main-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: var(--size-280) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 700px) {
+  .agent-main-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>

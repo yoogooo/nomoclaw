@@ -34,14 +34,23 @@ const { t } = useI18n();
   min-height: 0;
   height: 100%;
   flex: 1 1 auto;
-  overflow: hidden;
+  overflow: auto;
   box-shadow: none;
 }
 
-@media (max-width: 1120px) {
+@media (max-width: 700px) {
   .agent-detail-column {
+    height: auto;
+    min-height: unset;
     overflow: visible;
     max-height: none;
+  }
+
+  .detail-tabs-card {
+    height: auto;
+    min-height: unset;
+    flex: 0 0 auto;
+    overflow: visible;
   }
 }
 </style>
