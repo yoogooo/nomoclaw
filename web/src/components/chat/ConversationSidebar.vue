@@ -154,8 +154,8 @@ function handleAgentChange(agentUid: string | number | null) {
   <aside class="panel conversation-shell">
     <div class="panel-header conversation-header">
       <div class="conversation-header-top">
-        <div class="panel-title">{{ t("chat.sidebar.history") }}</div>
-        <div class="conversation-header-actions">
+        <div class="conversation-header-title-row">
+          <div class="panel-title">{{ t("chat.sidebar.history") }}</div>
           <button
             class="refresh-conversation-button ui-pill-btn"
             :title="t('chat.sidebar.refreshHistoryTooltip')"
@@ -164,6 +164,8 @@ function handleAgentChange(agentUid: string | number | null) {
           >
             <RefreshCw :size="14" :class="{ spinning: refreshAnimating }" />
           </button>
+        </div>
+        <div class="conversation-header-actions">
           <button class="create-conversation-button ui-pill-btn" @click="createConversationAndFocusInput()">
             {{ t("chat.sidebar.createConversation") }}
           </button>
@@ -247,15 +249,27 @@ function handleAgentChange(agentUid: string | number | null) {
 
 .conversation-header-top {
   display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.conversation-header-title-row {
+  display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
+  width: 100%;
+  gap: var(--space-2);
 }
 
 .conversation-header-actions {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  width: 100%;
+  justify-content: flex-start;
+  min-width: 0;
 }
 
 .agent-select-wrap {
@@ -297,8 +311,15 @@ function handleAgentChange(agentUid: string | number | null) {
 }
 
 .create-conversation-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex: none;
   white-space: nowrap;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   padding: var(--space-1_5) var(--space-3);
   border-color: var(--color-border-strong);
   background: var(--color-bg-surface-soft);
@@ -459,6 +480,10 @@ function handleAgentChange(agentUid: string | number | null) {
 }
 
 @media (max-width: 1120px) {
+  .conversation-header-actions {
+    justify-content: flex-start;
+  }
+
   .conversation-panel {
     gap: var(--space-3);
   }
