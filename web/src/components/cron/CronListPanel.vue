@@ -179,21 +179,16 @@ function onJobMouseLeave(jobUid: string) {
                         </template>
                         运行
                       </n-tooltip>
-                      <n-tooltip trigger="hover">
-                        <template #trigger>
-                          <n-dropdown
-                            trigger="click"
-                            :options="moreOptions(job)"
-                            @select="(key) => onMoreSelect(job, key)"
-                            @update:show="(show) => onMoreVisible(job.jobUid, show)"
-                          >
-                            <n-button size="tiny" text class="icon-action-btn">
-                              <template #icon><Ellipsis :size="15" /></template>
-                            </n-button>
-                          </n-dropdown>
-                        </template>
-                        更多
-                      </n-tooltip>
+                      <n-dropdown
+                        trigger="click"
+                        :options="moreOptions(job)"
+                        @select="(key) => onMoreSelect(job, key)"
+                        @update:show="(show) => onMoreVisible(job.jobUid, show)"
+                      >
+                        <n-button size="tiny" text class="icon-action-btn" aria-label="更多操作">
+                          <template #icon><Ellipsis :size="15" /></template>
+                        </n-button>
+                      </n-dropdown>
                     </div>
                     <span v-else>{{ humanizeCronExpression(job.expression) }}</span>
                   </td>
