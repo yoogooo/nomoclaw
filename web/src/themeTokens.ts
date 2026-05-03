@@ -147,7 +147,7 @@ export const themeTokens = {
     }
   },
   radius: {
-    base: "18px"
+    base: "10px"
   },
   font: {
     sans: "\"IBM Plex Sans\", \"PingFang SC\", sans-serif",

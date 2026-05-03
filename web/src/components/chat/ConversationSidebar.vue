@@ -166,7 +166,7 @@ function handleAgentChange(agentUid: string | number | null) {
           </button>
         </div>
         <div class="conversation-header-actions">
-          <button class="create-conversation-button ui-pill-btn" @click="createConversationAndFocusInput()">
+          <button class="create-conversation-button ui-control-btn" @click="createConversationAndFocusInput()">
             {{ t("chat.sidebar.createConversation") }}
           </button>
         </div>

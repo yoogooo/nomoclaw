@@ -315,6 +315,15 @@ a {
   font-weight: 600;
 }
 
+.ui-control-btn {
+  border: var(--size-1) solid var(--color-border-strong);
+  border-radius: var(--control-radius-md);
+  background: var(--color-bg-surface-soft);
+  color: var(--color-text-subtle);
+  font-size: var(--text-caption-size);
+  font-weight: 600;
+}
+
 .ui-button-brand {
   border-color: var(--color-button-primary-bg);
   background: var(--color-button-primary-bg);
