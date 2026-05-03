@@ -160,7 +160,7 @@ function onApprovalModeSelect(key: string) {
   align-items: center;
   gap: var(--space-1_5);
   border: var(--size-1) solid var(--color-border-strong);
-  border-radius: var(--radius-pill);
+  border-radius: var(--control-radius-md);
   background: transparent;
   color: var(--color-text-secondary);
   padding: var(--space-1) var(--space-2_5);
@@ -296,6 +296,13 @@ function onApprovalModeSelect(key: string) {
   background: transparent;
   border: 0;
   box-shadow: none;
+}
+
+.composer-model-inline :deep(.n-base-selection-overlay),
+.composer-model-inline :deep(.n-base-selection-label),
+.composer-model-inline :deep(.n-base-selection-input),
+.composer-model-inline :deep(.n-base-selection-placeholder) {
+  background: transparent;
 }
 
 .composer-model-inline :deep(.n-base-selection-label) {
