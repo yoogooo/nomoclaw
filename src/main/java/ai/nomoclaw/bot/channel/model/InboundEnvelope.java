@@ -1,6 +1,7 @@
 package ai.nomoclaw.bot.channel.model;
 
 import java.time.Instant;
+import java.util.Locale;
 import java.util.Map;
 
 public record InboundEnvelope(
@@ -35,5 +36,28 @@ public record InboundEnvelope(
 
     public ChannelSessionKey toSessionKey() {
         return new ChannelSessionKey(channel, tenantId, sessionKey);
+    }
+
+    public boolean isGroupChat() {
+        if (channel == ChannelType.FEISHU) {
+            String chatType = metadataValue("chatType");
+            if (chatType.isBlank()) {
+                return false;
+            }
+            return !"p2p".equals(chatType);
+        }
+        if (channel == ChannelType.DINGTALK) {
+            String conversationType = metadataValue("conversationType");
+            return switch (conversationType) {
+                case "2", "group", "group_chat", "chat" -> true;
+                default -> false;
+            };
+        }
+        return false;
+    }
+
+    private String metadataValue(String key) {
+        String value = metadata.get(key);
+        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
     }
 }

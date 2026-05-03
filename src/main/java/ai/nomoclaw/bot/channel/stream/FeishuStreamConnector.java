@@ -4,6 +4,7 @@ import ai.nomoclaw.bot.channel.core.ChannelManager;
 import ai.nomoclaw.bot.channel.model.ChannelType;
 import ai.nomoclaw.bot.channel.model.InboundEnvelope;
 import ai.nomoclaw.bot.channel.config.AgentChannelsProperties;
+import ai.nomoclaw.bot.channel.config.ChannelBotCredentialResolver;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lark.oapi.event.EventDispatcher;
@@ -35,14 +36,18 @@ public class FeishuStreamConnector implements ChannelStreamConnector {
 
     private final ChannelManager channelManager;
     private final AgentChannelsProperties properties;
+    private final ChannelBotCredentialResolver botCredentialResolver;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final AtomicBoolean started = new AtomicBoolean(false);
     private ExecutorService executor;
     private volatile Client wsClient;
 
-    public FeishuStreamConnector(ChannelManager channelManager, AgentChannelsProperties properties) {
+    public FeishuStreamConnector(ChannelManager channelManager,
+                                 AgentChannelsProperties properties,
+                                 ChannelBotCredentialResolver botCredentialResolver) {
         this.channelManager = channelManager;
         this.properties = properties;
+        this.botCredentialResolver = botCredentialResolver;
     }
 
     @Override
@@ -152,7 +157,9 @@ public class FeishuStreamConnector implements ChannelStreamConnector {
             return;
         }
 
-        boolean mentioned = isMentioned(message.getMentions()) || "p2p".equalsIgnoreCase(trim(message.getChatType()));
+        String chatType = trim(message.getChatType());
+        boolean p2p = "p2p".equalsIgnoreCase(chatType);
+        boolean mentioned = p2p || isBotMentioned(message.getMentions());
         String replyTarget = !chatId.isBlank()
                 ? "feishu:chat_id:" + chatId
                 : "feishu:open_id:" + senderKey;
@@ -166,7 +173,7 @@ public class FeishuStreamConnector implements ChannelStreamConnector {
                 mentioned,
                 replyTarget,
                 Instant.now(),
-                Map.of("chatType", trim(message.getChatType()))
+                Map.of("chatType", chatType)
         );
         channelManager.enqueue(envelope);
     }
@@ -185,8 +192,35 @@ public class FeishuStreamConnector implements ChannelStreamConnector {
         }
     }
 
-    private boolean isMentioned(MentionEvent[] mentions) {
-        return mentions != null && mentions.length > 0;
+    private boolean isBotMentioned(MentionEvent[] mentions) {
+        if (mentions == null || mentions.length == 0) {
+            return false;
+        }
+        String botOpenId = defaultBotOpenId();
+        if (botOpenId.isBlank()) {
+            return true;
+        }
+        for (MentionEvent mention : mentions) {
+            UserId id = mention == null ? null : mention.getId();
+            String openId = id == null ? "" : trim(id.getOpenId());
+            if (botOpenId.equals(openId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String defaultBotOpenId() {
+        ChannelBotCredentialResolver.FeishuBotCredential credential = botCredentialResolver.resolveFeishu("");
+        if (credential == null) {
+            return "";
+        }
+        String target = trim(credential.defaultTarget());
+        String prefix = "feishu:open_id:";
+        if (!target.startsWith(prefix)) {
+            return "";
+        }
+        return target.substring(prefix.length()).trim();
     }
 
     private String trim(String value) {

@@ -54,6 +54,10 @@ public abstract class AbstractWebhookChannel implements Channel {
             log.info("[Channel] sender blocked type={} sender={}", type, envelope.senderId());
             return;
         }
+        if (envelope.isGroupChat() && !envelope.mentioned()) {
+            log.info("[Channel] group message ignored without bot mention type={} sessionKey={}", type, envelope.sessionKey());
+            return;
+        }
         if (policy.requireMention() && !envelope.mentioned()) {
             log.debug("[Channel] mention required type={} sessionKey={}", type, envelope.sessionKey());
             return;

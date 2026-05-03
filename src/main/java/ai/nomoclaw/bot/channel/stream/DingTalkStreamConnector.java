@@ -115,6 +115,8 @@ public class DingTalkStreamConnector implements ChannelStreamConnector {
         if (sessionId.isBlank()) {
             return;
         }
+        String conversationType = trim(message.getConversationType());
+        boolean mentioned = !isGroupConversation(conversationType) || Boolean.TRUE.equals(message.getInAtList());
         InboundEnvelope envelope = new InboundEnvelope(
                 ChannelType.DINGTALK,
                 trim(tenantId),
@@ -122,10 +124,10 @@ public class DingTalkStreamConnector implements ChannelStreamConnector {
                 sessionId,
                 senderId,
                 text,
-                Boolean.TRUE.equals(message.getInAtList()),
+                mentioned,
                 replyTarget,
                 Instant.now(),
-                Map.of("conversationType", trim(message.getConversationType()))
+                Map.of("conversationType", conversationType)
         );
         channelManager.enqueue(envelope);
     }
@@ -163,6 +165,13 @@ public class DingTalkStreamConnector implements ChannelStreamConnector {
             }
         }
         return "";
+    }
+
+    private boolean isGroupConversation(String conversationType) {
+        return "2".equals(conversationType)
+                || "group".equalsIgnoreCase(conversationType)
+                || "group_chat".equalsIgnoreCase(conversationType)
+                || "chat".equalsIgnoreCase(conversationType);
     }
 
     private String trim(String value) {
