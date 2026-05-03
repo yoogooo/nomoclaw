@@ -2,7 +2,7 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { NButton, NDropdown, NEmpty, NFlex, NModal, NTag, NTooltip, type DropdownOption } from "naive-ui";
-import { Ellipsis, Pencil, Play } from "lucide-vue-next";
+import { ChevronRight, Ellipsis, Pencil, Play } from "lucide-vue-next";
 import { useCronJobsStore } from "@/stores/cronJobs";
 import type { CronJob } from "@/types/api";
 import { getSortLocale } from "@/i18n";
@@ -136,7 +136,9 @@ function onJobMouseLeave(jobUid: string) {
                 <tr class="cron-group-row">
                   <td colspan="3">
                     <button class="cron-group-header" @click="toggleGroup(group.label)">
-                      <span class="cron-group-toggle">{{ isGroupCollapsed(group.label) ? "▶" : "▼" }}</span>
+                      <span class="cron-group-toggle" :class="{ collapsed: isGroupCollapsed(group.label) }">
+                        <ChevronRight :size="18" />
+                      </span>
                       <span class="cron-group-title">{{ group.label }}</span>
                       <span class="cron-group-count">{{ t("cron.list.jobCount", { count: group.jobs.length }) }}</span>
                     </button>
@@ -162,35 +164,45 @@ function onJobMouseLeave(jobUid: string) {
                     </n-tag>
                   </td>
                   <td class="cron-cycle-cell">
-                    <div v-if="hoveredJobUid === job.jobUid || menuOpenJobUid === job.jobUid" class="cron-inline-actions">
-                      <n-tooltip trigger="hover">
-                        <template #trigger>
-                          <n-button size="tiny" text class="icon-action-btn" @click="emit('edit', job)">
-                            <template #icon><Pencil :size="15" /></template>
-                          </n-button>
-                        </template>
-                        编辑
-                      </n-tooltip>
-                      <n-tooltip trigger="hover">
-                        <template #trigger>
-                          <n-button size="tiny" text class="icon-action-btn" @click="cronJobsStore.runJob(job.jobUid)">
-                            <template #icon><Play :size="15" /></template>
-                          </n-button>
-                        </template>
-                        运行
-                      </n-tooltip>
-                      <n-dropdown
-                        trigger="click"
-                        :options="moreOptions(job)"
-                        @select="(key) => onMoreSelect(job, key)"
-                        @update:show="(show) => onMoreVisible(job.jobUid, show)"
+                    <div class="cron-cycle-content">
+                      <span
+                        class="cron-cycle-text"
+                        :class="{ 'is-hidden': hoveredJobUid === job.jobUid || menuOpenJobUid === job.jobUid }"
                       >
-                        <n-button size="tiny" text class="icon-action-btn" aria-label="更多操作">
-                          <template #icon><Ellipsis :size="15" /></template>
-                        </n-button>
-                      </n-dropdown>
+                        {{ humanizeCronExpression(job.expression) }}
+                      </span>
+                      <div
+                        class="cron-inline-actions"
+                        :class="{ visible: hoveredJobUid === job.jobUid || menuOpenJobUid === job.jobUid }"
+                      >
+                        <n-tooltip trigger="hover">
+                          <template #trigger>
+                            <n-button size="tiny" text class="icon-action-btn" @click="emit('edit', job)">
+                              <template #icon><Pencil :size="15" /></template>
+                            </n-button>
+                          </template>
+                          编辑
+                        </n-tooltip>
+                        <n-tooltip trigger="hover">
+                          <template #trigger>
+                            <n-button size="tiny" text class="icon-action-btn" @click="cronJobsStore.runJob(job.jobUid)">
+                              <template #icon><Play :size="15" /></template>
+                            </n-button>
+                          </template>
+                          运行
+                        </n-tooltip>
+                        <n-dropdown
+                          trigger="click"
+                          :options="moreOptions(job)"
+                          @select="(key) => onMoreSelect(job, key)"
+                          @update:show="(show) => onMoreVisible(job.jobUid, show)"
+                        >
+                          <n-button size="tiny" text class="icon-action-btn" aria-label="更多操作">
+                            <template #icon><Ellipsis :size="15" /></template>
+                          </n-button>
+                        </n-dropdown>
+                      </div>
                     </div>
-                    <span v-else>{{ humanizeCronExpression(job.expression) }}</span>
                   </td>
                 </tr>
               </template>
@@ -297,8 +309,16 @@ function onJobMouseLeave(jobUid: string) {
 }
 
 .cron-group-toggle {
-  font-size: var(--text-caption-size);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--color-text-secondary);
+  transform: rotate(90deg);
+  transition: transform 0.16s ease;
+}
+
+.cron-group-toggle.collapsed {
+  transform: rotate(0deg);
 }
 
 .cron-group-title {
@@ -338,12 +358,35 @@ function onJobMouseLeave(jobUid: string) {
   min-width: 0;
 }
 
+.cron-cycle-content {
+  position: relative;
+}
+
+.cron-cycle-text {
+  display: block;
+  transition: opacity 0.12s ease;
+}
+
+.cron-cycle-text.is-hidden {
+  opacity: 0;
+}
+
 .cron-inline-actions {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   flex-wrap: nowrap;
   gap: var(--space-2);
   white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+.cron-inline-actions.visible {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .icon-action-btn :deep(.n-button__border),
