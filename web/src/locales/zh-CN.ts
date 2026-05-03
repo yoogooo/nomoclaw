@@ -419,6 +419,9 @@ const zhCN = {
     edit: {
       title: "修改任务"
     },
+    create: {
+      title: "创建任务"
+    },
     detail: {
       title: "任务详情",
       selectOneHint: "请选择左侧的一个定时任务。",

@@ -419,6 +419,9 @@ const enUS = {
     edit: {
       title: "Edit Task"
     },
+    create: {
+      title: "Create Task"
+    },
     detail: {
       title: "Task Details",
       selectOneHint: "Select one scheduled task from the left.",
