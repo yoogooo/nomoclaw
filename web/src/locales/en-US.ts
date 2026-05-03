@@ -434,6 +434,7 @@ const enUS = {
       deleteTask: "Delete Task",
       tabConfig: "Config",
       tabResult: "Execution Logs",
+      globalRecentResults: "Global recent execution results",
       frequency: "Frequency",
       nextRun: "Next Run",
       currentStatus: "Current Status",

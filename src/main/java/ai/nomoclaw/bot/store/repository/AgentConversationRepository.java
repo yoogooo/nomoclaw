@@ -23,6 +23,17 @@ public class AgentConversationRepository extends CrudRepository<AgentConversatio
                 .list();
     }
 
+
+    public List<AgentConversationEntity> listAllDescExcludeChannel(String channel) {
+        if (channel == null || channel.isBlank()) {
+            return listAllDesc();
+        }
+        return lambdaQuery()
+                .ne(AgentConversationEntity::getChannel, channel)
+                .orderByDesc(AgentConversationEntity::getPinned, AgentConversationEntity::getUpdatedTime, AgentConversationEntity::getCreatedTime)
+                .list();
+    }
+
     public void deleteByConversationUid(String conversationUid) {
         lambdaUpdate()
                 .eq(AgentConversationEntity::getConversationUid, conversationUid)

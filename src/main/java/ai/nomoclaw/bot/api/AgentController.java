@@ -591,6 +591,18 @@ public class AgentController {
         return ApiDtoMapper.toCronJobExecutionResults(cronJobApplicationService.listRecentResults(jobUid, 20));
     }
 
+    @GetMapping("/cron-jobs/results/recent")
+    public List<CronJobExecutionResultResponse> listRecentCronJobResults(@RequestParam(required = false, defaultValue = "20") int limit) {
+        log.info("[AgentAPI] listRecentCronJobResults limit={}", limit);
+        return ApiDtoMapper.toCronJobExecutionResults(cronJobApplicationService.listGlobalRecentResults(limit));
+    }
+
+    @GetMapping("/cron-jobs/executions/{executionUid}")
+    public CronExecutionDetailResponse getCronExecutionDetail(@PathVariable String executionUid) {
+        log.info("[AgentAPI] getCronExecutionDetail executionUid={}", executionUid);
+        return ApiDtoMapper.toCronExecutionDetail(cronJobApplicationService.getExecutionDetail(executionUid));
+    }
+
     @PostMapping("/cron-jobs/{jobUid}/run")
     public CronJobResponse runCronJob(@PathVariable String jobUid) {
         log.info("[AgentAPI] runCronJob jobUid={}", jobUid);

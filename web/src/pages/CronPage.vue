@@ -5,15 +5,18 @@ import { NButton } from "naive-ui";
 import DirectoryRail from "@/components/chat/DirectoryRail.vue";
 import AppPageHeader from "@/components/layout/AppPageHeader.vue";
 import CronCreateModal from "@/components/cron/CronCreateModal.vue";
-import CronDetailPanel from "@/components/cron/CronDetailPanel.vue";
 import CronListPanel from "@/components/cron/CronListPanel.vue";
+import CronEditModal from "@/components/cron/CronEditModal.vue";
 import { buildCronTaskTemplates } from "@/components/cron/cronTaskTemplates";
 import { message } from "@/discrete";
 import { useCronJobsStore } from "@/stores/cronJobs";
+import type { CronJob } from "@/types/api";
 
 const cronJobsStore = useCronJobsStore();
 const showCreateModal = ref(false);
 const createTemplateId = ref<string | null>(null);
+const showEditModal = ref(false);
+const editingJob = ref<CronJob | null>(null);
 const hasJobs = computed(() => cronJobsStore.jobs.length > 0);
 const { t } = useI18n();
 const cronTaskTemplates = computed(() => buildCronTaskTemplates(t));
@@ -21,6 +24,12 @@ const cronTaskTemplates = computed(() => buildCronTaskTemplates(t));
 function openCreateModal(templateId?: string) {
   createTemplateId.value = templateId ?? null;
   showCreateModal.value = true;
+}
+
+function openEditModal(job: CronJob) {
+  editingJob.value = job;
+  showEditModal.value = true;
+  void cronJobsStore.selectJob(job.jobUid);
 }
 
 async function refreshJobs() {
@@ -34,9 +43,7 @@ async function refreshJobs() {
 }
 
 onMounted(() => {
-  if (!cronJobsStore.jobs.length) {
-    void cronJobsStore.refresh();
-  }
+  void cronJobsStore.refresh(null);
 });
 </script>
 
@@ -56,8 +63,7 @@ onMounted(() => {
           </AppPageHeader>
 
           <div v-if="hasJobs" class="grid-cron cron-page-grid">
-            <CronListPanel @create="openCreateModal()" />
-            <CronDetailPanel />
+            <CronListPanel @create="openCreateModal()" @edit="openEditModal" />
           </div>
 
           <div v-else class="panel cron-empty-layout">
@@ -96,6 +102,13 @@ onMounted(() => {
     :initial-template-id="createTemplateId"
     @update:show="showCreateModal = $event; if (!$event) createTemplateId = null"
   />
+
+  <CronEditModal
+    :show="showEditModal"
+    :job="editingJob"
+    @update:show="showEditModal = $event"
+    @submit="editingJob && cronJobsStore.updateJob(editingJob.jobUid, $event)"
+  />
 </template>
 
 <style scoped>
@@ -107,6 +120,7 @@ onMounted(() => {
 }
 
 .cron-page-grid {
+  grid-template-columns: 1fr;
   min-height: 0;
   height: auto;
   max-height: none;

@@ -5,6 +5,7 @@ import type {
   CronJobExecutionResult,
   CronJobReport,
   CronSubscription,
+  CronExecutionDetail,
   SimpleResponse
 } from "@/types/api";
 import { requestJson } from "@/utils/http";
@@ -56,6 +57,12 @@ export const cronApi = {
   },
   listCronJobResults(jobUid: string) {
     return requestJson<CronJobExecutionResult[]>(`/api/cron-jobs/${jobUid}/results`);
+  },
+  listGlobalRecentResults(limit = 20) {
+    return requestJson<CronJobExecutionResult[]>(`/api/cron-jobs/results/recent?limit=${limit}`);
+  },
+  getExecutionDetail(executionUid: string) {
+    return requestJson<CronExecutionDetail>(`/api/cron-jobs/executions/${executionUid}`);
   },
   listCronSubscriptions(jobUid: string) {
     return requestJson<CronSubscription[]>(`/api/cron-jobs/${jobUid}/subscriptions`);

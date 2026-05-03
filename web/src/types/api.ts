@@ -434,11 +434,34 @@ export interface CronJobReport {
 }
 
 export interface CronJobExecutionResult {
+  executionUid?: string | null;
+  jobUid?: string | null;
+  jobTitle?: string | null;
+  agentUid?: string | null;
+  agentDisplayName?: string | null;
+  conversationUid?: string | null;
+  messageUid?: string | null;
   executedTime: string;
   status: string;
   summary: string;
   reportPath?: string | null;
   reportContent?: string | null;
+}
+
+export interface CronExecutionDetail {
+  executionUid: string;
+  jobUid: string;
+  jobTitle: string;
+  agentUid: string;
+  agentDisplayName: string;
+  conversationUid: string;
+  messageUid: string;
+  status: string;
+  summary: string;
+  reportPath?: string | null;
+  reportContent?: string | null;
+  executedTime: string;
+  runs: ConversationMessageRun[];
 }
 
 export interface CronSubscription {

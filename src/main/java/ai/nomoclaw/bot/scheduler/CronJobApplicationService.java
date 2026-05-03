@@ -5,6 +5,9 @@ import ai.nomoclaw.bot.application.dto.CronJobReportDto;
 import ai.nomoclaw.bot.application.dto.CronJobDto;
 import ai.nomoclaw.bot.application.dto.CronJobExecutionResultDto;
 import ai.nomoclaw.bot.application.dto.CronSubscriptionDto;
+import ai.nomoclaw.bot.application.dto.CronExecutionDetailDto;
+import ai.nomoclaw.bot.application.dto.ConversationMessageRunDto;
+import ai.nomoclaw.bot.orchestrator.ConversationAppService;
 import ai.nomoclaw.bot.application.command.CreateCronJobCommand;
 import ai.nomoclaw.bot.application.command.UpdateCronJobCommand;
 import ai.nomoclaw.bot.channel.model.ChannelType;
@@ -31,6 +34,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Comparator;
 
 @Service
 public class CronJobApplicationService {
@@ -43,6 +47,7 @@ public class CronJobApplicationService {
     private final AgentChannelsProperties channelsProperties;
     private final CronChannelTargetResolver channelTargetResolver;
     private final ChannelBotCredentialResolver botCredentialResolver;
+    private final ConversationAppService conversationAppService;
 
     public CronJobApplicationService(AgentCronJobRepository agentCronJobRepository,
                                      CronJobSchedulerService cronJobSchedulerService,
@@ -50,7 +55,8 @@ public class CronJobApplicationService {
                                      CronSubscriptionRepository cronSubscriptionRepository,
                                      AgentChannelsProperties channelsProperties,
                                      CronChannelTargetResolver channelTargetResolver,
-                                     ChannelBotCredentialResolver botCredentialResolver) {
+                                     ChannelBotCredentialResolver botCredentialResolver,
+                                     ConversationAppService conversationAppService) {
         this.agentCronJobRepository = agentCronJobRepository;
         this.cronJobSchedulerService = cronJobSchedulerService;
         this.agentDefinitionRepository = agentDefinitionRepository;
@@ -58,6 +64,7 @@ public class CronJobApplicationService {
         this.channelsProperties = channelsProperties;
         this.channelTargetResolver = channelTargetResolver;
         this.botCredentialResolver = botCredentialResolver;
+        this.conversationAppService = conversationAppService;
     }
 
     public List<CronJobDto> listCronJobs() {
@@ -282,8 +289,75 @@ public class CronJobApplicationService {
         }
     }
 
+    public List<CronJobExecutionResultDto> listGlobalRecentResults(int limit) {
+        int safeLimit = limit <= 0 ? 20 : Math.min(limit, 100);
+        List<AgentCronJobEntity> jobs = agentCronJobRepository.listAllJobs();
+        Map<String, AgentDefinitionEntity> agentsByUid = loadAgentsByUid(jobs);
+        List<CronJobExecutionResultDto> all = new java.util.ArrayList<>();
+        for (AgentCronJobEntity job : jobs) {
+            AgentDefinitionEntity agent = agentsByUid.get(job.getAgentUid());
+            all.addAll(readResultsFromJob(job, agent, 50));
+        }
+        return all.stream()
+                .sorted(Comparator.comparing(CronJobExecutionResultDto::executedTime).reversed())
+                .limit(safeLimit)
+                .toList();
+    }
+
+    public CronExecutionDetailDto getExecutionDetail(String executionUid) {
+        if (executionUid == null || executionUid.isBlank()) {
+            throw new IllegalArgumentException("executionUid is required");
+        }
+        List<AgentCronJobEntity> jobs = agentCronJobRepository.listAllJobs();
+        Map<String, AgentDefinitionEntity> agentsByUid = loadAgentsByUid(jobs);
+        for (AgentCronJobEntity job : jobs) {
+            AgentDefinitionEntity agent = agentsByUid.get(job.getAgentUid());
+            List<CronJobExecutionResultDto> results = readResultsFromJob(job, agent, 100);
+            for (CronJobExecutionResultDto item : results) {
+                if (executionUid.equals(item.executionUid())) {
+                    List<ConversationMessageRunDto> runs = List.of();
+                    if (item.conversationUid() != null && !item.conversationUid().isBlank()) {
+                        runs = resolveConversationRuns(item.conversationUid(), item.messageUid());
+                    }
+                    return new CronExecutionDetailDto(
+                            item.executionUid(),
+                            item.jobUid(),
+                            item.jobTitle(),
+                            item.agentUid(),
+                            item.agentDisplayName(),
+                            item.conversationUid(),
+                            item.messageUid(),
+                            item.status(),
+                            item.summary(),
+                            item.reportPath(),
+                            item.reportContent(),
+                            item.executedTime() == null ? "" : item.executedTime().toString(),
+                            runs
+                    );
+                }
+            }
+        }
+        throw new IllegalArgumentException("execution not found: " + executionUid);
+    }
+
     public List<CronJobExecutionResultDto> listRecentResults(String jobUid, int limit) {
         AgentCronJobEntity job = requireJob(jobUid);
+        int safeLimit = limit <= 0 ? 20 : Math.min(limit, 100);
+        if (job.getExtConfig() == null || job.getExtConfig().isBlank()) {
+            return List.of();
+        }
+        JsonNode extNode = JsonUtil.fromJsonQuietly(job.getExtConfig(), JsonNode.class).orElse(JsonNodeFactory.instance.objectNode());
+        JsonNode rawResults = extNode.path("executionResults");
+        if (!(rawResults instanceof ArrayNode arrayNode) || arrayNode.isEmpty()) {
+            return List.of();
+        }
+        List<CronJobExecutionResultDto> results = readResultsFromJob(job, resolveAgent(job.getAgentUid()), safeLimit);
+        return List.copyOf(results);
+    }
+
+    private List<CronJobExecutionResultDto> readResultsFromJob(AgentCronJobEntity job,
+                                                              AgentDefinitionEntity agent,
+                                                              int limit) {
         int safeLimit = limit <= 0 ? 20 : Math.min(limit, 100);
         if (job.getExtConfig() == null || job.getExtConfig().isBlank()) {
             return List.of();
@@ -309,7 +383,20 @@ public class CronJobApplicationService {
             String summary = item.path("summary").asText("");
             String reportPath = item.path("reportPath").asText("");
             String normalizedReportPath = reportPath.isBlank() ? null : reportPath;
+            String executionUid = item.path("executionUid").asText("");
+            String conversationUid = item.path("conversationUid").asText("");
+            String messageUid = item.path("messageUid").asText("");
+            String normalizedExecutionUid = executionUid.isBlank()
+                    ? buildLegacyExecutionUid(job.getJobUid(), executedText, conversationUid, messageUid, normalizedReportPath)
+                    : executionUid;
             results.add(new CronJobExecutionResultDto(
+                    normalizedExecutionUid,
+                    job.getJobUid(),
+                    defaultCronJobTitle(job.getTitle(), job.getTaskContent()),
+                    job.getAgentUid(),
+                    agent == null ? buildFallbackAgentDisplayName(job.getAgentUid()) : nullToEmpty(agent.getDisplayName()),
+                    conversationUid.isBlank() ? null : conversationUid,
+                    messageUid.isBlank() ? null : messageUid,
                     executedTime,
                     status,
                     summary,
@@ -320,7 +407,37 @@ public class CronJobApplicationService {
                 break;
             }
         }
-        return List.copyOf(results);
+        return results;
+    }
+
+    private List<ConversationMessageRunDto> resolveConversationRuns(String conversationUid, String messageUid) {
+        if (conversationUid == null || conversationUid.isBlank()) {
+            return List.of();
+        }
+        try {
+            List<ConversationMessageRunDto> runs = conversationAppService.listMessageRuns(conversationUid);
+            if (messageUid == null || messageUid.isBlank()) {
+                return runs;
+            }
+            return runs.stream().filter(item -> messageUid.equals(item.messageUid())).toList();
+        } catch (Exception ignored) {
+            return List.of();
+        }
+    }
+
+    private String buildLegacyExecutionUid(String jobUid,
+                                          String executedTime,
+                                          String conversationUid,
+                                          String messageUid,
+                                          String reportPath) {
+        String seed = String.join("|",
+                jobUid == null ? "" : jobUid,
+                executedTime == null ? "" : executedTime,
+                conversationUid == null ? "" : conversationUid,
+                messageUid == null ? "" : messageUid,
+                reportPath == null ? "" : reportPath
+        );
+        return "legacy-" + UUID.nameUUIDFromBytes(seed.getBytes(StandardCharsets.UTF_8));
     }
 
     private String readReportPreview(String reportPath) {

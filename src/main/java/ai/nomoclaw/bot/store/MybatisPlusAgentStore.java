@@ -75,7 +75,7 @@ public class MybatisPlusAgentStore implements AgentStore {
 
     @Override
     public List<AgentConversation> listConversations() {
-        return conversationRepository.listAllDesc()
+        return conversationRepository.listAllDescExcludeChannel("cron")
                 .stream()
                 .map(this::toDomain)
                 .toList();

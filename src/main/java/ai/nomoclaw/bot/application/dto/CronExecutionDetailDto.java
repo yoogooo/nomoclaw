@@ -1,8 +1,8 @@
-package ai.nomoclaw.bot.api;
+package ai.nomoclaw.bot.application.dto;
 
-import java.time.LocalDateTime;
+import java.util.List;
 
-public record CronJobExecutionResultResponse(
+public record CronExecutionDetailDto(
         String executionUid,
         String jobUid,
         String jobTitle,
@@ -10,10 +10,11 @@ public record CronJobExecutionResultResponse(
         String agentDisplayName,
         String conversationUid,
         String messageUid,
-        LocalDateTime executedTime,
         String status,
         String summary,
         String reportPath,
-        String reportContent
+        String reportContent,
+        String executedTime,
+        List<ConversationMessageRunDto> runs
 ) {
 }

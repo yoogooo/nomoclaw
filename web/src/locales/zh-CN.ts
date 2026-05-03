@@ -434,6 +434,7 @@ const zhCN = {
       deleteTask: "删除任务",
       tabConfig: "配置",
       tabResult: "执行记录",
+      globalRecentResults: "全局最近执行结果",
       frequency: "执行频率",
       nextRun: "下次执行",
       currentStatus: "当前状态",

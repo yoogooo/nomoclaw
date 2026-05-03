@@ -65,14 +65,15 @@ public class CronJobExecutionService {
             String messageUid = agentApplicationService.submitMessage(conversationUid, job.getTaskContent(), "cron");
             AgentMessage completedMessage = waitForCompletion(messageUid);
             String finalContent = loadFinalAnswer(conversationUid, messageUid, completedMessage);
+            String executionUid = java.util.UUID.randomUUID().toString();
             Path reportPath = writeReport(job, finalContent, executedAt, completedMessage.status().name());
             notifyCompletion(job, finalContent, reportPath, executedAt, completedMessage.status().name());
-            updateJobResult(job, now, summarize(finalContent), reportPath, "COMPLETED");
+            updateJobResult(job, now, summarize(finalContent), reportPath, "COMPLETED", executionUid, conversationUid, messageUid);
         } catch (Exception ex) {
             Path reportPath = writeFailureReportSafely(job, ex, executedAt);
             String failureSummary = summarize(ex.getMessage() == null ? "cron execution failed" : ex.getMessage());
             notifyCompletion(job, failureSummary, reportPath, executedAt, "FAILED");
-            updateJobResult(job, now, failureSummary, reportPath, "FAILED");
+            updateJobResult(job, now, failureSummary, reportPath, "FAILED", java.util.UUID.randomUUID().toString(), job.getConversationUid(), job.getMessageUid());
             log.error("[Quartz] cron job execution failed jobUid={}", jobUid, ex);
         }
     }
@@ -157,13 +158,16 @@ public class CronJobExecutionService {
                                  LocalDateTime now,
                                  String summary,
                                  Path reportPath,
-                                 String executionStatus) {
+                                 String executionStatus,
+                                 String executionUid,
+                                 String conversationUid,
+                                 String messageUid) {
         ObjectNode extConfig = job.getExtConfig() == null || job.getExtConfig().isBlank()
                 ? JsonNodeFactory.instance.objectNode()
                 : (ObjectNode) JsonUtil.fromJsonQuietly(job.getExtConfig(), tools.jackson.databind.JsonNode.class)
                 .orElse(JsonNodeFactory.instance.objectNode());
         extConfig.put("lastReportPath", reportPath == null ? "" : reportPath.toString());
-        appendExecutionResult(extConfig, now, summary, reportPath, executionStatus);
+        appendExecutionResult(extConfig, now, summary, reportPath, executionStatus, executionUid, conversationUid, messageUid);
         LocalDateTime nextRunTime = cronJobSchedulerService.nextRunTime(job.getJobUid(), job.getTimezone());
         String nextStatus = job.getStatus();
         if (nextRunTime == null && "ACTIVE".equalsIgnoreCase(job.getStatus())) {
@@ -175,6 +179,8 @@ public class CronJobExecutionService {
                 .set(AgentCronJobEntity::getNextRunTime, nextRunTime)
                 .set(AgentCronJobEntity::getStatus, nextStatus)
                 .set(AgentCronJobEntity::getLastResult, summary == null ? "" : summary)
+                .set(AgentCronJobEntity::getConversationUid, conversationUid)
+                .set(AgentCronJobEntity::getMessageUid, messageUid)
                 .set(AgentCronJobEntity::getExtConfig, JsonUtil.toJson(extConfig))
                 .set(AgentCronJobEntity::getUpdatedTime, now));
     }
@@ -183,12 +189,18 @@ public class CronJobExecutionService {
                                        LocalDateTime executedTime,
                                        String summary,
                                        Path reportPath,
-                                       String status) {
+                                       String status,
+                                       String executionUid,
+                                       String conversationUid,
+                                       String messageUid) {
         ArrayNode existing = extConfig.path("executionResults") instanceof ArrayNode arrayNode
                 ? (ArrayNode) arrayNode.deepCopy()
                 : JsonNodeFactory.instance.arrayNode();
         ArrayNode next = JsonNodeFactory.instance.arrayNode();
         ObjectNode current = JsonNodeFactory.instance.objectNode();
+        current.put("executionUid", executionUid == null ? "" : executionUid);
+        current.put("conversationUid", conversationUid == null ? "" : conversationUid);
+        current.put("messageUid", messageUid == null ? "" : messageUid);
         current.put("executedTime", executedTime.toString());
         current.put("status", status == null ? "" : status);
         current.put("summary", summary == null ? "" : summary);

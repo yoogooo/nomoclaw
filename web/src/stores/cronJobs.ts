@@ -13,16 +13,10 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
   const selectedTab = ref<"config" | "result">("config");
   const currentSubscriptions = ref<CronSubscription[]>([]);
   const currentResults = ref<CronJobExecutionResult[]>([]);
-  const bulkMode = ref(false);
-  const selectedBulkJobUids = ref<string[]>([]);
   const loading = ref(false);
+  const recentGlobalResults = ref<CronJobExecutionResult[]>([]);
 
   const currentJob = computed(() => jobs.value.find((job) => job.jobUid === selectedJobUid.value) || null);
-
-  function clearBulkMode() {
-    bulkMode.value = false;
-    selectedBulkJobUids.value = [];
-  }
 
   async function selectJob(jobUid: string) {
     selectedJobUid.value = jobUid;
@@ -40,29 +34,33 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
   async function refresh(preferredJobUid: string | null = selectedJobUid.value) {
     loading.value = true;
     try {
-      const [nextJobs, nextGroups] = await Promise.all([
+      const [nextJobs, nextGroups, recentResults] = await Promise.all([
         cronApi.listCronJobs(),
-        cronApi.listAgentGroups()
+        cronApi.listAgentGroups(),
+        cronApi.listGlobalRecentResults(20)
       ]);
       jobs.value = nextJobs;
       agentGroups.value = nextGroups;
-      selectedBulkJobUids.value = selectedBulkJobUids.value.filter((jobUid) =>
-        jobs.value.some((job) => job.jobUid === jobUid)
-      );
+      recentGlobalResults.value = recentResults;
 
       if (!jobs.value.length) {
         selectedJobUid.value = null;
         currentSubscriptions.value = [];
         currentResults.value = [];
-        clearBulkMode();
+        recentGlobalResults.value = [];
+        return;
+      }
+
+      if (preferredJobUid === null) {
+        selectedJobUid.value = null;
+        currentSubscriptions.value = [];
+        currentResults.value = [];
         return;
       }
 
       const nextSelection = preferredJobUid && jobs.value.some((job) => job.jobUid === preferredJobUid)
         ? preferredJobUid
-        : selectedJobUid.value && jobs.value.some((job) => job.jobUid === selectedJobUid.value)
-          ? selectedJobUid.value
-          : jobs.value[0].jobUid;
+        : jobs.value[0].jobUid;
 
       if (nextSelection) {
         await selectJob(nextSelection);
@@ -70,23 +68,6 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
     } finally {
       loading.value = false;
     }
-  }
-
-  function toggleBulkMode() {
-    bulkMode.value = !bulkMode.value;
-    if (!bulkMode.value) {
-      selectedBulkJobUids.value = [];
-    }
-  }
-
-  function toggleBulkSelection(jobUid: string, checked: boolean) {
-    const next = new Set(selectedBulkJobUids.value);
-    if (checked) {
-      next.add(jobUid);
-    } else {
-      next.delete(jobUid);
-    }
-    selectedBulkJobUids.value = Array.from(next);
   }
 
   async function runJob(jobUid: string) {
@@ -147,41 +128,10 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
     });
   }
 
-  async function batchDeleteSelected() {
-    const selectedJobs = jobs.value.filter((job) => selectedBulkJobUids.value.includes(job.jobUid));
-    if (!selectedJobs.length) {
-      return;
-    }
-
-    const preview = selectedJobs.slice(0, 3).map((job) => `- ${job.title || job.taskContent || tr("format.fallbackNoName")}`).join("\n");
-    const suffix = selectedJobs.length > 3 ? tr("cron.batchDeleteSuffix", { count: selectedJobs.length - 3 }) : "";
-
-    dialog.warning({
-      title: tr("dialogs.deleteCronBatchTitle"),
-      content: tr("dialogs.deleteCronBatchContent", { count: selectedJobs.length, preview, suffix }),
-      ...warningDialogPreset(),
-      positiveText: tr("dialogs.confirmDelete"),
-      negativeText: tr("common.cancel"),
-      onPositiveClick: async () => {
-        const result = await cronApi.batchDeleteCronJobs(selectedJobs.map((job) => job.jobUid));
-        const nextJobUid = jobs.value.find((job) => !selectedBulkJobUids.value.includes(job.jobUid))?.jobUid || null;
-        clearBulkMode();
-        await refresh(nextJobUid);
-        if (!result.failedItems.length) {
-          message.success(tr("cron.batchDeleteSuccess", { count: result.deletedJobUids.length }));
-          return;
-        }
-        message.warning(tr("cron.batchDeletePartial", {
-          success: result.deletedJobUids.length,
-          failed: result.failedItems.length
-        }));
-      }
-    });
-  }
-
   async function openReportFile(path: string) {
     await fileApi.openFile(path);
   }
+
 
   async function updateSubscriptions(jobUid: string, payload: Array<{ channel: string; target: string; botId?: string; enabled: boolean }>) {
     const updated = await cronApi.updateCronSubscriptions(jobUid, { subscriptions: payload });
@@ -196,23 +146,18 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
     selectedTab,
     currentSubscriptions,
     currentResults,
-    bulkMode,
-    selectedBulkJobUids,
+    recentGlobalResults,
     currentJob,
     loading,
     refresh,
     createJob,
     selectJob,
-    toggleBulkMode,
-    clearBulkMode,
-    toggleBulkSelection,
     runJob,
     pauseJob,
     resumeJob,
     updateJob,
     deleteJob,
     confirmDeleteJob,
-    batchDeleteSelected,
     openReportFile,
     updateSubscriptions
   };

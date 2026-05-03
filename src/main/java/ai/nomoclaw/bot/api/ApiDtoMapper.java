@@ -21,6 +21,7 @@ import ai.nomoclaw.bot.application.dto.ChannelConfigDto;
 import ai.nomoclaw.bot.application.dto.CronJobDto;
 import ai.nomoclaw.bot.application.dto.CronJobExecutionResultDto;
 import ai.nomoclaw.bot.application.dto.CronJobReportDto;
+import ai.nomoclaw.bot.application.dto.CronExecutionDetailDto;
 import ai.nomoclaw.bot.application.dto.MessageFileLinkDto;
 import ai.nomoclaw.bot.application.dto.SystemConfigDto;
 import ai.nomoclaw.bot.application.dto.SystemErrorLogDto;
@@ -561,6 +562,13 @@ public final class ApiDtoMapper {
     public static List<CronJobExecutionResultResponse> toCronJobExecutionResults(List<CronJobExecutionResultDto> dtos) {
         return dtos.stream()
                 .map(item -> new CronJobExecutionResultResponse(
+                        item.executionUid(),
+                        item.jobUid(),
+                        item.jobTitle(),
+                        item.agentUid(),
+                        item.agentDisplayName(),
+                        item.conversationUid(),
+                        item.messageUid(),
                         item.executedTime(),
                         item.status(),
                         item.summary(),
@@ -568,6 +576,24 @@ public final class ApiDtoMapper {
                         item.reportContent()
                 ))
                 .toList();
+    }
+
+    public static CronExecutionDetailResponse toCronExecutionDetail(CronExecutionDetailDto dto) {
+        return new CronExecutionDetailResponse(
+                dto.executionUid(),
+                dto.jobUid(),
+                dto.jobTitle(),
+                dto.agentUid(),
+                dto.agentDisplayName(),
+                dto.conversationUid(),
+                dto.messageUid(),
+                dto.status(),
+                dto.summary(),
+                dto.reportPath(),
+                dto.reportContent(),
+                dto.executedTime(),
+                toMessageRuns(dto.runs())
+        );
     }
 
     public static BatchDeleteCronJobsResponse toBatchDeleteResult(BatchDeleteCronJobsDto dto) {
