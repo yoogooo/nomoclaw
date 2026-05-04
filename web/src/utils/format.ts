@@ -105,8 +105,145 @@ function cronToNaturalText(expression?: string | null) {
   }
 }
 
+function toInt(value: string) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function pad2(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function formatHm(hour: number, minute: number) {
+  return `${pad2(hour)}:${pad2(minute)}`;
+}
+
+function weekdaySetFromCronField(field: string) {
+  const tokenToNum: Record<string, number> = {
+    SUN: 1, MON: 2, TUE: 3, WED: 4, THU: 5, FRI: 6, SAT: 7,
+    "1": 1, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "0": 1
+  };
+  const set = new Set<number>();
+  for (const raw of field.split(",")) {
+    const token = raw.trim().toUpperCase();
+    if (!token) continue;
+    if (token.includes("-")) {
+      const [startRaw, endRaw] = token.split("-");
+      const start = tokenToNum[startRaw];
+      const end = tokenToNum[endRaw];
+      if (!start || !end) continue;
+      if (start <= end) {
+        for (let i = start; i <= end; i += 1) set.add(i);
+      } else {
+        for (let i = start; i <= 7; i += 1) set.add(i);
+        for (let i = 1; i <= end; i += 1) set.add(i);
+      }
+      continue;
+    }
+    const num = tokenToNum[token];
+    if (num) set.add(num);
+  }
+  return set;
+}
+
+function weekdayLabel(day: number, zh = true) {
+  if (zh) {
+    return ["周日", "周一", "周二", "周三", "周四", "周五", "周六"][day - 1] || "周?";
+  }
+  return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][day - 1] || "?";
+}
+
+function humanizeWeekdays(weekdayField: string, hour: number, minute: number, zh = true) {
+  const set = weekdaySetFromCronField(weekdayField);
+  if (!set.size) return null;
+  const time = formatHm(hour, minute);
+  const weekdayOrder = [2, 3, 4, 5, 6, 7, 1];
+  const sorted = [...set].sort((a, b) => weekdayOrder.indexOf(a) - weekdayOrder.indexOf(b));
+  const isWeekdays = sorted.length === 5 && sorted.join(",") === "2,3,4,5,6";
+  const isWeekends = sorted.length === 2 && sorted.join(",") === "1,7";
+  const isEveryday = sorted.length === 7;
+  if (zh) {
+    if (isEveryday) return `每天 ${time}`;
+    if (isWeekdays) return `工作日 ${time}`;
+    if (isWeekends) return `周末 ${time}`;
+    return `每周${sorted.map((day) => weekdayLabel(day, true)).join("、")} ${time}`;
+  }
+  if (isEveryday) return `Every day ${time}`;
+  if (isWeekdays) return `Weekdays ${time}`;
+  if (isWeekends) return `Weekends ${time}`;
+  return `Weekly ${sorted.map((day) => weekdayLabel(day, false)).join(", ")} ${time}`;
+}
+
+function humanizeCronFriendly(expression?: string | null) {
+  const normalized = normalizeCronExpression(expression);
+  if (!normalized) return null;
+  const parts = normalized.split(" ");
+  if (parts.length < 6) return null;
+
+  const minuteField = parts[1];
+  const hourField = parts[2];
+  const dayOfMonthField = parts[3];
+  const monthField = parts[4];
+  const dayOfWeekField = parts[5];
+  const zh = getCronLocale() === "zh_CN";
+
+  // Every N minutes: 0 */N * ? * *
+  if (hourField === "*" && dayOfMonthField === "?" && monthField === "*" && dayOfWeekField === "*" && minuteField.startsWith("*/")) {
+    const interval = toInt(minuteField.slice(2));
+    if (interval && interval > 0) {
+      return zh ? `每${interval}分钟` : `Every ${interval} minutes`;
+    }
+  }
+
+  // Every N hours at minute M: 0 M */N ? * *
+  if (dayOfMonthField === "?" && monthField === "*" && dayOfWeekField === "*" && hourField.startsWith("*/")) {
+    const minute = toInt(minuteField);
+    const interval = toInt(hourField.slice(2));
+    if (minute !== null && minute >= 0 && minute <= 59 && interval && interval > 0) {
+      return zh ? `每${interval}小时（每小时 ${pad2(minute)} 分）` : `Every ${interval} hours (at minute ${pad2(minute)})`;
+    }
+  }
+
+  const minute = toInt(minuteField);
+  const hour = toInt(hourField);
+  if (minute === null || hour === null || minute < 0 || minute > 59 || hour < 0 || hour > 23) return null;
+
+  const dayOfMonthAny = dayOfMonthField === "?" || dayOfMonthField === "*";
+  const dayOfWeekAny = dayOfWeekField === "?" || dayOfWeekField === "*";
+
+  // Daily: 0 M H ? * *  /  0 M H * * ?
+  if (dayOfMonthAny && monthField === "*" && dayOfWeekAny) {
+    return zh ? `每天 ${formatHm(hour, minute)}` : `Every day ${formatHm(hour, minute)}`;
+  }
+
+  // Weekly: 0 M H ? * 2,3,4...
+  if (dayOfMonthAny && monthField === "*" && !dayOfWeekAny) {
+    return humanizeWeekdays(dayOfWeekField, hour, minute, zh);
+  }
+
+  // Monthly: 0 M H D * ?
+  if (dayOfWeekAny && monthField === "*") {
+    const day = toInt(dayOfMonthField);
+    if (day !== null && day >= 1 && day <= 31) {
+      return zh ? `每月${day}日 ${formatHm(hour, minute)}` : `Day ${day} of every month ${formatHm(hour, minute)}`;
+    }
+  }
+
+  return null;
+}
+
 export function humanizeCronExpression(expression?: string | null) {
-  return cronToNaturalText(expression) || tr("format.cronFallback");
+  const friendly = humanizeCronFriendly(expression);
+  if (friendly) return friendly;
+  const fallback = cronToNaturalText(expression);
+  if (fallback) {
+    const zhTimeOnly = fallback.match(/^在(\d{1,2}:\d{2})$/);
+    if (zhTimeOnly) {
+      return `每天 ${zhTimeOnly[1]}`;
+    }
+    return fallback;
+  }
+  return tr("format.cronFallback");
 }
 
 export function fallbackAgentLabel(job: CronJob) {

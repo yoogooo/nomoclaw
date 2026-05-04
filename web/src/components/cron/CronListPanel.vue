@@ -131,6 +131,11 @@ function onJobMouseLeave(jobUid: string) {
       <div class="scroll-area cron-scroll-body">
         <div v-if="cronJobsStore.jobs.length" class="cron-table-wrap">
           <table class="cron-table">
+            <colgroup>
+              <col class="cron-col-title">
+              <col class="cron-col-status">
+              <col class="cron-col-cycle">
+            </colgroup>
             <tbody>
               <template v-for="group in groupedJobs" :key="group.label">
                 <tr class="cron-group-row">
@@ -285,9 +290,20 @@ function onJobMouseLeave(jobUid: string) {
 
 .cron-table {
   width: 100%;
-  min-width: 760px;
   border-collapse: collapse;
   table-layout: fixed;
+}
+
+.cron-col-title {
+  width: 52%;
+}
+
+.cron-col-status {
+  width: 84px;
+}
+
+.cron-col-cycle {
+  width: auto;
 }
 
 .cron-group-row td {
@@ -340,18 +356,6 @@ function onJobMouseLeave(jobUid: string) {
   font-size: var(--text-body-size);
   vertical-align: middle;
   transition: background-color 0.16s ease;
-}
-
-.cron-job-row td:nth-child(1) {
-  width: 46%;
-}
-
-.cron-job-row td:nth-child(2) {
-  width: 16%;
-}
-
-.cron-job-row td:nth-child(3) {
-  width: 38%;
 }
 
 .cron-cycle-cell {
