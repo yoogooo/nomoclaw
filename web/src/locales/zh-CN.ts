@@ -480,7 +480,9 @@ const zhCN = {
       longRunning: "长期执行",
       channel: {
         feishu: "飞书",
-        dingtalk: "钉钉"
+        dingtalk: "钉钉",
+        discord: "Discord",
+        telegram: "Telegram"
       }
     },
     empty: {
@@ -718,6 +720,14 @@ const zhCN = {
         summaryConfigured: "Robot Code: {robotCode}",
         summaryEmpty: "未配置 Robot Code"
       },
+      discord: {
+        title: "Discord Channel",
+        subtitle: "Gateway 接收消息，Bot API 回复到频道"
+      },
+      telegram: {
+        title: "Telegram Channel",
+        subtitle: "Bot API 轮询接收消息，并回复到 chat"
+      },
       mentionPolicy: "@响应策略",
       mentionOnly: "仅 @ 触发",
       allMessages: "所有消息",
@@ -726,13 +736,18 @@ const zhCN = {
     editor: {
       feishuTitle: "编辑飞书通道",
       dingtalkTitle: "编辑钉钉通道",
+      discordTitle: "编辑 Discord 通道",
+      telegramTitle: "编辑 Telegram 通道",
       enable: "启用",
       enableDingtalk: "启用钉钉通道",
+      enableDiscord: "启用 Discord 通道",
+      enableTelegram: "启用 Telegram 通道",
       mentionOnly: "仅响应 @ 机器人",
       feishuAppId: "App ID（启用时必填）",
       feishuAppSecret: "App Secret（启用时必填）",
       feishuAppIdPlaceholder: "cli_xxx",
       allowList: "Allow List（可选，逗号分隔）",
+      allowListTip: "限制哪些用户可以触发机器人；留空表示不限制。请填写平台用户 ID，多个 ID 用逗号分隔。",
       allowListFeishuPlaceholder: "ou_xxx, ou_yyy",
       addBot: "新增机器人",
       setDefault: "设为默认",
@@ -746,11 +761,19 @@ const zhCN = {
       dingtalkClientSecret: "Client Secret（启用时必填）",
       dingtalkRobotCode: "Robot Code（启用时必填）",
       dingtalkRobotCodePlaceholder: "dingxxxx",
-      allowListDingtalkPlaceholder: "manager001, manager002"
+      allowListDingtalkPlaceholder: "manager001, manager002",
+      discordToken: "Bot Token（启用时必填）",
+      discordBotUserId: "Bot User ID（群聊 @ 判断）",
+      discordBotUserIdTip: "用于识别 Discord 群聊/频道消息是否 @ 了机器人，并在转交给 Agent 前移除 @ 文本。私聊不依赖此字段。",
+      acceptBotMessages: "接收其他机器人消息",
+      telegramToken: "Bot Token（启用时必填）",
+      telegramUsername: "Bot Username（群聊 @ 判断）"
     },
     errors: {
       feishuRequired: "飞书启用时必须填写 appId 和 appSecret",
-      dingtalkRequired: "钉钉启用时必须填写 clientId、clientSecret、robotCode"
+      dingtalkRequired: "钉钉启用时必须填写 clientId、clientSecret、robotCode",
+      discordRequired: "Discord 启用时必须填写 Bot Token",
+      telegramRequired: "Telegram 启用时必须填写 Bot Token"
     },
     toast: {
       saved: "Channel 配置已保存"

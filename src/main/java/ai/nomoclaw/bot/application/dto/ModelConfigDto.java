@@ -15,6 +15,9 @@ public record ModelConfigDto(
             boolean freezeUrl,
             String baseUrl,
             String apiKey,
+            boolean configured,
+            String authStatus,
+            String authMessage,
             String defaultModel,
             List<Model> models
     ) {

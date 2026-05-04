@@ -218,6 +218,9 @@ class ConversationAttachmentAppServiceTests {
                         true,
                         "https://example.com",
                         "",
+                        true,
+                        "configured",
+                        "Provider 已配置",
                         modelId,
                         List.of(new ModelConfigDto.Model(
                                 modelId,

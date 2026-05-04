@@ -75,6 +75,8 @@ public class ChannelConfigEnvironmentPostProcessor implements ApplicationContext
         root.set("channels", channels);
         channels.set("feishu", normalizeFeishu(channels.path("feishu")));
         channels.set("dingtalk", normalizeDingtalk(channels.path("dingtalk")));
+        channels.set("discord", normalizeDiscord(channels.path("discord")));
+        channels.set("telegram", normalizeTelegram(channels.path("telegram")));
         return channels;
     }
 
@@ -133,17 +135,76 @@ public class ChannelConfigEnvironmentPostProcessor implements ApplicationContext
         return dingtalk;
     }
 
+    private ObjectNode normalizeDiscord(JsonNode node) {
+        ObjectNode discord = node instanceof ObjectNode object ? object.deepCopy() : MAPPER.createObjectNode();
+        discord.remove("added");
+        boolean enabled = discord.path("enabled").asBoolean(false);
+        ArrayNode bots = MAPPER.createArrayNode();
+        JsonNode oldBots = discord.path("bots");
+        if (oldBots.isArray() && !oldBots.isEmpty()) {
+            oldBots.forEach(bots::add);
+        } else {
+            ObjectNode defaultBot = MAPPER.createObjectNode();
+            defaultBot.put("botId", "default");
+            defaultBot.put("displayName", "Discord Default");
+            defaultBot.put("enabled", enabled);
+            defaultBot.put("isDefault", true);
+            defaultBot.put("requireMention", discord.path("requireMention").asBoolean(true));
+            defaultBot.set("allowList", discord.path("allowList").isArray() ? discord.path("allowList") : MAPPER.createArrayNode());
+            defaultBot.put("token", trim(discord.path("token").asText("")));
+            defaultBot.put("botUserId", trim(discord.path("botUserId").asText("")));
+            defaultBot.put("acceptBotMessages", discord.path("acceptBotMessages").asBoolean(false));
+            bots.add(defaultBot);
+        }
+        discord.removeAll();
+        discord.put("enabled", enabled);
+        discord.set("bots", bots);
+        return discord;
+    }
+
+    private ObjectNode normalizeTelegram(JsonNode node) {
+        ObjectNode telegram = node instanceof ObjectNode object ? object.deepCopy() : MAPPER.createObjectNode();
+        telegram.remove("added");
+        boolean enabled = telegram.path("enabled").asBoolean(false);
+        ArrayNode bots = MAPPER.createArrayNode();
+        JsonNode oldBots = telegram.path("bots");
+        if (oldBots.isArray() && !oldBots.isEmpty()) {
+            oldBots.forEach(bots::add);
+        } else {
+            ObjectNode defaultBot = MAPPER.createObjectNode();
+            defaultBot.put("botId", "default");
+            defaultBot.put("displayName", "Telegram Default");
+            defaultBot.put("enabled", enabled);
+            defaultBot.put("isDefault", true);
+            defaultBot.put("requireMention", telegram.path("requireMention").asBoolean(true));
+            defaultBot.set("allowList", telegram.path("allowList").isArray() ? telegram.path("allowList") : MAPPER.createArrayNode());
+            defaultBot.put("token", trim(telegram.path("token").asText("")));
+            defaultBot.put("botUsername", normalizeUsername(telegram.path("botUsername").asText("")));
+            bots.add(defaultBot);
+        }
+        telegram.removeAll();
+        telegram.put("enabled", enabled);
+        telegram.set("bots", bots);
+        return telegram;
+    }
+
     private Map<String, Object> toChannelProperties(ObjectNode channels) {
         ObjectNode feishu = channels.path("feishu") instanceof ObjectNode node ? node : MAPPER.createObjectNode();
         ObjectNode dingtalk = channels.path("dingtalk") instanceof ObjectNode node ? node : MAPPER.createObjectNode();
+        ObjectNode discord = channels.path("discord") instanceof ObjectNode node ? node : MAPPER.createObjectNode();
+        ObjectNode telegram = channels.path("telegram") instanceof ObjectNode node ? node : MAPPER.createObjectNode();
         boolean feishuEnabled = feishu.path("enabled").asBoolean(false);
         boolean dingtalkEnabled = dingtalk.path("enabled").asBoolean(false);
+        boolean discordEnabled = discord.path("enabled").asBoolean(false);
+        boolean telegramEnabled = telegram.path("enabled").asBoolean(false);
 
         ObjectNode feishuDefaultBot = pickDefaultEnabledBot(feishu.path("bots"));
         ObjectNode dingtalkDefaultBot = pickDefaultEnabledBot(dingtalk.path("bots"));
+        ObjectNode discordDefaultBot = pickDefaultEnabledBot(discord.path("bots"));
+        ObjectNode telegramDefaultBot = pickDefaultEnabledBot(telegram.path("bots"));
 
         Map<String, Object> props = new LinkedHashMap<>();
-        props.put("agent.channels.enabled", feishuEnabled || dingtalkEnabled);
+        props.put("agent.channels.enabled", feishuEnabled || dingtalkEnabled || discordEnabled || telegramEnabled);
         props.put("agent.channels.processing-ack-enabled", true);
         props.put("agent.channels.processing-ack-text", "正在处理，请稍候...");
         props.put("agent.channels.feishu.enabled", feishuEnabled && feishuDefaultBot != null);
@@ -161,6 +222,17 @@ public class ChannelConfigEnvironmentPostProcessor implements ApplicationContext
         props.put("agent.channels.dingtalk.client-id", dingtalkDefaultBot == null ? "" : trim(dingtalkDefaultBot.path("clientId").asText("")));
         props.put("agent.channels.dingtalk.client-secret", dingtalkDefaultBot == null ? "" : trim(dingtalkDefaultBot.path("clientSecret").asText("")));
         props.put("agent.channels.dingtalk.robot-code", dingtalkDefaultBot == null ? "" : trim(dingtalkDefaultBot.path("robotCode").asText("")));
+        props.put("agent.channels.discord.enabled", discordEnabled && discordDefaultBot != null);
+        props.put("agent.channels.discord.require-mention", discordDefaultBot != null && discordDefaultBot.path("requireMention").asBoolean(true));
+        props.put("agent.channels.discord.allow-list", discordDefaultBot == null ? "" : joinList(discordDefaultBot.path("allowList")));
+        props.put("agent.channels.discord.token", discordDefaultBot == null ? "" : trim(discordDefaultBot.path("token").asText("")));
+        props.put("agent.channels.discord.bot-user-id", discordDefaultBot == null ? "" : trim(discordDefaultBot.path("botUserId").asText("")));
+        props.put("agent.channels.discord.accept-bot-messages", discordDefaultBot != null && discordDefaultBot.path("acceptBotMessages").asBoolean(false));
+        props.put("agent.channels.telegram.enabled", telegramEnabled && telegramDefaultBot != null);
+        props.put("agent.channels.telegram.require-mention", telegramDefaultBot != null && telegramDefaultBot.path("requireMention").asBoolean(true));
+        props.put("agent.channels.telegram.allow-list", telegramDefaultBot == null ? "" : joinList(telegramDefaultBot.path("allowList")));
+        props.put("agent.channels.telegram.token", telegramDefaultBot == null ? "" : trim(telegramDefaultBot.path("token").asText("")));
+        props.put("agent.channels.telegram.bot-username", telegramDefaultBot == null ? "" : normalizeUsername(telegramDefaultBot.path("botUsername").asText("")));
         return props;
     }
 
@@ -225,5 +297,10 @@ public class ChannelConfigEnvironmentPostProcessor implements ApplicationContext
 
     private String trim(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private String normalizeUsername(String value) {
+        String username = trim(value);
+        return username.startsWith("@") ? username.substring(1).trim() : username;
     }
 }

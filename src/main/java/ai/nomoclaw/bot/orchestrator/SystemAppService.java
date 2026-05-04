@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -75,6 +76,8 @@ public class SystemAppService {
     private void validateRequired(ChannelConfigDto dto) {
         ChannelConfigDto.Feishu feishu = dto.channels().feishu();
         ChannelConfigDto.DingTalk dingtalk = dto.channels().dingtalk();
+        ChannelConfigDto.Discord discord = dto.channels().discord();
+        ChannelConfigDto.Telegram telegram = dto.channels().telegram();
         if (feishu.enabled()) {
             List<ChannelConfigDto.FeishuBot> enabledBots = feishu.bots().stream().filter(ChannelConfigDto.FeishuBot::enabled).toList();
             if (enabledBots.isEmpty()) {
@@ -97,6 +100,28 @@ public class SystemAppService {
                 }
             }
         }
+        if (discord.enabled()) {
+            List<ChannelConfigDto.DiscordBot> enabledBots = discord.bots().stream().filter(ChannelConfigDto.DiscordBot::enabled).toList();
+            if (enabledBots.isEmpty()) {
+                throw new IllegalArgumentException("discord enabled requires at least one enabled bot");
+            }
+            for (ChannelConfigDto.DiscordBot bot : enabledBots) {
+                if (isBlank(bot.token())) {
+                    throw new IllegalArgumentException("discord enabled bot requires token: " + bot.botId());
+                }
+            }
+        }
+        if (telegram.enabled()) {
+            List<ChannelConfigDto.TelegramBot> enabledBots = telegram.bots().stream().filter(ChannelConfigDto.TelegramBot::enabled).toList();
+            if (enabledBots.isEmpty()) {
+                throw new IllegalArgumentException("telegram enabled requires at least one enabled bot");
+            }
+            for (ChannelConfigDto.TelegramBot bot : enabledBots) {
+                if (isBlank(bot.token())) {
+                    throw new IllegalArgumentException("telegram enabled bot requires token: " + bot.botId());
+                }
+            }
+        }
     }
 
     private ChannelConfigDto sanitize(ChannelConfigDto input) {
@@ -104,12 +129,18 @@ public class SystemAppService {
         ChannelConfigDto.Channels channels = baseline.channels() == null ? ChannelConfigDto.defaults().channels() : baseline.channels();
         ChannelConfigDto.Feishu feishuInput = channels.feishu() == null ? ChannelConfigDto.defaults().channels().feishu() : channels.feishu();
         ChannelConfigDto.DingTalk dingInput = channels.dingtalk() == null ? ChannelConfigDto.defaults().channels().dingtalk() : channels.dingtalk();
+        ChannelConfigDto.Discord discordInput = channels.discord() == null ? ChannelConfigDto.defaults().channels().discord() : channels.discord();
+        ChannelConfigDto.Telegram telegramInput = channels.telegram() == null ? ChannelConfigDto.defaults().channels().telegram() : channels.telegram();
 
         List<ChannelConfigDto.FeishuBot> feishuBots = sanitizeFeishuBots(feishuInput.bots());
         List<ChannelConfigDto.DingTalkBot> dingBots = sanitizeDingTalkBots(dingInput.bots());
+        List<ChannelConfigDto.DiscordBot> discordBots = sanitizeDiscordBots(discordInput.bots());
+        List<ChannelConfigDto.TelegramBot> telegramBots = sanitizeTelegramBots(telegramInput.bots());
         return new ChannelConfigDto(new ChannelConfigDto.Channels(
                 new ChannelConfigDto.Feishu(feishuInput.enabled(), feishuBots),
-                new ChannelConfigDto.DingTalk(dingInput.enabled(), dingBots)
+                new ChannelConfigDto.DingTalk(dingInput.enabled(), dingBots),
+                new ChannelConfigDto.Discord(discordInput.enabled(), discordBots),
+                new ChannelConfigDto.Telegram(telegramInput.enabled(), telegramBots)
         ));
     }
 
@@ -161,6 +192,51 @@ public class SystemAppService {
                 })
                 .toList();
         return enforceSingleDefaultDingTalk(normalized, ChannelConfigDto.defaultDingTalkBot().botId());
+    }
+
+    private List<ChannelConfigDto.DiscordBot> sanitizeDiscordBots(List<ChannelConfigDto.DiscordBot> raw) {
+        List<ChannelConfigDto.DiscordBot> bots = raw == null || raw.isEmpty() ? List.of(ChannelConfigDto.defaultDiscordBot()) : raw;
+        Set<String> seen = new LinkedHashSet<>();
+        List<ChannelConfigDto.DiscordBot> normalized = bots.stream()
+                .filter(Objects::nonNull)
+                .map(bot -> {
+                    String botId = ensureUniqueBotId(normalizeBotId(bot.botId()), seen);
+                    return new ChannelConfigDto.DiscordBot(
+                            botId,
+                            fallback(trim(bot.displayName()), "Discord " + botId),
+                            bot.enabled(),
+                            bot.isDefault(),
+                            bot.requireMention(),
+                            normalizeList(bot.allowList()),
+                            trim(bot.token()),
+                            trim(bot.botUserId()),
+                            bot.acceptBotMessages()
+                    );
+                })
+                .toList();
+        return enforceSingleDefaultDiscord(normalized, ChannelConfigDto.defaultDiscordBot().botId());
+    }
+
+    private List<ChannelConfigDto.TelegramBot> sanitizeTelegramBots(List<ChannelConfigDto.TelegramBot> raw) {
+        List<ChannelConfigDto.TelegramBot> bots = raw == null || raw.isEmpty() ? List.of(ChannelConfigDto.defaultTelegramBot()) : raw;
+        Set<String> seen = new LinkedHashSet<>();
+        List<ChannelConfigDto.TelegramBot> normalized = bots.stream()
+                .filter(Objects::nonNull)
+                .map(bot -> {
+                    String botId = ensureUniqueBotId(normalizeBotId(bot.botId()), seen);
+                    return new ChannelConfigDto.TelegramBot(
+                            botId,
+                            fallback(trim(bot.displayName()), "Telegram " + botId),
+                            bot.enabled(),
+                            bot.isDefault(),
+                            bot.requireMention(),
+                            normalizeList(bot.allowList()),
+                            trim(bot.token()),
+                            normalizeTelegramUsername(bot.botUsername())
+                    );
+                })
+                .toList();
+        return enforceSingleDefaultTelegram(normalized, ChannelConfigDto.defaultTelegramBot().botId());
     }
 
     private List<ChannelConfigDto.FeishuBot> enforceSingleDefault(List<ChannelConfigDto.FeishuBot> bots, String fallbackBotId) {
@@ -215,6 +291,53 @@ public class SystemAppService {
                 .toList();
     }
 
+    private List<ChannelConfigDto.DiscordBot> enforceSingleDefaultDiscord(List<ChannelConfigDto.DiscordBot> bots, String fallbackBotId) {
+        if (bots.isEmpty()) {
+            return List.of(ChannelConfigDto.defaultDiscordBot());
+        }
+        String defaultBotId = resolveDefaultBotId(
+                bots.stream().filter(ChannelConfigDto.DiscordBot::isDefault).map(ChannelConfigDto.DiscordBot::botId).toList(),
+                bots.stream().map(ChannelConfigDto.DiscordBot::botId).toList(),
+                fallbackBotId
+        );
+        return bots.stream()
+                .map(bot -> new ChannelConfigDto.DiscordBot(
+                        bot.botId(),
+                        bot.displayName(),
+                        bot.enabled(),
+                        bot.botId().equals(defaultBotId),
+                        bot.requireMention(),
+                        bot.allowList(),
+                        bot.token(),
+                        bot.botUserId(),
+                        bot.acceptBotMessages()
+                ))
+                .toList();
+    }
+
+    private List<ChannelConfigDto.TelegramBot> enforceSingleDefaultTelegram(List<ChannelConfigDto.TelegramBot> bots, String fallbackBotId) {
+        if (bots.isEmpty()) {
+            return List.of(ChannelConfigDto.defaultTelegramBot());
+        }
+        String defaultBotId = resolveDefaultBotId(
+                bots.stream().filter(ChannelConfigDto.TelegramBot::isDefault).map(ChannelConfigDto.TelegramBot::botId).toList(),
+                bots.stream().map(ChannelConfigDto.TelegramBot::botId).toList(),
+                fallbackBotId
+        );
+        return bots.stream()
+                .map(bot -> new ChannelConfigDto.TelegramBot(
+                        bot.botId(),
+                        bot.displayName(),
+                        bot.enabled(),
+                        bot.botId().equals(defaultBotId),
+                        bot.requireMention(),
+                        bot.allowList(),
+                        bot.token(),
+                        bot.botUsername()
+                ))
+                .toList();
+    }
+
     private String resolveDefaultBotId(List<String> explicitDefaults, List<String> allBotIds, String fallbackBotId) {
         if (!explicitDefaults.isEmpty()) {
             return explicitDefaults.get(0);
@@ -262,6 +385,8 @@ public class SystemAppService {
         root.set("channels", channels);
         channels.set("feishu", normalizeFeishuNode(channels.path("feishu")));
         channels.set("dingtalk", normalizeDingTalkNode(channels.path("dingtalk")));
+        channels.set("discord", normalizeDiscordNode(channels.path("discord")));
+        channels.set("telegram", normalizeTelegramNode(channels.path("telegram")));
         return channels;
     }
 
@@ -302,7 +427,9 @@ public class SystemAppService {
                 .toList();
         return new ChannelConfigDto(new ChannelConfigDto.Channels(
                 new ChannelConfigDto.Feishu(config.channels().feishu().enabled(), updatedBots),
-                config.channels().dingtalk()
+                config.channels().dingtalk(),
+                config.channels().discord(),
+                config.channels().telegram()
         ));
     }
 
@@ -408,6 +535,59 @@ public class SystemAppService {
         return dingtalk;
     }
 
+    private ObjectNode normalizeDiscordNode(JsonNode node) {
+        ObjectNode discord = node instanceof ObjectNode object ? object.deepCopy() : MAPPER.createObjectNode();
+        discord.remove("added");
+        boolean enabled = discord.path("enabled").asBoolean(false);
+        ArrayNode bots = MAPPER.createArrayNode();
+        JsonNode rawBots = discord.path("bots");
+        if (rawBots.isArray()) {
+            rawBots.forEach(bots::add);
+        } else {
+            ObjectNode migrated = MAPPER.createObjectNode();
+            migrated.put("botId", "default");
+            migrated.put("displayName", "Discord Default");
+            migrated.put("enabled", enabled);
+            migrated.put("isDefault", true);
+            migrated.put("requireMention", discord.path("requireMention").asBoolean(true));
+            migrated.set("allowList", discord.path("allowList").isArray() ? discord.path("allowList") : MAPPER.createArrayNode());
+            migrated.put("token", trim(discord.path("token").asText("")));
+            migrated.put("botUserId", trim(discord.path("botUserId").asText("")));
+            migrated.put("acceptBotMessages", discord.path("acceptBotMessages").asBoolean(false));
+            bots.add(migrated);
+        }
+        discord.removeAll();
+        discord.put("enabled", enabled);
+        discord.set("bots", bots);
+        return discord;
+    }
+
+    private ObjectNode normalizeTelegramNode(JsonNode node) {
+        ObjectNode telegram = node instanceof ObjectNode object ? object.deepCopy() : MAPPER.createObjectNode();
+        telegram.remove("added");
+        boolean enabled = telegram.path("enabled").asBoolean(false);
+        ArrayNode bots = MAPPER.createArrayNode();
+        JsonNode rawBots = telegram.path("bots");
+        if (rawBots.isArray()) {
+            rawBots.forEach(bots::add);
+        } else {
+            ObjectNode migrated = MAPPER.createObjectNode();
+            migrated.put("botId", "default");
+            migrated.put("displayName", "Telegram Default");
+            migrated.put("enabled", enabled);
+            migrated.put("isDefault", true);
+            migrated.put("requireMention", telegram.path("requireMention").asBoolean(true));
+            migrated.set("allowList", telegram.path("allowList").isArray() ? telegram.path("allowList") : MAPPER.createArrayNode());
+            migrated.put("token", trim(telegram.path("token").asText("")));
+            migrated.put("botUsername", normalizeTelegramUsername(telegram.path("botUsername").asText("")));
+            bots.add(migrated);
+        }
+        telegram.removeAll();
+        telegram.put("enabled", enabled);
+        telegram.set("bots", bots);
+        return telegram;
+    }
+
     private ObjectNode readRootConfig() {
         Path file = configFilePath();
         if (Files.notExists(file)) {
@@ -438,7 +618,7 @@ public class SystemAppService {
             Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
             String pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(root);
             Files.writeString(tmp, pretty, StandardCharsets.UTF_8);
-            Files.move(tmp, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         } catch (IOException ex) {
             throw new IllegalStateException("failed to write nomoclaw config: " + file, ex);
         }
@@ -458,5 +638,10 @@ public class SystemAppService {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private String normalizeTelegramUsername(String value) {
+        String username = trim(value);
+        return username.startsWith("@") ? username.substring(1).trim() : username;
     }
 }

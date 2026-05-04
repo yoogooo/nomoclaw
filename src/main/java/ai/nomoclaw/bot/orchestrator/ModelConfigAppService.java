@@ -1,6 +1,8 @@
 package ai.nomoclaw.bot.orchestrator;
 
 import ai.nomoclaw.bot.application.dto.ModelConfigDto;
+import ai.nomoclaw.bot.llm.codex.CodexAuthFileTokenProvider;
+import ai.nomoclaw.bot.llm.codex.CodexTokenProvider;
 import ai.nomoclaw.bot.model.ModelProviderDefaults;
 import ai.nomoclaw.bot.store.entity.LlmProviderConfigEntity;
 import ai.nomoclaw.bot.store.entity.LlmProviderModelEntity;
@@ -18,6 +20,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Function;
@@ -83,6 +86,9 @@ public class ModelConfigAppService {
                         provider.freezeUrl(),
                         provider.baseUrl(),
                         provider.apiKey(),
+                        provider.configured(),
+                        provider.authStatus(),
+                        provider.authMessage(),
                         provider.defaultModel(),
                         provider.models().stream()
                                 .filter(model -> !trim(model.id()).isBlank())
@@ -218,6 +224,13 @@ public class ModelConfigAppService {
             fetchOllamaModelIds(baseUrl);
             return new ProbeResult(true, "连接成功，" + provider.name() + " 可访问");
         }
+        if ("codex".equals(provider.id())) {
+            CodexTokenProvider.AuthStatus status = codexAuthStatus();
+            if (!status.configured()) {
+                throw new IllegalArgumentException(status.message());
+            }
+            return new ProbeResult(true, status.message());
+        }
         String protocol = trim(provider.protocol()).toLowerCase(Locale.ROOT);
         if (protocol.contains("gemini")) {
             requestGeminiModels(provider.name(), baseUrl, apiKey);
@@ -232,15 +245,37 @@ public class ModelConfigAppService {
     }
 
     private void initializeDefaultsIfNeeded() {
-        if (!providerConfigRepository.listAll().isEmpty()) {
+        List<LlmProviderConfigEntity> existingConfigs = providerConfigRepository.listAll();
+        List<ModelConfigDto.Provider> defaults = ModelProviderDefaults.providers();
+        if (existingConfigs.isEmpty()) {
+            LocalDateTime now = LocalDateTime.now();
+            providerConfigRepository.saveBatch(defaults.stream()
+                    .map(provider -> toProviderEntity(provider, null, now))
+                    .toList(), BATCH_SIZE);
+            List<LlmProviderModelEntity> models = defaults.stream()
+                    .map(provider -> toModelEntities(provider, now))
+                    .flatMap(Collection::stream)
+                    .toList();
+            if (!models.isEmpty()) {
+                providerModelRepository.saveBatch(models, BATCH_SIZE);
+            }
+            return;
+        }
+
+        Set<String> existingProviderIds = existingConfigs.stream()
+                .map(LlmProviderConfigEntity::getProviderId)
+                .collect(Collectors.toSet());
+        List<ModelConfigDto.Provider> missingDefaults = defaults.stream()
+                .filter(provider -> !existingProviderIds.contains(provider.id()))
+                .toList();
+        if (missingDefaults.isEmpty()) {
             return;
         }
         LocalDateTime now = LocalDateTime.now();
-        List<ModelConfigDto.Provider> defaults = ModelProviderDefaults.providers();
-        providerConfigRepository.saveBatch(defaults.stream()
+        providerConfigRepository.saveBatch(missingDefaults.stream()
                 .map(provider -> toProviderEntity(provider, null, now))
                 .toList(), BATCH_SIZE);
-        List<LlmProviderModelEntity> models = defaults.stream()
+        List<LlmProviderModelEntity> models = missingDefaults.stream()
                 .map(provider -> toModelEntities(provider, now))
                 .flatMap(Collection::stream)
                 .toList();
@@ -270,6 +305,9 @@ public class ModelConfigAppService {
                 builtin.freezeUrl(),
                 baseUrl,
                 apiKey,
+                false,
+                "missing",
+                "",
                 defaultModel,
                 sanitizedModels
         );
@@ -369,6 +407,9 @@ public class ModelConfigAppService {
     }
 
     private boolean isProviderConfigured(ModelConfigDto.Provider provider) {
+        if ("codex".equals(provider.id())) {
+            return provider.configured();
+        }
         if (provider.local()) {
             return !trim(provider.baseUrl()).isBlank();
         }
@@ -406,16 +447,22 @@ public class ModelConfigAppService {
         for (int i = 0; i < provider.models().size(); i++) {
             ModelConfigDto.Model model = provider.models().get(i);
             ModelMetadata metadata = modelCatalogService.resolve(provider.id(), model.id());
+            List<String> inputModalities = metadata.matched()
+                    ? metadata.inputModalities()
+                    : sanitizeCapabilities(model.capabilities()).isEmpty() ? metadata.inputModalities() : sanitizeCapabilities(model.capabilities());
+            ModelConfigDto.UploadPolicy uploadPolicy = metadata.matched()
+                    ? metadata.uploadPolicy()
+                    : model.uploadPolicy() == null ? metadata.uploadPolicy() : model.uploadPolicy();
             LlmProviderModelEntity entity = new LlmProviderModelEntity();
             entity.setProviderId(provider.id());
             entity.setModelId(model.id());
             entity.setModelName(model.name());
-            entity.setCapabilitiesJson(JsonUtil.toJson(metadata.inputModalities()));
-            entity.setReasoning(metadata.reasoning() ? 1 : 0);
-            entity.setContextWindow(sanitizeNonNegative(metadata.contextWindowTokens()));
-            entity.setMaxInputTokens(sanitizeNonNegative(metadata.maxInputTokens()));
-            entity.setMaxOutputTokens(sanitizeNonNegative(metadata.maxOutputTokens()));
-            entity.setUploadPolicyJson(JsonUtil.toJson(sanitizeUploadPolicy(metadata.uploadPolicy())));
+            entity.setCapabilitiesJson(JsonUtil.toJson(inputModalities));
+            entity.setReasoning((metadata.matched() ? metadata.reasoning() : model.reasoning()) ? 1 : 0);
+            entity.setContextWindow(sanitizeNonNegative(metadata.matched() ? metadata.contextWindowTokens() : model.contextWindow()));
+            entity.setMaxInputTokens(sanitizeNonNegative(metadata.matched() ? metadata.maxInputTokens() : model.maxInputTokens()));
+            entity.setMaxOutputTokens(sanitizeNonNegative(metadata.matched() ? metadata.maxOutputTokens() : model.maxOutputTokens()));
+            entity.setUploadPolicyJson(JsonUtil.toJson(sanitizeUploadPolicy(uploadPolicy)));
             entity.setSortIndex(i);
             entity.setStatus("ACTIVE");
             entity.setCreatedTime(now);
@@ -426,6 +473,15 @@ public class ModelConfigAppService {
     }
 
     private ModelConfigDto.Provider toProviderDto(LlmProviderConfigEntity config, List<LlmProviderModelEntity> models) {
+        boolean configured = isStoredProviderConfigured(config);
+        String authStatus = configured ? "configured" : "missing";
+        String authMessage = configured ? "Provider 已配置" : "Provider 未配置";
+        if ("codex".equals(config.getProviderId())) {
+            CodexTokenProvider.AuthStatus status = codexAuthStatus();
+            configured = status.configured();
+            authStatus = status.status();
+            authMessage = status.message();
+        }
         return new ModelConfigDto.Provider(
                 config.getProviderId(),
                 config.getProviderName(),
@@ -435,9 +491,26 @@ public class ModelConfigAppService {
                 config.getFreezeUrl() != null && config.getFreezeUrl() == 1,
                 defaultString(config.getBaseUrl()),
                 safeDecryptApiKey(config.getProviderId(), config.getApiKeyCiphertext()),
+                configured,
+                authStatus,
+                authMessage,
                 defaultString(config.getDefaultModel()),
                 models.stream().map(model -> toModelDto(config.getProviderId(), model)).toList()
         );
+    }
+
+    private boolean isStoredProviderConfigured(LlmProviderConfigEntity config) {
+        if (config.getLocal() != null && config.getLocal() == 1) {
+            return !trim(config.getBaseUrl()).isBlank();
+        }
+        if (config.getRequireApiKey() != null && config.getRequireApiKey() == 0) {
+            return true;
+        }
+        return !trim(safeDecryptApiKey(config.getProviderId(), config.getApiKeyCiphertext())).isBlank();
+    }
+
+    private CodexTokenProvider.AuthStatus codexAuthStatus() {
+        return new CodexAuthFileTokenProvider(Path.of(System.getProperty("user.home"), ".codex")).authStatus();
     }
 
     private String safeDecryptApiKey(String providerId, String ciphertext) {

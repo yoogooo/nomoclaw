@@ -16,6 +16,14 @@ public record ChannelConfigDto(
                         new DingTalk(
                                 false,
                                 List.of(defaultDingTalkBot())
+                        ),
+                        new Discord(
+                                false,
+                                List.of(defaultDiscordBot())
+                        ),
+                        new Telegram(
+                                false,
+                                List.of(defaultTelegramBot())
                         )
                 )
         );
@@ -53,9 +61,38 @@ public record ChannelConfigDto(
         );
     }
 
+    public static DiscordBot defaultDiscordBot() {
+        return new DiscordBot(
+                "default",
+                "Discord Default",
+                false,
+                true,
+                true,
+                List.of(),
+                "",
+                "",
+                false
+        );
+    }
+
+    public static TelegramBot defaultTelegramBot() {
+        return new TelegramBot(
+                "default",
+                "Telegram Default",
+                false,
+                true,
+                true,
+                List.of(),
+                "",
+                ""
+        );
+    }
+
     public record Channels(
             Feishu feishu,
-            DingTalk dingtalk
+            DingTalk dingtalk,
+            Discord discord,
+            Telegram telegram
     ) {
     }
 
@@ -68,6 +105,18 @@ public record ChannelConfigDto(
     public record DingTalk(
             boolean enabled,
             List<DingTalkBot> bots
+    ) {
+    }
+
+    public record Discord(
+            boolean enabled,
+            List<DiscordBot> bots
+    ) {
+    }
+
+    public record Telegram(
+            boolean enabled,
+            List<TelegramBot> bots
     ) {
     }
 
@@ -98,6 +147,31 @@ public record ChannelConfigDto(
             String clientId,
             String clientSecret,
             String robotCode
+    ) {
+    }
+
+    public record DiscordBot(
+            String botId,
+            String displayName,
+            boolean enabled,
+            boolean isDefault,
+            boolean requireMention,
+            List<String> allowList,
+            String token,
+            String botUserId,
+            boolean acceptBotMessages
+    ) {
+    }
+
+    public record TelegramBot(
+            String botId,
+            String displayName,
+            boolean enabled,
+            boolean isDefault,
+            boolean requireMention,
+            List<String> allowList,
+            String token,
+            String botUsername
     ) {
     }
 }

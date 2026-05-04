@@ -96,6 +96,9 @@ function normalizeUploadPolicy(policy?: UploadPolicy | null): UploadPolicy {
 }
 
 function isProviderConfigured(provider: ModelConfig["providers"][number]) {
+  if (!provider.requireApiKey) {
+    return Boolean(provider.configured);
+  }
   if (provider.local) {
     return Boolean(provider.baseUrl?.trim());
   }

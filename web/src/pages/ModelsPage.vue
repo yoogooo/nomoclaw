@@ -37,14 +37,18 @@ const modelCardRefs = ref<Array<HTMLElement | null>>([]);
 
 const providerCards = computed(() =>
   config.providers.map((provider) => {
-    const configured = provider.local
-      ? Boolean(provider.baseUrl.trim())
-      : Boolean(provider.apiKey.trim());
+    const configured = provider.requireApiKey
+      ? provider.local
+        ? Boolean(provider.baseUrl.trim())
+        : Boolean(provider.apiKey.trim())
+      : Boolean(provider.configured);
     return {
       ...provider,
       statusText: configured
         ? t("models.status.configured")
-        : provider.local
+        : !provider.requireApiKey && provider.authMessage
+          ? provider.authMessage
+          : provider.local
           ? t("models.status.pendingLocalUrl")
           : t("models.status.pendingApiKey"),
       statusType: (configured ? "success" : "warning") as ProviderStatusType
@@ -98,6 +102,9 @@ function normalizeProvider(provider: ModelProvider): ModelProvider {
     freezeUrl: Boolean(provider.freezeUrl),
     baseUrl: provider.baseUrl ?? "",
     apiKey: provider.apiKey ?? "",
+    configured: Boolean(provider.configured),
+    authStatus: provider.authStatus ?? "",
+    authMessage: provider.authMessage ?? "",
     defaultModel: provider.defaultModel ?? "",
     models: Array.isArray(provider.models) ? provider.models.map(normalizeModel) : []
   };
@@ -263,7 +270,7 @@ async function testProviderConnection() {
     const result = await modelApi.testProviderConnection({
       providerId: provider.id,
       baseUrl: provider.baseUrl.trim(),
-      apiKey: provider.apiKey.trim()
+      apiKey: provider.requireApiKey ? provider.apiKey.trim() : ""
     });
     if (result.success) {
       message.success(result.message || t("models.toast.connectionTestSuccess"));
@@ -371,7 +378,7 @@ onMounted(() => {
           <n-input v-model:value="editingProvider.baseUrl" :disabled="editingProvider.freezeUrl" />
         </n-form-item>
 
-        <n-form-item v-if="!editingProvider.local" label="API Key">
+        <n-form-item v-if="!editingProvider.local && editingProvider.requireApiKey" label="API Key">
           <div class="api-key-test-inline">
             <n-input class="api-key-test-input" v-model:value="editingProvider.apiKey" type="password" show-password-on="click" :placeholder="t('models.editor.apiKeyPlaceholder')" />
             <n-button class="api-key-test-btn" :loading="testingProviderConnection" @click="testProviderConnection">
@@ -380,10 +387,21 @@ onMounted(() => {
           </div>
         </n-form-item>
 
-        <n-form-item v-else>
+        <n-form-item v-else-if="editingProvider.local">
           <n-button :loading="testingProviderConnection" @click="testProviderConnection">
             {{ t("models.actions.testConnection") }}
           </n-button>
+        </n-form-item>
+
+        <n-form-item v-else label="Codex Login">
+          <div class="api-key-test-inline">
+            <n-tag :type="editingProvider.configured ? 'success' : 'warning'">
+              {{ editingProvider.authMessage || (editingProvider.configured ? t("models.status.configured") : t("models.status.pendingApiKey")) }}
+            </n-tag>
+            <n-button class="api-key-test-btn" :loading="testingProviderConnection" @click="testProviderConnection">
+              {{ t("models.actions.testConnection") }}
+            </n-button>
+          </div>
         </n-form-item>
 
         <n-form-item :label="t('models.labels.defaultModel')">

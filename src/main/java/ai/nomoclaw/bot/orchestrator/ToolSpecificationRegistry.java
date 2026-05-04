@@ -10,7 +10,14 @@ import ai.nomoclaw.bot.store.repository.AgentDefinitionRepository;
 import ai.nomoclaw.bot.store.repository.AgentToolRelationRepository;
 import ai.nomoclaw.bot.store.repository.ToolDefinitionRepository;
 import dev.langchain4j.agent.tool.ToolSpecification;
+import dev.langchain4j.model.chat.request.json.JsonArraySchema;
+import dev.langchain4j.model.chat.request.json.JsonBooleanSchema;
+import dev.langchain4j.model.chat.request.json.JsonEnumSchema;
+import dev.langchain4j.model.chat.request.json.JsonIntegerSchema;
+import dev.langchain4j.model.chat.request.json.JsonNumberSchema;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
+import dev.langchain4j.model.chat.request.json.JsonSchemaElement;
+import dev.langchain4j.model.chat.request.json.JsonStringSchema;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.core.type.TypeReference;
@@ -345,11 +352,80 @@ public class ToolSpecificationRegistry {
         return ToolSpecification.builder()
                 .name(snapshot.getToolKey())
                 .description(description)
-                .parameters(JsonObjectSchema.builder()
-                        .description("Arguments for MCP tool " + snapshot.getOriginalToolName())
-                        .additionalProperties(true)
-                        .build())
+                .parameters(toMcpInputSchema(snapshot))
                 .build();
+    }
+
+    private JsonObjectSchema toMcpInputSchema(McpToolSnapshotEntity snapshot) {
+        String schema = snapshot.getInputSchemaJson() == null ? "" : snapshot.getInputSchemaJson().trim();
+        if (schema.isBlank()) {
+            return JsonObjectSchema.builder()
+                    .description("Arguments for MCP tool " + snapshot.getOriginalToolName())
+                    .additionalProperties(true)
+                    .build();
+        }
+        try {
+            JsonNode root = JsonUtil.fromJson(schema, JsonNode.class);
+            return toObjectSchema(root, "Arguments for MCP tool " + snapshot.getOriginalToolName());
+        } catch (Exception ignored) {
+            return JsonObjectSchema.builder()
+                    .description("Arguments for MCP tool " + snapshot.getOriginalToolName())
+                    .additionalProperties(true)
+                    .build();
+        }
+    }
+
+    private JsonObjectSchema toObjectSchema(JsonNode node, String fallbackDescription) {
+        JsonObjectSchema.Builder builder = JsonObjectSchema.builder()
+                .description(firstNonBlank(text(node.path("description")), fallbackDescription));
+        JsonNode properties = node.path("properties");
+        if (properties.isObject()) {
+            properties.properties().forEach(entry -> builder.addProperty(entry.getKey(), toSchemaElement(entry.getValue())));
+        }
+        JsonNode required = node.path("required");
+        if (required.isArray()) {
+            List<String> requiredFields = new ArrayList<>();
+            required.forEach(item -> {
+                String value = item.asText("").trim();
+                if (!value.isBlank()) {
+                    requiredFields.add(value);
+                }
+            });
+            if (!requiredFields.isEmpty()) {
+                builder.required(requiredFields);
+            }
+        }
+        if (node.path("additionalProperties").isBoolean()) {
+            builder.additionalProperties(node.path("additionalProperties").asBoolean());
+        } else {
+            builder.additionalProperties(false);
+        }
+        return builder.build();
+    }
+
+    private JsonSchemaElement toSchemaElement(JsonNode node) {
+        JsonNode enumNode = node.path("enum");
+        if (enumNode.isArray() && !enumNode.isEmpty()) {
+            List<String> values = new ArrayList<>();
+            enumNode.forEach(item -> values.add(item.asText("")));
+            return JsonEnumSchema.builder()
+                    .description(text(node.path("description")))
+                    .enumValues(values)
+                    .build();
+        }
+        String type = text(node.path("type")).toLowerCase();
+        String description = text(node.path("description"));
+        return switch (type) {
+            case "integer" -> JsonIntegerSchema.builder().description(description).build();
+            case "number" -> JsonNumberSchema.builder().description(description).build();
+            case "boolean" -> JsonBooleanSchema.builder().description(description).build();
+            case "array" -> JsonArraySchema.builder()
+                    .description(description)
+                    .items(toSchemaElement(node.path("items")))
+                    .build();
+            case "object" -> toObjectSchema(node, description);
+            default -> JsonStringSchema.builder().description(description).build();
+        };
     }
 
     private String buildMcpToolDescription(McpToolSnapshotEntity snapshot) {
@@ -406,5 +482,19 @@ public class ToolSpecificationRegistry {
         } catch (Exception ignored) {
             return base;
         }
+    }
+
+    private String text(JsonNode node) {
+        return node == null || node.isMissingNode() || node.isNull() ? "" : node.asText("").trim();
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            String normalized = value == null ? "" : value.trim();
+            if (!normalized.isBlank()) {
+                return normalized;
+            }
+        }
+        return "";
     }
 }

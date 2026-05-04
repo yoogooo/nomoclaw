@@ -6,6 +6,8 @@ public enum ChannelType {
     WEB,
     FEISHU,
     DINGTALK,
+    DISCORD,
+    TELEGRAM,
     NOOP;
 
     public static ChannelType from(String value) {
@@ -15,6 +17,8 @@ public enum ChannelType {
         return switch (value.trim().toLowerCase(Locale.ROOT)) {
             case "feishu", "lark" -> FEISHU;
             case "dingtalk", "ding" -> DINGTALK;
+            case "discord" -> DISCORD;
+            case "telegram", "tg" -> TELEGRAM;
             case "noop" -> NOOP;
             case "web" -> WEB;
             default -> WEB;

@@ -11,7 +11,24 @@ public final class ModelProviderDefaults {
 
     public static List<ModelConfigDto.Provider> providers() {
         return List.of(
-                new ModelConfigDto.Provider(
+                provider(
+                        "codex",
+                        "Codex",
+                        "Codex Login",
+                        false,
+                        false,
+                        true,
+                        "https://chatgpt.com/backend-api/codex",
+                        "",
+                        "gpt-5.4",
+                        List.of(
+                                model("gpt-5.4", "GPT-5.4", List.of("text"), true, 0, 0, 0, disabledUpload()),
+                                model("gpt-5.4-mini", "GPT-5.4 Mini", List.of("text"), true, 0, 0, 0, disabledUpload()),
+                                model("gpt-5.3-codex", "GPT-5.3 Codex", List.of("text"), true, 0, 0, 0, disabledUpload()),
+                                model("gpt-5.2", "GPT-5.2", List.of("text"), true, 0, 0, 0, disabledUpload())
+                        )
+                ),
+                provider(
                         "deepseek",
                         "DeepSeek",
                         "OpenAI Compatible",
@@ -26,7 +43,7 @@ public final class ModelProviderDefaults {
                                 model("deepseek-v4-flash", "DeepSeek-V4-Flash", List.of("text"), true, 1048576, 0, 393216, disabledUpload())
                         )
                 ),
-                new ModelConfigDto.Provider(
+                provider(
                         "dashscope",
                         "DashScope",
                         "OpenAI Compatible",
@@ -42,7 +59,7 @@ public final class ModelProviderDefaults {
                                 model("qwen3.6-plus", "qwen3.6-plus", List.of("text", "image"), true, 0, 0, 0, disabledUpload())
                         )
                 ),
-                new ModelConfigDto.Provider(
+                provider(
                         "aliyun-codingplan",
                         "Aliyun Coding Plan",
                         "OpenAI Compatible",
@@ -64,7 +81,7 @@ public final class ModelProviderDefaults {
                                 model("qwen3-coder-plus", "Qwen3 Coder Plus", List.of("text"), true, 0, 0, 0, disabledUpload())
                         )
                 ),
-                new ModelConfigDto.Provider(
+                provider(
                         "kimi-cn",
                         "Kimi",
                         "OpenAI Compatible",
@@ -83,7 +100,7 @@ public final class ModelProviderDefaults {
                                 model("kimi-k2-thinking-turbo", "Kimi K2 Thinking Turbo", List.of("text"), true, 0, 0, 0, disabledUpload())
                         )
                 ),
-                new ModelConfigDto.Provider(
+                provider(
                         "openai",
                         "OpenAI",
                         "OpenAI Compatible",
@@ -101,7 +118,7 @@ public final class ModelProviderDefaults {
                                 model("gpt-4o", "GPT-4o", List.of("text", "image", "audio"), false, 0, 0, 0, disabledUpload())
                         )
                 ),
-                new ModelConfigDto.Provider(
+                provider(
                         "gemini",
                         "Google Gemini",
                         "Gemini Native",
@@ -117,7 +134,7 @@ public final class ModelProviderDefaults {
                                 model("gemini-2.0-flash", "Gemini 2.0 Flash", List.of("text", "image"), false, 0, 0, 0, disabledUpload())
                         )
                 ),
-                new ModelConfigDto.Provider(
+                provider(
                         "minimax-cn",
                         "MiniMax",
                         "Anthropic Compatible",
@@ -134,7 +151,7 @@ public final class ModelProviderDefaults {
                                 model("MiniMax-M2.7-highspeed", "MiniMax M2.7 Highspeed", List.of("text"), false, 0, 0, 0, disabledUpload())
                         )
                 ),
-                new ModelConfigDto.Provider(
+                provider(
                         "ollama",
                         "Ollama",
                         "Local Service",
@@ -146,6 +163,33 @@ public final class ModelProviderDefaults {
                         "",
                         List.of()
                 )
+        );
+    }
+
+    private static ModelConfigDto.Provider provider(String id,
+                                                   String name,
+                                                   String protocol,
+                                                   boolean local,
+                                                   boolean requireApiKey,
+                                                   boolean freezeUrl,
+                                                   String baseUrl,
+                                                   String apiKey,
+                                                   String defaultModel,
+                                                   List<ModelConfigDto.Model> models) {
+        return new ModelConfigDto.Provider(
+                id,
+                name,
+                protocol,
+                local,
+                requireApiKey,
+                freezeUrl,
+                baseUrl,
+                apiKey,
+                false,
+                "missing",
+                "",
+                defaultModel,
+                models
         );
     }
 

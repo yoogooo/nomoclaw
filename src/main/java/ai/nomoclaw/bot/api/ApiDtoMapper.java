@@ -413,6 +413,37 @@ public final class ApiDtoMapper {
                                                 bot.robotCode()
                                         ))
                                         .toList()
+                        ),
+                        new ChannelConfigResponse.Discord(
+                                dto.channels().discord().enabled(),
+                                dto.channels().discord().bots().stream()
+                                        .map(bot -> new ChannelConfigResponse.DiscordBot(
+                                                bot.botId(),
+                                                bot.displayName(),
+                                                bot.enabled(),
+                                                bot.isDefault(),
+                                                bot.requireMention(),
+                                                bot.allowList(),
+                                                bot.token(),
+                                                bot.botUserId(),
+                                                bot.acceptBotMessages()
+                                        ))
+                                        .toList()
+                        ),
+                        new ChannelConfigResponse.Telegram(
+                                dto.channels().telegram().enabled(),
+                                dto.channels().telegram().bots().stream()
+                                        .map(bot -> new ChannelConfigResponse.TelegramBot(
+                                                bot.botId(),
+                                                bot.displayName(),
+                                                bot.enabled(),
+                                                bot.isDefault(),
+                                                bot.requireMention(),
+                                                bot.allowList(),
+                                                bot.token(),
+                                                bot.botUsername()
+                                        ))
+                                        .toList()
                         )
                 )
         );
@@ -430,6 +461,9 @@ public final class ApiDtoMapper {
                                 provider.freezeUrl(),
                                 provider.baseUrl(),
                                 provider.apiKey(),
+                                provider.configured(),
+                                provider.authStatus(),
+                                provider.authMessage(),
                                 provider.defaultModel(),
                                 provider.models().stream()
                                         .map(model -> new ModelConfigResponse.Model(
@@ -465,6 +499,9 @@ public final class ApiDtoMapper {
                                 provider.freezeUrl(),
                                 provider.baseUrl(),
                                 provider.apiKey(),
+                                false,
+                                "missing",
+                                "",
                                 provider.defaultModel(),
                                 provider.models() == null ? List.of() : provider.models().stream()
                                         .map(model -> new ModelConfigDto.Model(
@@ -758,8 +795,9 @@ public final class ApiDtoMapper {
         if (request == null || request.channels() == null) {
             throw new IllegalArgumentException("channels must not be null");
         }
-        if (request.channels().feishu() == null || request.channels().dingtalk() == null) {
-            throw new IllegalArgumentException("channels.feishu and channels.dingtalk must not be null");
+        if (request.channels().feishu() == null || request.channels().dingtalk() == null
+                || request.channels().discord() == null || request.channels().telegram() == null) {
+            throw new IllegalArgumentException("channels.feishu, channels.dingtalk, channels.discord and channels.telegram must not be null");
         }
         return new ChannelConfigDto(
                 new ChannelConfigDto.Channels(
@@ -800,6 +838,41 @@ public final class ApiDtoMapper {
                                                 bot.clientId(),
                                                 bot.clientSecret(),
                                                 bot.robotCode()
+                                        ))
+                                        .toList()
+                        ),
+                        new ChannelConfigDto.Discord(
+                                request.channels().discord().enabled(),
+                                request.channels().discord().bots() == null
+                                        ? List.of()
+                                        : request.channels().discord().bots().stream()
+                                        .map(bot -> new ChannelConfigDto.DiscordBot(
+                                                bot.botId(),
+                                                bot.displayName(),
+                                                bot.enabled(),
+                                                bot.isDefault(),
+                                                bot.requireMention(),
+                                                bot.allowList(),
+                                                bot.token(),
+                                                bot.botUserId(),
+                                                bot.acceptBotMessages()
+                                        ))
+                                        .toList()
+                        ),
+                        new ChannelConfigDto.Telegram(
+                                request.channels().telegram().enabled(),
+                                request.channels().telegram().bots() == null
+                                        ? List.of()
+                                        : request.channels().telegram().bots().stream()
+                                        .map(bot -> new ChannelConfigDto.TelegramBot(
+                                                bot.botId(),
+                                                bot.displayName(),
+                                                bot.enabled(),
+                                                bot.isDefault(),
+                                                bot.requireMention(),
+                                                bot.allowList(),
+                                                bot.token(),
+                                                bot.botUsername()
                                         ))
                                         .toList()
                         )

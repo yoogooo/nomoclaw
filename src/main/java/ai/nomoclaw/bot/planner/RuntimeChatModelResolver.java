@@ -1,6 +1,10 @@
 package ai.nomoclaw.bot.planner;
 
 import ai.nomoclaw.bot.application.dto.ModelConfigDto;
+import ai.nomoclaw.bot.llm.codex.CodexAuthFileTokenProvider;
+import ai.nomoclaw.bot.llm.codex.CodexChatModel;
+import ai.nomoclaw.bot.llm.codex.CodexStreamingChatModel;
+import ai.nomoclaw.bot.llm.codex.CodexTokenProvider;
 import ai.nomoclaw.bot.llm.config.LlmProperties;
 import ai.nomoclaw.bot.orchestrator.ModelConfigAppService;
 import ai.nomoclaw.bot.prompt.PromptLoader;
@@ -20,6 +24,8 @@ import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
+import java.net.http.HttpClient;
+import java.nio.file.Path;
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
@@ -35,17 +41,20 @@ public class RuntimeChatModelResolver {
     private final AgentConversationRepository agentConversationRepository;
     private final AgentMessageRepository agentMessageRepository;
     private final ModelConfigAppService modelConfigAppService;
+    private final HttpClient httpClient;
 
     public RuntimeChatModelResolver(LlmProperties llmProperties,
                                     AgentDefinitionRepository agentDefinitionRepository,
                                     AgentConversationRepository agentConversationRepository,
                                     AgentMessageRepository agentMessageRepository,
-                                    ModelConfigAppService modelConfigAppService) {
+                                    ModelConfigAppService modelConfigAppService,
+                                    HttpClient appHttpClient) {
         this.llmProperties = llmProperties;
         this.agentDefinitionRepository = agentDefinitionRepository;
         this.agentConversationRepository = agentConversationRepository;
         this.agentMessageRepository = agentMessageRepository;
         this.modelConfigAppService = modelConfigAppService;
+        this.httpClient = appHttpClient;
     }
 
     public ResolvedModel resolve(PromptLoader.PromptContext promptContext) {
@@ -87,6 +96,29 @@ public class RuntimeChatModelResolver {
         }
         if (runtimeModelId.isBlank()) {
             throw new IllegalArgumentException("No model configured for provider=" + provider.id());
+        }
+
+        if ("codex".equals(provider.id())) {
+            CodexTokenProvider tokenProvider = new CodexAuthFileTokenProvider(Path.of(System.getProperty("user.home"), ".codex"));
+            CodexTokenProvider.AuthStatus authStatus = tokenProvider.authStatus();
+            if (!authStatus.configured()) {
+                throw new IllegalArgumentException(authStatus.message());
+            }
+            ChatModel model = new CodexChatModel(
+                    httpClient,
+                    tokenProvider,
+                    provider.baseUrl(),
+                    runtimeModelId,
+                    llmProperties.getTimeout()
+            );
+            StreamingChatModel streamingModel = new CodexStreamingChatModel(
+                    httpClient,
+                    tokenProvider,
+                    provider.baseUrl(),
+                    runtimeModelId,
+                    llmProperties.getTimeout()
+            );
+            return new ResolvedModel(provider.id(), runtimeModelId, model, streamingModel);
         }
 
         if (provider.local() || "ollama".equals(provider.id())) {

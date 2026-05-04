@@ -53,6 +53,16 @@ public record InboundEnvelope(
                 default -> false;
             };
         }
+        if (channel == ChannelType.DISCORD) {
+            return !metadataValue("guildId").isBlank();
+        }
+        if (channel == ChannelType.TELEGRAM) {
+            String chatType = metadataValue("chatType");
+            return switch (chatType) {
+                case "group", "supergroup", "channel" -> true;
+                default -> false;
+            };
+        }
         return false;
     }
 
