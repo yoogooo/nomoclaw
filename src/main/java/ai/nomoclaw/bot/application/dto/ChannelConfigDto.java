@@ -24,6 +24,18 @@ public record ChannelConfigDto(
                         new Telegram(
                                 false,
                                 List.of(defaultTelegramBot())
+                        ),
+                        new Qq(
+                                false,
+                                List.of(defaultQqBot())
+                        ),
+                        new WeCom(
+                                false,
+                                List.of(defaultWeComBot())
+                        ),
+                        new Weixin(
+                                false,
+                                List.of(defaultWeixinBot())
                         )
                 )
         );
@@ -88,11 +100,57 @@ public record ChannelConfigDto(
         );
     }
 
+    public static QqBot defaultQqBot() {
+        return new QqBot(
+                "default",
+                "QQ Default",
+                false,
+                true,
+                true,
+                List.of(),
+                "",
+                "",
+                "",
+                false,
+                false
+        );
+    }
+
+    public static WeComBot defaultWeComBot() {
+        return new WeComBot(
+                "default",
+                "WeCom Default",
+                false,
+                true,
+                true,
+                List.of(),
+                "",
+                ""
+        );
+    }
+
+    public static WeixinBot defaultWeixinBot() {
+        return new WeixinBot(
+                "default",
+                "Weixin Default",
+                false,
+                true,
+                true,
+                List.of(),
+                "",
+                "",
+                ""
+        );
+    }
+
     public record Channels(
             Feishu feishu,
             DingTalk dingtalk,
             Discord discord,
-            Telegram telegram
+            Telegram telegram,
+            Qq qq,
+            WeCom wecom,
+            Weixin weixin
     ) {
     }
 
@@ -117,6 +175,24 @@ public record ChannelConfigDto(
     public record Telegram(
             boolean enabled,
             List<TelegramBot> bots
+    ) {
+    }
+
+    public record Qq(
+            boolean enabled,
+            List<QqBot> bots
+    ) {
+    }
+
+    public record WeCom(
+            boolean enabled,
+            List<WeComBot> bots
+    ) {
+    }
+
+    public record Weixin(
+            boolean enabled,
+            List<WeixinBot> bots
     ) {
     }
 
@@ -172,6 +248,46 @@ public record ChannelConfigDto(
             List<String> allowList,
             String token,
             String botUsername
+    ) {
+    }
+
+    public record QqBot(
+            String botId,
+            String displayName,
+            boolean enabled,
+            boolean isDefault,
+            boolean requireMention,
+            List<String> allowList,
+            String appId,
+            String clientSecret,
+            String botUserId,
+            boolean sandbox,
+            boolean markdownEnabled
+    ) {
+    }
+
+    public record WeComBot(
+            String botId,
+            String displayName,
+            boolean enabled,
+            boolean isDefault,
+            boolean requireMention,
+            List<String> allowList,
+            String wecomBotId,
+            String secret
+    ) {
+    }
+
+    public record WeixinBot(
+            String botId,
+            String displayName,
+            boolean enabled,
+            boolean isDefault,
+            boolean requireMention,
+            List<String> allowList,
+            String botToken,
+            String botTokenFile,
+            String baseUrl
     ) {
     }
 }

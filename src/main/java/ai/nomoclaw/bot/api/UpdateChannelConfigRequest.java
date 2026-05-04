@@ -10,7 +10,10 @@ public record UpdateChannelConfigRequest(
             Feishu feishu,
             DingTalk dingtalk,
             Discord discord,
-            Telegram telegram
+            Telegram telegram,
+            Qq qq,
+            WeCom wecom,
+            Weixin weixin
     ) {
     }
 
@@ -35,6 +38,24 @@ public record UpdateChannelConfigRequest(
     public record Telegram(
             boolean enabled,
             List<TelegramBot> bots
+    ) {
+    }
+
+    public record Qq(
+            boolean enabled,
+            List<QqBot> bots
+    ) {
+    }
+
+    public record WeCom(
+            boolean enabled,
+            List<WeComBot> bots
+    ) {
+    }
+
+    public record Weixin(
+            boolean enabled,
+            List<WeixinBot> bots
     ) {
     }
 
@@ -90,6 +111,46 @@ public record UpdateChannelConfigRequest(
             List<String> allowList,
             String token,
             String botUsername
+    ) {
+    }
+
+    public record QqBot(
+            String botId,
+            String displayName,
+            boolean enabled,
+            boolean isDefault,
+            boolean requireMention,
+            List<String> allowList,
+            String appId,
+            String clientSecret,
+            String botUserId,
+            boolean sandbox,
+            boolean markdownEnabled
+    ) {
+    }
+
+    public record WeComBot(
+            String botId,
+            String displayName,
+            boolean enabled,
+            boolean isDefault,
+            boolean requireMention,
+            List<String> allowList,
+            String wecomBotId,
+            String secret
+    ) {
+    }
+
+    public record WeixinBot(
+            String botId,
+            String displayName,
+            boolean enabled,
+            boolean isDefault,
+            boolean requireMention,
+            List<String> allowList,
+            String botToken,
+            String botTokenFile,
+            String baseUrl
     ) {
     }
 }

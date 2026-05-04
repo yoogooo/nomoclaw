@@ -23,6 +23,9 @@ public class AgentChannelsProperties {
     private final DingTalk dingtalk = new DingTalk();
     private final Discord discord = new Discord();
     private final Telegram telegram = new Telegram();
+    private final Qq qq = new Qq();
+    private final WeCom wecom = new WeCom();
+    private final Weixin weixin = new Weixin();
 
     public boolean isEnabled() {
         return enabled;
@@ -82,6 +85,18 @@ public class AgentChannelsProperties {
 
     public Telegram getTelegram() {
         return telegram;
+    }
+
+    public Qq getQq() {
+        return qq;
+    }
+
+    public WeCom getWecom() {
+        return wecom;
+    }
+
+    public Weixin getWeixin() {
+        return weixin;
     }
 
     public static class BasePlatform {
@@ -245,6 +260,106 @@ public class AgentChannelsProperties {
 
         public void setBotUsername(String botUsername) {
             this.botUsername = botUsername;
+        }
+    }
+
+    public static class Qq extends BasePlatform {
+        private String appId = "";
+        private String clientSecret = "";
+        private String botUserId = "";
+        private boolean sandbox = false;
+        private boolean markdownEnabled = false;
+
+        public String getAppId() {
+            return appId;
+        }
+
+        public void setAppId(String appId) {
+            this.appId = appId;
+        }
+
+        public String getClientSecret() {
+            return clientSecret;
+        }
+
+        public void setClientSecret(String clientSecret) {
+            this.clientSecret = clientSecret;
+        }
+
+        public String getBotUserId() {
+            return botUserId;
+        }
+
+        public void setBotUserId(String botUserId) {
+            this.botUserId = botUserId;
+        }
+
+        public boolean isSandbox() {
+            return sandbox;
+        }
+
+        public void setSandbox(boolean sandbox) {
+            this.sandbox = sandbox;
+        }
+
+        public boolean isMarkdownEnabled() {
+            return markdownEnabled;
+        }
+
+        public void setMarkdownEnabled(boolean markdownEnabled) {
+            this.markdownEnabled = markdownEnabled;
+        }
+    }
+
+    public static class WeCom extends BasePlatform {
+        private String wecomBotId = "";
+        private String secret = "";
+
+        public String getWecomBotId() {
+            return wecomBotId;
+        }
+
+        public void setWecomBotId(String wecomBotId) {
+            this.wecomBotId = wecomBotId;
+        }
+
+        public String getSecret() {
+            return secret;
+        }
+
+        public void setSecret(String secret) {
+            this.secret = secret;
+        }
+
+    }
+
+    public static class Weixin extends BasePlatform {
+        private String botToken = "";
+        private String botTokenFile = "";
+        private String baseUrl = "https://ilinkai.weixin.qq.com";
+
+        public String getBotToken() {
+            return botToken;
+        }
+
+        public void setBotToken(String botToken) {
+            this.botToken = botToken;
+        }
+
+        public String getBotTokenFile() {
+            return botTokenFile;
+        }
+
+        public void setBotTokenFile(String botTokenFile) {
+            this.botTokenFile = botTokenFile;
+        }
+
+        public String getBaseUrl() {
+            return baseUrl;
+        }
+
+        public void setBaseUrl(String baseUrl) {
+            this.baseUrl = baseUrl;
         }
     }
 }

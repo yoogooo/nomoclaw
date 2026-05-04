@@ -8,6 +8,9 @@ public enum ChannelType {
     DINGTALK,
     DISCORD,
     TELEGRAM,
+    QQ,
+    WECOM,
+    WEIXIN,
     NOOP;
 
     public static ChannelType from(String value) {
@@ -19,6 +22,9 @@ public enum ChannelType {
             case "dingtalk", "ding" -> DINGTALK;
             case "discord" -> DISCORD;
             case "telegram", "tg" -> TELEGRAM;
+            case "qq", "qqbot" -> QQ;
+            case "wecom", "wechatwork", "qiyeweixin" -> WECOM;
+            case "weixin", "wechat", "wechatmp" -> WEIXIN;
             case "noop" -> NOOP;
             case "web" -> WEB;
             default -> WEB;

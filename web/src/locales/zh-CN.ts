@@ -482,7 +482,10 @@ const zhCN = {
         feishu: "飞书",
         dingtalk: "钉钉",
         discord: "Discord",
-        telegram: "Telegram"
+        telegram: "Telegram",
+        qq: "QQ",
+        wecom: "企业微信",
+        weixin: "微信"
       }
     },
     empty: {
@@ -709,24 +712,36 @@ const zhCN = {
   channels: {
     cards: {
       feishu: {
-        title: "飞书 Channel",
+        title: "飞书",
         subtitle: "长连接接收消息，支持 Reaction ACK",
         summaryConfigured: "App ID: {appId}",
         summaryEmpty: "未配置 App ID"
       },
       dingtalk: {
-        title: "钉钉 Channel",
+        title: "钉钉",
         subtitle: "Stream SDK 接收消息，支持会话 webhook 回复",
         summaryConfigured: "Robot Code: {robotCode}",
         summaryEmpty: "未配置 Robot Code"
       },
       discord: {
-        title: "Discord Channel",
+        title: "Discord",
         subtitle: "Gateway 接收消息，Bot API 回复到频道"
       },
       telegram: {
-        title: "Telegram Channel",
+        title: "Telegram",
         subtitle: "Bot API 轮询接收消息，并回复到 chat"
+      },
+      qq: {
+        title: "QQ",
+        subtitle: "QQBot 网关接收消息，官方 API 回复"
+      },
+      wecom: {
+        title: "企业微信",
+        subtitle: "企业微信 AI Bot WebSocket 配置"
+      },
+      weixin: {
+        title: "微信",
+        subtitle: "iLink Bot long polling 接收消息"
       },
       mentionPolicy: "@响应策略",
       mentionOnly: "仅 @ 触发",
@@ -738,10 +753,16 @@ const zhCN = {
       dingtalkTitle: "编辑钉钉通道",
       discordTitle: "编辑 Discord 通道",
       telegramTitle: "编辑 Telegram 通道",
+      qqTitle: "编辑 QQ 通道",
+      wecomTitle: "编辑企业微信通道",
+      weixinTitle: "编辑微信通道",
       enable: "启用",
       enableDingtalk: "启用钉钉通道",
       enableDiscord: "启用 Discord 通道",
       enableTelegram: "启用 Telegram 通道",
+      enableQq: "启用 QQ 通道",
+      enableWecom: "启用企业微信通道",
+      enableWeixin: "启用微信通道",
       mentionOnly: "仅响应 @ 机器人",
       feishuAppId: "App ID（启用时必填）",
       feishuAppSecret: "App Secret（启用时必填）",
@@ -767,13 +788,25 @@ const zhCN = {
       discordBotUserIdTip: "用于识别 Discord 群聊/频道消息是否 @ 了机器人，并在转交给 Agent 前移除 @ 文本。私聊不依赖此字段。",
       acceptBotMessages: "接收其他机器人消息",
       telegramToken: "Bot Token（启用时必填）",
-      telegramUsername: "Bot Username（群聊 @ 判断）"
+      telegramUsername: "Bot Username（群聊 @ 判断）",
+      qqAppId: "App ID（启用时必填）",
+      qqClientSecret: "Client Secret（启用时必填）",
+      qqBotUserId: "Bot User ID（群聊 @ 判断）",
+      qqSandbox: "使用 QQ 沙箱环境",
+      wecomBotId: "Bot ID（启用时必填）",
+      wecomSecret: "Secret（启用时必填）",
+      weixinBotToken: "Bot Token（启用时必填）",
+      weixinBotTokenFile: "Bot Token File（可选）",
+      weixinBaseUrl: "Base URL"
     },
     errors: {
       feishuRequired: "飞书启用时必须填写 appId 和 appSecret",
       dingtalkRequired: "钉钉启用时必须填写 clientId、clientSecret、robotCode",
       discordRequired: "Discord 启用时必须填写 Bot Token",
-      telegramRequired: "Telegram 启用时必须填写 Bot Token"
+      telegramRequired: "Telegram 启用时必须填写 Bot Token",
+      qqRequired: "QQ 启用时必须填写 App ID 和 Client Secret",
+      wecomRequired: "企业微信启用时必须填写 Bot ID 和 Secret",
+      weixinRequired: "微信启用时必须填写 Bot Token 或 Bot Token File"
     },
     toast: {
       saved: "Channel 配置已保存"

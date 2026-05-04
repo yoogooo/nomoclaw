@@ -67,6 +67,15 @@ public class ChannelBotCredentialResolver {
         if (channelType == ChannelType.TELEGRAM) {
             return resolveTelegram(botId) != null;
         }
+        if (channelType == ChannelType.QQ) {
+            return resolveQq(botId) != null;
+        }
+        if (channelType == ChannelType.WECOM) {
+            return resolveWeCom(botId) != null;
+        }
+        if (channelType == ChannelType.WEIXIN) {
+            return resolveWeixin(botId) != null;
+        }
         return false;
     }
 
@@ -85,6 +94,18 @@ public class ChannelBotCredentialResolver {
         }
         if (channelType == ChannelType.TELEGRAM) {
             TelegramBotCredential bot = resolveTelegram("");
+            return bot == null ? "" : bot.botId();
+        }
+        if (channelType == ChannelType.QQ) {
+            QqBotCredential bot = resolveQq("");
+            return bot == null ? "" : bot.botId();
+        }
+        if (channelType == ChannelType.WECOM) {
+            WeComBotCredential bot = resolveWeCom("");
+            return bot == null ? "" : bot.botId();
+        }
+        if (channelType == ChannelType.WEIXIN) {
+            WeixinBotCredential bot = resolveWeixin("");
             return bot == null ? "" : bot.botId();
         }
         return "";
@@ -117,6 +138,57 @@ public class ChannelBotCredentialResolver {
             return findDefaultTelegramBot(bots);
         }
         for (TelegramBotCredential bot : bots) {
+            if (bot.botId().equals(normalizedBotId) && bot.enabled()) {
+                return bot;
+            }
+        }
+        return null;
+    }
+
+    public QqBotCredential resolveQq(String botId) {
+        List<QqBotCredential> bots = listQqBots();
+        if (bots.isEmpty()) {
+            return null;
+        }
+        String normalizedBotId = normalizeLookupBotId(botId);
+        if (normalizedBotId.isBlank()) {
+            return findDefaultQqBot(bots);
+        }
+        for (QqBotCredential bot : bots) {
+            if (bot.botId().equals(normalizedBotId) && bot.enabled()) {
+                return bot;
+            }
+        }
+        return null;
+    }
+
+    public WeComBotCredential resolveWeCom(String botId) {
+        List<WeComBotCredential> bots = listWeComBots();
+        if (bots.isEmpty()) {
+            return null;
+        }
+        String normalizedBotId = normalizeLookupBotId(botId);
+        if (normalizedBotId.isBlank()) {
+            return findDefaultWeComBot(bots);
+        }
+        for (WeComBotCredential bot : bots) {
+            if (bot.botId().equals(normalizedBotId) && bot.enabled()) {
+                return bot;
+            }
+        }
+        return null;
+    }
+
+    public WeixinBotCredential resolveWeixin(String botId) {
+        List<WeixinBotCredential> bots = listWeixinBots();
+        if (bots.isEmpty()) {
+            return null;
+        }
+        String normalizedBotId = normalizeLookupBotId(botId);
+        if (normalizedBotId.isBlank()) {
+            return findDefaultWeixinBot(bots);
+        }
+        for (WeixinBotCredential bot : bots) {
             if (bot.botId().equals(normalizedBotId) && bot.enabled()) {
                 return bot;
             }
@@ -276,6 +348,107 @@ public class ChannelBotCredentialResolver {
         return List.copyOf(bots);
     }
 
+    public List<QqBotCredential> listQqBots() {
+        JsonNode qq = readChannelsNode().path("qq");
+        boolean channelEnabled = qq.path("enabled").asBoolean(false);
+        ArrayList<QqBotCredential> bots = new ArrayList<>();
+        JsonNode botNodes = qq.path("bots");
+        if (botNodes.isArray()) {
+            for (JsonNode bot : botNodes) {
+                bots.add(new QqBotCredential(
+                        normalizeBotId(bot.path("botId").asText("")),
+                        trim(bot.path("displayName").asText("")),
+                        channelEnabled && bot.path("enabled").asBoolean(false),
+                        bot.path("isDefault").asBoolean(false),
+                        bot.path("requireMention").asBoolean(true),
+                        trim(bot.path("appId").asText("")),
+                        trim(bot.path("clientSecret").asText(bot.path("token").asText(""))),
+                        trim(bot.path("botUserId").asText("")),
+                        bot.path("sandbox").asBoolean(false),
+                        bot.path("markdownEnabled").asBoolean(false)
+                ));
+            }
+        } else {
+            bots.add(new QqBotCredential(
+                    "default",
+                    "QQ Default",
+                    channelEnabled,
+                    true,
+                    qq.path("requireMention").asBoolean(true),
+                    trim(qq.path("appId").asText("")),
+                    trim(qq.path("clientSecret").asText(qq.path("token").asText(""))),
+                    trim(qq.path("botUserId").asText("")),
+                    qq.path("sandbox").asBoolean(false),
+                    qq.path("markdownEnabled").asBoolean(false)
+            ));
+        }
+        return List.copyOf(bots);
+    }
+
+    public List<WeComBotCredential> listWeComBots() {
+        JsonNode wecom = readChannelsNode().path("wecom");
+        boolean channelEnabled = wecom.path("enabled").asBoolean(false);
+        ArrayList<WeComBotCredential> bots = new ArrayList<>();
+        JsonNode botNodes = wecom.path("bots");
+        if (botNodes.isArray()) {
+            for (JsonNode bot : botNodes) {
+                bots.add(new WeComBotCredential(
+                        normalizeBotId(bot.path("botId").asText("")),
+                        trim(bot.path("displayName").asText("")),
+                        channelEnabled && bot.path("enabled").asBoolean(false),
+                        bot.path("isDefault").asBoolean(false),
+                        bot.path("requireMention").asBoolean(true),
+                        trim(bot.path("wecomBotId").asText(bot.path("botId").asText(""))),
+                        trim(bot.path("secret").asText(""))
+                ));
+            }
+        } else {
+            bots.add(new WeComBotCredential(
+                    "default",
+                    "WeCom Default",
+                    channelEnabled,
+                    true,
+                    wecom.path("requireMention").asBoolean(true),
+                    trim(wecom.path("wecomBotId").asText(wecom.path("botId").asText(""))),
+                    trim(wecom.path("secret").asText(""))
+            ));
+        }
+        return List.copyOf(bots);
+    }
+
+    public List<WeixinBotCredential> listWeixinBots() {
+        JsonNode weixin = readChannelsNode().path("weixin");
+        boolean channelEnabled = weixin.path("enabled").asBoolean(false);
+        ArrayList<WeixinBotCredential> bots = new ArrayList<>();
+        JsonNode botNodes = weixin.path("bots");
+        if (botNodes.isArray()) {
+            for (JsonNode bot : botNodes) {
+                bots.add(new WeixinBotCredential(
+                        normalizeBotId(bot.path("botId").asText("")),
+                        trim(bot.path("displayName").asText("")),
+                        channelEnabled && bot.path("enabled").asBoolean(false),
+                        bot.path("isDefault").asBoolean(false),
+                        bot.path("requireMention").asBoolean(true),
+                        trim(bot.path("botToken").asText("")),
+                        trim(bot.path("botTokenFile").asText("")),
+                        fallback(trim(bot.path("baseUrl").asText("")), "https://ilinkai.weixin.qq.com")
+                ));
+            }
+        } else {
+            bots.add(new WeixinBotCredential(
+                    "default",
+                    "Weixin Default",
+                    channelEnabled,
+                    true,
+                    weixin.path("requireMention").asBoolean(true),
+                    trim(weixin.path("botToken").asText("")),
+                    trim(weixin.path("botTokenFile").asText("")),
+                    fallback(trim(weixin.path("baseUrl").asText("")), "https://ilinkai.weixin.qq.com")
+            ));
+        }
+        return List.copyOf(bots);
+    }
+
     private FeishuBotCredential findDefaultFeishuBot(List<FeishuBotCredential> bots) {
         for (FeishuBotCredential bot : bots) {
             if (bot.isDefault() && bot.enabled()) {
@@ -325,6 +498,48 @@ public class ChannelBotCredentialResolver {
             }
         }
         for (TelegramBotCredential bot : bots) {
+            if (bot.enabled()) {
+                return bot;
+            }
+        }
+        return null;
+    }
+
+    private QqBotCredential findDefaultQqBot(List<QqBotCredential> bots) {
+        for (QqBotCredential bot : bots) {
+            if (bot.isDefault() && bot.enabled()) {
+                return bot;
+            }
+        }
+        for (QqBotCredential bot : bots) {
+            if (bot.enabled()) {
+                return bot;
+            }
+        }
+        return null;
+    }
+
+    private WeComBotCredential findDefaultWeComBot(List<WeComBotCredential> bots) {
+        for (WeComBotCredential bot : bots) {
+            if (bot.isDefault() && bot.enabled()) {
+                return bot;
+            }
+        }
+        for (WeComBotCredential bot : bots) {
+            if (bot.enabled()) {
+                return bot;
+            }
+        }
+        return null;
+    }
+
+    private WeixinBotCredential findDefaultWeixinBot(List<WeixinBotCredential> bots) {
+        for (WeixinBotCredential bot : bots) {
+            if (bot.isDefault() && bot.enabled()) {
+                return bot;
+            }
+        }
+        for (WeixinBotCredential bot : bots) {
             if (bot.enabled()) {
                 return bot;
             }
@@ -426,6 +641,43 @@ public class ChannelBotCredentialResolver {
             boolean requireMention,
             String token,
             String botUsername
+    ) {
+    }
+
+    public record QqBotCredential(
+            String botId,
+            String displayName,
+            boolean enabled,
+            boolean isDefault,
+            boolean requireMention,
+            String appId,
+            String clientSecret,
+            String botUserId,
+            boolean sandbox,
+            boolean markdownEnabled
+    ) {
+    }
+
+    public record WeComBotCredential(
+            String botId,
+            String displayName,
+            boolean enabled,
+            boolean isDefault,
+            boolean requireMention,
+            String wecomBotId,
+            String secret
+    ) {
+    }
+
+    public record WeixinBotCredential(
+            String botId,
+            String displayName,
+            boolean enabled,
+            boolean isDefault,
+            boolean requireMention,
+            String botToken,
+            String botTokenFile,
+            String baseUrl
     ) {
     }
 }

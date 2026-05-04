@@ -444,6 +444,55 @@ public final class ApiDtoMapper {
                                                 bot.botUsername()
                                         ))
                                         .toList()
+                        ),
+                        new ChannelConfigResponse.Qq(
+                                dto.channels().qq().enabled(),
+                                dto.channels().qq().bots().stream()
+                                        .map(bot -> new ChannelConfigResponse.QqBot(
+                                                bot.botId(),
+                                                bot.displayName(),
+                                                bot.enabled(),
+                                                bot.isDefault(),
+                                                bot.requireMention(),
+                                                bot.allowList(),
+                                                bot.appId(),
+                                                bot.clientSecret(),
+                                                bot.botUserId(),
+                                                bot.sandbox(),
+                                                bot.markdownEnabled()
+                                        ))
+                                        .toList()
+                        ),
+                        new ChannelConfigResponse.WeCom(
+                                dto.channels().wecom().enabled(),
+                                dto.channels().wecom().bots().stream()
+                                        .map(bot -> new ChannelConfigResponse.WeComBot(
+                                                bot.botId(),
+                                                bot.displayName(),
+                                                bot.enabled(),
+                                                bot.isDefault(),
+                                                bot.requireMention(),
+                                                bot.allowList(),
+                                                bot.wecomBotId(),
+                                                bot.secret()
+                                        ))
+                                        .toList()
+                        ),
+                        new ChannelConfigResponse.Weixin(
+                                dto.channels().weixin().enabled(),
+                                dto.channels().weixin().bots().stream()
+                                        .map(bot -> new ChannelConfigResponse.WeixinBot(
+                                                bot.botId(),
+                                                bot.displayName(),
+                                                bot.enabled(),
+                                                bot.isDefault(),
+                                                bot.requireMention(),
+                                                bot.allowList(),
+                                                bot.botToken(),
+                                                bot.botTokenFile(),
+                                                bot.baseUrl()
+                                        ))
+                                        .toList()
                         )
                 )
         );
@@ -796,8 +845,9 @@ public final class ApiDtoMapper {
             throw new IllegalArgumentException("channels must not be null");
         }
         if (request.channels().feishu() == null || request.channels().dingtalk() == null
-                || request.channels().discord() == null || request.channels().telegram() == null) {
-            throw new IllegalArgumentException("channels.feishu, channels.dingtalk, channels.discord and channels.telegram must not be null");
+                || request.channels().discord() == null || request.channels().telegram() == null
+                || request.channels().qq() == null || request.channels().wecom() == null || request.channels().weixin() == null) {
+            throw new IllegalArgumentException("channels.feishu, channels.dingtalk, channels.discord, channels.telegram, channels.qq, channels.wecom and channels.weixin must not be null");
         }
         return new ChannelConfigDto(
                 new ChannelConfigDto.Channels(
@@ -873,6 +923,61 @@ public final class ApiDtoMapper {
                                                 bot.allowList(),
                                                 bot.token(),
                                                 bot.botUsername()
+                                        ))
+                                        .toList()
+                        ),
+                        new ChannelConfigDto.Qq(
+                                request.channels().qq().enabled(),
+                                request.channels().qq().bots() == null
+                                        ? List.of()
+                                        : request.channels().qq().bots().stream()
+                                        .map(bot -> new ChannelConfigDto.QqBot(
+                                                bot.botId(),
+                                                bot.displayName(),
+                                                bot.enabled(),
+                                                bot.isDefault(),
+                                                bot.requireMention(),
+                                                bot.allowList(),
+                                                bot.appId(),
+                                                bot.clientSecret(),
+                                                bot.botUserId(),
+                                                bot.sandbox(),
+                                                bot.markdownEnabled()
+                                        ))
+                                        .toList()
+                        ),
+                        new ChannelConfigDto.WeCom(
+                                request.channels().wecom().enabled(),
+                                request.channels().wecom().bots() == null
+                                        ? List.of()
+                                        : request.channels().wecom().bots().stream()
+                                        .map(bot -> new ChannelConfigDto.WeComBot(
+                                                bot.botId(),
+                                                bot.displayName(),
+                                                bot.enabled(),
+                                                bot.isDefault(),
+                                                bot.requireMention(),
+                                                bot.allowList(),
+                                                bot.wecomBotId(),
+                                                bot.secret()
+                                        ))
+                                        .toList()
+                        ),
+                        new ChannelConfigDto.Weixin(
+                                request.channels().weixin().enabled(),
+                                request.channels().weixin().bots() == null
+                                        ? List.of()
+                                        : request.channels().weixin().bots().stream()
+                                        .map(bot -> new ChannelConfigDto.WeixinBot(
+                                                bot.botId(),
+                                                bot.displayName(),
+                                                bot.enabled(),
+                                                bot.isDefault(),
+                                                bot.requireMention(),
+                                                bot.allowList(),
+                                                bot.botToken(),
+                                                bot.botTokenFile(),
+                                                bot.baseUrl()
                                         ))
                                         .toList()
                         )

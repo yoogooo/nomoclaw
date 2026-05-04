@@ -482,7 +482,10 @@ const enUS = {
         feishu: "Feishu",
         dingtalk: "DingTalk",
         discord: "Discord",
-        telegram: "Telegram"
+        telegram: "Telegram",
+        qq: "QQ",
+        wecom: "WeCom",
+        weixin: "Weixin"
       }
     },
     empty: {
@@ -709,24 +712,36 @@ const enUS = {
   channels: {
     cards: {
       feishu: {
-        title: "Feishu Channel",
+        title: "Feishu",
         subtitle: "Receives messages via long connection and supports reaction ACK",
         summaryConfigured: "App ID: {appId}",
         summaryEmpty: "App ID not configured"
       },
       dingtalk: {
-        title: "DingTalk Channel",
+        title: "DingTalk",
         subtitle: "Receives messages via Stream SDK and supports webhook replies",
         summaryConfigured: "Robot Code: {robotCode}",
         summaryEmpty: "Robot Code not configured"
       },
       discord: {
-        title: "Discord Channel",
+        title: "Discord",
         subtitle: "Receives messages via Gateway and replies with the Bot API"
       },
       telegram: {
-        title: "Telegram Channel",
+        title: "Telegram",
         subtitle: "Receives messages through Bot API polling and replies to chats"
+      },
+      qq: {
+        title: "QQ",
+        subtitle: "Receives via QQBot Gateway and replies with the official API"
+      },
+      wecom: {
+        title: "WeCom",
+        subtitle: "Enterprise WeChat AI Bot WebSocket configuration"
+      },
+      weixin: {
+        title: "Weixin",
+        subtitle: "Receives messages through iLink Bot long polling"
       },
       mentionPolicy: "@ mention policy",
       mentionOnly: "Only when @ mentioned",
@@ -738,10 +753,16 @@ const enUS = {
       dingtalkTitle: "Edit DingTalk Channel",
       discordTitle: "Edit Discord Channel",
       telegramTitle: "Edit Telegram Channel",
+      qqTitle: "Edit QQ Channel",
+      wecomTitle: "Edit WeCom Channel",
+      weixinTitle: "Edit Weixin Channel",
       enable: "Enable",
       enableDingtalk: "Enable DingTalk channel",
       enableDiscord: "Enable Discord channel",
       enableTelegram: "Enable Telegram channel",
+      enableQq: "Enable QQ channel",
+      enableWecom: "Enable WeCom channel",
+      enableWeixin: "Enable Weixin channel",
       mentionOnly: "Respond only when @ bot",
       feishuAppId: "App ID (required when enabled)",
       feishuAppSecret: "App Secret (required when enabled)",
@@ -767,13 +788,25 @@ const enUS = {
       discordBotUserIdTip: "Used to detect whether a Discord server/channel message mentioned this bot, and to remove the mention before sending text to the agent. DMs do not depend on it.",
       acceptBotMessages: "Accept other bot messages",
       telegramToken: "Bot Token (required when enabled)",
-      telegramUsername: "Bot Username (for group mentions)"
+      telegramUsername: "Bot Username (for group mentions)",
+      qqAppId: "App ID (required when enabled)",
+      qqClientSecret: "Client Secret (required when enabled)",
+      qqBotUserId: "Bot User ID (for group mentions)",
+      qqSandbox: "Use QQ sandbox environment",
+      wecomBotId: "Bot ID (required when enabled)",
+      wecomSecret: "Secret (required when enabled)",
+      weixinBotToken: "Bot Token (required when enabled)",
+      weixinBotTokenFile: "Bot Token File (optional)",
+      weixinBaseUrl: "Base URL"
     },
     errors: {
       feishuRequired: "When Feishu is enabled, appId and appSecret are required",
       dingtalkRequired: "When DingTalk is enabled, clientId, clientSecret, and robotCode are required",
       discordRequired: "When Discord is enabled, Bot Token is required",
-      telegramRequired: "When Telegram is enabled, Bot Token is required"
+      telegramRequired: "When Telegram is enabled, Bot Token is required",
+      qqRequired: "When QQ is enabled, App ID and Client Secret are required",
+      wecomRequired: "When WeCom is enabled, Bot ID and Secret are required",
+      weixinRequired: "When Weixin is enabled, Bot Token or Bot Token File is required"
     },
     toast: {
       saved: "Channel configuration saved"

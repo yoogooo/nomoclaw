@@ -201,6 +201,18 @@ export interface ChannelConfig {
       enabled: boolean;
       bots: ChannelTelegramBotConfig[];
     };
+    qq: {
+      enabled: boolean;
+      bots: ChannelQqBotConfig[];
+    };
+    wecom: {
+      enabled: boolean;
+      bots: ChannelWeComBotConfig[];
+    };
+    weixin: {
+      enabled: boolean;
+      bots: ChannelWeixinBotConfig[];
+    };
   };
 }
 
@@ -253,6 +265,43 @@ export interface ChannelTelegramBotConfig {
   allowList: string[];
   token: string;
   botUsername: string;
+}
+
+export interface ChannelQqBotConfig {
+  botId: string;
+  displayName: string;
+  enabled: boolean;
+  isDefault: boolean;
+  requireMention: boolean;
+  allowList: string[];
+  appId: string;
+  clientSecret: string;
+  botUserId: string;
+  sandbox: boolean;
+  markdownEnabled: boolean;
+}
+
+export interface ChannelWeComBotConfig {
+  botId: string;
+  displayName: string;
+  enabled: boolean;
+  isDefault: boolean;
+  requireMention: boolean;
+  allowList: string[];
+  wecomBotId: string;
+  secret: string;
+}
+
+export interface ChannelWeixinBotConfig {
+  botId: string;
+  displayName: string;
+  enabled: boolean;
+  isDefault: boolean;
+  requireMention: boolean;
+  allowList: string[];
+  botToken: string;
+  botTokenFile: string;
+  baseUrl: string;
 }
 
 export interface ChannelTargetOption {

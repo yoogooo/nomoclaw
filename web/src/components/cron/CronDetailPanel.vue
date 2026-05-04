@@ -21,7 +21,7 @@ const { t } = useI18n();
 const showEditModal = ref(false);
 const savingSubscriptions = ref(false);
 const switchingJobStatus = ref(false);
-type ChannelKey = "feishu" | "dingtalk" | "discord" | "telegram";
+type ChannelKey = "feishu" | "dingtalk" | "discord" | "telegram" | "qq" | "wecom" | "weixin";
 const selectedChannel = ref<ChannelKey | null>(null);
 const selectedBotId = ref("");
 const enabledChannelOptions = ref<Array<{ label: string; value: ChannelKey }>>([]);
@@ -29,7 +29,10 @@ const channelBotOptions = ref<Record<ChannelKey, Array<{ label: string; value: s
   feishu: [],
   dingtalk: [],
   discord: [],
-  telegram: []
+  telegram: [],
+  qq: [],
+  wecom: [],
+  weixin: []
 });
 
 const scheduleSummary = computed(() => cronJobsStore.currentJob ? humanizeCronExpression(cronJobsStore.currentJob.expression) : "-");
@@ -58,7 +61,7 @@ watch(
       return;
     }
     const first = (cronJobsStore.currentSubscriptions || [])[0];
-    selectedChannel.value = first && ["feishu", "dingtalk", "discord", "telegram"].includes(first.channel)
+    selectedChannel.value = first && ["feishu", "dingtalk", "discord", "telegram", "qq", "wecom", "weixin"].includes(first.channel)
       ? (first.channel as ChannelKey)
       : null;
     selectedBotId.value = first?.botId || "";
@@ -88,6 +91,18 @@ async function loadEnabledChannels() {
       label: item.displayName || item.botId,
       value: item.botId
     }));
+    channelBotOptions.value.qq = (config.channels.qq.bots || []).filter((item) => item.enabled).map((item) => ({
+      label: item.displayName || item.botId,
+      value: item.botId
+    }));
+    channelBotOptions.value.wecom = (config.channels.wecom.bots || []).filter((item) => item.enabled).map((item) => ({
+      label: item.displayName || item.botId,
+      value: item.botId
+    }));
+    channelBotOptions.value.weixin = (config.channels.weixin.bots || []).filter((item) => item.enabled).map((item) => ({
+      label: item.displayName || item.botId,
+      value: item.botId
+    }));
     if (config.channels.feishu.enabled) {
       options.push({ label: t("cron.detail.channel.feishu"), value: "feishu" });
     }
@@ -99,6 +114,15 @@ async function loadEnabledChannels() {
     }
     if (config.channels.telegram.enabled) {
       options.push({ label: t("cron.detail.channel.telegram"), value: "telegram" });
+    }
+    if (config.channels.qq.enabled) {
+      options.push({ label: t("cron.detail.channel.qq"), value: "qq" });
+    }
+    if (config.channels.wecom.enabled) {
+      options.push({ label: t("cron.detail.channel.wecom"), value: "wecom" });
+    }
+    if (config.channels.weixin.enabled) {
+      options.push({ label: t("cron.detail.channel.weixin"), value: "weixin" });
     }
     enabledChannelOptions.value = options;
     if (selectedChannel.value && !options.some((item) => item.value === selectedChannel.value)) {

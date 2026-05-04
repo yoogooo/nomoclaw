@@ -63,6 +63,12 @@ public record InboundEnvelope(
                 default -> false;
             };
         }
+        if (channel == ChannelType.QQ) {
+            return !metadataValue("guildId").isBlank() || !metadataValue("groupId").isBlank();
+        }
+        if (channel == ChannelType.WECOM || channel == ChannelType.WEIXIN) {
+            return false;
+        }
         return false;
     }
 

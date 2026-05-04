@@ -78,6 +78,9 @@ public class SystemAppService {
         ChannelConfigDto.DingTalk dingtalk = dto.channels().dingtalk();
         ChannelConfigDto.Discord discord = dto.channels().discord();
         ChannelConfigDto.Telegram telegram = dto.channels().telegram();
+        ChannelConfigDto.Qq qq = dto.channels().qq();
+        ChannelConfigDto.WeCom wecom = dto.channels().wecom();
+        ChannelConfigDto.Weixin weixin = dto.channels().weixin();
         if (feishu.enabled()) {
             List<ChannelConfigDto.FeishuBot> enabledBots = feishu.bots().stream().filter(ChannelConfigDto.FeishuBot::enabled).toList();
             if (enabledBots.isEmpty()) {
@@ -122,6 +125,39 @@ public class SystemAppService {
                 }
             }
         }
+        if (qq.enabled()) {
+            List<ChannelConfigDto.QqBot> enabledBots = qq.bots().stream().filter(ChannelConfigDto.QqBot::enabled).toList();
+            if (enabledBots.isEmpty()) {
+                throw new IllegalArgumentException("qq enabled requires at least one enabled bot");
+            }
+            for (ChannelConfigDto.QqBot bot : enabledBots) {
+                if (isBlank(bot.appId()) || isBlank(bot.clientSecret())) {
+                    throw new IllegalArgumentException("qq enabled bot requires appId and clientSecret: " + bot.botId());
+                }
+            }
+        }
+        if (wecom.enabled()) {
+            List<ChannelConfigDto.WeComBot> enabledBots = wecom.bots().stream().filter(ChannelConfigDto.WeComBot::enabled).toList();
+            if (enabledBots.isEmpty()) {
+                throw new IllegalArgumentException("wecom enabled requires at least one enabled bot");
+            }
+            for (ChannelConfigDto.WeComBot bot : enabledBots) {
+                if (isBlank(bot.wecomBotId()) || isBlank(bot.secret())) {
+                    throw new IllegalArgumentException("wecom enabled bot requires botId and secret: " + bot.botId());
+                }
+            }
+        }
+        if (weixin.enabled()) {
+            List<ChannelConfigDto.WeixinBot> enabledBots = weixin.bots().stream().filter(ChannelConfigDto.WeixinBot::enabled).toList();
+            if (enabledBots.isEmpty()) {
+                throw new IllegalArgumentException("weixin enabled requires at least one enabled bot");
+            }
+            for (ChannelConfigDto.WeixinBot bot : enabledBots) {
+                if (isBlank(bot.botToken()) && isBlank(bot.botTokenFile())) {
+                    throw new IllegalArgumentException("weixin enabled bot requires botToken or botTokenFile: " + bot.botId());
+                }
+            }
+        }
     }
 
     private ChannelConfigDto sanitize(ChannelConfigDto input) {
@@ -131,16 +167,25 @@ public class SystemAppService {
         ChannelConfigDto.DingTalk dingInput = channels.dingtalk() == null ? ChannelConfigDto.defaults().channels().dingtalk() : channels.dingtalk();
         ChannelConfigDto.Discord discordInput = channels.discord() == null ? ChannelConfigDto.defaults().channels().discord() : channels.discord();
         ChannelConfigDto.Telegram telegramInput = channels.telegram() == null ? ChannelConfigDto.defaults().channels().telegram() : channels.telegram();
+        ChannelConfigDto.Qq qqInput = channels.qq() == null ? ChannelConfigDto.defaults().channels().qq() : channels.qq();
+        ChannelConfigDto.WeCom wecomInput = channels.wecom() == null ? ChannelConfigDto.defaults().channels().wecom() : channels.wecom();
+        ChannelConfigDto.Weixin weixinInput = channels.weixin() == null ? ChannelConfigDto.defaults().channels().weixin() : channels.weixin();
 
         List<ChannelConfigDto.FeishuBot> feishuBots = sanitizeFeishuBots(feishuInput.bots());
         List<ChannelConfigDto.DingTalkBot> dingBots = sanitizeDingTalkBots(dingInput.bots());
         List<ChannelConfigDto.DiscordBot> discordBots = sanitizeDiscordBots(discordInput.bots());
         List<ChannelConfigDto.TelegramBot> telegramBots = sanitizeTelegramBots(telegramInput.bots());
+        List<ChannelConfigDto.QqBot> qqBots = sanitizeQqBots(qqInput.bots());
+        List<ChannelConfigDto.WeComBot> wecomBots = sanitizeWeComBots(wecomInput.bots());
+        List<ChannelConfigDto.WeixinBot> weixinBots = sanitizeWeixinBots(weixinInput.bots());
         return new ChannelConfigDto(new ChannelConfigDto.Channels(
                 new ChannelConfigDto.Feishu(feishuInput.enabled(), feishuBots),
                 new ChannelConfigDto.DingTalk(dingInput.enabled(), dingBots),
                 new ChannelConfigDto.Discord(discordInput.enabled(), discordBots),
-                new ChannelConfigDto.Telegram(telegramInput.enabled(), telegramBots)
+                new ChannelConfigDto.Telegram(telegramInput.enabled(), telegramBots),
+                new ChannelConfigDto.Qq(qqInput.enabled(), qqBots),
+                new ChannelConfigDto.WeCom(wecomInput.enabled(), wecomBots),
+                new ChannelConfigDto.Weixin(weixinInput.enabled(), weixinBots)
         ));
     }
 
@@ -237,6 +282,76 @@ public class SystemAppService {
                 })
                 .toList();
         return enforceSingleDefaultTelegram(normalized, ChannelConfigDto.defaultTelegramBot().botId());
+    }
+
+    private List<ChannelConfigDto.QqBot> sanitizeQqBots(List<ChannelConfigDto.QqBot> raw) {
+        List<ChannelConfigDto.QqBot> bots = raw == null || raw.isEmpty() ? List.of(ChannelConfigDto.defaultQqBot()) : raw;
+        Set<String> seen = new LinkedHashSet<>();
+        List<ChannelConfigDto.QqBot> normalized = bots.stream()
+                .filter(Objects::nonNull)
+                .map(bot -> {
+                    String botId = ensureUniqueBotId(normalizeBotId(bot.botId()), seen);
+                    return new ChannelConfigDto.QqBot(
+                            botId,
+                            fallback(trim(bot.displayName()), "QQ " + botId),
+                            bot.enabled(),
+                            bot.isDefault(),
+                            bot.requireMention(),
+                            normalizeList(bot.allowList()),
+                            trim(bot.appId()),
+                            trim(bot.clientSecret()),
+                            trim(bot.botUserId()),
+                            bot.sandbox(),
+                            bot.markdownEnabled()
+                    );
+                })
+                .toList();
+        return enforceSingleDefaultQq(normalized, ChannelConfigDto.defaultQqBot().botId());
+    }
+
+    private List<ChannelConfigDto.WeComBot> sanitizeWeComBots(List<ChannelConfigDto.WeComBot> raw) {
+        List<ChannelConfigDto.WeComBot> bots = raw == null || raw.isEmpty() ? List.of(ChannelConfigDto.defaultWeComBot()) : raw;
+        Set<String> seen = new LinkedHashSet<>();
+        List<ChannelConfigDto.WeComBot> normalized = bots.stream()
+                .filter(Objects::nonNull)
+                .map(bot -> {
+                    String botId = ensureUniqueBotId(normalizeBotId(bot.botId()), seen);
+                    return new ChannelConfigDto.WeComBot(
+                            botId,
+                            fallback(trim(bot.displayName()), "WeCom " + botId),
+                            bot.enabled(),
+                            bot.isDefault(),
+                            bot.requireMention(),
+                            normalizeList(bot.allowList()),
+                            trim(bot.wecomBotId()),
+                            trim(bot.secret())
+                    );
+                })
+                .toList();
+        return enforceSingleDefaultWeCom(normalized, ChannelConfigDto.defaultWeComBot().botId());
+    }
+
+    private List<ChannelConfigDto.WeixinBot> sanitizeWeixinBots(List<ChannelConfigDto.WeixinBot> raw) {
+        List<ChannelConfigDto.WeixinBot> bots = raw == null || raw.isEmpty() ? List.of(ChannelConfigDto.defaultWeixinBot()) : raw;
+        Set<String> seen = new LinkedHashSet<>();
+        List<ChannelConfigDto.WeixinBot> normalized = bots.stream()
+                .filter(Objects::nonNull)
+                .map(bot -> {
+                    String botId = ensureUniqueBotId(normalizeBotId(bot.botId()), seen);
+                    return new ChannelConfigDto.WeixinBot(
+                            botId,
+                            fallback(trim(bot.displayName()), "Weixin " + botId),
+                            bot.enabled(),
+                            bot.isDefault(),
+                            bot.requireMention(),
+                            normalizeList(bot.allowList()),
+                            trim(bot.botToken()),
+                            trim(bot.botTokenFile()),
+                            fallback(trim(bot.baseUrl()), "https://ilinkai.weixin.qq.com")
+                    );
+                })
+                .toList();
+        return enforceSingleDefaultWeixin(normalized, ChannelConfigDto.defaultWeixinBot().botId());
     }
 
     private List<ChannelConfigDto.FeishuBot> enforceSingleDefault(List<ChannelConfigDto.FeishuBot> bots, String fallbackBotId) {
@@ -338,6 +453,79 @@ public class SystemAppService {
                 .toList();
     }
 
+    private List<ChannelConfigDto.QqBot> enforceSingleDefaultQq(List<ChannelConfigDto.QqBot> bots, String fallbackBotId) {
+        if (bots.isEmpty()) {
+            return List.of(ChannelConfigDto.defaultQqBot());
+        }
+        String defaultBotId = resolveDefaultBotId(
+                bots.stream().filter(ChannelConfigDto.QqBot::isDefault).map(ChannelConfigDto.QqBot::botId).toList(),
+                bots.stream().map(ChannelConfigDto.QqBot::botId).toList(),
+                fallbackBotId
+        );
+        return bots.stream()
+                .map(bot -> new ChannelConfigDto.QqBot(
+                        bot.botId(),
+                        bot.displayName(),
+                        bot.enabled(),
+                        bot.botId().equals(defaultBotId),
+                        bot.requireMention(),
+                        bot.allowList(),
+                        bot.appId(),
+                        bot.clientSecret(),
+                        bot.botUserId(),
+                        bot.sandbox(),
+                        bot.markdownEnabled()
+                ))
+                .toList();
+    }
+
+    private List<ChannelConfigDto.WeComBot> enforceSingleDefaultWeCom(List<ChannelConfigDto.WeComBot> bots, String fallbackBotId) {
+        if (bots.isEmpty()) {
+            return List.of(ChannelConfigDto.defaultWeComBot());
+        }
+        String defaultBotId = resolveDefaultBotId(
+                bots.stream().filter(ChannelConfigDto.WeComBot::isDefault).map(ChannelConfigDto.WeComBot::botId).toList(),
+                bots.stream().map(ChannelConfigDto.WeComBot::botId).toList(),
+                fallbackBotId
+        );
+        return bots.stream()
+                .map(bot -> new ChannelConfigDto.WeComBot(
+                        bot.botId(),
+                        bot.displayName(),
+                        bot.enabled(),
+                        bot.botId().equals(defaultBotId),
+                        bot.requireMention(),
+                        bot.allowList(),
+                        bot.wecomBotId(),
+                        bot.secret()
+                ))
+                .toList();
+    }
+
+    private List<ChannelConfigDto.WeixinBot> enforceSingleDefaultWeixin(List<ChannelConfigDto.WeixinBot> bots, String fallbackBotId) {
+        if (bots.isEmpty()) {
+            return List.of(ChannelConfigDto.defaultWeixinBot());
+        }
+        String defaultBotId = resolveDefaultBotId(
+                bots.stream().filter(ChannelConfigDto.WeixinBot::isDefault).map(ChannelConfigDto.WeixinBot::botId).toList(),
+                bots.stream().map(ChannelConfigDto.WeixinBot::botId).toList(),
+                fallbackBotId
+        );
+        return bots.stream()
+                .map(bot -> new ChannelConfigDto.WeixinBot(
+                        bot.botId(),
+                        bot.displayName(),
+                        bot.enabled(),
+                        bot.botId().equals(defaultBotId),
+                        bot.requireMention(),
+                        bot.allowList(),
+                        bot.botToken(),
+                        bot.botTokenFile(),
+                        bot.baseUrl()
+                ))
+                .toList();
+    }
+
     private String resolveDefaultBotId(List<String> explicitDefaults, List<String> allBotIds, String fallbackBotId) {
         if (!explicitDefaults.isEmpty()) {
             return explicitDefaults.get(0);
@@ -387,6 +575,9 @@ public class SystemAppService {
         channels.set("dingtalk", normalizeDingTalkNode(channels.path("dingtalk")));
         channels.set("discord", normalizeDiscordNode(channels.path("discord")));
         channels.set("telegram", normalizeTelegramNode(channels.path("telegram")));
+        channels.set("qq", normalizeQqNode(channels.path("qq")));
+        channels.set("wecom", normalizeWeComNode(channels.path("wecom")));
+        channels.set("weixin", normalizeWeixinNode(channels.path("weixin")));
         return channels;
     }
 
@@ -429,7 +620,10 @@ public class SystemAppService {
                 new ChannelConfigDto.Feishu(config.channels().feishu().enabled(), updatedBots),
                 config.channels().dingtalk(),
                 config.channels().discord(),
-                config.channels().telegram()
+                config.channels().telegram(),
+                config.channels().qq(),
+                config.channels().wecom(),
+                config.channels().weixin()
         ));
     }
 
@@ -586,6 +780,88 @@ public class SystemAppService {
         telegram.put("enabled", enabled);
         telegram.set("bots", bots);
         return telegram;
+    }
+
+    private ObjectNode normalizeQqNode(JsonNode node) {
+        ObjectNode qq = node instanceof ObjectNode object ? object.deepCopy() : MAPPER.createObjectNode();
+        qq.remove("added");
+        boolean enabled = qq.path("enabled").asBoolean(false);
+        ArrayNode bots = MAPPER.createArrayNode();
+        JsonNode rawBots = qq.path("bots");
+        if (rawBots.isArray()) {
+            rawBots.forEach(bots::add);
+        } else {
+            ObjectNode migrated = MAPPER.createObjectNode();
+            migrated.put("botId", "default");
+            migrated.put("displayName", "QQ Default");
+            migrated.put("enabled", enabled);
+            migrated.put("isDefault", true);
+            migrated.put("requireMention", qq.path("requireMention").asBoolean(true));
+            migrated.set("allowList", qq.path("allowList").isArray() ? qq.path("allowList") : MAPPER.createArrayNode());
+            migrated.put("appId", trim(qq.path("appId").asText("")));
+            migrated.put("clientSecret", trim(qq.path("clientSecret").asText(qq.path("token").asText(""))));
+            migrated.put("botUserId", trim(qq.path("botUserId").asText("")));
+            migrated.put("sandbox", qq.path("sandbox").asBoolean(false));
+            migrated.put("markdownEnabled", qq.path("markdownEnabled").asBoolean(false));
+            bots.add(migrated);
+        }
+        qq.removeAll();
+        qq.put("enabled", enabled);
+        qq.set("bots", bots);
+        return qq;
+    }
+
+    private ObjectNode normalizeWeComNode(JsonNode node) {
+        ObjectNode wecom = node instanceof ObjectNode object ? object.deepCopy() : MAPPER.createObjectNode();
+        wecom.remove("added");
+        boolean enabled = wecom.path("enabled").asBoolean(false);
+        ArrayNode bots = MAPPER.createArrayNode();
+        JsonNode rawBots = wecom.path("bots");
+        if (rawBots.isArray()) {
+            rawBots.forEach(bots::add);
+        } else {
+            ObjectNode migrated = MAPPER.createObjectNode();
+            migrated.put("botId", "default");
+            migrated.put("displayName", "WeCom Default");
+            migrated.put("enabled", enabled);
+            migrated.put("isDefault", true);
+            migrated.put("requireMention", wecom.path("requireMention").asBoolean(true));
+            migrated.set("allowList", wecom.path("allowList").isArray() ? wecom.path("allowList") : MAPPER.createArrayNode());
+            migrated.put("wecomBotId", trim(wecom.path("wecomBotId").asText(wecom.path("botId").asText(""))));
+            migrated.put("secret", trim(wecom.path("secret").asText("")));
+            bots.add(migrated);
+        }
+        wecom.removeAll();
+        wecom.put("enabled", enabled);
+        wecom.set("bots", bots);
+        return wecom;
+    }
+
+    private ObjectNode normalizeWeixinNode(JsonNode node) {
+        ObjectNode weixin = node instanceof ObjectNode object ? object.deepCopy() : MAPPER.createObjectNode();
+        weixin.remove("added");
+        boolean enabled = weixin.path("enabled").asBoolean(false);
+        ArrayNode bots = MAPPER.createArrayNode();
+        JsonNode rawBots = weixin.path("bots");
+        if (rawBots.isArray()) {
+            rawBots.forEach(bots::add);
+        } else {
+            ObjectNode migrated = MAPPER.createObjectNode();
+            migrated.put("botId", "default");
+            migrated.put("displayName", "Weixin Default");
+            migrated.put("enabled", enabled);
+            migrated.put("isDefault", true);
+            migrated.put("requireMention", weixin.path("requireMention").asBoolean(true));
+            migrated.set("allowList", weixin.path("allowList").isArray() ? weixin.path("allowList") : MAPPER.createArrayNode());
+            migrated.put("botToken", trim(weixin.path("botToken").asText("")));
+            migrated.put("botTokenFile", trim(weixin.path("botTokenFile").asText("")));
+            migrated.put("baseUrl", fallback(trim(weixin.path("baseUrl").asText("")), "https://ilinkai.weixin.qq.com"));
+            bots.add(migrated);
+        }
+        weixin.removeAll();
+        weixin.put("enabled", enabled);
+        weixin.set("bots", bots);
+        return weixin;
     }
 
     private ObjectNode readRootConfig() {
