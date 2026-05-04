@@ -240,11 +240,15 @@ function handleAgentChange(agentUid: string | number | null) {
   min-height: 0;
 }
 
-.conversation-panel {
+.conversation-shell .conversation-panel {
   display: flex;
   min-height: 0;
   flex-direction: column;
   gap: 0;
+  padding-top: var(--space-5);
+  padding-right: 0 !important;
+  padding-bottom: 0;
+  padding-left: 0 !important;
 }
 
 .conversation-header-top {
@@ -338,8 +342,8 @@ function handleAgentChange(agentUid: string | number | null) {
 
 .conversation-list {
   flex: 1;
-  width: calc(100% + var(--size-48));
-  margin: 0 calc(var(--space-6) * -1);
+  width: 100%;
+  margin: 0;
 }
 
 .conversation-list-empty {
@@ -354,7 +358,7 @@ function handleAgentChange(agentUid: string | number | null) {
   display: flex;
   align-items: flex-start;
   gap: var(--space-1_5);
-  padding: var(--space-4) var(--space-3);
+  padding: var(--space-2_5) var(--space-2);
   margin: 0;
   border-left: var(--size-3) solid transparent;
   border-radius: 0;
@@ -484,8 +488,11 @@ function handleAgentChange(agentUid: string | number | null) {
     justify-content: flex-start;
   }
 
-  .conversation-panel {
+  .conversation-shell .conversation-panel {
     gap: var(--space-3);
+    padding-top: var(--space-3_5);
+    padding-right: 0 !important;
+    padding-left: 0 !important;
   }
 
   .create-conversation-button {
@@ -500,7 +507,7 @@ function handleAgentChange(agentUid: string | number | null) {
   }
 
   .conversation-row {
-    padding: var(--space-3_5) var(--space-2_5);
+    padding: var(--space-2) var(--space-1_5);
   }
 }
 </style>
