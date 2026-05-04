@@ -21,6 +21,8 @@ public class AgentChannelsProperties {
     private int queueSize = 1000;
     private final Feishu feishu = new Feishu();
     private final DingTalk dingtalk = new DingTalk();
+    private final Discord discord = new Discord();
+    private final Telegram telegram = new Telegram();
 
     public boolean isEnabled() {
         return enabled;
@@ -72,6 +74,14 @@ public class AgentChannelsProperties {
 
     public DingTalk getDingtalk() {
         return dingtalk;
+    }
+
+    public Discord getDiscord() {
+        return discord;
+    }
+
+    public Telegram getTelegram() {
+        return telegram;
     }
 
     public static class BasePlatform {
@@ -184,6 +194,57 @@ public class AgentChannelsProperties {
 
         public void setRobotCode(String robotCode) {
             this.robotCode = robotCode;
+        }
+    }
+
+    public static class Discord extends BasePlatform {
+        private String token = "";
+        private String botUserId = "";
+        private boolean acceptBotMessages = false;
+
+        public String getToken() {
+            return token;
+        }
+
+        public void setToken(String token) {
+            this.token = token;
+        }
+
+        public String getBotUserId() {
+            return botUserId;
+        }
+
+        public void setBotUserId(String botUserId) {
+            this.botUserId = botUserId;
+        }
+
+        public boolean isAcceptBotMessages() {
+            return acceptBotMessages;
+        }
+
+        public void setAcceptBotMessages(boolean acceptBotMessages) {
+            this.acceptBotMessages = acceptBotMessages;
+        }
+    }
+
+    public static class Telegram extends BasePlatform {
+        private String token = "";
+        private String botUsername = "";
+
+        public String getToken() {
+            return token;
+        }
+
+        public void setToken(String token) {
+            this.token = token;
+        }
+
+        public String getBotUsername() {
+            return botUsername;
+        }
+
+        public void setBotUsername(String botUsername) {
+            this.botUsername = botUsername;
         }
     }
 }

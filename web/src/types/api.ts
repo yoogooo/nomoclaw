@@ -193,6 +193,14 @@ export interface ChannelConfig {
       enabled: boolean;
       bots: ChannelDingTalkBotConfig[];
     };
+    discord: {
+      enabled: boolean;
+      bots: ChannelDiscordBotConfig[];
+    };
+    telegram: {
+      enabled: boolean;
+      bots: ChannelTelegramBotConfig[];
+    };
   };
 }
 
@@ -222,6 +230,29 @@ export interface ChannelDingTalkBotConfig {
   clientId: string;
   clientSecret: string;
   robotCode: string;
+}
+
+export interface ChannelDiscordBotConfig {
+  botId: string;
+  displayName: string;
+  enabled: boolean;
+  isDefault: boolean;
+  requireMention: boolean;
+  allowList: string[];
+  token: string;
+  botUserId: string;
+  acceptBotMessages: boolean;
+}
+
+export interface ChannelTelegramBotConfig {
+  botId: string;
+  displayName: string;
+  enabled: boolean;
+  isDefault: boolean;
+  requireMention: boolean;
+  allowList: string[];
+  token: string;
+  botUsername: string;
 }
 
 export interface ChannelTargetOption {

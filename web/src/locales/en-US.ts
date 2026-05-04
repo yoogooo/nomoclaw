@@ -480,7 +480,9 @@ const enUS = {
       longRunning: "Long-term",
       channel: {
         feishu: "Feishu",
-        dingtalk: "DingTalk"
+        dingtalk: "DingTalk",
+        discord: "Discord",
+        telegram: "Telegram"
       }
     },
     empty: {
@@ -718,6 +720,14 @@ const enUS = {
         summaryConfigured: "Robot Code: {robotCode}",
         summaryEmpty: "Robot Code not configured"
       },
+      discord: {
+        title: "Discord Channel",
+        subtitle: "Receives messages via Gateway and replies with the Bot API"
+      },
+      telegram: {
+        title: "Telegram Channel",
+        subtitle: "Receives messages through Bot API polling and replies to chats"
+      },
       mentionPolicy: "@ mention policy",
       mentionOnly: "Only when @ mentioned",
       allMessages: "All messages",
@@ -726,13 +736,18 @@ const enUS = {
     editor: {
       feishuTitle: "Edit Feishu Channel",
       dingtalkTitle: "Edit DingTalk Channel",
+      discordTitle: "Edit Discord Channel",
+      telegramTitle: "Edit Telegram Channel",
       enable: "Enable",
       enableDingtalk: "Enable DingTalk channel",
+      enableDiscord: "Enable Discord channel",
+      enableTelegram: "Enable Telegram channel",
       mentionOnly: "Respond only when @ bot",
       feishuAppId: "App ID (required when enabled)",
       feishuAppSecret: "App Secret (required when enabled)",
       feishuAppIdPlaceholder: "cli_xxx",
       allowList: "Allow List (optional, comma-separated)",
+      allowListTip: "Restricts who can trigger this bot. Leave empty to allow anyone. Enter platform user IDs separated by commas.",
       allowListFeishuPlaceholder: "ou_xxx, ou_yyy",
       addBot: "Add Bot",
       setDefault: "Set Default",
@@ -746,11 +761,19 @@ const enUS = {
       dingtalkClientSecret: "Client Secret (required when enabled)",
       dingtalkRobotCode: "Robot Code (required when enabled)",
       dingtalkRobotCodePlaceholder: "dingxxxx",
-      allowListDingtalkPlaceholder: "manager001, manager002"
+      allowListDingtalkPlaceholder: "manager001, manager002",
+      discordToken: "Bot Token (required when enabled)",
+      discordBotUserId: "Bot User ID (for group mentions)",
+      discordBotUserIdTip: "Used to detect whether a Discord server/channel message mentioned this bot, and to remove the mention before sending text to the agent. DMs do not depend on it.",
+      acceptBotMessages: "Accept other bot messages",
+      telegramToken: "Bot Token (required when enabled)",
+      telegramUsername: "Bot Username (for group mentions)"
     },
     errors: {
       feishuRequired: "When Feishu is enabled, appId and appSecret are required",
-      dingtalkRequired: "When DingTalk is enabled, clientId, clientSecret, and robotCode are required"
+      dingtalkRequired: "When DingTalk is enabled, clientId, clientSecret, and robotCode are required",
+      discordRequired: "When Discord is enabled, Bot Token is required",
+      telegramRequired: "When Telegram is enabled, Bot Token is required"
     },
     toast: {
       saved: "Channel configuration saved"

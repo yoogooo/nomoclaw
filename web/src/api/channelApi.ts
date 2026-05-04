@@ -12,7 +12,7 @@ export const channelApi = {
       body: JSON.stringify(payload)
     });
   },
-  searchChannelTargets(channel: "feishu" | "dingtalk", keyword = "", limit = 20, botId = "") {
+  searchChannelTargets(channel: "feishu" | "dingtalk" | "discord" | "telegram", keyword = "", limit = 20, botId = "") {
     const params = new URLSearchParams({
       channel,
       keyword,

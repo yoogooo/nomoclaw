@@ -61,6 +61,12 @@ public class ChannelBotCredentialResolver {
         if (channelType == ChannelType.DINGTALK) {
             return resolveDingTalk(botId) != null;
         }
+        if (channelType == ChannelType.DISCORD) {
+            return resolveDiscord(botId) != null;
+        }
+        if (channelType == ChannelType.TELEGRAM) {
+            return resolveTelegram(botId) != null;
+        }
         return false;
     }
 
@@ -73,7 +79,49 @@ public class ChannelBotCredentialResolver {
             DingTalkBotCredential bot = resolveDingTalk("");
             return bot == null ? "" : bot.botId();
         }
+        if (channelType == ChannelType.DISCORD) {
+            DiscordBotCredential bot = resolveDiscord("");
+            return bot == null ? "" : bot.botId();
+        }
+        if (channelType == ChannelType.TELEGRAM) {
+            TelegramBotCredential bot = resolveTelegram("");
+            return bot == null ? "" : bot.botId();
+        }
         return "";
+    }
+
+    public DiscordBotCredential resolveDiscord(String botId) {
+        List<DiscordBotCredential> bots = listDiscordBots();
+        if (bots.isEmpty()) {
+            return null;
+        }
+        String normalizedBotId = normalizeLookupBotId(botId);
+        if (normalizedBotId.isBlank()) {
+            return findDefaultDiscordBot(bots);
+        }
+        for (DiscordBotCredential bot : bots) {
+            if (bot.botId().equals(normalizedBotId) && bot.enabled()) {
+                return bot;
+            }
+        }
+        return null;
+    }
+
+    public TelegramBotCredential resolveTelegram(String botId) {
+        List<TelegramBotCredential> bots = listTelegramBots();
+        if (bots.isEmpty()) {
+            return null;
+        }
+        String normalizedBotId = normalizeLookupBotId(botId);
+        if (normalizedBotId.isBlank()) {
+            return findDefaultTelegramBot(bots);
+        }
+        for (TelegramBotCredential bot : bots) {
+            if (bot.botId().equals(normalizedBotId) && bot.enabled()) {
+                return bot;
+            }
+        }
+        return null;
     }
 
     public String resolveDefaultTarget(ChannelType channelType, String botId) {
@@ -162,6 +210,72 @@ public class ChannelBotCredentialResolver {
         return List.copyOf(bots);
     }
 
+    public List<DiscordBotCredential> listDiscordBots() {
+        JsonNode discord = readChannelsNode().path("discord");
+        boolean channelEnabled = discord.path("enabled").asBoolean(false);
+        ArrayList<DiscordBotCredential> bots = new ArrayList<>();
+        JsonNode botNodes = discord.path("bots");
+        if (botNodes.isArray()) {
+            for (JsonNode bot : botNodes) {
+                String botId = normalizeBotId(bot.path("botId").asText(""));
+                bots.add(new DiscordBotCredential(
+                        botId,
+                        trim(bot.path("displayName").asText("")),
+                        channelEnabled && bot.path("enabled").asBoolean(false),
+                        bot.path("isDefault").asBoolean(false),
+                        bot.path("requireMention").asBoolean(true),
+                        trim(bot.path("token").asText("")),
+                        trim(bot.path("botUserId").asText("")),
+                        bot.path("acceptBotMessages").asBoolean(false)
+                ));
+            }
+        } else {
+            bots.add(new DiscordBotCredential(
+                    "default",
+                    "Discord Default",
+                    channelEnabled,
+                    true,
+                    discord.path("requireMention").asBoolean(true),
+                    trim(discord.path("token").asText("")),
+                    trim(discord.path("botUserId").asText("")),
+                    discord.path("acceptBotMessages").asBoolean(false)
+            ));
+        }
+        return List.copyOf(bots);
+    }
+
+    public List<TelegramBotCredential> listTelegramBots() {
+        JsonNode telegram = readChannelsNode().path("telegram");
+        boolean channelEnabled = telegram.path("enabled").asBoolean(false);
+        ArrayList<TelegramBotCredential> bots = new ArrayList<>();
+        JsonNode botNodes = telegram.path("bots");
+        if (botNodes.isArray()) {
+            for (JsonNode bot : botNodes) {
+                String botId = normalizeBotId(bot.path("botId").asText(""));
+                bots.add(new TelegramBotCredential(
+                        botId,
+                        trim(bot.path("displayName").asText("")),
+                        channelEnabled && bot.path("enabled").asBoolean(false),
+                        bot.path("isDefault").asBoolean(false),
+                        bot.path("requireMention").asBoolean(true),
+                        trim(bot.path("token").asText("")),
+                        normalizeUsername(bot.path("botUsername").asText(""))
+                ));
+            }
+        } else {
+            bots.add(new TelegramBotCredential(
+                    "default",
+                    "Telegram Default",
+                    channelEnabled,
+                    true,
+                    telegram.path("requireMention").asBoolean(true),
+                    trim(telegram.path("token").asText("")),
+                    normalizeUsername(telegram.path("botUsername").asText(""))
+            ));
+        }
+        return List.copyOf(bots);
+    }
+
     private FeishuBotCredential findDefaultFeishuBot(List<FeishuBotCredential> bots) {
         for (FeishuBotCredential bot : bots) {
             if (bot.isDefault() && bot.enabled()) {
@@ -183,6 +297,34 @@ public class ChannelBotCredentialResolver {
             }
         }
         for (DingTalkBotCredential bot : bots) {
+            if (bot.enabled()) {
+                return bot;
+            }
+        }
+        return null;
+    }
+
+    private DiscordBotCredential findDefaultDiscordBot(List<DiscordBotCredential> bots) {
+        for (DiscordBotCredential bot : bots) {
+            if (bot.isDefault() && bot.enabled()) {
+                return bot;
+            }
+        }
+        for (DiscordBotCredential bot : bots) {
+            if (bot.enabled()) {
+                return bot;
+            }
+        }
+        return null;
+    }
+
+    private TelegramBotCredential findDefaultTelegramBot(List<TelegramBotCredential> bots) {
+        for (TelegramBotCredential bot : bots) {
+            if (bot.isDefault() && bot.enabled()) {
+                return bot;
+            }
+        }
+        for (TelegramBotCredential bot : bots) {
             if (bot.enabled()) {
                 return bot;
             }
@@ -231,6 +373,11 @@ public class ChannelBotCredentialResolver {
         return value == null ? "" : value.trim();
     }
 
+    private String normalizeUsername(String value) {
+        String username = trim(value);
+        return username.startsWith("@") ? username.substring(1).trim() : username;
+    }
+
     public record FeishuBotCredential(
             String botId,
             String displayName,
@@ -256,6 +403,29 @@ public class ChannelBotCredentialResolver {
             String clientId,
             String clientSecret,
             String robotCode
+    ) {
+    }
+
+    public record DiscordBotCredential(
+            String botId,
+            String displayName,
+            boolean enabled,
+            boolean isDefault,
+            boolean requireMention,
+            String token,
+            String botUserId,
+            boolean acceptBotMessages
+    ) {
+    }
+
+    public record TelegramBotCredential(
+            String botId,
+            String displayName,
+            boolean enabled,
+            boolean isDefault,
+            boolean requireMention,
+            String token,
+            String botUsername
     ) {
     }
 }
