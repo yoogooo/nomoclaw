@@ -326,9 +326,17 @@ final class CodexApiClient {
         if ("response.output_item.added".equals(type) || "response.output_item.done".equals(type)) {
             JsonNode item = root.path("item").isMissingNode() ? root.path("output_item") : root.path("item");
             ToolExecutionRequest toolExecutionRequest = toToolExecutionRequest(item);
-            if (toolExecutionRequest != null && toolExecutionRequests.stream().noneMatch(existing -> sameToolCall(existing, toolExecutionRequest))) {
-                toolExecutionRequests.add(toolExecutionRequest);
+            if (toolExecutionRequest != null) {
+                addOrUpdateToolExecutionRequest(toolExecutionRequests, toolExecutionRequest);
             }
+            return;
+        }
+        if ("response.function_call_arguments.done".equals(type)) {
+            updateToolExecutionRequestArguments(
+                    toolExecutionRequests,
+                    firstNonBlank(text(root.path("item_id")), text(root.path("call_id")), text(root.path("id"))),
+                    argumentString(root.path("arguments"))
+            );
             return;
         }
         if ("response.completed".equals(type)) {
@@ -444,7 +452,12 @@ final class CodexApiClient {
             return null;
         }
         String id = firstNonBlank(text(item.path("call_id")), text(item.path("id")), text(execution.path("call_id")), text(execution.path("id")));
-        String arguments = firstNonBlank(text(item.path("arguments")), text(execution.path("arguments")), toJsonObjectString(item.path("input")), "{}");
+        String arguments = firstNonBlank(
+                argumentString(item.path("arguments")),
+                argumentString(execution.path("arguments")),
+                argumentString(item.path("input")),
+                "{}"
+        );
         return ToolExecutionRequest.builder()
                 .id(id)
                 .name(name)
@@ -464,11 +477,75 @@ final class CodexApiClient {
         return trim(left.name()).equals(trim(right.name())) && trim(left.arguments()).equals(trim(right.arguments()));
     }
 
-    private String toJsonObjectString(JsonNode node) {
+    private void addOrUpdateToolExecutionRequest(List<ToolExecutionRequest> requests, ToolExecutionRequest incoming) {
+        for (int i = 0; i < requests.size(); i++) {
+            ToolExecutionRequest existing = requests.get(i);
+            if (sameToolCallIdentity(existing, incoming)) {
+                if (shouldReplaceToolCall(existing, incoming)) {
+                    requests.set(i, incoming);
+                }
+                return;
+            }
+        }
+        requests.add(incoming);
+    }
+
+    private boolean sameToolCallIdentity(ToolExecutionRequest left, ToolExecutionRequest right) {
+        if (left == null || right == null) {
+            return false;
+        }
+        String leftId = trim(left.id());
+        String rightId = trim(right.id());
+        if (!leftId.isBlank() && !rightId.isBlank()) {
+            return leftId.equals(rightId);
+        }
+        return trim(left.name()).equals(trim(right.name()));
+    }
+
+    private boolean shouldReplaceToolCall(ToolExecutionRequest existing, ToolExecutionRequest incoming) {
+        if (!hasMeaningfulArguments(existing) && hasMeaningfulArguments(incoming)) {
+            return true;
+        }
+        return trim(incoming.arguments()).length() > trim(existing.arguments()).length();
+    }
+
+    private void updateToolExecutionRequestArguments(List<ToolExecutionRequest> requests, String id, String arguments) {
+        String normalizedId = trim(id);
+        String normalizedArguments = trim(arguments);
+        if (normalizedId.isBlank() || normalizedArguments.isBlank()) {
+            return;
+        }
+        for (int i = 0; i < requests.size(); i++) {
+            ToolExecutionRequest existing = requests.get(i);
+            if (normalizedId.equals(trim(existing.id())) && hasMeaningfulArguments(normalizedArguments)) {
+                requests.set(i, ToolExecutionRequest.builder()
+                        .id(existing.id())
+                        .name(existing.name())
+                        .arguments(normalizedArguments)
+                        .build());
+                return;
+            }
+        }
+    }
+
+    private boolean hasMeaningfulArguments(ToolExecutionRequest request) {
+        String arguments = trim(request == null ? "" : request.arguments());
+        return hasMeaningfulArguments(arguments);
+    }
+
+    private boolean hasMeaningfulArguments(String arguments) {
+        arguments = trim(arguments);
+        return !arguments.isBlank() && !"{}".equals(arguments) && !"[]".equals(arguments);
+    }
+
+    private String argumentString(JsonNode node) {
         if (node == null || node.isMissingNode() || node.isNull()) {
             return "";
         }
-        return node.isObject() ? JsonUtil.toJson(node) : text(node);
+        if (node.isObject() || node.isArray()) {
+            return JsonUtil.toJson(node);
+        }
+        return text(node);
     }
 
     private FinishReason finishReason(List<ToolExecutionRequest> toolExecutionRequests) {

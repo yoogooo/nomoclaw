@@ -20,8 +20,9 @@ public final class ModelProviderDefaults {
                         true,
                         "https://chatgpt.com/backend-api/codex",
                         "",
-                        "gpt-5.4",
+                        "gpt-5.5",
                         List.of(
+                                model("gpt-5.5", "GPT-5.5", List.of("text"), true, 0, 0, 0, disabledUpload()),
                                 model("gpt-5.4", "GPT-5.4", List.of("text"), true, 0, 0, 0, disabledUpload()),
                                 model("gpt-5.4-mini", "GPT-5.4 Mini", List.of("text"), true, 0, 0, 0, disabledUpload()),
                                 model("gpt-5.3-codex", "GPT-5.3 Codex", List.of("text"), true, 0, 0, 0, disabledUpload()),
