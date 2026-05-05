@@ -674,6 +674,7 @@ const enUS = {
       archiveHint: "Upload an archive. The system will parse the Skill directory automatically.",
       pickArchive: "Select archive",
       archiveSupportFormat: "Supports .zip / .tar.gz / .tgz",
+      archiveInvalidFormat: "Only .zip, .tar.gz, or .tgz archives are supported.",
       archiveChooseButton: "Choose file",
       archiveSelectedLabel: "Selected file",
       archiveNotSelected: "No file selected",

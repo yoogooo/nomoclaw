@@ -674,6 +674,7 @@ const zhCN = {
       archiveHint: "请上传压缩包，系统会自动解析 Skill 目录结构。",
       pickArchive: "选择压缩包",
       archiveSupportFormat: "支持 .zip / .tar.gz / .tgz",
+      archiveInvalidFormat: "仅支持 .zip、.tar.gz 或 .tgz 压缩包。",
       archiveChooseButton: "点击选择文件",
       archiveSelectedLabel: "当前文件",
       archiveNotSelected: "未选择",
