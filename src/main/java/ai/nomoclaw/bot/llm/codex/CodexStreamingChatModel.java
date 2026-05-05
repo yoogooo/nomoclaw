@@ -21,7 +21,7 @@ public class CodexStreamingChatModel implements StreamingChatModel {
                                    String modelName,
                                    Duration timeout) {
         this.client = new CodexApiClient(httpClient, tokenProvider, baseUrl, timeout);
-        this.modelName = trim(modelName).isBlank() ? "gpt-5.4" : trim(modelName);
+        this.modelName = trim(modelName).isBlank() ? "gpt-5.5" : trim(modelName);
     }
 
     @Override

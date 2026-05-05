@@ -6,6 +6,7 @@ import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.request.ToolChoice;
@@ -285,21 +286,56 @@ final class CodexApiClient {
     private List<Map<String, Object>> toInput(List<ChatMessage> messages) {
         List<Map<String, Object>> input = new ArrayList<>();
         for (ChatMessage message : messages) {
-            Map<String, Object> item = new LinkedHashMap<>();
             if (message instanceof SystemMessage systemMessage) {
                 continue;
             } else if (message instanceof UserMessage userMessage) {
+                Map<String, Object> item = new LinkedHashMap<>();
                 item.put("role", "user");
                 item.put("content", userMessage.hasSingleText() ? userMessage.singleText() : userMessage.toString());
+                input.add(item);
             } else if (message instanceof AiMessage aiMessage) {
-                item.put("role", "assistant");
-                item.put("content", aiMessage.text());
+                input.addAll(toAssistantInput(aiMessage));
+            } else if (message instanceof ToolExecutionResultMessage toolResultMessage) {
+                input.add(toFunctionCallOutput(toolResultMessage));
             } else {
                 continue;
             }
-            input.add(item);
         }
         return input;
+    }
+
+    private List<Map<String, Object>> toAssistantInput(AiMessage aiMessage) {
+        List<Map<String, Object>> input = new ArrayList<>();
+        String text = trim(aiMessage.text());
+        if (!text.isBlank()) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("role", "assistant");
+            item.put("content", text);
+            input.add(item);
+        }
+        if (aiMessage.hasToolExecutionRequests()) {
+            for (ToolExecutionRequest request : aiMessage.toolExecutionRequests()) {
+                input.add(toFunctionCallInput(request));
+            }
+        }
+        return input;
+    }
+
+    private Map<String, Object> toFunctionCallInput(ToolExecutionRequest request) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("type", "function_call");
+        item.put("call_id", trim(request.id()));
+        item.put("name", trim(request.name()));
+        item.put("arguments", trim(request.arguments()).isBlank() ? "{}" : trim(request.arguments()));
+        return item;
+    }
+
+    private Map<String, Object> toFunctionCallOutput(ToolExecutionResultMessage message) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("type", "function_call_output");
+        item.put("call_id", trim(message.id()));
+        item.put("output", trim(message.text()));
+        return item;
     }
 
     private void handleSseEvent(String event,

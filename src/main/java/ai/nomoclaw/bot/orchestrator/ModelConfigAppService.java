@@ -268,17 +268,48 @@ public class ModelConfigAppService {
         List<ModelConfigDto.Provider> missingDefaults = defaults.stream()
                 .filter(provider -> !existingProviderIds.contains(provider.id()))
                 .toList();
-        if (missingDefaults.isEmpty()) {
-            return;
-        }
         LocalDateTime now = LocalDateTime.now();
-        providerConfigRepository.saveBatch(missingDefaults.stream()
-                .map(provider -> toProviderEntity(provider, null, now))
-                .toList(), BATCH_SIZE);
-        List<LlmProviderModelEntity> models = missingDefaults.stream()
-                .map(provider -> toModelEntities(provider, now))
-                .flatMap(Collection::stream)
+        if (!missingDefaults.isEmpty()) {
+            providerConfigRepository.saveBatch(missingDefaults.stream()
+                    .map(provider -> toProviderEntity(provider, null, now))
+                    .toList(), BATCH_SIZE);
+            List<LlmProviderModelEntity> models = missingDefaults.stream()
+                    .map(provider -> toModelEntities(provider, now))
+                    .flatMap(Collection::stream)
+                    .toList();
+            if (!models.isEmpty()) {
+                providerModelRepository.saveBatch(models, BATCH_SIZE);
+            }
+        }
+        backfillMissingDefaultModels(defaults, now);
+    }
+
+    private void backfillMissingDefaultModels(List<ModelConfigDto.Provider> defaults, LocalDateTime now) {
+        List<String> providerIds = defaults.stream()
+                .map(ModelConfigDto.Provider::id)
                 .toList();
+        Map<String, List<LlmProviderModelEntity>> existingModelsByProvider = providerModelRepository.listByProviderIds(providerIds)
+                .stream()
+                .collect(Collectors.groupingBy(LlmProviderModelEntity::getProviderId, LinkedHashMap::new, Collectors.toList()));
+        List<LlmProviderModelEntity> models = new ArrayList<>();
+        for (ModelConfigDto.Provider provider : defaults) {
+            List<LlmProviderModelEntity> existingModels = existingModelsByProvider.getOrDefault(provider.id(), List.of());
+            Set<String> existingModelIds = existingModels.stream()
+                    .map(LlmProviderModelEntity::getModelId)
+                    .collect(Collectors.toSet());
+            int sortIndex = existingModels.stream()
+                    .map(LlmProviderModelEntity::getSortIndex)
+                    .filter(Objects::nonNull)
+                    .max(Integer::compareTo)
+                    .map(value -> value + 1)
+                    .orElse(0);
+            for (ModelConfigDto.Model model : provider.models()) {
+                if (existingModelIds.contains(model.id())) {
+                    continue;
+                }
+                models.add(toModelEntity(provider.id(), model, sortIndex++, now));
+            }
+        }
         if (!models.isEmpty()) {
             providerModelRepository.saveBatch(models, BATCH_SIZE);
         }
@@ -445,31 +476,37 @@ public class ModelConfigAppService {
     private List<LlmProviderModelEntity> toModelEntities(ModelConfigDto.Provider provider, LocalDateTime now) {
         List<LlmProviderModelEntity> models = new ArrayList<>();
         for (int i = 0; i < provider.models().size(); i++) {
-            ModelConfigDto.Model model = provider.models().get(i);
-            ModelMetadata metadata = modelCatalogService.resolve(provider.id(), model.id());
-            List<String> inputModalities = metadata.matched()
-                    ? metadata.inputModalities()
-                    : sanitizeCapabilities(model.capabilities()).isEmpty() ? metadata.inputModalities() : sanitizeCapabilities(model.capabilities());
-            ModelConfigDto.UploadPolicy uploadPolicy = metadata.matched()
-                    ? metadata.uploadPolicy()
-                    : model.uploadPolicy() == null ? metadata.uploadPolicy() : model.uploadPolicy();
-            LlmProviderModelEntity entity = new LlmProviderModelEntity();
-            entity.setProviderId(provider.id());
-            entity.setModelId(model.id());
-            entity.setModelName(model.name());
-            entity.setCapabilitiesJson(JsonUtil.toJson(inputModalities));
-            entity.setReasoning((metadata.matched() ? metadata.reasoning() : model.reasoning()) ? 1 : 0);
-            entity.setContextWindow(sanitizeNonNegative(metadata.matched() ? metadata.contextWindowTokens() : model.contextWindow()));
-            entity.setMaxInputTokens(sanitizeNonNegative(metadata.matched() ? metadata.maxInputTokens() : model.maxInputTokens()));
-            entity.setMaxOutputTokens(sanitizeNonNegative(metadata.matched() ? metadata.maxOutputTokens() : model.maxOutputTokens()));
-            entity.setUploadPolicyJson(JsonUtil.toJson(sanitizeUploadPolicy(uploadPolicy)));
-            entity.setSortIndex(i);
-            entity.setStatus("ACTIVE");
-            entity.setCreatedTime(now);
-            entity.setUpdatedTime(now);
-            models.add(entity);
+            models.add(toModelEntity(provider.id(), provider.models().get(i), i, now));
         }
         return models;
+    }
+
+    private LlmProviderModelEntity toModelEntity(String providerId,
+                                                 ModelConfigDto.Model model,
+                                                 int sortIndex,
+                                                 LocalDateTime now) {
+        ModelMetadata metadata = modelCatalogService.resolve(providerId, model.id());
+        List<String> inputModalities = metadata.matched()
+                ? metadata.inputModalities()
+                : sanitizeCapabilities(model.capabilities()).isEmpty() ? metadata.inputModalities() : sanitizeCapabilities(model.capabilities());
+        ModelConfigDto.UploadPolicy uploadPolicy = metadata.matched()
+                ? metadata.uploadPolicy()
+                : model.uploadPolicy() == null ? metadata.uploadPolicy() : model.uploadPolicy();
+        LlmProviderModelEntity entity = new LlmProviderModelEntity();
+        entity.setProviderId(providerId);
+        entity.setModelId(model.id());
+        entity.setModelName(model.name());
+        entity.setCapabilitiesJson(JsonUtil.toJson(inputModalities));
+        entity.setReasoning((metadata.matched() ? metadata.reasoning() : model.reasoning()) ? 1 : 0);
+        entity.setContextWindow(sanitizeNonNegative(metadata.matched() ? metadata.contextWindowTokens() : model.contextWindow()));
+        entity.setMaxInputTokens(sanitizeNonNegative(metadata.matched() ? metadata.maxInputTokens() : model.maxInputTokens()));
+        entity.setMaxOutputTokens(sanitizeNonNegative(metadata.matched() ? metadata.maxOutputTokens() : model.maxOutputTokens()));
+        entity.setUploadPolicyJson(JsonUtil.toJson(sanitizeUploadPolicy(uploadPolicy)));
+        entity.setSortIndex(sortIndex);
+        entity.setStatus("ACTIVE");
+        entity.setCreatedTime(now);
+        entity.setUpdatedTime(now);
+        return entity;
     }
 
     private ModelConfigDto.Provider toProviderDto(LlmProviderConfigEntity config, List<LlmProviderModelEntity> models) {
