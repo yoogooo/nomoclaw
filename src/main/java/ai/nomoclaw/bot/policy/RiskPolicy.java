@@ -28,7 +28,7 @@ public class RiskPolicy {
     public RiskLevel evaluateRisk(String toolName, JsonNode toolArgs) {
         String tool = toolName == null ? "" : toolName.toLowerCase();
         if (tool.startsWith("mcp_")) {
-            return RiskLevel.HIGH;
+            return RiskLevel.LOW;
         }
         if (tool.contains("command")) {
             String cmd = toolArgs == null ? "" : toolArgs.path("command").asText("").toLowerCase();

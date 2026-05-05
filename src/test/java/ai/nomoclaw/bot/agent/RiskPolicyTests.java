@@ -53,4 +53,11 @@ class RiskPolicyTests {
         assertEquals(RiskLevel.LOW, riskPolicy.evaluateRisk("WebSearchTool", JsonNodeFactory.instance.objectNode()));
         assertEquals(RiskLevel.LOW, riskPolicy.evaluateRisk("WebFetchTool", JsonNodeFactory.instance.objectNode()));
     }
+
+    @Test
+    void mcpToolsShouldBeLowRisk() {
+        AgentProperties properties = new AgentProperties();
+        RiskPolicy riskPolicy = new RiskPolicy(properties);
+        assertEquals(RiskLevel.LOW, riskPolicy.evaluateRisk("mcp_maps_weather_91b24b61", JsonNodeFactory.instance.objectNode()));
+    }
 }

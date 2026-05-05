@@ -111,6 +111,18 @@ public class PermissionEngine {
             );
         }
 
+        if (isMcpBaselineAllowed(context)) {
+            return new PermissionDecision(
+                    PermissionEffect.ALLOW,
+                    ToolPolicyReasonCode.RULE_ALLOW_MATCHED,
+                    "MCP 工具默认放行。",
+                    PermissionSource.COMMAND,
+                    "mcp-default-allow",
+                    firstPath(details),
+                    false
+            );
+        }
+
         if (isBuiltinReadonlyTool(context.toolName())) {
             return new PermissionDecision(
                     PermissionEffect.ALLOW,
@@ -408,5 +420,9 @@ public class PermissionEngine {
         return "croncreatetool".equals(tool)
                 || "crondeletetool".equals(tool)
                 || "cronlisttool".equals(tool);
+    }
+
+    private boolean isMcpBaselineAllowed(ToolPolicyContext context) {
+        return normalize(context.toolName()).startsWith("mcp_");
     }
 }

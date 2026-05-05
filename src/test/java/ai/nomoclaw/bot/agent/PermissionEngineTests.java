@@ -265,6 +265,45 @@ class PermissionEngineTests {
         }
     }
 
+    @Test
+    void mcpToolShouldAllowByBaseline() {
+        StubSettingsStore settings = new StubSettingsStore();
+        SessionPermissionStore sessionStore = new SessionPermissionStore();
+        PermissionEngine engine = new PermissionEngine(settings, sessionStore, new CommandRuleResolver(), new HardGuardService());
+
+        ObjectNode args = JsonNodeFactory.instance.objectNode();
+        args.put("city", "北京");
+
+        PermissionDecision decision = engine.evaluate(toolContext("mcp_maps_weather_91b24b61", args));
+
+        assertEquals(PermissionEffect.ALLOW, decision.effect());
+        assertEquals("mcp-default-allow", decision.matchedRuleId());
+    }
+
+    @Test
+    void explicitMcpDenyRuleShouldOverrideBaselineAllow() {
+        StubSettingsStore settings = new StubSettingsStore();
+        settings.userRules = List.of(new PermissionRule(
+                "r-user-deny-mcp",
+                PermissionSource.USER_SETTINGS,
+                PermissionEffect.DENY,
+                "mcp_*",
+                "*",
+                PermissionResourceType.ANY,
+                "",
+                "",
+                null,
+                true
+        ));
+        SessionPermissionStore sessionStore = new SessionPermissionStore();
+        PermissionEngine engine = new PermissionEngine(settings, sessionStore, new CommandRuleResolver(), new HardGuardService());
+
+        PermissionDecision decision = engine.evaluate(toolContext("mcp_maps_weather_91b24b61", JsonNodeFactory.instance.objectNode()));
+
+        assertEquals(PermissionEffect.DENY, decision.effect());
+        assertEquals("r-user-deny-mcp", decision.matchedRuleId());
+    }
+
     private PermissionRule rule(String id, PermissionSource source, PermissionEffect effect) {
         return new PermissionRule(
                 id,
