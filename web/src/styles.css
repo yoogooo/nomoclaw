@@ -1093,7 +1093,7 @@ a {
   border-radius: var(--size-12);
   overflow: hidden;
   background: var(--color-overlay-white-76);
-  box-shadow: 0 var(--size-8) var(--size-20) var(--color-shadow-surface);
+  box-shadow: none;
 }
 
 .message-html thead {
