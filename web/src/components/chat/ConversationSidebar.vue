@@ -427,7 +427,7 @@ function handleAgentChange(agentUid: string | number | null) {
   display: flex;
   flex-shrink: 0;
   align-self: center;
-  margin-right: calc(var(--space-2) * -1);
+  margin-right: var(--space-1);
 }
 
 .history-menu-button {
@@ -503,7 +503,6 @@ function handleAgentChange(agentUid: string | number | null) {
   .conversation-list {
     width: 100%;
     margin: 0;
-    max-height: var(--size-280);
   }
 
   .conversation-row {
