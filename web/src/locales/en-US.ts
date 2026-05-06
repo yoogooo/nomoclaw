@@ -817,13 +817,15 @@ const enUS = {
     status: {
       configured: "Configured",
       pendingLocalUrl: "Local URL required",
-      pendingApiKey: "API key required"
+      pendingApiKey: "API key required",
+      pendingCodexLogin: "Codex login required"
     },
     actions: {
       editConfig: "Edit Config",
       loadLocalModels: "Load Local Models",
       addModel: "Add Model",
-      testConnection: "Test Connection"
+      testConnection: "Test Connection",
+      codexLogin: "Log in to Codex"
     },
     labels: {
       defaultModel: "Default Model",
@@ -871,7 +873,9 @@ const enUS = {
       localModelsLoaded: "Local Ollama models loaded",
       localModelsLoadFailed: "Failed to load local models",
       connectionTestSuccess: "Connection test succeeded",
-      connectionTestFailed: "Connection test failed"
+      connectionTestFailed: "Connection test failed",
+      codexLoginStarted: "Codex login page opened",
+      codexLoginFailed: "Failed to open Codex login page"
     }
   },
   pages: {

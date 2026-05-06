@@ -22,11 +22,11 @@ public final class ModelProviderDefaults {
                         "",
                         "gpt-5.5",
                         List.of(
-                                model("gpt-5.5", "GPT-5.5", List.of("text"), true, 0, 0, 0, disabledUpload()),
-                                model("gpt-5.4", "GPT-5.4", List.of("text"), true, 0, 0, 0, disabledUpload()),
-                                model("gpt-5.4-mini", "GPT-5.4 Mini", List.of("text"), true, 0, 0, 0, disabledUpload()),
-                                model("gpt-5.3-codex", "GPT-5.3 Codex", List.of("text"), true, 0, 0, 0, disabledUpload()),
-                                model("gpt-5.2", "GPT-5.2", List.of("text"), true, 0, 0, 0, disabledUpload())
+                                model("gpt-5.5", "GPT-5.5", List.of("text", "image"), true, 0, 0, 0, imageUpload()),
+                                model("gpt-5.4", "GPT-5.4", List.of("text", "image"), true, 0, 0, 0, imageUpload()),
+                                model("gpt-5.4-mini", "GPT-5.4 Mini", List.of("text", "image"), true, 0, 0, 0, imageUpload()),
+                                model("gpt-5.3-codex", "GPT-5.3 Codex", List.of("text", "image"), true, 0, 0, 0, imageUpload()),
+                                model("gpt-5.2", "GPT-5.2", List.of("text", "image"), true, 0, 0, 0, imageUpload())
                         )
                 ),
                 provider(
@@ -207,5 +207,9 @@ public final class ModelProviderDefaults {
 
     private static ModelConfigDto.UploadPolicy disabledUpload() {
         return new ModelConfigDto.UploadPolicy(false, List.of(), 0, 0, 0L, 0L, false, false);
+    }
+
+    private static ModelConfigDto.UploadPolicy imageUpload() {
+        return new ModelConfigDto.UploadPolicy(true, List.of("image"), 0, 5, 20971520L, 104857600L, true, false);
     }
 }

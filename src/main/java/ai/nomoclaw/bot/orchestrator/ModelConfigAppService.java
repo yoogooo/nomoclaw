@@ -12,6 +12,7 @@ import ai.nomoclaw.bot.util.JsonUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.JsonNode;
 
 import java.net.URI;
@@ -23,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -242,6 +244,45 @@ public class ModelConfigAppService {
         }
         requestOpenAiModels(provider.name(), baseUrl, apiKey);
         return new ProbeResult(true, "连接成功，" + provider.name() + " API 可访问");
+    }
+
+    public ProbeResult startCodexLogin() {
+        CodexTokenProvider.AuthStatus status = codexAuthStatus();
+        if (status.configured()) {
+            return new ProbeResult(true, status.message());
+        }
+        if (!codexCliAvailable()) {
+            throw new IllegalArgumentException("未找到 Codex CLI，请先安装 Codex，并在终端确认 codex login 可执行");
+        }
+        try {
+            new ProcessBuilder("zsh", "-lc", "codex login")
+                    .redirectInput(ProcessBuilder.Redirect.PIPE)
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .start();
+            return new ProbeResult(true, "已打开 Codex 登录页面，请在浏览器完成授权后重新检测");
+        } catch (Exception ex) {
+            log.warn("failed to start codex login", ex);
+            throw new IllegalArgumentException("无法启动 codex login，请确认 Codex CLI 已安装并在终端手动运行 codex login");
+        }
+    }
+
+    private boolean codexCliAvailable() {
+        try {
+            Process process = new ProcessBuilder("zsh", "-lc", "command -v codex")
+                    .redirectInput(ProcessBuilder.Redirect.PIPE)
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .start();
+            if (!process.waitFor(5, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                return false;
+            }
+            return process.exitValue() == 0;
+        } catch (Exception ex) {
+            log.warn("failed to detect codex cli", ex);
+            return false;
+        }
     }
 
     private void initializeDefaultsIfNeeded() {
@@ -565,21 +606,61 @@ public class ModelConfigAppService {
 
     private ModelConfigDto.Model toModelDto(String providerId, LlmProviderModelEntity entity) {
         ModelMetadata metadata = modelCatalogService.resolve(providerId, entity.getModelId());
+        ModelConfigDto.Model builtin = builtinModel(providerId, entity.getModelId());
         String name = trim(entity.getModelName()).isBlank()
                 ? trim(metadata.displayName()).isBlank() ? entity.getModelId() : metadata.displayName()
                 : entity.getModelName();
+        List<String> capabilities = metadata.matched()
+                ? metadata.inputModalities()
+                : builtin == null ? storedCapabilities(entity) : builtin.capabilities();
+        ModelConfigDto.UploadPolicy uploadPolicy = metadata.matched()
+                ? metadata.uploadPolicy()
+                : builtin == null ? storedUploadPolicy(entity) : builtin.uploadPolicy();
         return new ModelConfigDto.Model(
                 entity.getModelId(),
                 name,
-                metadata.inputModalities(),
-                metadata.reasoning(),
-                metadata.contextWindowTokens(),
-                metadata.maxInputTokens(),
-                metadata.maxOutputTokens(),
-                metadata.uploadPolicy(),
+                capabilities,
+                metadata.matched() ? metadata.reasoning() : builtin == null ? entity.getReasoning() != null && entity.getReasoning() == 1 : builtin.reasoning(),
+                metadata.matched() ? metadata.contextWindowTokens() : builtin == null ? sanitizeNonNegative(entity.getContextWindow()) : builtin.contextWindow(),
+                metadata.matched() ? metadata.maxInputTokens() : builtin == null ? sanitizeNonNegative(entity.getMaxInputTokens()) : builtin.maxInputTokens(),
+                metadata.matched() ? metadata.maxOutputTokens() : builtin == null ? sanitizeNonNegative(entity.getMaxOutputTokens()) : builtin.maxOutputTokens(),
+                uploadPolicy,
                 metadata.matched(),
                 metadata.source()
         );
+    }
+
+    private ModelConfigDto.Model builtinModel(String providerId, String modelId) {
+        for (ModelConfigDto.Provider provider : ModelProviderDefaults.providers()) {
+            if (!provider.id().equals(trim(providerId))) {
+                continue;
+            }
+            for (ModelConfigDto.Model model : provider.models()) {
+                if (model.id().equals(trim(modelId))) {
+                    return model;
+                }
+            }
+        }
+        return null;
+    }
+
+    private List<String> storedCapabilities(LlmProviderModelEntity entity) {
+        List<String> capabilities = JsonUtil.fromJsonQuietly(
+                defaultString(entity.getCapabilitiesJson()),
+                new TypeReference<List<String>>() {}
+        ).orElse(List.of());
+        List<String> sanitized = sanitizeCapabilities(capabilities);
+        return sanitized.isEmpty() ? List.of("text") : sanitized;
+    }
+
+    private ModelConfigDto.UploadPolicy storedUploadPolicy(LlmProviderModelEntity entity) {
+        return JsonUtil.fromJsonQuietly(defaultString(entity.getUploadPolicyJson()), ModelConfigDto.UploadPolicy.class)
+                .map(this::sanitizeUploadPolicy)
+                .orElseGet(this::disabledUploadPolicy);
+    }
+
+    private ModelConfigDto.UploadPolicy disabledUploadPolicy() {
+        return new ModelConfigDto.UploadPolicy(false, List.of(), 0, 0, 0L, 0L, false, false);
     }
 
     private Map<String, Integer> providerSortOrder(List<ModelConfigDto.Provider> defaults) {

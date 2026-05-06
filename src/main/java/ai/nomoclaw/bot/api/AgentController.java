@@ -330,6 +330,13 @@ public class AgentController {
         return new ModelProviderTestResponse(result.success(), result.message());
     }
 
+    @PostMapping("/system/models/codex/login")
+    public ModelProviderTestResponse startCodexLogin() {
+        log.info("[AgentAPI] startCodexLogin");
+        ModelConfigAppService.ProbeResult result = modelConfigAppService.startCodexLogin();
+        return new ModelProviderTestResponse(result.success(), result.message());
+    }
+
     @PatchMapping("/agents/{agentUid}/skills/{skillKey}")
     public AgentSkillResponse updateAgentSkillStatus(@PathVariable String agentUid,
                                                      @PathVariable String skillKey,

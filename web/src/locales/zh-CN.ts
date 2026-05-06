@@ -817,13 +817,15 @@ const zhCN = {
     status: {
       configured: "已配置",
       pendingLocalUrl: "待填写本地地址",
-      pendingApiKey: "待填写密钥"
+      pendingApiKey: "待填写密钥",
+      pendingCodexLogin: "待登录 Codex"
     },
     actions: {
       editConfig: "编辑配置",
       loadLocalModels: "加载本地模型",
       addModel: "新增模型",
-      testConnection: "测试连接"
+      testConnection: "测试连接",
+      codexLogin: "登录 Codex"
     },
     labels: {
       defaultModel: "默认模型",
@@ -871,7 +873,9 @@ const zhCN = {
       localModelsLoaded: "已加载本地 Ollama 模型",
       localModelsLoadFailed: "加载本地模型失败",
       connectionTestSuccess: "连接测试成功",
-      connectionTestFailed: "连接测试失败"
+      connectionTestFailed: "连接测试失败",
+      codexLoginStarted: "已打开 Codex 登录页面",
+      codexLoginFailed: "无法打开 Codex 登录页面"
     }
   },
   pages: {

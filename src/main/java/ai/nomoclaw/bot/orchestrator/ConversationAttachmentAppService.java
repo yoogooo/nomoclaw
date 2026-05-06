@@ -400,13 +400,20 @@ public class ConversationAttachmentAppService {
             for (ModelConfigDto.Model model : provider.models()) {
                 if (model.id().equals(trim(modelName))) {
                     ModelMetadata metadata = modelCatalogService.resolve(provider.id(), model.id());
-                    return metadata.uploadPolicy() == null
-                            ? new ModelConfigDto.UploadPolicy(false, List.of(), 0, 0, 0L, 0L, false, false)
-                            : metadata.uploadPolicy();
+                    if (metadata.matched()) {
+                        return metadata.uploadPolicy() == null
+                                ? disabledUploadPolicy()
+                                : metadata.uploadPolicy();
+                    }
+                    return model.uploadPolicy() == null ? disabledUploadPolicy() : model.uploadPolicy();
                 }
             }
         }
         throw new IllegalArgumentException("model not configured: " + modelProvider + "/" + modelName);
+    }
+
+    private ModelConfigDto.UploadPolicy disabledUploadPolicy() {
+        return new ModelConfigDto.UploadPolicy(false, List.of(), 0, 0, 0L, 0L, false, false);
     }
 
     private String formatBytes(long bytes) {

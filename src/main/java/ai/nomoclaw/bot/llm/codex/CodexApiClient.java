@@ -5,9 +5,13 @@ import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.Content;
+import dev.langchain4j.data.message.ImageContent;
 import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.TextContent;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.data.image.Image;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.request.ToolChoice;
 import dev.langchain4j.model.chat.request.json.JsonArraySchema;
@@ -291,7 +295,7 @@ final class CodexApiClient {
             } else if (message instanceof UserMessage userMessage) {
                 Map<String, Object> item = new LinkedHashMap<>();
                 item.put("role", "user");
-                item.put("content", userMessage.hasSingleText() ? userMessage.singleText() : userMessage.toString());
+                item.put("content", toUserContent(userMessage));
                 input.add(item);
             } else if (message instanceof AiMessage aiMessage) {
                 input.addAll(toAssistantInput(aiMessage));
@@ -302,6 +306,45 @@ final class CodexApiClient {
             }
         }
         return input;
+    }
+
+    private Object toUserContent(UserMessage userMessage) {
+        if (userMessage.hasSingleText()) {
+            return userMessage.singleText();
+        }
+        List<Map<String, Object>> content = new ArrayList<>();
+        for (Content item : userMessage.contents()) {
+            if (item instanceof TextContent textContent) {
+                Map<String, Object> part = new LinkedHashMap<>();
+                part.put("type", "input_text");
+                part.put("text", textContent.text());
+                content.add(part);
+            } else if (item instanceof ImageContent imageContent) {
+                Map<String, Object> part = new LinkedHashMap<>();
+                part.put("type", "input_image");
+                part.put("image_url", imageUrl(imageContent.image()));
+                content.add(part);
+            }
+        }
+        if (content.isEmpty()) {
+            return userMessage.toString();
+        }
+        return content;
+    }
+
+    private String imageUrl(Image image) {
+        if (image == null) {
+            throw new IllegalArgumentException("Codex image input is empty");
+        }
+        if (image.url() != null) {
+            return image.url().toString();
+        }
+        String base64Data = trim(image.base64Data());
+        if (!base64Data.isBlank()) {
+            String mimeType = trim(image.mimeType()).isBlank() ? "image/png" : trim(image.mimeType());
+            return "data:" + mimeType + ";base64," + base64Data;
+        }
+        throw new IllegalArgumentException("Codex image input requires URL or base64 data");
     }
 
     private List<Map<String, Object>> toAssistantInput(AiMessage aiMessage) {
