@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { NButton } from "naive-ui";
 import DirectoryRail from "@/components/chat/DirectoryRail.vue";
 import AppPageHeader from "@/components/layout/AppPageHeader.vue";
 import CronCreateModal from "@/components/cron/CronCreateModal.vue";
 import CronListPanel from "@/components/cron/CronListPanel.vue";
+import CronExecutionTimelinePanel from "@/components/cron/CronExecutionTimelinePanel.vue";
 import CronEditModal from "@/components/cron/CronEditModal.vue";
 import { buildCronTaskTemplates } from "@/components/cron/cronTaskTemplates";
 import { message } from "@/discrete";
@@ -18,8 +19,31 @@ const createTemplateId = ref<string | null>(null);
 const showEditModal = ref(false);
 const editingJob = ref<CronJob | null>(null);
 const hasJobs = computed(() => cronJobsStore.jobs.length > 0);
+const ACTIVE_EXECUTION_STATUSES = new Set(["RUNNING", "IN_PROGRESS", "WAITING_APPROVAL"]);
+const hasRunningJobs = computed(() => {
+  const completedExecutionUids = new Set(
+    cronJobsStore.recentGlobalResults
+      .map((item) => String(item.executionUid || "").trim())
+      .filter((uid) => uid.length > 0)
+  );
+  return cronJobsStore.jobs.some((job) => {
+    const executionUid = String(job.currentExecutionUid || "").trim();
+    if (!executionUid) {
+      return false;
+    }
+    const normalizedStatus = String(job.currentExecutionStatus || "").toUpperCase();
+    if (ACTIVE_EXECUTION_STATUSES.has(normalizedStatus)) {
+      return true;
+    }
+    if (String(job.triggerState || "").toUpperCase() === "BLOCKED") {
+      return true;
+    }
+    return !completedExecutionUids.has(executionUid);
+  });
+});
 const { t } = useI18n();
 const cronTaskTemplates = computed(() => buildCronTaskTemplates(t));
+let executionPollTimer: number | null = null;
 
 function openCreateModal(templateId?: string) {
   createTemplateId.value = templateId ?? null;
@@ -42,8 +66,34 @@ async function refreshJobs() {
   }
 }
 
+function stopExecutionPolling() {
+  if (executionPollTimer !== null) {
+    window.clearInterval(executionPollTimer);
+    executionPollTimer = null;
+  }
+}
+
+function startExecutionPolling() {
+  stopExecutionPolling();
+  executionPollTimer = window.setInterval(async () => {
+    if (!hasRunningJobs.value) {
+      return;
+    }
+    try {
+      await cronJobsStore.refreshExecutionState();
+    } catch {
+      // Polling is best-effort; manual refresh remains available.
+    }
+  }, 3000);
+}
+
 onMounted(() => {
   void cronJobsStore.refresh(null);
+  startExecutionPolling();
+});
+
+onBeforeUnmount(() => {
+  stopExecutionPolling();
 });
 </script>
 
@@ -64,6 +114,7 @@ onMounted(() => {
 
           <div v-if="hasJobs" class="grid-cron cron-page-grid">
             <CronListPanel @create="openCreateModal()" @edit="openEditModal" />
+            <CronExecutionTimelinePanel />
           </div>
 
           <div v-else class="panel cron-empty-layout">
@@ -120,11 +171,13 @@ onMounted(() => {
 }
 
 .cron-page-grid {
-  grid-template-columns: 1fr;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   min-height: 0;
   height: auto;
   max-height: none;
   padding: 0;
+  gap: var(--space-4);
 }
 
 .cron-empty-layout {

@@ -19,11 +19,12 @@ function executionStatusText(status: string | null | undefined) {
   return normalized || t("common.unknown");
 }
 
-function openExecution(result: { executionUid?: string | null }) {
+function openExecution(result: { executionUid?: string | null; conversationUid?: string | null; messageUid?: string | null }) {
   if (!result.executionUid) {
     return;
   }
-  void router.push(`/cron/executions/${result.executionUid}`);
+  void cronJobsStore.markExecutionRead(result.executionUid);
+  void router.push(`/cron/executions/${result.executionUid}/chat`);
 }
 </script>
 

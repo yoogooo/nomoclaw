@@ -26,6 +26,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @Slf4j
@@ -59,13 +60,19 @@ public class CronJobExecutionService {
 
         Instant executedAt = Instant.now();
         LocalDateTime now = LocalDateTime.now();
+        CurrentExecutionContext currentExecution = resolveOrCreateCurrentExecution(job, now);
+        String executionUid = currentExecution.executionUid();
+        String conversationUid = currentExecution.conversationUid();
+        String messageUid = currentExecution.messageUid();
         try {
-            // Mark scheduled runs with channel=cron so planner/executor can apply cron-specific safeguards.
-            String conversationUid = agentApplicationService.createConversation("", job.getAgentUid(), "cron");
-            String messageUid = agentApplicationService.submitMessage(conversationUid, job.getTaskContent(), "cron");
+            if (conversationUid == null || conversationUid.isBlank() || messageUid == null || messageUid.isBlank()) {
+                // Mark scheduled runs with channel=cron so planner/executor can apply cron-specific safeguards.
+                conversationUid = agentApplicationService.createConversation("", job.getAgentUid(), "cron");
+                messageUid = agentApplicationService.submitMessage(conversationUid, job.getTaskContent(), "cron");
+                markCurrentExecution(job, executionUid, conversationUid, messageUid, now);
+            }
             AgentMessage completedMessage = waitForCompletion(messageUid);
             String finalContent = loadFinalAnswer(conversationUid, messageUid, completedMessage);
-            String executionUid = java.util.UUID.randomUUID().toString();
             Path reportPath = writeReport(job, finalContent, executedAt, completedMessage.status().name());
             notifyCompletion(job, finalContent, reportPath, executedAt, completedMessage.status().name());
             updateJobResult(job, now, summarize(finalContent), reportPath, "COMPLETED", executionUid, conversationUid, messageUid);
@@ -73,9 +80,68 @@ public class CronJobExecutionService {
             Path reportPath = writeFailureReportSafely(job, ex, executedAt);
             String failureSummary = summarize(ex.getMessage() == null ? "cron execution failed" : ex.getMessage());
             notifyCompletion(job, failureSummary, reportPath, executedAt, "FAILED");
-            updateJobResult(job, now, failureSummary, reportPath, "FAILED", java.util.UUID.randomUUID().toString(), job.getConversationUid(), job.getMessageUid());
+            updateJobResult(job, now, failureSummary, reportPath, "FAILED", executionUid, conversationUid, messageUid);
             log.error("[Quartz] cron job execution failed jobUid={}", jobUid, ex);
         }
+    }
+
+    public String initializeCurrentExecution(String jobUid, LocalDateTime now) {
+        AgentCronJobEntity job = agentCronJobRepository.findByJobUid(jobUid);
+        if (job == null) {
+            throw new IllegalArgumentException("cron job not found: " + jobUid);
+        }
+        String executionUid = UUID.randomUUID().toString();
+        // Manual trigger: create conversation/message immediately so UI can open execution chat right away.
+        String conversationUid = agentApplicationService.createConversation("", job.getAgentUid(), "cron");
+        String messageUid = agentApplicationService.submitMessage(conversationUid, job.getTaskContent(), "cron");
+        markCurrentExecution(job, executionUid, conversationUid, messageUid, now);
+        return executionUid;
+    }
+
+    private CurrentExecutionContext resolveOrCreateCurrentExecution(AgentCronJobEntity job, LocalDateTime now) {
+        JsonNode extNode = job.getExtConfig() == null || job.getExtConfig().isBlank()
+                ? JsonNodeFactory.instance.objectNode()
+                : JsonUtil.fromJsonQuietly(job.getExtConfig(), JsonNode.class).orElse(JsonNodeFactory.instance.objectNode());
+        JsonNode currentExecution = extNode.path("currentExecution");
+        String existingExecutionUid = currentExecution.path("executionUid").asText("");
+        String existingConversationUid = currentExecution.path("conversationUid").asText("");
+        String existingMessageUid = currentExecution.path("messageUid").asText("");
+        if (!existingExecutionUid.isBlank()) {
+            return new CurrentExecutionContext(
+                    existingExecutionUid,
+                    existingConversationUid.isBlank() ? null : existingConversationUid,
+                    existingMessageUid.isBlank() ? null : existingMessageUid
+            );
+        }
+        String generatedExecutionUid = UUID.randomUUID().toString();
+        markCurrentExecution(job, generatedExecutionUid, null, null, now);
+        return new CurrentExecutionContext(generatedExecutionUid, null, null);
+    }
+
+    private void markCurrentExecution(AgentCronJobEntity job,
+                                      String executionUid,
+                                      String conversationUid,
+                                      String messageUid,
+                                      LocalDateTime now) {
+        String normalizedConversationUid = conversationUid == null ? "" : conversationUid;
+        String normalizedMessageUid = messageUid == null ? "" : messageUid;
+        ObjectNode extConfig = job.getExtConfig() == null || job.getExtConfig().isBlank()
+                ? JsonNodeFactory.instance.objectNode()
+                : (ObjectNode) JsonUtil.fromJsonQuietly(job.getExtConfig(), tools.jackson.databind.JsonNode.class)
+                .orElse(JsonNodeFactory.instance.objectNode());
+        ObjectNode currentExecution = JsonNodeFactory.instance.objectNode();
+        currentExecution.put("executionUid", executionUid == null ? "" : executionUid);
+        currentExecution.put("conversationUid", normalizedConversationUid);
+        currentExecution.put("messageUid", normalizedMessageUid);
+        currentExecution.put("status", "RUNNING");
+        currentExecution.put("startedTime", now.toString());
+        extConfig.set("currentExecution", currentExecution);
+        agentCronJobRepository.update(new LambdaUpdateWrapper<AgentCronJobEntity>()
+                .eq(AgentCronJobEntity::getJobUid, job.getJobUid())
+                .set(AgentCronJobEntity::getConversationUid, normalizedConversationUid)
+                .set(AgentCronJobEntity::getMessageUid, normalizedMessageUid)
+                .set(AgentCronJobEntity::getExtConfig, JsonUtil.toJson(extConfig))
+                .set(AgentCronJobEntity::getUpdatedTime, now));
     }
 
     private AgentMessage waitForCompletion(String messageUid) throws InterruptedException {
@@ -162,12 +228,15 @@ public class CronJobExecutionService {
                                  String executionUid,
                                  String conversationUid,
                                  String messageUid) {
+        String normalizedConversationUid = conversationUid == null ? "" : conversationUid;
+        String normalizedMessageUid = messageUid == null ? "" : messageUid;
         ObjectNode extConfig = job.getExtConfig() == null || job.getExtConfig().isBlank()
                 ? JsonNodeFactory.instance.objectNode()
                 : (ObjectNode) JsonUtil.fromJsonQuietly(job.getExtConfig(), tools.jackson.databind.JsonNode.class)
                 .orElse(JsonNodeFactory.instance.objectNode());
         extConfig.put("lastReportPath", reportPath == null ? "" : reportPath.toString());
-        appendExecutionResult(extConfig, now, summary, reportPath, executionStatus, executionUid, conversationUid, messageUid);
+        extConfig.remove("currentExecution");
+        appendExecutionResult(extConfig, now, summary, reportPath, executionStatus, executionUid, normalizedConversationUid, normalizedMessageUid);
         LocalDateTime nextRunTime = cronJobSchedulerService.nextRunTime(job.getJobUid(), job.getTimezone());
         String nextStatus = job.getStatus();
         if (nextRunTime == null && "ACTIVE".equalsIgnoreCase(job.getStatus())) {
@@ -179,8 +248,8 @@ public class CronJobExecutionService {
                 .set(AgentCronJobEntity::getNextRunTime, nextRunTime)
                 .set(AgentCronJobEntity::getStatus, nextStatus)
                 .set(AgentCronJobEntity::getLastResult, summary == null ? "" : summary)
-                .set(AgentCronJobEntity::getConversationUid, conversationUid)
-                .set(AgentCronJobEntity::getMessageUid, messageUid)
+                .set(AgentCronJobEntity::getConversationUid, normalizedConversationUid)
+                .set(AgentCronJobEntity::getMessageUid, normalizedMessageUid)
                 .set(AgentCronJobEntity::getExtConfig, JsonUtil.toJson(extConfig))
                 .set(AgentCronJobEntity::getUpdatedTime, now));
     }
@@ -205,6 +274,7 @@ public class CronJobExecutionService {
         current.put("status", status == null ? "" : status);
         current.put("summary", summary == null ? "" : summary);
         current.put("reportPath", reportPath == null ? "" : reportPath.toString());
+        current.put("read", false);
         next.add(current);
         for (JsonNode item : existing) {
             if (next.size() >= 20) {
@@ -234,5 +304,8 @@ public class CronJobExecutionService {
             return "";
         }
         return text.length() <= 200 ? text : text.substring(0, 200) + "...";
+    }
+
+    private record CurrentExecutionContext(String executionUid, String conversationUid, String messageUid) {
     }
 }

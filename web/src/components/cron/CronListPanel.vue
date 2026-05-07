@@ -154,7 +154,6 @@ function onJobMouseLeave(jobUid: string) {
                   v-show="!isGroupCollapsed(group.label)"
                   :key="job.jobUid"
                   class="cron-job-row"
-                  :class="{ active: job.jobUid === cronJobsStore.selectedJobUid }"
                   @mouseenter="hoveredJobUid = job.jobUid"
                   @mouseleave="onJobMouseLeave(job.jobUid)"
                 >
@@ -253,7 +252,7 @@ function onJobMouseLeave(jobUid: string) {
 .cron-list-header-top {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
 }
@@ -269,6 +268,11 @@ function onJobMouseLeave(jobUid: string) {
 
 .cron-list-header .panel-subtitle {
   max-width: var(--size-360);
+}
+
+.cron-list-header .panel-title {
+  font-size: var(--text-title-sm-size);
+  line-height: 1.12;
 }
 
 .cron-list-panel {
@@ -338,7 +342,7 @@ function onJobMouseLeave(jobUid: string) {
 }
 
 .cron-group-title {
-  font-size: var(--text-title-sm-size);
+  font-size: var(--text-body-size);
   font-weight: 600;
   color: var(--color-text-heading);
 }
@@ -408,15 +412,6 @@ function onJobMouseLeave(jobUid: string) {
 
 .icon-action-btn-danger:hover :deep(.n-button__state) {
   background-color: color-mix(in srgb, var(--color-danger-500) 18%, transparent);
-}
-
-.cron-job-row.active td {
-  border-color: var(--color-overlay-slate-28);
-  background: var(--color-overlay-slate-16);
-}
-
-.cron-job-row:hover td {
-  background: var(--color-overlay-slate-16);
 }
 
 .cron-main {

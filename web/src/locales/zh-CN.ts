@@ -377,7 +377,7 @@ const zhCN = {
       endAtAfterFirstRun: "截止日期必须晚于首次触发时间"
     },
     list: {
-      title: "任务列表",
+      title: "任务计划",
       subtitle: "按 Agent 分组查看调度中的任务，支持批量管理。",
       createTask: "创建任务",
       createFirstTask: "创建第一个任务",
@@ -487,6 +487,14 @@ const zhCN = {
         wecom: "企业微信",
         weixin: "微信"
       }
+    },
+    execution: {
+      runningSectionTitle: "执行中",
+      completedSectionTitle: "已完成",
+      runningTag: "运行中",
+      viewExecutionDetail: "查看运行详情",
+      noRunningTasks: "当前没有执行中的任务。",
+      noCompletedTasks: "当前没有已完成的执行记录。"
     },
     empty: {
       title: "还没有定时任务",
@@ -703,11 +711,11 @@ const zhCN = {
     },
     time: {
       justNow: "刚刚",
-      minutesAgo: "{count}分钟前",
-      hoursAgo: "{count}小时前",
-      daysAgo: "{count}天前",
-      monthsAgo: "{count}个月前",
-      yearsAgo: "{count}年前"
+      minutesAgo: "{count} 分钟前",
+      hoursAgo: "{count} 小时前",
+      daysAgo: "{count} 天前",
+      monthsAgo: "{count} 个月前",
+      yearsAgo: "{count} 年前"
     }
   },
   channels: {

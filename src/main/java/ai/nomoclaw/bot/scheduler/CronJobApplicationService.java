@@ -1,5 +1,6 @@
 package ai.nomoclaw.bot.scheduler;
 
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import ai.nomoclaw.bot.application.dto.BatchDeleteCronJobsDto;
 import ai.nomoclaw.bot.application.dto.CronJobReportDto;
 import ai.nomoclaw.bot.application.dto.CronJobDto;
@@ -18,6 +19,7 @@ import ai.nomoclaw.bot.store.entity.AgentCronJobEntity;
 import ai.nomoclaw.bot.store.repository.AgentDefinitionRepository;
 import ai.nomoclaw.bot.store.repository.AgentCronJobRepository;
 import ai.nomoclaw.bot.util.JsonUtil;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
@@ -48,6 +50,7 @@ public class CronJobApplicationService {
     private final CronChannelTargetResolver channelTargetResolver;
     private final ChannelBotCredentialResolver botCredentialResolver;
     private final ConversationAppService conversationAppService;
+    private final CronJobExecutionService cronJobExecutionService;
 
     public CronJobApplicationService(AgentCronJobRepository agentCronJobRepository,
                                      CronJobSchedulerService cronJobSchedulerService,
@@ -56,7 +59,8 @@ public class CronJobApplicationService {
                                      AgentChannelsProperties channelsProperties,
                                      CronChannelTargetResolver channelTargetResolver,
                                      ChannelBotCredentialResolver botCredentialResolver,
-                                     ConversationAppService conversationAppService) {
+                                     ConversationAppService conversationAppService,
+                                     CronJobExecutionService cronJobExecutionService) {
         this.agentCronJobRepository = agentCronJobRepository;
         this.cronJobSchedulerService = cronJobSchedulerService;
         this.agentDefinitionRepository = agentDefinitionRepository;
@@ -65,6 +69,7 @@ public class CronJobApplicationService {
         this.channelTargetResolver = channelTargetResolver;
         this.botCredentialResolver = botCredentialResolver;
         this.conversationAppService = conversationAppService;
+        this.cronJobExecutionService = cronJobExecutionService;
     }
 
     public List<CronJobDto> listCronJobs() {
@@ -207,8 +212,10 @@ public class CronJobApplicationService {
 
     public CronJobDto runCronJob(String jobUid) {
         AgentCronJobEntity job = requireJob(jobUid);
+        cronJobExecutionService.initializeCurrentExecution(jobUid, LocalDateTime.now());
         cronJobSchedulerService.runNow(jobUid);
-        return toResponse(job, resolveAgent(job.getAgentUid()));
+        AgentCronJobEntity refreshedJob = requireJob(jobUid);
+        return toResponse(refreshedJob, resolveAgent(refreshedJob.getAgentUid()));
     }
 
     public void deleteCronJob(String jobUid) {
@@ -340,6 +347,47 @@ public class CronJobApplicationService {
         throw new IllegalArgumentException("execution not found: " + executionUid);
     }
 
+    public void markExecutionRead(String executionUid) {
+        if (executionUid == null || executionUid.isBlank()) {
+            throw new IllegalArgumentException("executionUid is required");
+        }
+        List<AgentCronJobEntity> jobs = agentCronJobRepository.listAllJobs();
+        for (AgentCronJobEntity job : jobs) {
+            if (job.getExtConfig() == null || job.getExtConfig().isBlank()) {
+                continue;
+            }
+            JsonNode extNode = JsonUtil.fromJsonQuietly(job.getExtConfig(), JsonNode.class)
+                    .orElse(JsonNodeFactory.instance.objectNode());
+            if (!(extNode instanceof ObjectNode extObject)) {
+                continue;
+            }
+            JsonNode rawResults = extObject.path("executionResults");
+            if (!(rawResults instanceof ArrayNode arrayNode) || arrayNode.isEmpty()) {
+                continue;
+            }
+            boolean changed = false;
+            for (JsonNode item : arrayNode) {
+                if (!(item instanceof ObjectNode resultNode)) {
+                    continue;
+                }
+                String itemExecutionUid = resultNode.path("executionUid").asText("");
+                if (executionUid.equals(itemExecutionUid)) {
+                    resultNode.put("read", true);
+                    changed = true;
+                    break;
+                }
+            }
+            if (changed) {
+                LocalDateTime now = LocalDateTime.now();
+                agentCronJobRepository.update(new LambdaUpdateWrapper<AgentCronJobEntity>()
+                        .eq(AgentCronJobEntity::getJobUid, job.getJobUid())
+                        .set(AgentCronJobEntity::getExtConfig, JsonUtil.toJson(extObject))
+                        .set(AgentCronJobEntity::getUpdatedTime, now));
+                return;
+            }
+        }
+    }
+
     public List<CronJobExecutionResultDto> listRecentResults(String jobUid, int limit) {
         AgentCronJobEntity job = requireJob(jobUid);
         int safeLimit = limit <= 0 ? 20 : Math.min(limit, 100);
@@ -386,11 +434,13 @@ public class CronJobApplicationService {
             String executionUid = item.path("executionUid").asText("");
             String conversationUid = item.path("conversationUid").asText("");
             String messageUid = item.path("messageUid").asText("");
+            boolean unread = !item.path("read").asBoolean(false);
             String normalizedExecutionUid = executionUid.isBlank()
                     ? buildLegacyExecutionUid(job.getJobUid(), executedText, conversationUid, messageUid, normalizedReportPath)
                     : executionUid;
             results.add(new CronJobExecutionResultDto(
                     normalizedExecutionUid,
+                    unread,
                     job.getJobUid(),
                     defaultCronJobTitle(job.getTitle(), job.getTaskContent()),
                     job.getAgentUid(),
@@ -472,6 +522,20 @@ public class CronJobApplicationService {
                 ? JsonNodeFactory.instance.objectNode()
                 : JsonUtil.fromJsonQuietly(job.getExtConfig(), JsonNode.class).orElse(JsonNodeFactory.instance.objectNode());
         String lastReportPath = extConfig.path("lastReportPath").asText("");
+        JsonNode currentExecution = extConfig.path("currentExecution");
+        String currentExecutionUid = currentExecution.path("executionUid").asText("");
+        String currentConversationUid = currentExecution.path("conversationUid").asText("");
+        String currentMessageUid = currentExecution.path("messageUid").asText("");
+        String currentExecutionStatus = currentExecution.path("status").asText("");
+        LocalDateTime currentExecutionStartedTime = null;
+        try {
+            String startedTimeText = currentExecution.path("startedTime").asText("");
+            if (!startedTimeText.isBlank()) {
+                currentExecutionStartedTime = LocalDateTime.parse(startedTimeText);
+            }
+        } catch (Exception ignored) {
+            currentExecutionStartedTime = null;
+        }
         return new CronJobDto(
                 job.getJobUid(),
                 job.getAgentUid(),
@@ -486,6 +550,11 @@ public class CronJobApplicationService {
                 readScheduleEndAt(job.getExtConfig()),
                 job.getTaskContent(),
                 job.getStatus(),
+                currentExecutionUid.isBlank() ? null : currentExecutionUid,
+                currentConversationUid.isBlank() ? null : currentConversationUid,
+                currentMessageUid.isBlank() ? null : currentMessageUid,
+                currentExecutionStatus.isBlank() ? null : currentExecutionStatus,
+                currentExecutionStartedTime,
                 job.getLastRunTime(),
                 job.getNextRunTime(),
                 job.getLastResult(),

@@ -377,7 +377,7 @@ const enUS = {
       endAtAfterFirstRun: "End date must be later than the first run"
     },
     list: {
-      title: "Task List",
+      title: "Task Plan",
       subtitle: "View scheduled tasks grouped by Agent and manage them in bulk.",
       createTask: "Create Task",
       createFirstTask: "Create First Task",
@@ -487,6 +487,14 @@ const enUS = {
         wecom: "WeCom",
         weixin: "Weixin"
       }
+    },
+    execution: {
+      runningSectionTitle: "Running",
+      completedSectionTitle: "Completed",
+      runningTag: "Running",
+      viewExecutionDetail: "View Execution Details",
+      noRunningTasks: "No running tasks at the moment.",
+      noCompletedTasks: "No completed execution records yet."
     },
     empty: {
       title: "No scheduled tasks yet",

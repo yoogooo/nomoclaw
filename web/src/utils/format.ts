@@ -8,6 +8,35 @@ export function formatDateTime(value?: string | null) {
   return new Date(value).toLocaleString(getSortLocale());
 }
 
+export function formatRelativeTime(value?: string | null) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+  const diffMs = Date.now() - date.getTime();
+  if (diffMs < 60_000) {
+    return tr("agents.time.justNow");
+  }
+  const minutes = Math.floor(diffMs / 60_000);
+  if (minutes < 60) {
+    return tr("agents.time.minutesAgo", { count: minutes });
+  }
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return tr("agents.time.hoursAgo", { count: hours });
+  }
+  const days = Math.floor(hours / 24);
+  if (days < 30) {
+    return tr("agents.time.daysAgo", { count: days });
+  }
+  const months = Math.floor(days / 30);
+  if (months < 12) {
+    return tr("agents.time.monthsAgo", { count: months });
+  }
+  return tr("agents.time.yearsAgo", { count: Math.floor(months / 12) });
+}
+
 export function formatFriendlyDateTime(value?: string | null, emptyFallback = "-") {
   if (!value) return emptyFallback;
   const date = new Date(value);

@@ -17,6 +17,41 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
   const recentGlobalResults = ref<CronJobExecutionResult[]>([]);
 
   const currentJob = computed(() => jobs.value.find((job) => job.jobUid === selectedJobUid.value) || null);
+  const ACTIVE_EXECUTION_STATUSES = new Set(["RUNNING", "IN_PROGRESS", "WAITING_APPROVAL"]);
+
+  function isJobExecutionActive(job: CronJob | undefined) {
+    if (!job) return false;
+    const executionUid = String(job.currentExecutionUid || "").trim();
+    if (!executionUid) return false;
+    const normalizedStatus = String(job.currentExecutionStatus || "").toUpperCase();
+    if (ACTIVE_EXECUTION_STATUSES.has(normalizedStatus)) {
+      return true;
+    }
+    if (String(job.triggerState || "").toUpperCase() === "BLOCKED") {
+      return true;
+    }
+    const completedExecutionUids = new Set(
+      recentGlobalResults.value
+        .map((item) => String(item.executionUid || "").trim())
+        .filter((uid) => uid.length > 0)
+    );
+    return !completedExecutionUids.has(executionUid);
+  }
+
+  function markJobRunningLocally(jobUid: string) {
+    const nowIso = new Date().toISOString();
+    jobs.value = jobs.value.map((job) => (
+      job.jobUid === jobUid
+        ? {
+            ...job,
+            triggerState: "BLOCKED",
+            currentExecutionStatus: "RUNNING",
+            currentExecutionStartedTime: job.currentExecutionStartedTime || nowIso,
+            updatedTime: nowIso
+          }
+        : job
+    ));
+  }
 
   async function selectJob(jobUid: string) {
     selectedJobUid.value = jobUid;
@@ -70,10 +105,76 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
     }
   }
 
+  async function refreshExecutionState() {
+    const [nextJobs, recentResults] = await Promise.all([
+      cronApi.listCronJobs(),
+      cronApi.listGlobalRecentResults(20)
+    ]);
+    const completedExecutionUids = new Set(
+      recentResults
+        .map((item) => String(item.executionUid || "").trim())
+        .filter((uid) => uid.length > 0)
+    );
+    const runningJobs = nextJobs.filter((job) => {
+      const executionUid = String(job.currentExecutionUid || "").trim();
+      if (!executionUid) {
+        return false;
+      }
+      const normalizedStatus = String(job.currentExecutionStatus || "").toUpperCase();
+      if (ACTIVE_EXECUTION_STATUSES.has(normalizedStatus)) {
+        return true;
+      }
+      if (String(job.triggerState || "").toUpperCase() === "BLOCKED") {
+        return true;
+      }
+      // Fallback: if it has an execution uid and is not in completed results yet, keep tracking it as active.
+      return !completedExecutionUids.has(executionUid);
+    });
+    const statusByExecutionUid = new Map<string, string>();
+    await Promise.all(runningJobs.map(async (job) => {
+      const executionUid = String(job.currentExecutionUid || "").trim();
+      if (!executionUid) return;
+      try {
+        const detail = await cronApi.getExecutionDetail(executionUid, { suppressErrorToast: true });
+        const normalizedStatus = String(detail?.status || "").trim();
+        if (normalizedStatus) {
+          statusByExecutionUid.set(executionUid, normalizedStatus);
+        }
+      } catch {
+        // Best-effort sync: keep existing job status when detail is temporarily unavailable.
+      }
+    }));
+    jobs.value = nextJobs.map((job) => {
+      const executionUid = String(job.currentExecutionUid || "").trim();
+      const syncedStatus = executionUid ? statusByExecutionUid.get(executionUid) : undefined;
+      return syncedStatus ? { ...job, currentExecutionStatus: syncedStatus } : job;
+    });
+    recentGlobalResults.value = recentResults;
+    if (selectedJobUid.value && !jobs.value.some((job) => job.jobUid === selectedJobUid.value)) {
+      selectedJobUid.value = null;
+      currentSubscriptions.value = [];
+      currentResults.value = [];
+    }
+  }
+
   async function runJob(jobUid: string) {
-    await cronApi.runCronJob(jobUid);
-    await refresh(jobUid);
-    message.success(tr("toast.taskTriggered"));
+    const targetJob = jobs.value.find((job) => job.jobUid === jobUid);
+    if (isJobExecutionActive(targetJob)) {
+      message.warning("该任务正在执行中，请勿重复触发。");
+      return;
+    }
+    const preferredSelection = selectedJobUid.value;
+    const previousJobs = jobs.value.slice();
+    markJobRunningLocally(jobUid);
+    try {
+      const latestJob = await cronApi.runCronJob(jobUid);
+      jobs.value = jobs.value.map((job) => (job.jobUid === jobUid ? { ...job, ...latestJob } : job));
+      await refresh(preferredSelection);
+      message.success(tr("toast.taskTriggered"));
+    } catch (error) {
+      jobs.value = previousJobs;
+      throw error;
+    }
   }
 
   async function createJob(payload: CreateCronJobPayload) {
@@ -132,6 +233,23 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
     await fileApi.openFile(path);
   }
 
+  async function markExecutionRead(executionUid: string) {
+    if (!executionUid) {
+      return;
+    }
+    await cronApi.markExecutionRead(executionUid);
+    recentGlobalResults.value = recentGlobalResults.value.map((item) => (
+      item.executionUid === executionUid
+        ? { ...item, unread: false }
+        : item
+    ));
+    currentResults.value = currentResults.value.map((item) => (
+      item.executionUid === executionUid
+        ? { ...item, unread: false }
+        : item
+    ));
+  }
+
 
   async function updateSubscriptions(jobUid: string, payload: Array<{ channel: string; target: string; botId?: string; enabled: boolean }>) {
     const updated = await cronApi.updateCronSubscriptions(jobUid, { subscriptions: payload });
@@ -150,6 +268,7 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
     currentJob,
     loading,
     refresh,
+    refreshExecutionState,
     createJob,
     selectJob,
     runJob,
@@ -159,6 +278,7 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
     deleteJob,
     confirmDeleteJob,
     openReportFile,
+    markExecutionRead,
     updateSubscriptions
   };
 });

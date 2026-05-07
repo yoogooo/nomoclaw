@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 
 public record CronJobExecutionResultResponse(
         String executionUid,
+        boolean unread,
         String jobUid,
         String jobTitle,
         String agentUid,

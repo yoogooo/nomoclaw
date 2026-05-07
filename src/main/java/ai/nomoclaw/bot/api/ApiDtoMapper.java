@@ -632,6 +632,11 @@ public final class ApiDtoMapper {
                 dto.endAt(),
                 dto.taskContent(),
                 dto.status(),
+                dto.currentExecutionUid(),
+                dto.currentConversationUid(),
+                dto.currentMessageUid(),
+                dto.currentExecutionStatus(),
+                dto.currentExecutionStartedTime(),
                 dto.lastRunTime(),
                 dto.nextRunTime(),
                 dto.lastResult(),
@@ -649,6 +654,7 @@ public final class ApiDtoMapper {
         return dtos.stream()
                 .map(item -> new CronJobExecutionResultResponse(
                         item.executionUid(),
+                        item.unread(),
                         item.jobUid(),
                         item.jobTitle(),
                         item.agentUid(),

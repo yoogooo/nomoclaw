@@ -24,6 +24,20 @@ type RunStepRenderData = {
   details: string;
 };
 
+const props = withDefaults(defineProps<{
+  hideComposer?: boolean;
+  focusMessageUid?: string;
+  forceTypingIndicator?: boolean;
+  hideTypingRoleLabel?: boolean;
+  disableAutoTypingIndicator?: boolean;
+}>(), {
+  hideComposer: false,
+  focusMessageUid: "",
+  forceTypingIndicator: false,
+  hideTypingRoleLabel: false,
+  disableAutoTypingIndicator: false
+});
+
 const conversationStore = useConversationStore();
 const conversationRunsStore = useConversationRunsStore();
 const agentCatalogStore = useAgentCatalogStore();
@@ -52,6 +66,33 @@ const savedTipMessageUidSet = computed(() => {
 const latestMessageUid = computed(() => {
   const items = conversationStore.messages;
   return (items.length ? items[items.length - 1].messageUid : "") || "";
+});
+const displayedMessages = computed(() => {
+  const allMessages = conversationStore.messages;
+  const focusMessageUid = (props.focusMessageUid || "").trim();
+  if (!focusMessageUid) {
+    return allMessages;
+  }
+  const focusIndex = allMessages.findIndex((item) => item.messageUid === focusMessageUid);
+  if (focusIndex < 0) {
+    return allMessages;
+  }
+  const focusMessage = allMessages[focusIndex];
+  let start = focusIndex;
+  if (focusMessage.role !== "user") {
+    const nearestUserIndex = allMessages.slice(0, focusIndex + 1).map((item) => item.role).lastIndexOf("user");
+    if (nearestUserIndex >= 0) {
+      start = nearestUserIndex;
+    }
+  }
+  let end = allMessages.length;
+  for (let i = start + 1; i < allMessages.length; i += 1) {
+    if (allMessages[i].role === "user") {
+      end = i;
+      break;
+    }
+  }
+  return allMessages.slice(start, end);
 });
 const isRunningCurrentConversation = computed(() =>
   Boolean(conversationStore.currentConversationUid)
@@ -517,7 +558,7 @@ onMounted(() => {
   <section class="panel message-panel">
     <div ref="messageListRef" class="panel-body message-list scroll-area">
       <div
-        v-if="!conversationStore.messages.length && !isRunningCurrentConversation"
+        v-if="!displayedMessages.length && !isRunningCurrentConversation"
         class="conversation-empty-state"
       >
         <div class="conversation-empty-hero">
@@ -539,7 +580,7 @@ onMounted(() => {
       </div>
       <template v-else>
         <div
-          v-for="message in conversationStore.messages"
+          v-for="message in displayedMessages"
           :key="`${message.createdTime}-${message.messageUid || message.content}`"
           class="message-wrap"
           :class="{ user: message.role === 'user' }"
@@ -741,18 +782,22 @@ onMounted(() => {
 
         <div
           v-if="conversationStore.currentConversationUid
-            && conversationStore.runningConversationUid === conversationStore.currentConversationUid
-            && !conversationRunsStore.runsByMessageUid[latestMessageUid]"
+            && (
+              (!props.disableAutoTypingIndicator
+                && conversationStore.runningConversationUid === conversationStore.currentConversationUid
+                && !conversationRunsStore.runsByMessageUid[latestMessageUid])
+              || props.forceTypingIndicator
+            )"
           class="message-wrap"
         >
-          <div class="message-role">ASSISTANT</div>
+          <div v-if="!props.hideTypingRoleLabel" class="message-role">ASSISTANT</div>
           <div class="typing-indicator">
             <span v-for="index in 3" :key="index" />
           </div>
         </div>
       </template>
     </div>
-    <ComposerPanel />
+    <ComposerPanel v-if="!props.hideComposer" />
   </section>
 </template>
 

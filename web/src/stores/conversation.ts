@@ -189,9 +189,11 @@ export const useConversationStore = defineStore("conversation", () => {
     overallPercent: -1,
     completedArtifacts: []
   });
+  const skipConversationListRefresh = ref(false);
 
   let eventSource: EventSource | null = null;
   const streamingAssistantByParentUid = ref<Record<string, number>>({});
+  let messageLoadToken = 0;
 
   function loadApprovalModeMap(): Record<string, ApprovalMode> {
     if (typeof window === "undefined") return {};
@@ -633,10 +635,17 @@ export const useConversationStore = defineStore("conversation", () => {
   }
 
   async function loadMessages(conversationUid: string) {
+    const token = ++messageLoadToken;
     const [loadedMessages, runs] = await Promise.all([
       conversationApi.listMessages(conversationUid),
       conversationApi.listMessageRuns(conversationUid)
     ]);
+    if (token !== messageLoadToken) {
+      return;
+    }
+    if (currentConversationUid.value !== conversationUid) {
+      return;
+    }
     messages.value = loadedMessages;
     reconcileRunningConversationByMessages(conversationUid, loadedMessages);
     conversationRunsStore.setRuns(runs);
@@ -799,6 +808,9 @@ export const useConversationStore = defineStore("conversation", () => {
   }
 
   async function selectConversation(conversationUid: string) {
+    if (currentConversationUid.value !== conversationUid) {
+      messages.value = [];
+    }
     currentConversationUid.value = conversationUid;
     restoreApprovalModeForConversation(conversationUid);
     saveChatLastViewState({ mode: "conversation", conversationUid });
@@ -1225,7 +1237,9 @@ export const useConversationStore = defineStore("conversation", () => {
       runningConversationUid.value = null;
       if (currentConversationUid.value) {
         await loadMessages(currentConversationUid.value);
-        await refreshConversations(currentConversationUid.value);
+        if (!skipConversationListRefresh.value) {
+          await refreshConversations(currentConversationUid.value);
+        }
       }
       return;
     }
@@ -1250,9 +1264,15 @@ export const useConversationStore = defineStore("conversation", () => {
       runningConversationUid.value = null;
       if (currentConversationUid.value) {
         await loadMessages(currentConversationUid.value);
-        await refreshConversations(currentConversationUid.value);
+        if (!skipConversationListRefresh.value) {
+          await refreshConversations(currentConversationUid.value);
+        }
       }
     }
+  }
+
+  function setSkipConversationListRefresh(value: boolean) {
+    skipConversationListRefresh.value = value;
   }
 
   async function confirmDeleteConversation(conversationUid: string, title: string) {
@@ -1308,6 +1328,7 @@ export const useConversationStore = defineStore("conversation", () => {
     cancelRunningMessage,
     approveStep,
     rejectStep,
+    setSkipConversationListRefresh,
     openFile,
     renameConversation,
     updateConversationPin,

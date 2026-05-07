@@ -501,6 +501,11 @@ export interface CronJob {
   endAt?: string | null;
   taskContent: string;
   status: string;
+  currentExecutionUid?: string | null;
+  currentConversationUid?: string | null;
+  currentMessageUid?: string | null;
+  currentExecutionStatus?: string | null;
+  currentExecutionStartedTime?: string | null;
   lastRunTime: string | null;
   nextRunTime: string | null;
   lastResult: string;
@@ -518,6 +523,7 @@ export interface CronJobReport {
 
 export interface CronJobExecutionResult {
   executionUid?: string | null;
+  unread?: boolean;
   jobUid?: string | null;
   jobTitle?: string | null;
   agentUid?: string | null;

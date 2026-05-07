@@ -2,6 +2,7 @@ import { createRouter, createWebHashHistory } from "vue-router";
 import ChatPage from "@/pages/ChatPage.vue";
 import CronPage from "@/pages/CronPage.vue";
 import CronExecutionDetailPage from "@/pages/CronExecutionDetailPage.vue";
+import CronExecutionChatPage from "@/pages/CronExecutionChatPage.vue";
 import AgentsPage from "@/pages/AgentsPage.vue";
 import SkillsPage from "@/pages/SkillsPage.vue";
 import SettingsPage from "@/pages/SettingsPage.vue";
@@ -33,6 +34,11 @@ export const router = createRouter({
       path: "/cron/executions/:executionUid",
       name: "cron-execution-detail",
       component: CronExecutionDetailPage
+    },
+    {
+      path: "/cron/executions/:executionUid/chat",
+      name: "cron-execution-chat",
+      component: CronExecutionChatPage
     },
     {
       path: "/agents",

@@ -610,6 +610,13 @@ public class AgentController {
         return ApiDtoMapper.toCronExecutionDetail(cronJobApplicationService.getExecutionDetail(executionUid));
     }
 
+    @PostMapping("/cron-jobs/executions/{executionUid}/read")
+    public SimpleResponse markCronExecutionRead(@PathVariable String executionUid) {
+        log.info("[AgentAPI] markCronExecutionRead executionUid={}", executionUid);
+        cronJobApplicationService.markExecutionRead(executionUid);
+        return new SimpleResponse("updated");
+    }
+
     @PostMapping("/cron-jobs/{jobUid}/run")
     public CronJobResponse runCronJob(@PathVariable String jobUid) {
         log.info("[AgentAPI] runCronJob jobUid={}", jobUid);

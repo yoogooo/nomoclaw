@@ -61,8 +61,19 @@ export const cronApi = {
   listGlobalRecentResults(limit = 20) {
     return requestJson<CronJobExecutionResult[]>(`/api/cron-jobs/results/recent?limit=${limit}`);
   },
-  getExecutionDetail(executionUid: string) {
-    return requestJson<CronExecutionDetail>(`/api/cron-jobs/executions/${executionUid}`);
+  getExecutionDetail(executionUid: string, options?: { suppressErrorToast?: boolean }) {
+    return requestJson<CronExecutionDetail>(
+      `/api/cron-jobs/executions/${executionUid}`,
+      undefined,
+      options
+    );
+  },
+  markExecutionRead(executionUid: string) {
+    return requestJson<SimpleResponse>(`/api/cron-jobs/executions/${executionUid}/read`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({})
+    });
   },
   listCronSubscriptions(jobUid: string) {
     return requestJson<CronSubscription[]>(`/api/cron-jobs/${jobUid}/subscriptions`);
