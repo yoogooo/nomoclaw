@@ -11,6 +11,7 @@ import type {
 import { requestJson } from "@/utils/http";
 
 export interface UpdateCronJobPayload {
+  agentUid?: string;
   title?: string;
   expression?: string;
   timezone?: string;

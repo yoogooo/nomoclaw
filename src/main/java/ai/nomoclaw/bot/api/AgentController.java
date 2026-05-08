@@ -626,8 +626,9 @@ public class AgentController {
     @PatchMapping("/cron-jobs/{jobUid}")
     public CronJobResponse updateCronJob(@PathVariable String jobUid,
                                          @RequestBody(required = false) UpdateCronJobRequest request) {
-        log.info("[AgentAPI] updateCronJob jobUid={} title={} expression={} timezone={} taskContent={} status={}",
+        log.info("[AgentAPI] updateCronJob jobUid={} agentUid={} title={} expression={} timezone={} taskContent={} status={}",
                 jobUid,
+                request == null ? null : request.agentUid(),
                 request == null ? null : request.title(),
                 request == null ? null : request.expression(),
                 request == null ? null : request.timezone(),

@@ -152,9 +152,15 @@ public class CronJobApplicationService {
 
     public CronJobDto updateCronJob(String jobUid, UpdateCronJobCommand request) {
         if (request == null) {
-            request = new UpdateCronJobCommand(null, null, null, null, null, null);
+            request = new UpdateCronJobCommand(null, null, null, null, null, null, null);
         }
         AgentCronJobEntity job = requireJob(jobUid);
+        String requestedAgentUid = request.agentUid() == null ? "" : request.agentUid().trim();
+        String agentUid = requestedAgentUid.isBlank() ? job.getAgentUid() : requestedAgentUid;
+        AgentDefinitionEntity agent = agentDefinitionRepository.findActiveByUid(agentUid);
+        if (agent == null) {
+            throw new IllegalArgumentException("agent not found: " + agentUid);
+        }
         String title = request.title() == null || request.title().isBlank()
                 ? defaultCronJobTitle(job.getTitle(), job.getTaskContent())
                 : request.title().trim();
@@ -172,6 +178,7 @@ public class CronJobApplicationService {
                 : request.taskContent().trim();
         String status = normalizeStatus(request.status(), job.getStatus());
 
+        job.setAgentUid(agent.getAgentUid());
         job.setTitle(title);
         job.setExpression(expression);
         job.setTimezone(timezone);
@@ -191,7 +198,7 @@ public class CronJobApplicationService {
         job.setNextRunTime(nextRunTime);
         job.setUpdatedTime(LocalDateTime.now());
         agentCronJobRepository.updateById(job);
-        return toResponse(job, resolveAgent(job.getAgentUid()));
+        return toResponse(job, agent);
     }
 
     public CronJobDto pauseCronJob(String jobUid) {

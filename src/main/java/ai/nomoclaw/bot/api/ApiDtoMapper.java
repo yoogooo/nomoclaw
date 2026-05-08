@@ -822,6 +822,7 @@ public final class ApiDtoMapper {
 
     public static UpdateCronJobCommand toCommand(UpdateCronJobRequest request) {
         return new UpdateCronJobCommand(
+                request == null ? null : request.agentUid(),
                 request == null ? null : request.title(),
                 request == null ? null : request.expression(),
                 request == null ? null : request.timezone(),

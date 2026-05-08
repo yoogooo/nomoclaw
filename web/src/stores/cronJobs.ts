@@ -197,6 +197,7 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
   }
 
   async function updateJob(jobUid: string, payload: {
+    agentUid?: string;
     title: string;
     expression: string;
     timezone: string;

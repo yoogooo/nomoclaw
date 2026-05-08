@@ -2,7 +2,7 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { NButton, NDropdown, NEmpty, NFlex, NModal, NTag, NTooltip, type DropdownOption } from "naive-ui";
-import { ChevronRight, Ellipsis, Pencil, Play } from "lucide-vue-next";
+import { Ellipsis, Pencil, Play } from "lucide-vue-next";
 import { useCronJobsStore } from "@/stores/cronJobs";
 import type { CronJob } from "@/types/api";
 import { getSortLocale } from "@/i18n";
@@ -15,14 +15,13 @@ const emit = defineEmits<{
 
 const cronJobsStore = useCronJobsStore();
 const { t } = useI18n();
-const collapsedGroups = ref<Record<string, boolean>>({});
 const hoveredJobUid = ref<string | null>(null);
 const menuOpenJobUid = ref<string | null>(null);
 const showResultModal = ref(false);
 const resultModalTitle = ref("");
 const resultModalRows = ref<Array<{ executedTime: string; status: string; summary: string }>>([]);
 
-const groupedJobs = computed(() => {
+const jobsSorted = computed(() => {
   const order = new Map<string, number>();
   let index = 0;
   cronJobsStore.agentGroups.forEach((group) => {
@@ -33,35 +32,19 @@ const groupedJobs = computed(() => {
     });
   });
 
-  const groups = new Map<string, { label: string; sortIndex: number; jobs: CronJob[] }>();
-
-  cronJobsStore.jobs.forEach((job) => {
-    const key = job.agentUid || "__unbound__";
-    if (!groups.has(key)) {
-      groups.set(key, {
-        label: fallbackAgentLabel(job),
-        sortIndex: order.get(job.agentUid) ?? Number.MAX_SAFE_INTEGER,
-        jobs: []
-      });
+  return [...cronJobsStore.jobs].sort((left, right) => {
+    const leftSortIndex = order.get(left.agentUid) ?? Number.MAX_SAFE_INTEGER;
+    const rightSortIndex = order.get(right.agentUid) ?? Number.MAX_SAFE_INTEGER;
+    if (leftSortIndex !== rightSortIndex) {
+      return leftSortIndex - rightSortIndex;
     }
-    groups.get(key)!.jobs.push(job);
-  });
-
-  return Array.from(groups.values()).sort((left, right) => {
-    if (left.sortIndex !== right.sortIndex) {
-      return left.sortIndex - right.sortIndex;
+    const labelCompare = fallbackAgentLabel(left).localeCompare(fallbackAgentLabel(right), getSortLocale());
+    if (labelCompare !== 0) {
+      return labelCompare;
     }
-    return left.label.localeCompare(right.label, getSortLocale());
+    return displayCronJobTitle(left).localeCompare(displayCronJobTitle(right), getSortLocale());
   });
 });
-
-function toggleGroup(groupLabel: string) {
-  collapsedGroups.value[groupLabel] = !collapsedGroups.value[groupLabel];
-}
-
-function isGroupCollapsed(groupLabel: string) {
-  return !!collapsedGroups.value[groupLabel];
-}
 
 async function toggleJobStatus(job: CronJob) {
   if (job.status === "ACTIVE") {
@@ -133,83 +116,83 @@ function onJobMouseLeave(jobUid: string) {
           <table class="cron-table">
             <colgroup>
               <col class="cron-col-title">
+              <col class="cron-col-agent">
               <col class="cron-col-status">
               <col class="cron-col-cycle">
             </colgroup>
+            <thead>
+              <tr class="cron-table-head-row">
+                <th class="cron-table-head-cell">{{ t("cron.list.taskName") }}</th>
+                <th class="cron-table-head-cell">{{ t("cron.list.agentName") }}</th>
+                <th class="cron-table-head-cell">{{ t("cron.list.status") }}</th>
+                <th class="cron-table-head-cell">{{ t("cron.list.schedule") }}</th>
+              </tr>
+            </thead>
             <tbody>
-              <template v-for="group in groupedJobs" :key="group.label">
-                <tr class="cron-group-row">
-                  <td colspan="3">
-                    <button class="cron-group-header" @click="toggleGroup(group.label)">
-                      <span class="cron-group-toggle" :class="{ collapsed: isGroupCollapsed(group.label) }">
-                        <ChevronRight :size="18" />
-                      </span>
-                      <span class="cron-group-title">{{ group.label }}</span>
-                      <span class="cron-group-count">{{ t("cron.list.jobCount", { count: group.jobs.length }) }}</span>
-                    </button>
-                  </td>
-                </tr>
-                <tr
-                  v-for="job in group.jobs"
-                  v-show="!isGroupCollapsed(group.label)"
-                  :key="job.jobUid"
-                  class="cron-job-row"
-                  @mouseenter="hoveredJobUid = job.jobUid"
-                  @mouseleave="onJobMouseLeave(job.jobUid)"
-                >
-                  <td>
-                    <button class="cron-main" @click="emit('edit', job)">
-                      <span class="cron-title">{{ displayCronJobTitle(job) }}</span>
-                    </button>
-                  </td>
-                  <td>
-                    <n-tag size="small" :type="job.status === 'ACTIVE' ? 'success' : job.status === 'PAUSED' ? 'warning' : 'default'">
-                      {{ cronStatusLabel(job.status) }}
-                    </n-tag>
-                  </td>
-                  <td class="cron-cycle-cell">
-                    <div class="cron-cycle-content">
-                      <span
-                        class="cron-cycle-text"
-                        :class="{ 'is-hidden': hoveredJobUid === job.jobUid || menuOpenJobUid === job.jobUid }"
-                      >
-                        {{ humanizeCronExpression(job.expression) }}
-                      </span>
-                      <div
-                        class="cron-inline-actions"
-                        :class="{ visible: hoveredJobUid === job.jobUid || menuOpenJobUid === job.jobUid }"
-                      >
-                        <n-tooltip trigger="hover">
-                          <template #trigger>
-                            <n-button size="tiny" text class="icon-action-btn" @click="emit('edit', job)">
-                              <template #icon><Pencil :size="15" /></template>
-                            </n-button>
-                          </template>
-                          编辑
-                        </n-tooltip>
-                        <n-tooltip trigger="hover">
-                          <template #trigger>
-                            <n-button size="tiny" text class="icon-action-btn" @click="cronJobsStore.runJob(job.jobUid)">
-                              <template #icon><Play :size="15" /></template>
-                            </n-button>
-                          </template>
-                          运行
-                        </n-tooltip>
-                        <n-dropdown
-                          trigger="click"
-                          :options="moreOptions(job)"
-                          @select="(key) => onMoreSelect(job, key)"
-                          @update:show="(show) => onMoreVisible(job.jobUid, show)"
-                        >
-                          <n-button size="tiny" text class="icon-action-btn" aria-label="更多操作">
-                            <template #icon><Ellipsis :size="15" /></template>
+              <tr
+                v-for="job in jobsSorted"
+                :key="job.jobUid"
+                class="cron-job-row"
+                @mouseenter="hoveredJobUid = job.jobUid"
+                @mouseleave="onJobMouseLeave(job.jobUid)"
+              >
+                <td>
+                  <button class="cron-main" @click="emit('edit', job)">
+                    <span class="cron-title">{{ displayCronJobTitle(job) }}</span>
+                  </button>
+                </td>
+                <td>
+                  <n-tag size="small" type="info" :bordered="false" class="cron-agent-tag">
+                    {{ fallbackAgentLabel(job) }}
+                  </n-tag>
+                </td>
+                <td>
+                  <n-tag size="small" :type="job.status === 'ACTIVE' ? 'success' : job.status === 'PAUSED' ? 'warning' : 'default'">
+                    {{ cronStatusLabel(job.status) }}
+                  </n-tag>
+                </td>
+                <td class="cron-cycle-cell">
+                  <div class="cron-cycle-content">
+                    <span
+                      class="cron-cycle-text"
+                      :class="{ 'is-hidden': hoveredJobUid === job.jobUid || menuOpenJobUid === job.jobUid }"
+                    >
+                      {{ humanizeCronExpression(job.expression) }}
+                    </span>
+                    <div
+                      class="cron-inline-actions"
+                      :class="{ visible: hoveredJobUid === job.jobUid || menuOpenJobUid === job.jobUid }"
+                    >
+                      <n-tooltip trigger="hover">
+                        <template #trigger>
+                          <n-button size="tiny" text class="icon-action-btn" @click="emit('edit', job)">
+                            <template #icon><Pencil :size="15" /></template>
                           </n-button>
-                        </n-dropdown>
-                      </div>
+                        </template>
+                        编辑
+                      </n-tooltip>
+                      <n-tooltip trigger="hover">
+                        <template #trigger>
+                          <n-button size="tiny" text class="icon-action-btn" @click="cronJobsStore.runJob(job.jobUid)">
+                            <template #icon><Play :size="15" /></template>
+                          </n-button>
+                        </template>
+                        运行
+                      </n-tooltip>
+                      <n-dropdown
+                        trigger="click"
+                        :options="moreOptions(job)"
+                        @select="(key) => onMoreSelect(job, key)"
+                        @update:show="(show) => onMoreVisible(job.jobUid, show)"
+                      >
+                        <n-button size="tiny" text class="icon-action-btn" aria-label="更多操作">
+                          <template #icon><Ellipsis :size="15" /></template>
+                        </n-button>
+                      </n-dropdown>
                     </div>
-                  </td>
-                </tr>
-              </template>
+                  </div>
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -299,7 +282,11 @@ function onJobMouseLeave(jobUid: string) {
 }
 
 .cron-col-title {
-  width: 52%;
+  width: 34%;
+}
+
+.cron-col-agent {
+  width: 140px;
 }
 
 .cron-col-status {
@@ -310,47 +297,17 @@ function onJobMouseLeave(jobUid: string) {
   width: auto;
 }
 
-.cron-group-row td {
-  padding: 0;
+.cron-table-head-cell {
+  padding: var(--space-2) var(--space-3);
   border-bottom: var(--size-1) solid var(--color-border-slate-subtle);
-}
-
-.cron-group-header {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border: 0;
-  background: transparent;
-  color: var(--color-text-heading);
-  cursor: pointer;
+  color: var(--text-muted);
+  font-size: var(--text-caption-size);
+  font-weight: 500;
   text-align: left;
 }
 
-.cron-group-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text-secondary);
-  transform: rotate(90deg);
-  transition: transform 0.16s ease;
-}
-
-.cron-group-toggle.collapsed {
-  transform: rotate(0deg);
-}
-
-.cron-group-title {
-  font-size: var(--text-body-size);
-  font-weight: 600;
-  color: var(--color-text-heading);
-}
-
-.cron-group-count {
-  margin-top: var(--space-1);
-  font-size: var(--text-caption-size);
-  color: var(--text-muted);
+.cron-table-head-row .cron-table-head-cell:first-child {
+  padding-left: var(--space-3);
 }
 
 .cron-job-row td {
@@ -360,6 +317,19 @@ function onJobMouseLeave(jobUid: string) {
   font-size: var(--text-body-size);
   vertical-align: middle;
   transition: background-color 0.16s ease;
+}
+
+.cron-job-row td:first-child {
+  padding-left: var(--space-3);
+}
+
+.cron-job-row:hover td {
+  background: color-mix(in srgb, var(--color-overlay-brand-16) 48%, transparent);
+}
+
+.cron-agent-tag :deep(.n-tag) {
+  background: color-mix(in srgb, var(--color-brand-500) 16%, transparent);
+  color: var(--color-text-secondary);
 }
 
 .cron-cycle-cell {

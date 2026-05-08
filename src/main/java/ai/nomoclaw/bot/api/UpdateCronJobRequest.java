@@ -1,6 +1,7 @@
 package ai.nomoclaw.bot.api;
 
 public record UpdateCronJobRequest(
+        String agentUid,
         String title,
         String expression,
         String timezone,

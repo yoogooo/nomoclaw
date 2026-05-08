@@ -2,7 +2,8 @@
 import { computed, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { BellRing, Clock3 } from "lucide-vue-next";
-import { NButton, NForm, NFormItem, NInput, NInputNumber, NModal } from "naive-ui";
+import { NButton, NForm, NFormItem, NInput, NInputNumber, NModal, NSelect } from "naive-ui";
+import { useCronJobsStore } from "@/stores/cronJobs";
 import type { CronJob } from "@/types/api";
 import { getSortLocale } from "@/i18n";
 import { humanizeCronExpression } from "@/utils/format";
@@ -18,6 +19,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (event: "update:show", value: boolean): void;
   (event: "submit", payload: {
+    agentUid: string;
     title: string;
     expression: string;
     timezone: string;
@@ -27,6 +29,7 @@ const emit = defineEmits<{
   }): void;
 }>();
 const { t } = useI18n();
+const cronJobsStore = useCronJobsStore();
 
 const weekdayOptions = computed(() => [
   { label: t("cron.weekday.monday"), short: t("cron.weekdayShort.monday"), value: "2" },
@@ -50,6 +53,7 @@ const recurringModeOptions = computed<Array<{ value: RecurringMode; label: strin
 ]);
 
 const form = reactive({
+  agentUid: "",
   title: "",
   taskContent: "",
   status: "ACTIVE",
@@ -67,6 +71,15 @@ const form = reactive({
   onceTime: "",
   endAtLocal: ""
 });
+
+const agentOptions = computed(() =>
+  cronJobsStore.agentGroups.flatMap((group) =>
+    group.agents.map((agent) => ({
+      label: agent.displayName || agent.agentName,
+      value: agent.agentUid
+    }))
+  )
+);
 const modalStyle = {
   width: "min(880px, calc(100vw - 32px))",
   height: "min(860px, calc(100dvh - 24px))",
@@ -168,7 +181,9 @@ const scheduleError = computed(() => {
 });
 
 const canSubmit = computed(() =>
-  !!form.taskContent.trim()
+  !!form.agentUid
+  && !!String(form.agentUid).trim()
+  && !!form.taskContent.trim()
   && !!form.timezone.trim()
   && !!scheduleExpression.value
   && !scheduleError.value
@@ -196,12 +211,29 @@ const schedulePreviewRuns = computed(() => {
 watch(
   () => props.job,
   (job) => {
+    form.agentUid = job?.agentUid || "";
     form.title = job?.title || "";
     form.taskContent = job?.taskContent || "";
     form.status = job?.status || "ACTIVE";
     form.timezone = job?.timezone || "Asia/Shanghai";
     form.endAtLocal = toLocalDateTimeInput(job?.endAt || "");
     applyScheduleFromExpression(job?.expression || "");
+  },
+  { immediate: true }
+);
+
+watch(
+  agentOptions,
+  (options) => {
+    if (!options.length) return;
+    if (!String(form.agentUid || "").trim()) {
+      form.agentUid = String(options[0].value);
+      return;
+    }
+    const exists = options.some((item) => String(item.value) === String(form.agentUid));
+    if (!exists) {
+      form.agentUid = String(options[0].value);
+    }
   },
   { immediate: true }
 );
@@ -274,7 +306,10 @@ function parseWeekdays(value: string) {
 
 function submit() {
   if (!canSubmit.value) return;
+  const selectedAgentUid = String(form.agentUid || "").trim();
+  if (!selectedAgentUid) return;
   emit("submit", {
+    agentUid: selectedAgentUid,
     title: form.title.trim(),
     expression: scheduleExpression.value,
     timezone: form.timezone.trim(),
@@ -520,6 +555,14 @@ function formatPreviewTime(value: Date) {
               <span>{{ t("cron.form.taskInfo") }}</span>
             </div>
             <div class="basic-meta-grid">
+              <n-form-item :label="t('cron.form.executeAgent')">
+                <n-select
+                  v-model:value="form.agentUid"
+                  :placeholder="t('cron.form.executeAgentPlaceholder')"
+                  :options="agentOptions"
+                  filterable
+                />
+              </n-form-item>
               <n-form-item :label="t('cron.form.taskTitle')">
                 <n-input
                   v-model:value="form.title"
