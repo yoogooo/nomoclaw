@@ -172,7 +172,7 @@ const enUS = {
       noConversations: "No conversation history",
       cronTaskTag: "Scheduled Task: {title}",
       unnamed: "Untitled Conversation",
-      updatedAt: "Updated at {time}",
+      updatedAt: "{time}",
       pin: "Pin",
       unpin: "Unpin",
       pinned: "Pinned",

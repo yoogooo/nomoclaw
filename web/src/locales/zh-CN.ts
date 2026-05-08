@@ -172,7 +172,7 @@ const zhCN = {
       noConversations: "暂无历史对话",
       cronTaskTag: "定时任务：{title}",
       unnamed: "未命名对话",
-      updatedAt: "更新于 {time}",
+      updatedAt: "{time}",
       pin: "置顶",
       unpin: "取消置顶",
       pinned: "已置顶",

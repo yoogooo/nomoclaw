@@ -868,7 +868,7 @@ a {
 
 .grid-chat {
   display: grid;
-  grid-template-columns: var(--layout-directory-rail-width) var(--size-260) minmax(0, 1fr) var(--size-420);
+  grid-template-columns: var(--layout-directory-rail-width) var(--size-240) minmax(0, 1fr) var(--size-420);
   gap: 0;
   height: 100vh;
   min-height: 100vh;
@@ -877,7 +877,7 @@ a {
 }
 
 .grid-chat.runtime-collapsed {
-  grid-template-columns: var(--layout-directory-rail-width) var(--size-260) minmax(0, 1fr);
+  grid-template-columns: var(--layout-directory-rail-width) var(--size-240) minmax(0, 1fr);
 }
 
 .runtime-expand-toggle {

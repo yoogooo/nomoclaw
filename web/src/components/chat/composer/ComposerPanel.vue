@@ -404,7 +404,7 @@ onBeforeUnmount(() => {
   display: none;
 }
 
-@media (max-width: 860px) {
+@media (max-width: 600px) {
   .composer-spacer {
     display: block;
     height: calc(var(--size-190) + var(--size-20) + env(safe-area-inset-bottom));

@@ -2,13 +2,13 @@
 import { computed, nextTick, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { NButton, NDropdown, NInput, NModal, NSelect, type DropdownOption, type InputInst, type SelectOption } from "naive-ui";
-import { Pin, RefreshCw } from "lucide-vue-next";
+import { Clock3, MoreHorizontal, Pin, RefreshCw } from "lucide-vue-next";
 import { useRoute } from "vue-router";
 import { cronApi } from "@/api/cronApi";
 import { useAgentCatalogStore } from "@/stores/agentCatalog";
 import { useConversationStore } from "@/stores/conversation";
 import { message as discreteMessage } from "@/discrete";
-import { formatFriendlyDateTime } from "@/utils/format";
+import { formatConversationListTime, formatDateTime } from "@/utils/format";
 import { getSortLocale } from "@/i18n";
 
 type AgentSelectOption = SelectOption & {
@@ -19,7 +19,7 @@ type AgentSelectOption = SelectOption & {
 const conversationStore = useConversationStore();
 const agentCatalogStore = useAgentCatalogStore();
 const route = useRoute();
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const renameDialogVisible = ref(false);
 const renameConversationUid = ref("");
 const renameInput = ref("");
@@ -200,6 +200,10 @@ function handleAgentChange(agentUid: string | number | null) {
   agentCatalogStore.selectAgent(selected.agentGroupUid, selected.value);
   void conversationStore.applyAgentSelection();
 }
+
+function isCronConversation(conversationUid: string) {
+  return Boolean(cronTaskByConversationUid.value[String(conversationUid || "").trim()]);
+}
 </script>
 
 <template>
@@ -249,21 +253,27 @@ function handleAgentChange(agentUid: string | number | null) {
                 <span v-if="item.pinned" class="conversation-pinned-icon" :title="t('chat.sidebar.pinned')">
                   <Pin :size="12" />
                 </span>
+                <span v-if="isCronConversation(item.conversationUid)" class="conversation-cron-icon" aria-hidden="true">
+                  <Clock3 :size="12" />
+                </span>
                 <span class="conversation-title-text">{{ item.title || t("chat.sidebar.unnamed") }}</span>
               </div>
-              <div v-if="cronTaskByConversationUid[item.conversationUid]" class="conversation-cron-tag">
-                {{ t("chat.sidebar.cronTaskTag", { title: cronTaskByConversationUid[item.conversationUid] }) }}
-              </div>
-              <div class="conversation-time">{{ t("chat.sidebar.updatedAt", { time: formatFriendlyDateTime(item.updatedTime) }) }}</div>
             </button>
-            <div class="conversation-menu-wrap">
-              <n-dropdown
-                trigger="click"
-                :options="menuOptions(Boolean(item.pinned))"
-                @select="(key) => handleMenuSelect(key, item.conversationUid, item.title || '', Boolean(item.pinned))"
-              >
-                <button class="history-menu-button">...</button>
-              </n-dropdown>
+            <div class="conversation-meta-slot">
+              <div class="conversation-time-inline" :title="formatDateTime(item.updatedTime)">
+                {{ formatConversationListTime(item.updatedTime, locale) }}
+              </div>
+              <div class="conversation-menu-wrap">
+                <n-dropdown
+                  trigger="click"
+                  :options="menuOptions(Boolean(item.pinned))"
+                  @select="(key) => handleMenuSelect(key, item.conversationUid, item.title || '', Boolean(item.pinned))"
+                >
+                  <button class="history-menu-button" aria-label="actions">
+                    <MoreHorizontal :size="16" />
+                  </button>
+                </n-dropdown>
+              </div>
             </div>
           </div>
         </div>
@@ -410,15 +420,25 @@ function handleAgentChange(agentUid: string | number | null) {
 }
 
 .conversation-row {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-1_5);
-  padding: var(--space-2_5) var(--space-2);
+  --conversation-meta-width: 3.5rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--conversation-meta-width);
+  align-items: center;
+  column-gap: var(--space-1_5);
+  padding-top: var(--space-2_5);
+  padding-right: var(--space-2);
+  padding-bottom: var(--space-2_5);
+  padding-left: var(--space-2);
   margin: 0;
   border-left: var(--size-3) solid transparent;
   border-radius: 0;
-  border-bottom: var(--size-1) solid var(--color-border-panel);
+  border-bottom: var(--size-1) solid color-mix(in srgb, var(--color-border-panel) 58%, transparent);
   transition: background-color 0.18s ease, border-color 0.18s ease;
+}
+
+.conversation-row:hover:not(.active) {
+  background: color-mix(in srgb, var(--color-bg-surface-soft) 82%, var(--color-bg-soft-hover) 18%);
+  border-left-color: color-mix(in srgb, var(--color-border-active) 36%, transparent);
 }
 
 .conversation-row.active {
@@ -427,7 +447,7 @@ function handleAgentChange(agentUid: string | number | null) {
 }
 
 .conversation-main {
-  flex: 1;
+  width: 100%;
   min-width: 0;
   border: 0;
   background: transparent;
@@ -439,6 +459,14 @@ function handleAgentChange(agentUid: string | number | null) {
 
 .conversation-row.active .conversation-main {
   color: var(--color-text-brand);
+}
+
+.conversation-row:hover:not(.active) .conversation-main {
+  color: var(--color-text-heading);
+}
+
+.conversation-row:hover:not(.active) .conversation-time-inline {
+  color: var(--color-text-secondary);
 }
 
 .conversation-title {
@@ -471,44 +499,66 @@ function handleAgentChange(agentUid: string | number | null) {
   color: var(--color-text-brand);
 }
 
-.conversation-time {
-  margin-top: var(--space-2);
-  font-size: var(--text-caption-size);
-  color: var(--text-muted);
+.conversation-cron-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  flex: none;
 }
 
-.conversation-cron-tag {
-  margin-top: var(--space-1);
-  color: var(--color-text-brand);
-  font-size: var(--text-caption-size);
-  line-height: 1.3;
+.conversation-time-inline {
+  min-width: 0;
+  text-align: right;
+  font-size: 10px;
+  color: var(--color-text-tertiary);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  transition: opacity 0.18s ease, visibility 0.18s ease;
+}
+
+.conversation-meta-slot {
+  position: relative;
+  width: var(--conversation-meta-width);
+  height: var(--size-24);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 6px;
 }
 
 .conversation-menu-wrap {
-  position: relative;
-  display: flex;
-  flex-shrink: 0;
-  align-self: center;
-  margin-right: var(--space-1);
-}
-
-.history-menu-button {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: var(--size-24);
-  height: var(--size-24);
+  width: 100%;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.18s ease, visibility 0.18s ease;
+}
+
+.conversation-menu-wrap :deep(.n-dropdown-trigger) {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+}
+
+.history-menu-button {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  line-height: 0;
   border: 0;
   background: transparent;
   color: var(--color-text-tertiary);
-  font-weight: 700;
   cursor: pointer;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.18s ease, color 0.18s ease;
+  transition: color 0.18s ease;
 }
 
 .rename-dialog-body {
@@ -524,9 +574,15 @@ function handleAgentChange(agentUid: string | number | null) {
   gap: var(--space-2);
 }
 
-.conversation-row:hover .history-menu-button {
+.conversation-row:hover .conversation-menu-wrap {
   opacity: 1;
   visibility: visible;
+  pointer-events: auto;
+}
+
+.conversation-row:hover .conversation-time-inline {
+  opacity: 0;
+  visibility: hidden;
 }
 
 .history-menu-button:hover {
