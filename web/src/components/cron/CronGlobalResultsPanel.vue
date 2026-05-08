@@ -20,11 +20,29 @@ function executionStatusText(status: string | null | undefined) {
 }
 
 function openExecution(result: { executionUid?: string | null; conversationUid?: string | null; messageUid?: string | null }) {
-  if (!result.executionUid) {
+  const executionUid = String(result.executionUid || "").trim();
+  const conversationUid = String(result.conversationUid || "").trim();
+  const messageUid = String(result.messageUid || "").trim();
+  const agentUid = String((result as { agentUid?: string | null }).agentUid || "").trim();
+  const jobUid = String((result as { jobUid?: string | null }).jobUid || "").trim();
+  if (!executionUid || !conversationUid) {
     return;
   }
-  void cronJobsStore.markExecutionRead(result.executionUid);
-  void router.push(`/cron/executions/${result.executionUid}/chat`);
+  void cronJobsStore.markExecutionRead(executionUid);
+  if (jobUid) {
+    void cronJobsStore.selectJob(jobUid);
+  }
+  void router.push({
+    path: "/",
+    query: {
+      source: "cron",
+      executionUid,
+      conversationUid,
+      ...(messageUid ? { messageUid } : {}),
+      ...(agentUid ? { agentUid } : {}),
+      ...(jobUid ? { jobUid } : {})
+    }
+  });
 }
 </script>
 

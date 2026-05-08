@@ -43,6 +43,7 @@ const runningJobs = computed(() => {
     })
     .map((job) => ({
       jobUid: job.jobUid,
+      agentUid: normalizeId(job.agentUid),
       jobTitle: displayCronJobTitle(job),
       triggerState: job.triggerState || "UNKNOWN",
       executionStatus: String(job.currentExecutionStatus || "").toUpperCase(),
@@ -64,32 +65,53 @@ function completedStatusText(status?: string | null) {
   return String(status || "").toUpperCase() === "FAILED" ? t("common.failed") : t("common.success");
 }
 
-function openExecution(executionUid?: string | null, conversationUid?: string | null, messageUid?: string | null) {
-  const normalizedExecutionUid = normalizeId(executionUid);
-  const normalizedConversationUid = normalizeId(conversationUid);
-  const normalizedMessageUid = normalizeId(messageUid);
+function openExecution(params: {
+  executionUid?: string | null;
+  conversationUid?: string | null;
+  messageUid?: string | null;
+  agentUid?: string | null;
+  jobUid?: string | null;
+}) {
+  const normalizedExecutionUid = normalizeId(params.executionUid);
+  const normalizedConversationUid = normalizeId(params.conversationUid);
+  const normalizedMessageUid = normalizeId(params.messageUid);
+  const normalizedAgentUid = normalizeId(params.agentUid);
+  const normalizedJobUid = normalizeId(params.jobUid);
   if (!normalizedExecutionUid) {
     return;
   }
   void cronJobsStore.markExecutionRead(normalizedExecutionUid);
-  if (normalizedConversationUid) {
-    void router.push({
-      path: `/cron/executions/${normalizedExecutionUid}/chat`,
-      query: {
-        conversationUid: normalizedConversationUid,
-        ...(normalizedMessageUid ? { messageUid: normalizedMessageUid } : {})
-      }
-    });
+  if (normalizedJobUid) {
+    void cronJobsStore.selectJob(normalizedJobUid);
+  }
+  if (!normalizedConversationUid) {
+    message.warning("执行会话准备中，请稍后重试。");
     return;
   }
-  void router.push(`/cron/executions/${normalizedExecutionUid}/chat`);
+  void router.push({
+    path: "/",
+    query: {
+      source: "cron",
+      executionUid: normalizedExecutionUid,
+      conversationUid: normalizedConversationUid,
+      ...(normalizedMessageUid ? { messageUid: normalizedMessageUid } : {}),
+      ...(normalizedAgentUid ? { agentUid: normalizedAgentUid } : {}),
+      ...(normalizedJobUid ? { jobUid: normalizedJobUid } : {})
+    }
+  });
 }
 
-function openRunningExecution(item: { executionUid?: string | null; conversationUid?: string | null; messageUid?: string | null }) {
+function openRunningExecution(item: {
+  executionUid?: string | null;
+  conversationUid?: string | null;
+  messageUid?: string | null;
+  agentUid?: string | null;
+  jobUid?: string | null;
+}) {
   const executionUid = normalizeId(item.executionUid);
   const conversationUid = normalizeId(item.conversationUid);
   if (executionUid && conversationUid) {
-    void openExecution(executionUid, conversationUid, normalizeId(item.messageUid));
+    openExecution(item);
     return;
   }
   if (executionUid) {
@@ -99,8 +121,14 @@ function openRunningExecution(item: { executionUid?: string | null; conversation
   message.info("当前执行标识尚未就绪，请稍后重试。");
 }
 
-function openCompletedExecution(item: { executionUid?: string | null; conversationUid?: string | null; messageUid?: string | null }) {
-  void openExecution(item.executionUid, item.conversationUid, item.messageUid);
+function openCompletedExecution(item: {
+  executionUid?: string | null;
+  conversationUid?: string | null;
+  messageUid?: string | null;
+  agentUid?: string | null;
+  jobUid?: string | null;
+}) {
+  openExecution(item);
 }
 
 function runningTimeText(startedTime?: string | null) {

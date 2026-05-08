@@ -170,6 +170,7 @@ const zhCN = {
       refreshHistory: "刷新历史对话",
       refreshHistoryTooltip: "刷新历史对话（右键页面任意位置：刷新整个页面）",
       noConversations: "暂无历史对话",
+      cronTaskTag: "定时任务：{title}",
       unnamed: "未命名对话",
       updatedAt: "更新于 {time}",
       pin: "置顶",

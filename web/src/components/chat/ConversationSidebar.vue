@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { NButton, NDropdown, NInput, NModal, NSelect, type DropdownOption, type InputInst, type SelectOption } from "naive-ui";
 import { Pin, RefreshCw } from "lucide-vue-next";
+import { useRoute } from "vue-router";
+import { cronApi } from "@/api/cronApi";
 import { useAgentCatalogStore } from "@/stores/agentCatalog";
 import { useConversationStore } from "@/stores/conversation";
 import { message as discreteMessage } from "@/discrete";
@@ -16,6 +18,7 @@ type AgentSelectOption = SelectOption & {
 
 const conversationStore = useConversationStore();
 const agentCatalogStore = useAgentCatalogStore();
+const route = useRoute();
 const { t } = useI18n();
 const renameDialogVisible = ref(false);
 const renameConversationUid = ref("");
@@ -24,6 +27,9 @@ const renameSubmitting = ref(false);
 const renameInputRef = ref<InputInst | null>(null);
 const refreshingHistory = ref(false);
 const refreshAnimating = ref(false);
+const cronTaskByConversationUid = ref<Record<string, string>>({});
+const conversationListRef = ref<HTMLElement | null>(null);
+const lastAutoScrolledConversationUid = ref("");
 
 const agentOptions = computed<AgentSelectOption[]>(() =>
   [...agentCatalogStore.allAgents]
@@ -126,6 +132,7 @@ async function refreshHistoryConversations() {
   refreshAnimating.value = true;
   try {
     await conversationStore.refreshConversations();
+    await refreshCronConversationBindings();
   } catch {
     discreteMessage.error(t("toast.refreshFailed"));
   } finally {
@@ -136,6 +143,51 @@ async function refreshHistoryConversations() {
     }, Math.max(0, 650 - elapsed));
   }
 }
+
+async function refreshCronConversationBindings() {
+  try {
+    const recentResults = await cronApi.listGlobalRecentResults(200);
+    const nextMap: Record<string, string> = {};
+    for (const item of recentResults) {
+      const conversationUid = String(item.conversationUid || "").trim();
+      if (!conversationUid || nextMap[conversationUid]) {
+        continue;
+      }
+      const title = String(item.jobTitle || "").trim();
+      if (title) {
+        nextMap[conversationUid] = title;
+      }
+    }
+    cronTaskByConversationUid.value = nextMap;
+  } catch {
+    // best effort
+  }
+}
+
+void refreshCronConversationBindings();
+
+async function scrollActiveConversationIntoViewIfNeeded() {
+  const source = String(route.query.source || "").trim().toLowerCase();
+  if (source !== "cron") return;
+  const conversationUid = String(conversationStore.currentConversationUid || "").trim();
+  if (!conversationUid) return;
+  if (lastAutoScrolledConversationUid.value === conversationUid) return;
+  await nextTick();
+  const container = conversationListRef.value;
+  if (!container) return;
+  const activeRow = container.querySelector(".conversation-row.active") as HTMLElement | null;
+  if (!activeRow) return;
+  activeRow.scrollIntoView({ block: "center", inline: "nearest", behavior: "auto" });
+  lastAutoScrolledConversationUid.value = conversationUid;
+}
+
+watch(
+  () => [conversationStore.currentConversationUid, conversationStore.filteredConversations.length, String(route.query.source || "")],
+  () => {
+    void scrollActiveConversationIntoViewIfNeeded();
+  },
+  { immediate: true }
+);
 
 function handleAgentChange(agentUid: string | number | null) {
   if (!agentUid) {
@@ -184,7 +236,7 @@ function handleAgentChange(agentUid: string | number | null) {
       </div>
     </div>
     <div class="panel-body conversation-panel">
-      <div class="scroll-area conversation-list">
+      <div ref="conversationListRef" class="scroll-area conversation-list">
         <div v-if="conversationStore.filteredConversations.length">
           <div
             v-for="item in conversationStore.filteredConversations"
@@ -198,6 +250,9 @@ function handleAgentChange(agentUid: string | number | null) {
                   <Pin :size="12" />
                 </span>
                 <span class="conversation-title-text">{{ item.title || t("chat.sidebar.unnamed") }}</span>
+              </div>
+              <div v-if="cronTaskByConversationUid[item.conversationUid]" class="conversation-cron-tag">
+                {{ t("chat.sidebar.cronTaskTag", { title: cronTaskByConversationUid[item.conversationUid] }) }}
               </div>
               <div class="conversation-time">{{ t("chat.sidebar.updatedAt", { time: formatFriendlyDateTime(item.updatedTime) }) }}</div>
             </button>
@@ -420,6 +475,16 @@ function handleAgentChange(agentUid: string | number | null) {
   margin-top: var(--space-2);
   font-size: var(--text-caption-size);
   color: var(--text-muted);
+}
+
+.conversation-cron-tag {
+  margin-top: var(--space-1);
+  color: var(--color-text-brand);
+  font-size: var(--text-caption-size);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .conversation-menu-wrap {

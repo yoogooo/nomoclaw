@@ -2,18 +2,22 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { ChevronLeft } from "lucide-vue-next";
+import { useRoute } from "vue-router";
 import DirectoryRail from "@/components/chat/DirectoryRail.vue";
 import ConversationSidebar from "@/components/chat/ConversationSidebar.vue";
 import MessagesPanel from "@/components/chat/MessagesPanel.vue";
 import RuntimeLogPanel from "@/components/chat/RuntimeLogPanel.vue";
 import { useAgentCatalogStore } from "@/stores/agentCatalog";
 import { useConversationStore } from "@/stores/conversation";
+import { useCronJobsStore } from "@/stores/cronJobs";
 import { useJinnangStore } from "@/stores/jinnang";
 import { useUiPreferencesStore } from "@/stores/uiPreferences";
 import { themeTokens } from "@/themeTokens";
 
+const route = useRoute();
 const conversationStore = useConversationStore();
 const agentCatalogStore = useAgentCatalogStore();
+const cronJobsStore = useCronJobsStore();
 const jinnangStore = useJinnangStore();
 const uiPreferencesStore = useUiPreferencesStore();
 uiPreferencesStore.init();
@@ -23,6 +27,11 @@ const { t } = useI18n();
 const browserRuntimeOverlay = computed(() => conversationStore.browserRuntimeOverlay);
 const showRuntimeLogPanel = computed(() => uiPreferencesStore.chatRuntimeLogVisible);
 const runtimeAreaCollapsed = computed(() => !showRuntimeLogPanel.value || runtimeCollapsed.value);
+const routeConversationUid = computed(() => String(route.query.conversationUid || "").trim());
+const routeMessageUid = computed(() => String(route.query.messageUid || "").trim());
+const routeAgentUid = computed(() => String(route.query.agentUid || "").trim());
+const routeJobUid = computed(() => String(route.query.jobUid || "").trim());
+let applyRouteToken = 0;
 
 if (typeof window !== "undefined") {
   runtimeCollapsed.value = window.localStorage.getItem(runtimeCollapsedStorageKey) === "1";
@@ -37,21 +46,70 @@ onMounted(() => {
   if (window.matchMedia(`(max-width: ${themeTokens.layout.breakpointLg})`).matches) {
     runtimeCollapsed.value = true;
   }
-  if (!conversationStore.conversations.length) {
-    void conversationStore.init();
-  } else {
-    void conversationStore.loadModelConfig();
+  if (!routeConversationUid.value) {
+    if (!conversationStore.conversations.length) {
+      void conversationStore.init();
+    } else {
+      void conversationStore.loadModelConfig();
+    }
   }
   if (agentCatalogStore.selectedAgentUid) {
     void jinnangStore.restoreTips(agentCatalogStore.selectedAgentUid);
   }
 });
 
+async function applyConversationRouteContext() {
+  const token = ++applyRouteToken;
+  const targetConversationUid = routeConversationUid.value;
+  if (!targetConversationUid) {
+    return;
+  }
+  if (!conversationStore.conversations.length) {
+    await conversationStore.init();
+  } else {
+    await conversationStore.loadModelConfig();
+  }
+  if (token !== applyRouteToken) return;
+  if (!agentCatalogStore.allAgents.length) {
+    await agentCatalogStore.loadCatalog();
+  }
+  if (token !== applyRouteToken) return;
+
+  const conversationSummary = conversationStore.conversations.find(
+    (item) => item.conversationUid === targetConversationUid
+  );
+  const targetAgentUid = String(conversationSummary?.agentUid || "").trim() || routeAgentUid.value;
+  if (targetAgentUid) {
+    const targetAgent = agentCatalogStore.allAgents.find((item) => item.agentUid === targetAgentUid);
+    if (targetAgent && targetAgent.agentUid !== agentCatalogStore.selectedAgentUid) {
+      agentCatalogStore.selectAgent(targetAgent.agentGroupUid, targetAgent.agentUid);
+      await conversationStore.refreshConversations(targetConversationUid);
+      if (token !== applyRouteToken) return;
+    }
+  }
+
+  if (routeJobUid.value) {
+    void cronJobsStore.selectJob(routeJobUid.value);
+  }
+
+  if (conversationStore.currentConversationUid !== targetConversationUid) {
+    await conversationStore.selectConversation(targetConversationUid);
+  }
+}
+
 watch(
   () => agentCatalogStore.selectedAgentUid,
   (agentUid) => {
     if (!agentUid) return;
     void jinnangStore.restoreTips(agentUid);
+  },
+  { immediate: true }
+);
+
+watch(
+  () => [routeConversationUid.value, routeAgentUid.value, routeJobUid.value],
+  () => {
+    void applyConversationRouteContext();
   },
   { immediate: true }
 );
@@ -62,7 +120,7 @@ watch(
     <div class="grid-chat" :class="{ 'runtime-collapsed': runtimeAreaCollapsed }">
       <DirectoryRail />
       <ConversationSidebar />
-      <MessagesPanel />
+      <MessagesPanel :focus-message-uid="routeMessageUid" />
       <RuntimeLogPanel v-if="showRuntimeLogPanel && !runtimeCollapsed" :collapsed="runtimeCollapsed" @toggle="runtimeCollapsed = !runtimeCollapsed" />
     </div>
     <button v-if="showRuntimeLogPanel && runtimeCollapsed" class="runtime-expand-toggle" :title="t('chat.runtime.expand')" @click="runtimeCollapsed = false">

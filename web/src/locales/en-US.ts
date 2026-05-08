@@ -170,6 +170,7 @@ const enUS = {
       refreshHistory: "Refresh Conversation History",
       refreshHistoryTooltip: "Refresh history (right-click anywhere on page: reload whole page)",
       noConversations: "No conversation history",
+      cronTaskTag: "Scheduled Task: {title}",
       unnamed: "Untitled Conversation",
       updatedAt: "Updated at {time}",
       pin: "Pin",
