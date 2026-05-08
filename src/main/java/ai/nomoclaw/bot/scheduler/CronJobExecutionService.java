@@ -8,15 +8,12 @@ import ai.nomoclaw.bot.domain.AgentMessage;
 import ai.nomoclaw.bot.orchestrator.AgentApplicationService;
 import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
 import ai.nomoclaw.bot.store.entity.AgentCronJobEntity;
+import ai.nomoclaw.bot.store.entity.AgentCronJobExecutionEntity;
 import ai.nomoclaw.bot.store.repository.AgentDefinitionRepository;
+import ai.nomoclaw.bot.store.repository.AgentCronJobExecutionRepository;
 import ai.nomoclaw.bot.store.repository.AgentCronJobRepository;
-import ai.nomoclaw.bot.util.JsonUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.node.ArrayNode;
-import tools.jackson.databind.node.JsonNodeFactory;
-import tools.jackson.databind.node.ObjectNode;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -35,17 +32,20 @@ public class CronJobExecutionService {
     private static final DateTimeFormatter REPORT_NAME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
 
     private final AgentCronJobRepository agentCronJobRepository;
+    private final AgentCronJobExecutionRepository agentCronJobExecutionRepository;
     private final AgentApplicationService agentApplicationService;
     private final CronNotificationFanoutService cronNotificationFanoutService;
     private final CronJobSchedulerService cronJobSchedulerService;
     private final AgentDefinitionRepository agentDefinitionRepository;
 
     public CronJobExecutionService(AgentCronJobRepository agentCronJobRepository,
+                                   AgentCronJobExecutionRepository agentCronJobExecutionRepository,
                                    AgentApplicationService agentApplicationService,
                                    CronNotificationFanoutService cronNotificationFanoutService,
                                    CronJobSchedulerService cronJobSchedulerService,
                                    AgentDefinitionRepository agentDefinitionRepository) {
         this.agentCronJobRepository = agentCronJobRepository;
+        this.agentCronJobExecutionRepository = agentCronJobExecutionRepository;
         this.agentApplicationService = agentApplicationService;
         this.cronNotificationFanoutService = cronNotificationFanoutService;
         this.cronJobSchedulerService = cronJobSchedulerService;
@@ -94,28 +94,45 @@ public class CronJobExecutionService {
         // Manual trigger: create conversation/message immediately so UI can open execution chat right away.
         String conversationUid = agentApplicationService.createConversation("", job.getAgentUid(), "cron");
         String messageUid = agentApplicationService.submitMessage(conversationUid, job.getTaskContent(), "cron");
-        markCurrentExecution(job, executionUid, conversationUid, messageUid, now);
+        createRunningExecution(job, executionUid, conversationUid, messageUid, now);
+        updateJobConversationPointers(job.getJobUid(), conversationUid, messageUid, now);
         return executionUid;
     }
 
     private CurrentExecutionContext resolveOrCreateCurrentExecution(AgentCronJobEntity job, LocalDateTime now) {
-        JsonNode extNode = job.getExtConfig() == null || job.getExtConfig().isBlank()
-                ? JsonNodeFactory.instance.objectNode()
-                : JsonUtil.fromJsonQuietly(job.getExtConfig(), JsonNode.class).orElse(JsonNodeFactory.instance.objectNode());
-        JsonNode currentExecution = extNode.path("currentExecution");
-        String existingExecutionUid = currentExecution.path("executionUid").asText("");
-        String existingConversationUid = currentExecution.path("conversationUid").asText("");
-        String existingMessageUid = currentExecution.path("messageUid").asText("");
-        if (!existingExecutionUid.isBlank()) {
+        AgentCronJobExecutionEntity running = agentCronJobExecutionRepository.findLatestRunningByJobUid(job.getJobUid());
+        if (running != null) {
             return new CurrentExecutionContext(
-                    existingExecutionUid,
-                    existingConversationUid.isBlank() ? null : existingConversationUid,
-                    existingMessageUid.isBlank() ? null : existingMessageUid
+                    running.getExecutionUid(),
+                    blankToNull(running.getConversationUid()),
+                    blankToNull(running.getMessageUid())
             );
         }
-        String generatedExecutionUid = UUID.randomUUID().toString();
-        markCurrentExecution(job, generatedExecutionUid, null, null, now);
-        return new CurrentExecutionContext(generatedExecutionUid, null, null);
+        String executionUid = UUID.randomUUID().toString();
+        createRunningExecution(job, executionUid, null, null, now);
+        return new CurrentExecutionContext(executionUid, null, null);
+    }
+
+    private void createRunningExecution(AgentCronJobEntity job,
+                                        String executionUid,
+                                        String conversationUid,
+                                        String messageUid,
+                                        LocalDateTime now) {
+        AgentCronJobExecutionEntity entity = new AgentCronJobExecutionEntity();
+        entity.setExecutionUid(executionUid == null ? "" : executionUid);
+        entity.setJobUid(job.getJobUid());
+        entity.setAgentUid(job.getAgentUid());
+        entity.setConversationUid(conversationUid == null ? "" : conversationUid);
+        entity.setMessageUid(messageUid == null ? "" : messageUid);
+        entity.setStatus("RUNNING");
+        entity.setSummary("");
+        entity.setReportPath("");
+        entity.setReadFlag(0);
+        entity.setStartedTime(now);
+        entity.setFinishedTime(null);
+        entity.setCreatedTime(now);
+        entity.setUpdatedTime(now);
+        agentCronJobExecutionRepository.save(entity);
     }
 
     private void markCurrentExecution(AgentCronJobEntity job,
@@ -125,22 +142,20 @@ public class CronJobExecutionService {
                                       LocalDateTime now) {
         String normalizedConversationUid = conversationUid == null ? "" : conversationUid;
         String normalizedMessageUid = messageUid == null ? "" : messageUid;
-        ObjectNode extConfig = job.getExtConfig() == null || job.getExtConfig().isBlank()
-                ? JsonNodeFactory.instance.objectNode()
-                : (ObjectNode) JsonUtil.fromJsonQuietly(job.getExtConfig(), tools.jackson.databind.JsonNode.class)
-                .orElse(JsonNodeFactory.instance.objectNode());
-        ObjectNode currentExecution = JsonNodeFactory.instance.objectNode();
-        currentExecution.put("executionUid", executionUid == null ? "" : executionUid);
-        currentExecution.put("conversationUid", normalizedConversationUid);
-        currentExecution.put("messageUid", normalizedMessageUid);
-        currentExecution.put("status", "RUNNING");
-        currentExecution.put("startedTime", now.toString());
-        extConfig.set("currentExecution", currentExecution);
+        agentCronJobExecutionRepository.update(new LambdaUpdateWrapper<AgentCronJobExecutionEntity>()
+                .eq(AgentCronJobExecutionEntity::getExecutionUid, executionUid)
+                .set(AgentCronJobExecutionEntity::getConversationUid, normalizedConversationUid)
+                .set(AgentCronJobExecutionEntity::getMessageUid, normalizedMessageUid)
+                .set(AgentCronJobExecutionEntity::getStatus, "RUNNING")
+                .set(AgentCronJobExecutionEntity::getUpdatedTime, now));
+        updateJobConversationPointers(job.getJobUid(), normalizedConversationUid, normalizedMessageUid, now);
+    }
+
+    private void updateJobConversationPointers(String jobUid, String conversationUid, String messageUid, LocalDateTime now) {
         agentCronJobRepository.update(new LambdaUpdateWrapper<AgentCronJobEntity>()
-                .eq(AgentCronJobEntity::getJobUid, job.getJobUid())
-                .set(AgentCronJobEntity::getConversationUid, normalizedConversationUid)
-                .set(AgentCronJobEntity::getMessageUid, normalizedMessageUid)
-                .set(AgentCronJobEntity::getExtConfig, JsonUtil.toJson(extConfig))
+                .eq(AgentCronJobEntity::getJobUid, jobUid)
+                .set(AgentCronJobEntity::getConversationUid, conversationUid)
+                .set(AgentCronJobEntity::getMessageUid, messageUid)
                 .set(AgentCronJobEntity::getUpdatedTime, now));
     }
 
@@ -230,13 +245,17 @@ public class CronJobExecutionService {
                                  String messageUid) {
         String normalizedConversationUid = conversationUid == null ? "" : conversationUid;
         String normalizedMessageUid = messageUid == null ? "" : messageUid;
-        ObjectNode extConfig = job.getExtConfig() == null || job.getExtConfig().isBlank()
-                ? JsonNodeFactory.instance.objectNode()
-                : (ObjectNode) JsonUtil.fromJsonQuietly(job.getExtConfig(), tools.jackson.databind.JsonNode.class)
-                .orElse(JsonNodeFactory.instance.objectNode());
-        extConfig.put("lastReportPath", reportPath == null ? "" : reportPath.toString());
-        extConfig.remove("currentExecution");
-        appendExecutionResult(extConfig, now, summary, reportPath, executionStatus, executionUid, normalizedConversationUid, normalizedMessageUid);
+        String normalizedSummary = summary == null ? "" : summary;
+        String normalizedReportPath = reportPath == null ? "" : reportPath.toString();
+        agentCronJobExecutionRepository.update(new LambdaUpdateWrapper<AgentCronJobExecutionEntity>()
+                .eq(AgentCronJobExecutionEntity::getExecutionUid, executionUid)
+                .set(AgentCronJobExecutionEntity::getConversationUid, normalizedConversationUid)
+                .set(AgentCronJobExecutionEntity::getMessageUid, normalizedMessageUid)
+                .set(AgentCronJobExecutionEntity::getStatus, executionStatus)
+                .set(AgentCronJobExecutionEntity::getSummary, normalizedSummary)
+                .set(AgentCronJobExecutionEntity::getReportPath, normalizedReportPath)
+                .set(AgentCronJobExecutionEntity::getFinishedTime, now)
+                .set(AgentCronJobExecutionEntity::getUpdatedTime, now));
         LocalDateTime nextRunTime = cronJobSchedulerService.nextRunTime(job.getJobUid(), job.getTimezone());
         String nextStatus = job.getStatus();
         if (nextRunTime == null && "ACTIVE".equalsIgnoreCase(job.getStatus())) {
@@ -247,42 +266,10 @@ public class CronJobExecutionService {
                 .set(AgentCronJobEntity::getLastRunTime, now)
                 .set(AgentCronJobEntity::getNextRunTime, nextRunTime)
                 .set(AgentCronJobEntity::getStatus, nextStatus)
-                .set(AgentCronJobEntity::getLastResult, summary == null ? "" : summary)
+                .set(AgentCronJobEntity::getLastResult, normalizedSummary)
                 .set(AgentCronJobEntity::getConversationUid, normalizedConversationUid)
                 .set(AgentCronJobEntity::getMessageUid, normalizedMessageUid)
-                .set(AgentCronJobEntity::getExtConfig, JsonUtil.toJson(extConfig))
                 .set(AgentCronJobEntity::getUpdatedTime, now));
-    }
-
-    private void appendExecutionResult(ObjectNode extConfig,
-                                       LocalDateTime executedTime,
-                                       String summary,
-                                       Path reportPath,
-                                       String status,
-                                       String executionUid,
-                                       String conversationUid,
-                                       String messageUid) {
-        ArrayNode existing = extConfig.path("executionResults") instanceof ArrayNode arrayNode
-                ? (ArrayNode) arrayNode.deepCopy()
-                : JsonNodeFactory.instance.arrayNode();
-        ArrayNode next = JsonNodeFactory.instance.arrayNode();
-        ObjectNode current = JsonNodeFactory.instance.objectNode();
-        current.put("executionUid", executionUid == null ? "" : executionUid);
-        current.put("conversationUid", conversationUid == null ? "" : conversationUid);
-        current.put("messageUid", messageUid == null ? "" : messageUid);
-        current.put("executedTime", executedTime.toString());
-        current.put("status", status == null ? "" : status);
-        current.put("summary", summary == null ? "" : summary);
-        current.put("reportPath", reportPath == null ? "" : reportPath.toString());
-        current.put("read", false);
-        next.add(current);
-        for (JsonNode item : existing) {
-            if (next.size() >= 20) {
-                break;
-            }
-            next.add(item);
-        }
-        extConfig.set("executionResults", next);
     }
 
     private AgentDefinitionEntity resolveAgent(AgentCronJobEntity job) {
@@ -304,6 +291,10 @@ public class CronJobExecutionService {
             return "";
         }
         return text.length() <= 200 ? text : text.substring(0, 200) + "...";
+    }
+
+    private String blankToNull(String text) {
+        return text == null || text.isBlank() ? null : text;
     }
 
     private record CurrentExecutionContext(String executionUid, String conversationUid, String messageUid) {

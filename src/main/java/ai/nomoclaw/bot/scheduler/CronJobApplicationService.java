@@ -1,6 +1,5 @@
 package ai.nomoclaw.bot.scheduler;
 
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import ai.nomoclaw.bot.application.dto.BatchDeleteCronJobsDto;
 import ai.nomoclaw.bot.application.dto.CronJobReportDto;
 import ai.nomoclaw.bot.application.dto.CronJobDto;
@@ -16,10 +15,11 @@ import ai.nomoclaw.bot.channel.config.AgentChannelsProperties;
 import ai.nomoclaw.bot.channel.config.ChannelBotCredentialResolver;
 import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
 import ai.nomoclaw.bot.store.entity.AgentCronJobEntity;
+import ai.nomoclaw.bot.store.entity.AgentCronJobExecutionEntity;
 import ai.nomoclaw.bot.store.repository.AgentDefinitionRepository;
+import ai.nomoclaw.bot.store.repository.AgentCronJobExecutionRepository;
 import ai.nomoclaw.bot.store.repository.AgentCronJobRepository;
 import ai.nomoclaw.bot.util.JsonUtil;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
@@ -31,18 +31,20 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.LinkedHashSet;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.Comparator;
 
 @Service
 public class CronJobApplicationService {
     private static final int RESULT_REPORT_PREVIEW_LIMIT = 16_000;
 
     private final AgentCronJobRepository agentCronJobRepository;
+    private final AgentCronJobExecutionRepository agentCronJobExecutionRepository;
     private final CronJobSchedulerService cronJobSchedulerService;
     private final AgentDefinitionRepository agentDefinitionRepository;
     private final CronSubscriptionRepository cronSubscriptionRepository;
@@ -53,6 +55,7 @@ public class CronJobApplicationService {
     private final CronJobExecutionService cronJobExecutionService;
 
     public CronJobApplicationService(AgentCronJobRepository agentCronJobRepository,
+                                     AgentCronJobExecutionRepository agentCronJobExecutionRepository,
                                      CronJobSchedulerService cronJobSchedulerService,
                                      AgentDefinitionRepository agentDefinitionRepository,
                                      CronSubscriptionRepository cronSubscriptionRepository,
@@ -62,6 +65,7 @@ public class CronJobApplicationService {
                                      ConversationAppService conversationAppService,
                                      CronJobExecutionService cronJobExecutionService) {
         this.agentCronJobRepository = agentCronJobRepository;
+        this.agentCronJobExecutionRepository = agentCronJobExecutionRepository;
         this.cronJobSchedulerService = cronJobSchedulerService;
         this.agentDefinitionRepository = agentDefinitionRepository;
         this.cronSubscriptionRepository = cronSubscriptionRepository;
@@ -275,8 +279,12 @@ public class CronJobApplicationService {
 
     public CronJobReportDto getLatestReport(String jobUid) {
         AgentCronJobEntity job = requireJob(jobUid);
-        CronJobDto response = toResponse(job, resolveAgent(job.getAgentUid()));
-        String reportPathValue = response.lastReportPath();
+        AgentCronJobExecutionEntity latest = agentCronJobExecutionRepository.findLatestFinishedByJobUid(jobUid);
+        String reportPathValue = latest == null ? null : latest.getReportPath();
+        if (reportPathValue == null || reportPathValue.isBlank()) {
+            CronJobDto response = toResponse(job, resolveAgent(job.getAgentUid()));
+            reportPathValue = response.lastReportPath();
+        }
         if (reportPathValue == null || reportPathValue.isBlank()) {
             return new CronJobReportDto(jobUid, "", "", job.getUpdatedTime());
         }
@@ -300,12 +308,24 @@ public class CronJobApplicationService {
         int safeLimit = limit <= 0 ? 20 : Math.min(limit, 100);
         List<AgentCronJobEntity> jobs = agentCronJobRepository.listAllJobs();
         Map<String, AgentDefinitionEntity> agentsByUid = loadAgentsByUid(jobs);
-        List<CronJobExecutionResultDto> all = new java.util.ArrayList<>();
+        Map<String, AgentCronJobEntity> jobsByUid = new LinkedHashMap<>();
+        for (AgentCronJobEntity job : jobs) {
+            jobsByUid.put(job.getJobUid(), job);
+        }
+        List<CronJobExecutionResultDto> all = agentCronJobExecutionRepository.listRecent(safeLimit)
+                .stream()
+                .map(item -> toResultDto(item, jobsByUid.get(item.getJobUid()), agentsByUid.get(item.getAgentUid())))
+                .toList();
+        if (!all.isEmpty()) {
+            return all;
+        }
+        // One-version compatibility fallback for legacy records in ext_config.
+        List<CronJobExecutionResultDto> fallback = new ArrayList<>();
         for (AgentCronJobEntity job : jobs) {
             AgentDefinitionEntity agent = agentsByUid.get(job.getAgentUid());
-            all.addAll(readResultsFromJob(job, agent, 50));
+            fallback.addAll(readLegacyResultsFromJob(job, agent, 50));
         }
-        return all.stream()
+        return fallback.stream()
                 .sorted(Comparator.comparing(CronJobExecutionResultDto::executedTime).reversed())
                 .limit(safeLimit)
                 .toList();
@@ -315,11 +335,37 @@ public class CronJobApplicationService {
         if (executionUid == null || executionUid.isBlank()) {
             throw new IllegalArgumentException("executionUid is required");
         }
+        AgentCronJobExecutionEntity execution = agentCronJobExecutionRepository.findByExecutionUid(executionUid);
+        if (execution != null) {
+            AgentCronJobEntity job = agentCronJobRepository.findByJobUid(execution.getJobUid());
+            AgentDefinitionEntity agent = resolveAgent(execution.getAgentUid());
+            CronJobExecutionResultDto item = toResultDto(execution, job, agent);
+            List<ConversationMessageRunDto> runs = List.of();
+            if (item.conversationUid() != null && !item.conversationUid().isBlank()) {
+                runs = resolveConversationRuns(item.conversationUid(), item.messageUid());
+            }
+            return new CronExecutionDetailDto(
+                    item.executionUid(),
+                    item.jobUid(),
+                    item.jobTitle(),
+                    item.agentUid(),
+                    item.agentDisplayName(),
+                    item.conversationUid(),
+                    item.messageUid(),
+                    item.status(),
+                    item.summary(),
+                    item.reportPath(),
+                    item.reportContent(),
+                    item.executedTime() == null ? "" : item.executedTime().toString(),
+                    runs
+            );
+        }
+        // One-version compatibility fallback for legacy records in ext_config.
         List<AgentCronJobEntity> jobs = agentCronJobRepository.listAllJobs();
         Map<String, AgentDefinitionEntity> agentsByUid = loadAgentsByUid(jobs);
         for (AgentCronJobEntity job : jobs) {
             AgentDefinitionEntity agent = agentsByUid.get(job.getAgentUid());
-            List<CronJobExecutionResultDto> results = readResultsFromJob(job, agent, 100);
+            List<CronJobExecutionResultDto> results = readLegacyResultsFromJob(job, agent, 100);
             for (CronJobExecutionResultDto item : results) {
                 if (executionUid.equals(item.executionUid())) {
                     List<ConversationMessageRunDto> runs = List.of();
@@ -351,61 +397,33 @@ public class CronJobApplicationService {
         if (executionUid == null || executionUid.isBlank()) {
             throw new IllegalArgumentException("executionUid is required");
         }
-        List<AgentCronJobEntity> jobs = agentCronJobRepository.listAllJobs();
-        for (AgentCronJobEntity job : jobs) {
-            if (job.getExtConfig() == null || job.getExtConfig().isBlank()) {
-                continue;
-            }
-            JsonNode extNode = JsonUtil.fromJsonQuietly(job.getExtConfig(), JsonNode.class)
-                    .orElse(JsonNodeFactory.instance.objectNode());
-            if (!(extNode instanceof ObjectNode extObject)) {
-                continue;
-            }
-            JsonNode rawResults = extObject.path("executionResults");
-            if (!(rawResults instanceof ArrayNode arrayNode) || arrayNode.isEmpty()) {
-                continue;
-            }
-            boolean changed = false;
-            for (JsonNode item : arrayNode) {
-                if (!(item instanceof ObjectNode resultNode)) {
-                    continue;
-                }
-                String itemExecutionUid = resultNode.path("executionUid").asText("");
-                if (executionUid.equals(itemExecutionUid)) {
-                    resultNode.put("read", true);
-                    changed = true;
-                    break;
-                }
-            }
-            if (changed) {
-                LocalDateTime now = LocalDateTime.now();
-                agentCronJobRepository.update(new LambdaUpdateWrapper<AgentCronJobEntity>()
-                        .eq(AgentCronJobEntity::getJobUid, job.getJobUid())
-                        .set(AgentCronJobEntity::getExtConfig, JsonUtil.toJson(extObject))
-                        .set(AgentCronJobEntity::getUpdatedTime, now));
-                return;
-            }
+        LocalDateTime now = LocalDateTime.now();
+        AgentCronJobExecutionEntity execution = agentCronJobExecutionRepository.findByExecutionUid(executionUid);
+        if (execution != null) {
+            agentCronJobExecutionRepository.markRead(executionUid, now);
+            return;
         }
+        // One-version compatibility fallback for legacy records in ext_config.
+        markLegacyExecutionRead(executionUid, now);
     }
 
     public List<CronJobExecutionResultDto> listRecentResults(String jobUid, int limit) {
         AgentCronJobEntity job = requireJob(jobUid);
         int safeLimit = limit <= 0 ? 20 : Math.min(limit, 100);
-        if (job.getExtConfig() == null || job.getExtConfig().isBlank()) {
-            return List.of();
+        AgentDefinitionEntity agent = resolveAgent(job.getAgentUid());
+        List<CronJobExecutionResultDto> results = agentCronJobExecutionRepository.listByJobUid(jobUid, safeLimit).stream()
+                .map(item -> toResultDto(item, job, agent))
+                .toList();
+        if (!results.isEmpty()) {
+            return results;
         }
-        JsonNode extNode = JsonUtil.fromJsonQuietly(job.getExtConfig(), JsonNode.class).orElse(JsonNodeFactory.instance.objectNode());
-        JsonNode rawResults = extNode.path("executionResults");
-        if (!(rawResults instanceof ArrayNode arrayNode) || arrayNode.isEmpty()) {
-            return List.of();
-        }
-        List<CronJobExecutionResultDto> results = readResultsFromJob(job, resolveAgent(job.getAgentUid()), safeLimit);
-        return List.copyOf(results);
+        // One-version compatibility fallback for legacy records in ext_config.
+        return List.copyOf(readLegacyResultsFromJob(job, agent, safeLimit));
     }
 
-    private List<CronJobExecutionResultDto> readResultsFromJob(AgentCronJobEntity job,
-                                                              AgentDefinitionEntity agent,
-                                                              int limit) {
+    private List<CronJobExecutionResultDto> readLegacyResultsFromJob(AgentCronJobEntity job,
+                                                                      AgentDefinitionEntity agent,
+                                                                      int limit) {
         int safeLimit = limit <= 0 ? 20 : Math.min(limit, 100);
         if (job.getExtConfig() == null || job.getExtConfig().isBlank()) {
             return List.of();
@@ -458,6 +476,38 @@ public class CronJobApplicationService {
             }
         }
         return results;
+    }
+
+    private CronJobExecutionResultDto toResultDto(AgentCronJobExecutionEntity execution,
+                                                  AgentCronJobEntity job,
+                                                  AgentDefinitionEntity agent) {
+        String executionUid = nullToEmpty(execution.getExecutionUid());
+        LocalDateTime executedTime = execution.getStartedTime();
+        String status = nullToEmpty(execution.getStatus());
+        String summary = nullToEmpty(execution.getSummary());
+        String reportPath = nullToEmpty(execution.getReportPath());
+        String normalizedReportPath = reportPath.isBlank() ? null : reportPath;
+        String conversationUid = nullToEmpty(execution.getConversationUid());
+        String messageUid = nullToEmpty(execution.getMessageUid());
+        String jobUid = job == null ? nullToEmpty(execution.getJobUid()) : job.getJobUid();
+        String jobTitle = defaultCronJobTitle(job == null ? "" : job.getTitle(), job == null ? "" : job.getTaskContent());
+        String agentUid = job == null ? nullToEmpty(execution.getAgentUid()) : nullToEmpty(job.getAgentUid());
+        String agentDisplayName = agent == null ? buildFallbackAgentDisplayName(agentUid) : nullToEmpty(agent.getDisplayName());
+        return new CronJobExecutionResultDto(
+                executionUid,
+                execution.getReadFlag() == null || execution.getReadFlag() != 1,
+                jobUid,
+                jobTitle,
+                agentUid,
+                agentDisplayName,
+                conversationUid.isBlank() ? null : conversationUid,
+                messageUid.isBlank() ? null : messageUid,
+                executedTime,
+                status,
+                summary,
+                normalizedReportPath,
+                readReportPreview(normalizedReportPath)
+        );
     }
 
     private List<ConversationMessageRunDto> resolveConversationRuns(String conversationUid, String messageUid) {
@@ -521,20 +571,41 @@ public class CronJobApplicationService {
         JsonNode extConfig = job.getExtConfig() == null || job.getExtConfig().isBlank()
                 ? JsonNodeFactory.instance.objectNode()
                 : JsonUtil.fromJsonQuietly(job.getExtConfig(), JsonNode.class).orElse(JsonNodeFactory.instance.objectNode());
-        String lastReportPath = extConfig.path("lastReportPath").asText("");
-        JsonNode currentExecution = extConfig.path("currentExecution");
-        String currentExecutionUid = currentExecution.path("executionUid").asText("");
-        String currentConversationUid = currentExecution.path("conversationUid").asText("");
-        String currentMessageUid = currentExecution.path("messageUid").asText("");
-        String currentExecutionStatus = currentExecution.path("status").asText("");
+        AgentCronJobExecutionEntity currentExecution = agentCronJobExecutionRepository.findLatestRunningByJobUid(job.getJobUid());
+        String currentExecutionUid = "";
+        String currentConversationUid = "";
+        String currentMessageUid = "";
+        String currentExecutionStatus = "";
         LocalDateTime currentExecutionStartedTime = null;
-        try {
-            String startedTimeText = currentExecution.path("startedTime").asText("");
-            if (!startedTimeText.isBlank()) {
-                currentExecutionStartedTime = LocalDateTime.parse(startedTimeText);
+        if (currentExecution != null) {
+            currentExecutionUid = nullToEmpty(currentExecution.getExecutionUid());
+            currentConversationUid = nullToEmpty(currentExecution.getConversationUid());
+            currentMessageUid = nullToEmpty(currentExecution.getMessageUid());
+            currentExecutionStatus = nullToEmpty(currentExecution.getStatus());
+            currentExecutionStartedTime = currentExecution.getStartedTime();
+        } else {
+            // One-version compatibility fallback for legacy ext_config.currentExecution.
+            JsonNode legacyCurrentExecution = extConfig.path("currentExecution");
+            currentExecutionUid = legacyCurrentExecution.path("executionUid").asText("");
+            currentConversationUid = legacyCurrentExecution.path("conversationUid").asText("");
+            currentMessageUid = legacyCurrentExecution.path("messageUid").asText("");
+            currentExecutionStatus = legacyCurrentExecution.path("status").asText("");
+            try {
+                String startedTimeText = legacyCurrentExecution.path("startedTime").asText("");
+                if (!startedTimeText.isBlank()) {
+                    currentExecutionStartedTime = LocalDateTime.parse(startedTimeText);
+                }
+            } catch (Exception ignored) {
+                currentExecutionStartedTime = null;
             }
-        } catch (Exception ignored) {
-            currentExecutionStartedTime = null;
+        }
+        String lastReportPath = "";
+        AgentCronJobExecutionEntity lastFinished = agentCronJobExecutionRepository.findLatestFinishedByJobUid(job.getJobUid());
+        if (lastFinished != null && lastFinished.getReportPath() != null) {
+            lastReportPath = lastFinished.getReportPath();
+        } else {
+            // One-version compatibility fallback for legacy ext_config.lastReportPath.
+            lastReportPath = extConfig.path("lastReportPath").asText("");
         }
         return new CronJobDto(
                 job.getJobUid(),
@@ -558,10 +629,48 @@ public class CronJobApplicationService {
                 job.getLastRunTime(),
                 job.getNextRunTime(),
                 job.getLastResult(),
-                lastReportPath.isBlank() ? null : lastReportPath,
+                lastReportPath == null || lastReportPath.isBlank() ? null : lastReportPath,
                 job.getCreatedTime(),
                 job.getUpdatedTime()
         );
+    }
+
+    private void markLegacyExecutionRead(String executionUid, LocalDateTime now) {
+        List<AgentCronJobEntity> jobs = agentCronJobRepository.listAllJobs();
+        for (AgentCronJobEntity job : jobs) {
+            if (job.getExtConfig() == null || job.getExtConfig().isBlank()) {
+                continue;
+            }
+            JsonNode extNode = JsonUtil.fromJsonQuietly(job.getExtConfig(), JsonNode.class)
+                    .orElse(JsonNodeFactory.instance.objectNode());
+            if (!(extNode instanceof ObjectNode extObject)) {
+                continue;
+            }
+            JsonNode rawResults = extObject.path("executionResults");
+            if (!(rawResults instanceof ArrayNode arrayNode) || arrayNode.isEmpty()) {
+                continue;
+            }
+            boolean changed = false;
+            for (JsonNode item : arrayNode) {
+                if (!(item instanceof ObjectNode resultNode)) {
+                    continue;
+                }
+                String itemExecutionUid = resultNode.path("executionUid").asText("");
+                if (executionUid.equals(itemExecutionUid)) {
+                    resultNode.put("read", true);
+                    changed = true;
+                    break;
+                }
+            }
+            if (changed) {
+                agentCronJobRepository.lambdaUpdate()
+                        .eq(AgentCronJobEntity::getJobUid, job.getJobUid())
+                        .set(AgentCronJobEntity::getExtConfig, JsonUtil.toJson(extObject))
+                        .set(AgentCronJobEntity::getUpdatedTime, now)
+                        .update();
+                return;
+            }
+        }
     }
 
     private Map<String, AgentDefinitionEntity> loadAgentsByUid(List<AgentCronJobEntity> jobs) {

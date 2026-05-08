@@ -1,5 +1,6 @@
 DROP TABLE IF EXISTS llm_provider_model;
 DROP TABLE IF EXISTS llm_provider_config;
+DROP TABLE IF EXISTS agent_cron_job_execution;
 DROP TABLE IF EXISTS agent_cron_job;
 DROP TABLE IF EXISTS agent_cron_subscription;
 DROP TABLE IF EXISTS agent_tip;
@@ -481,6 +482,31 @@ CREATE TABLE IF NOT EXISTS agent_cron_job (
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_0900_ai_ci
   COMMENT='Agent 定时任务表';
+
+CREATE TABLE IF NOT EXISTS agent_cron_job_execution (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增主键',
+    execution_uid VARCHAR(64) NOT NULL DEFAULT '' COMMENT '执行业务ID',
+    job_uid VARCHAR(64) NOT NULL DEFAULT '' COMMENT '任务业务ID',
+    agent_uid VARCHAR(64) NOT NULL DEFAULT '' COMMENT 'Agent 业务ID',
+    conversation_uid VARCHAR(64) NOT NULL DEFAULT '' COMMENT '执行对话ID',
+    message_uid VARCHAR(64) NOT NULL DEFAULT '' COMMENT '执行消息ID',
+    status VARCHAR(32) NOT NULL DEFAULT 'RUNNING' COMMENT '状态：RUNNING / COMPLETED / FAILED / CANCELED',
+    summary VARCHAR(1024) NOT NULL DEFAULT '' COMMENT '执行摘要',
+    report_path VARCHAR(1024) NOT NULL DEFAULT '' COMMENT '报告文件路径',
+    read_flag TINYINT(1) NOT NULL DEFAULT 0 COMMENT '已读标记',
+    started_time DATETIME(3) NOT NULL COMMENT '开始时间',
+    finished_time DATETIME(3) NULL COMMENT '结束时间',
+    created_time DATETIME(3) NOT NULL COMMENT '创建时间',
+    updated_time DATETIME(3) NOT NULL COMMENT '更新时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_agent_cron_job_execution_uid (execution_uid),
+    KEY idx_agent_cron_job_execution_job (job_uid, started_time DESC),
+    KEY idx_agent_cron_job_execution_status_time (status, started_time DESC),
+    KEY idx_agent_cron_job_execution_conversation (conversation_uid)
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_0900_ai_ci
+  COMMENT='Agent 定时任务执行记录表';
 
 INSERT INTO agent_definition (
     agent_uid, agent_name, display_name, avatar, description, capability_tags, prompt_profile,

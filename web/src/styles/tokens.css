@@ -184,6 +184,8 @@
   --color-composer-stop-bg: #000000;
   --color-composer-stop-bg-hover: #141414;
   --color-composer-stop-fg: #FFFFFF;
+  --composer-model-select-border: 0;
+  --composer-model-select-border-hover: var(--color-border-active);
   --color-button-neutral-bg-light: #EEF1F5;
   --color-button-neutral-bg-hover-light: #E2E7EE;
   --color-button-neutral-bg-pressed-light: #D6DEE8;
@@ -492,6 +494,8 @@
   --color-composer-stop-bg: #F2F3F5;
   --color-composer-stop-bg-hover: #FFFFFF;
   --color-composer-stop-fg: #000000;
+  --composer-model-select-border: var(--size-1) solid var(--color-border-strong);
+  --composer-model-select-border-hover: var(--color-border-active);
   --color-button-neutral-bg-light: #EEF1F5;
   --color-button-neutral-bg-hover-light: #E2E7EE;
   --color-button-neutral-bg-pressed-light: #D6DEE8;

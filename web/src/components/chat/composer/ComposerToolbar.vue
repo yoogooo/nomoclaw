@@ -63,6 +63,7 @@ function onApprovalModeSelect(key: string) {
   <div class="composer-toolbar-row composer-toolbar-row-bottom">
     <div class="composer-model-inline" :style="{ '--model-select-width-ch': `${modelSelectWidthCh}ch` }">
       <n-select
+        class="composer-model-select"
         :value="selectedModelKey"
         :options="modelOptions"
         size="small"
@@ -294,7 +295,9 @@ function onApprovalModeSelect(key: string) {
 
 .composer-model-inline :deep(.n-base-selection) {
   background: transparent;
-  border: 0;
+  border: var(--composer-model-select-border, 0);
+  min-height: 0;
+  height: 28px;
   box-shadow: none;
 }
 
@@ -307,6 +310,13 @@ function onApprovalModeSelect(key: string) {
 
 .composer-model-inline :deep(.n-base-selection-label) {
   color: var(--color-text-secondary);
+  height: 26px;
+  line-height: 26px;
+}
+
+.composer-model-inline :deep(.composer-model-select .n-base-selection:hover),
+.composer-model-inline :deep(.composer-model-select .n-base-selection.n-base-selection--active) {
+  border-color: var(--composer-model-select-border-hover, currentColor);
 }
 
 @media (max-width: 860px) {

@@ -183,6 +183,7 @@ const enUS = {
     messages: {
       panelTitle: "Conversation",
       noMessages: "No messages in this conversation yet.",
+      routeLoadingMessage: "Loading messages...",
       newConversationTitle: "Start a new conversation",
       newConversationHint: "This is a new conversation. Use a starter prompt to begin.",
       starterTemplate1Title: "Daily AI News Digest",

@@ -183,6 +183,7 @@ const zhCN = {
     messages: {
       panelTitle: "对话区",
       noMessages: "当前对话暂无消息。",
+      routeLoadingMessage: "正在加载消息...",
       newConversationTitle: "开始一个新会话",
       newConversationHint: "这是一个新的会话，可以从下方模版快速开始。",
       starterTemplate1Title: "每日 AI 热点整理",
