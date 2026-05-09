@@ -1,9 +1,9 @@
 package ai.nomoclaw.bot.policy;
 
 import ai.nomoclaw.bot.config.AgentProperties;
-import ai.nomoclaw.bot.workspace.NomoClawPaths;
 import ai.nomoclaw.bot.model.PlanStep;
 import ai.nomoclaw.bot.model.RiskLevel;
+import ai.nomoclaw.bot.workspace.NomoClawPaths;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
@@ -31,13 +31,13 @@ public class RiskPolicy {
             return RiskLevel.LOW;
         }
         if (tool.contains("command")) {
-            String cmd = toolArgs == null ? "" : toolArgs.path("command").asText("").toLowerCase();
+            String cmd = toolArgs == null ? "" : toolArgs.path("command").asString("").toLowerCase();
             return cmd.contains("rm ") || cmd.contains("sudo ") || cmd.contains("chmod -r") || cmd.contains("mv ")
                     ? RiskLevel.HIGH
                     : RiskLevel.LOW;
         }
         if ("createfiletool".equals(tool) || "editfiletool".equals(tool)) {
-            String pathRaw = toolArgs == null ? "" : toolArgs.path("path").asText("");
+            String pathRaw = toolArgs == null ? "" : toolArgs.path("path").asString("");
             return isAgentWorkspacePath(pathRaw) ? RiskLevel.LOW : RiskLevel.HIGH;
         }
         if ("readfiletool".equals(tool) || "listfiletool".equals(tool)) {

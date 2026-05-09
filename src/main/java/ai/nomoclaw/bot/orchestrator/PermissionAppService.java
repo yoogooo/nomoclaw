@@ -100,16 +100,16 @@ public class PermissionAppService {
                                            PermissionEffect effect,
                                            PermissionSource source,
                                            Path workspacePath) {
-        String action = toolArgs == null ? "*" : toolArgs.path("action").asText("*");
-        String path = toolArgs == null ? "" : toolArgs.path("path").asText("");
-        String command = toolArgs == null ? "" : toolArgs.path("command").asText("");
+        String action = toolArgs == null ? "*" : toolArgs.path("action").asString("*");
+        String path = toolArgs == null ? "" : toolArgs.path("path").asString("");
+        String command = toolArgs == null ? "" : toolArgs.path("command").asString("");
         String normalizedTool = toolName == null || toolName.isBlank() ? "*" : toolName.trim();
         String pathPattern = path == null ? "" : path;
         String commandPattern = command.isBlank() ? "" : command;
         if ("CommandTool".equalsIgnoreCase(normalizedTool)) {
             pathPattern = resolveCommandScopePath(
                     command,
-                    toolArgs == null ? "" : toolArgs.path("cwd").asText(""),
+                    toolArgs == null ? "" : toolArgs.path("cwd").asString(""),
                     workspacePath
             );
             commandPattern = "";

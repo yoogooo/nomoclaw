@@ -13,9 +13,9 @@ import ai.nomoclaw.bot.model.*;
 import ai.nomoclaw.bot.planner.Planner;
 import ai.nomoclaw.bot.policy.RiskPolicy;
 import ai.nomoclaw.bot.policy.tool.ToolPermissionPolicyService;
-import ai.nomoclaw.bot.policy.tool.ToolPolicyReasonCode;
 import ai.nomoclaw.bot.policy.tool.ToolPolicyDecision;
 import ai.nomoclaw.bot.policy.tool.ToolPolicyDecisionResult;
+import ai.nomoclaw.bot.policy.tool.ToolPolicyReasonCode;
 import ai.nomoclaw.bot.policy.tool.permission.PermissionEffect;
 import ai.nomoclaw.bot.policy.tool.permission.PermissionScope;
 import ai.nomoclaw.bot.policy.tool.permission.PermissionSource;
@@ -1309,8 +1309,8 @@ public class AgentApplicationService {
             return null;
         }
         JsonNode artifacts = result.artifacts();
-        String stdout = artifacts == null ? "" : artifacts.path("stdout").asText("");
-        String stderr = artifacts == null ? "" : artifacts.path("stderr").asText("");
+        String stdout = artifacts == null ? "" : artifacts.path("stdout").asString("");
+        String stderr = artifacts == null ? "" : artifacts.path("stderr").asString("");
         String resolved = result.success()
                 ? firstNonBlank(stdout, result.output())
                 : firstNonBlank(result.errorMessage(), stderr, result.output());
@@ -1398,14 +1398,14 @@ public class AgentApplicationService {
     private String buildStepTitle(String toolName, JsonNode toolArgs) {
         return switch (nullToEmpty(toolName)) {
             case "CommandTool" -> {
-                String command = toolArgs.path("command").asText("");
+                String command = toolArgs.path("command").asString("");
                 yield command.isBlank() ? "执行命令" : "执行命令: " + abbreviate(command, 96);
             }
             case "BrowserTool" -> {
-                String action = toolArgs.path("action").asText("");
-                String target = toolArgs.path("selector").asText("");
+                String action = toolArgs.path("action").asString("");
+                String target = toolArgs.path("selector").asString("");
                 if (target.isBlank()) {
-                    target = toolArgs.path("url").asText("");
+                    target = toolArgs.path("url").asString("");
                 }
                 yield "浏览器" + (action.isBlank() ? "操作" : action) + (target.isBlank() ? "" : ": " + abbreviate(target, 48));
             }
@@ -1413,32 +1413,32 @@ public class AgentApplicationService {
                 String action = switch (nullToEmpty(toolName)) {
                     case "ReadFileTool" -> "read";
                     case "ListFileTool" -> "list";
-                    case "CreateFileTool" -> toolArgs.path("mode").asText("create_or_truncate");
+                    case "CreateFileTool" -> toolArgs.path("mode").asString("create_or_truncate");
                     case "EditFileTool" -> "edit";
                     default -> "";
                 };
-                String path = toolArgs.path("path").asText("");
+                String path = toolArgs.path("path").asString("");
                 yield "文件" + (action.isBlank() ? "操作" : action) + (path.isBlank() ? "" : ": " + abbreviate(path, 48));
             }
             case "CronCreateTool" -> {
-                String task = toolArgs.path("task").asText("");
+                String task = toolArgs.path("task").asString("");
                 yield task.isBlank() ? "创建定时任务" : "创建定时任务: " + abbreviate(task, 48);
             }
             case "CronDeleteTool" -> {
-                String jobUid = toolArgs.path("jobUid").asText("");
+                String jobUid = toolArgs.path("jobUid").asString("");
                 yield jobUid.isBlank() ? "删除定时任务" : "删除定时任务: " + abbreviate(jobUid, 48);
             }
             case "CronListTool" -> "查询定时任务";
             case "ImageLoaderTool" -> {
-                String reference = toolArgs.path("reference").asText("");
+                String reference = toolArgs.path("reference").asString("");
                 yield reference.isBlank() ? "分析图片" : "分析图片: " + abbreviate(reference, 48);
             }
             case "WebSearchTool" -> {
-                String query = toolArgs.path("query").asText("");
+                String query = toolArgs.path("query").asString("");
                 yield query.isBlank() ? "网页搜索" : "网页搜索: " + abbreviate(query, 48);
             }
             case "WebFetchTool" -> {
-                String url = toolArgs.path("url").asText("");
+                String url = toolArgs.path("url").asString("");
                 yield url.isBlank() ? "网页抓取" : "网页抓取: " + abbreviate(url, 48);
             }
             default -> "执行工具: " + nullToEmpty(toolName);
@@ -1449,10 +1449,10 @@ public class AgentApplicationService {
         JsonNode toolArgs = step.toolArgs();
         return switch (nullToEmpty(step.toolName())) {
             case "CommandTool" -> {
-                String command = toolArgs.path("command").asText("");
+                String command = toolArgs.path("command").asString("");
                 yield command.isBlank() ? "正在执行本地命令" : "正在执行命令: " + command;
             }
-            case "BrowserTool" -> switch (toolArgs.path("action").asText("")) {
+            case "BrowserTool" -> switch (toolArgs.path("action").asString("")) {
                 case "open", "navigate" -> "正在打开网页";
                 case "click" -> "正在操作网页元素";
                 case "type" -> "正在填写网页内容";
@@ -1483,16 +1483,16 @@ public class AgentApplicationService {
     private String buildStepPlanDetails(PlanStep step) {
         return switch (nullToEmpty(step.toolName())) {
             case "CommandTool" -> {
-                String command = step.toolArgs().path("command").asText("");
-                String cwd = step.toolArgs().path("cwd").asText("");
+                String command = step.toolArgs().path("command").asString("");
+                String cwd = step.toolArgs().path("cwd").asString("");
                 yield command.isBlank()
                         ? "系统已规划一条本地命令，稍后会开始执行。"
                         : "系统准备执行本地命令“" + command + "”" + (cwd.isBlank() ? "。" : "，工作目录为 " + cwd + "。");
             }
             case "BrowserTool" -> {
-                String action = step.toolArgs().path("action").asText("");
-                String url = step.toolArgs().path("url").asText("");
-                String selector = step.toolArgs().path("selector").asText("");
+                String action = step.toolArgs().path("action").asString("");
+                String url = step.toolArgs().path("url").asString("");
+                String selector = step.toolArgs().path("selector").asString("");
                 String target = !url.isBlank() ? abbreviate(url, 72) : abbreviate(selector, 48);
                 yield target.isBlank()
                         ? "系统已规划一个网页处理步骤，稍后会开始执行。"
@@ -1503,43 +1503,43 @@ public class AgentApplicationService {
                     case "ReadFileTool" -> "读取";
                     case "ListFileTool" -> "列举";
                     case "CreateFileTool" -> {
-                        String mode = step.toolArgs().path("mode").asText("create_or_truncate");
+                        String mode = step.toolArgs().path("mode").asString("create_or_truncate");
                         yield "append".equals(mode) ? "追加" : "写入";
                     }
                     case "EditFileTool" -> "编辑";
                     default -> "处理";
                 };
-                String path = step.toolArgs().path("path").asText("");
+                String path = step.toolArgs().path("path").asString("");
                 yield path.isBlank()
                         ? "系统已规划一个文件处理步骤，稍后会开始执行。"
                         : "系统准备对文件执行“" + (action.isBlank() ? "处理" : action) + "”，目标路径为 " + abbreviate(path, 72) + "。";
             }
             case "CronCreateTool" -> {
-                String task = step.toolArgs().path("task").asText("");
+                String task = step.toolArgs().path("task").asString("");
                 yield task.isBlank() ? "系统准备创建一个定时任务。" : "系统准备创建定时任务：“" + abbreviate(task, 72) + "”。";
             }
             case "CronDeleteTool" -> {
-                String jobUid = step.toolArgs().path("jobUid").asText("");
+                String jobUid = step.toolArgs().path("jobUid").asString("");
                 yield jobUid.isBlank() ? "系统准备删除一个定时任务。" : "系统准备删除定时任务 " + abbreviate(jobUid, 72) + "。";
             }
             case "CronListTool" -> {
-                String jobUid = step.toolArgs().path("jobUid").asText("");
+                String jobUid = step.toolArgs().path("jobUid").asString("");
                 yield jobUid.isBlank() ? "系统准备查询定时任务列表。" : "系统准备查询定时任务 " + abbreviate(jobUid, 72) + "。";
             }
             case "ImageLoaderTool" -> {
-                String reference = step.toolArgs().path("reference").asText("");
+                String reference = step.toolArgs().path("reference").asString("");
                 yield reference.isBlank()
                         ? "系统准备加载图片并进行视觉分析。"
                         : "系统准备根据“" + abbreviate(reference, 72) + "”加载图片并进行视觉分析。";
             }
             case "WebSearchTool" -> {
-                String query = step.toolArgs().path("query").asText("");
+                String query = step.toolArgs().path("query").asString("");
                 yield query.isBlank()
                         ? "系统准备执行一次网页搜索。"
                         : "系统准备执行网页搜索，关键词为“" + abbreviate(query, 72) + "”。";
             }
             case "WebFetchTool" -> {
-                String url = step.toolArgs().path("url").asText("");
+                String url = step.toolArgs().path("url").asString("");
                 yield url.isBlank()
                         ? "系统准备抓取网页内容。"
                         : "系统准备抓取网页内容，目标地址为 " + abbreviate(url, 72) + "。";
@@ -1564,20 +1564,20 @@ public class AgentApplicationService {
     private String buildStepSuccessDetails(PlanStep step, ToolResult result) {
         return switch (nullToEmpty(step.toolName())) {
             case "BrowserTool" -> {
-                String path = result.artifacts() == null ? "" : result.artifacts().path("path").asText("");
+                String path = result.artifacts() == null ? "" : result.artifacts().path("path").asString("");
                 if (!path.isBlank()) {
                     yield "网页操作已完成，生成的文件已保存到 " + path + "。";
                 }
                 yield hasMeaningfulText(result.output()) ? "网页操作已完成：" + abbreviate(result.output(), 120) : "网页操作已顺利完成。";
             }
             case "ReadFileTool", "ListFileTool", "CreateFileTool", "EditFileTool" -> {
-                String path = result.artifacts() == null ? "" : result.artifacts().path("path").asText("");
+                String path = result.artifacts() == null ? "" : result.artifacts().path("path").asString("");
                 yield path.isBlank() ? "文件处理已完成。" : "文件处理已完成，目标路径为 " + abbreviate(path, 96) + "。";
             }
             case "CommandTool" -> {
-                String command = step.toolArgs().path("command").asText("");
-                String stdout = result.artifacts() == null ? "" : result.artifacts().path("stdout").asText("");
-                String stderr = result.artifacts() == null ? "" : result.artifacts().path("stderr").asText("");
+                String command = step.toolArgs().path("command").asString("");
+                String stdout = result.artifacts() == null ? "" : result.artifacts().path("stdout").asString("");
+                String stderr = result.artifacts() == null ? "" : result.artifacts().path("stderr").asString("");
                 String outputBody = hasMeaningfulText(stdout) ? stdout : (hasMeaningfulText(result.output()) ? result.output() : stderr);
                 String prefix = command.isBlank() ? "本地命令已执行完成。" : "本地命令已执行完成：\"" + command + "\"。";
                 if (!hasMeaningfulText(outputBody)) {
@@ -1608,8 +1608,8 @@ public class AgentApplicationService {
             message = "执行过程中出现异常，暂时无法完成这一步。";
         }
         if ("CommandTool".equals(nullToEmpty(step.toolName()))) {
-            String command = step.toolArgs().path("command").asText("");
-            String stderr = result.artifacts() == null ? "" : result.artifacts().path("stderr").asText("");
+            String command = step.toolArgs().path("command").asString("");
+            String stderr = result.artifacts() == null ? "" : result.artifacts().path("stderr").asString("");
             String suffix = hasMeaningfulText(stderr) ? "\nstderr:\n" + abbreviate(stderr, 800) : "";
             if (!command.isBlank()) {
                 return abbreviate("命令执行失败：\"" + command + "\"。错误：" + message + suffix, 1600);
@@ -1621,10 +1621,10 @@ public class AgentApplicationService {
     private String formatApprovalAction(String toolName, JsonNode toolArgs) {
         return switch (nullToEmpty(toolName)) {
             case "BrowserTool" -> {
-                String action = toolArgs.path("action").asText("");
-                String url = toolArgs.path("url").asText("");
-                String selector = toolArgs.path("selector").asText("");
-                String text = toolArgs.path("text").asText("");
+                String action = toolArgs.path("action").asString("");
+                String url = toolArgs.path("url").asString("");
+                String selector = toolArgs.path("selector").asString("");
+                String text = toolArgs.path("text").asString("");
                 if ("open".equals(action) || "navigate".equals(action)) {
                     yield "系统将打开网页 " + (url.isBlank() ? "（未提供地址）" : abbreviate(url, 96)) + "。";
                 }
@@ -1635,14 +1635,14 @@ public class AgentApplicationService {
                     yield "系统将向网页元素 " + (selector.isBlank() ? "（未提供目标）" : abbreviate(selector, 72)) + " 输入内容" + (text.isBlank() ? "。" : "：“" + abbreviate(text, 60) + "”。");
                 }
                 if ("screenshot".equals(action)) {
-                    String output = toolArgs.path("output").asText("");
+                    String output = toolArgs.path("output").asString("");
                     yield "系统将保存当前页面截图" + (output.isBlank() ? "到默认临时目录。" : "到 " + abbreviate(output, 96) + "。");
                 }
                 yield "系统将执行一项网页操作。";
             }
             case "CommandTool" -> {
-                String command = toolArgs.path("command").asText("");
-                String cwd = toolArgs.path("cwd").asText("");
+                String command = toolArgs.path("command").asString("");
+                String cwd = toolArgs.path("cwd").asString("");
                 yield "系统将执行本地命令 " + (command.isBlank() ? "（未提供命令）" : "“" + command + "”")
                         + (cwd.isBlank() ? "。" : "，工作目录为 " + cwd + "。");
             }
@@ -1651,30 +1651,30 @@ public class AgentApplicationService {
                     case "ReadFileTool" -> "读取";
                     case "ListFileTool" -> "列举";
                     case "CreateFileTool" -> {
-                        String mode = toolArgs.path("mode").asText("create_or_truncate");
+                        String mode = toolArgs.path("mode").asString("create_or_truncate");
                         yield "append".equals(mode) ? "追加" : "写入";
                     }
                     case "EditFileTool" -> "编辑";
                     default -> "处理";
                 };
-                String path = toolArgs.path("path").asText("");
+                String path = toolArgs.path("path").asString("");
                 yield "系统将对文件执行“" + action + "”操作" + (path.isBlank() ? "。" : "，目标路径为 " + abbreviate(path, 96) + "。");
             }
             case "CronCreateTool" -> {
-                String task = toolArgs.path("task").asText("");
+                String task = toolArgs.path("task").asString("");
                 yield "系统将创建定时任务" + (task.isBlank() ? "。" : "：“" + abbreviate(task, 72) + "”。");
             }
             case "CronDeleteTool" -> {
-                String jobUid = toolArgs.path("jobUid").asText("");
+                String jobUid = toolArgs.path("jobUid").asString("");
                 yield "系统将删除定时任务" + (jobUid.isBlank() ? "。" : " " + abbreviate(jobUid, 72) + "。");
             }
             case "CronListTool" -> "系统将查询定时任务。";
             case "WebSearchTool" -> {
-                String query = toolArgs.path("query").asText("");
+                String query = toolArgs.path("query").asString("");
                 yield "系统将执行网页搜索" + (query.isBlank() ? "。" : "，关键词为“" + abbreviate(query, 72) + "”。");
             }
             case "WebFetchTool" -> {
-                String url = toolArgs.path("url").asText("");
+                String url = toolArgs.path("url").asString("");
                 yield "系统将抓取网页内容" + (url.isBlank() ? "。" : "，目标地址为 " + abbreviate(url, 96) + "。");
             }
             default -> "系统将执行一项待确认操作。";
@@ -1954,7 +1954,7 @@ public class AgentApplicationService {
             if (event.eventType() != AgentEventType.STEP_FINISHED || event.payload() == null || !event.payload().path("success").asBoolean(false)) {
                 continue;
             }
-            String path = event.payload().path("artifacts").path("path").asText("");
+            String path = event.payload().path("artifacts").path("path").asString("");
             if (path.isBlank()) {
                 continue;
             }
@@ -2014,7 +2014,7 @@ public class AgentApplicationService {
                 JsonNode displaySteps = event.payload() == null ? null : event.payload().path("displaySteps");
                 if (displaySteps != null && displaySteps.isArray()) {
                     for (JsonNode node : displaySteps) {
-                        String stepUid = node.path("stepUid").asText("");
+                        String stepUid = node.path("stepUid").asString("");
                         if (stepUid.isBlank()) {
                             continue;
                         }
@@ -2026,7 +2026,7 @@ public class AgentApplicationService {
                 continue;
             }
             if (event.eventType() == AgentEventType.MESSAGE_COMPLETED) {
-                runStatus = "COMPLETED".equalsIgnoreCase(event.payload().path("status").asText("")) ? "completed" : "failed";
+                runStatus = "COMPLETED".equalsIgnoreCase(event.payload().path("status").asString("")) ? "completed" : "failed";
                 continue;
             }
             if (event.eventType() == AgentEventType.MESSAGE_CANCELED) {
@@ -2156,7 +2156,7 @@ public class AgentApplicationService {
     }
 
     private String toolCallId(PlanStep step) {
-        String toolCallId = step.toolArgs().path("_toolCallId").asText("");
+        String toolCallId = step.toolArgs().path("_toolCallId").asString("");
         return toolCallId.isBlank() ? step.stepUid() : toolCallId;
     }
 
@@ -2190,17 +2190,17 @@ public class AgentApplicationService {
         }
 
         static RunStepAccumulator fromEventNode(JsonNode node) {
-            RunStepAccumulator accumulator = new RunStepAccumulator(node.path("stepUid").asText(""));
+            RunStepAccumulator accumulator = new RunStepAccumulator(node.path("stepUid").asString(""));
             accumulator.roundIndex = node.path("roundIndex").asInt(1);
             accumulator.stepIndex = node.path("stepIndex").asInt(1);
-            accumulator.status = node.path("status").asText("planned");
-            accumulator.toolName = node.path("toolName").asText("");
+            accumulator.status = node.path("status").asString("planned");
+            accumulator.toolName = node.path("toolName").asString("");
             accumulator.toolArgs = copyJson(node.path("toolArgs"));
-            accumulator.displayTitle = node.path("displayTitle").asText("");
-            accumulator.displaySummary = node.path("displaySummary").asText("");
-            accumulator.displayDetails = node.path("displayDetails").asText("");
-            accumulator.policyReasonCode = node.path("policyReasonCode").asText("");
-            String updated = node.path("updatedTime").asText("");
+            accumulator.displayTitle = node.path("displayTitle").asString("");
+            accumulator.displaySummary = node.path("displaySummary").asString("");
+            accumulator.displayDetails = node.path("displayDetails").asString("");
+            accumulator.policyReasonCode = node.path("policyReasonCode").asString("");
+            String updated = node.path("updatedTime").asString("");
             if (!updated.isBlank()) {
                 accumulator.updatedTime = Instant.parse(updated);
             }
@@ -2213,7 +2213,7 @@ public class AgentApplicationService {
 
         void applyEvent(AgentEvent event) {
             applyEventNode(event.payload(), event.timestamp());
-            if (event.payload() == null || event.payload().path("status").asText("").isBlank()) {
+            if (event.payload() == null || event.payload().path("status").asString("").isBlank()) {
                 status = switch (event.eventType()) {
                     case STEP_STARTED -> "running";
                     case STEP_WAITING_APPROVAL -> "waiting_approval";
@@ -2231,24 +2231,24 @@ public class AgentApplicationService {
             }
             roundIndex = node.path("roundIndex").asInt(roundIndex == 0 ? 1 : roundIndex);
             stepIndex = node.path("stepIndex").asInt(stepIndex == 0 ? 1 : stepIndex);
-            status = node.path("status").asText(status == null || status.isBlank() ? "planned" : status);
-            if (!node.path("toolName").asText("").isBlank()) {
-                toolName = node.path("toolName").asText("");
+            status = node.path("status").asString(status == null || status.isBlank() ? "planned" : status);
+            if (!node.path("toolName").asString("").isBlank()) {
+                toolName = node.path("toolName").asString("");
             }
             if (node.hasNonNull("toolArgs") && node.path("toolArgs").isObject()) {
                 toolArgs = copyJson(node.path("toolArgs"));
             }
-            if (!node.path("displayTitle").asText("").isBlank()) {
-                displayTitle = node.path("displayTitle").asText("");
+            if (!node.path("displayTitle").asString("").isBlank()) {
+                displayTitle = node.path("displayTitle").asString("");
             }
-            if (!node.path("displaySummary").asText("").isBlank()) {
-                displaySummary = node.path("displaySummary").asText("");
+            if (!node.path("displaySummary").asString("").isBlank()) {
+                displaySummary = node.path("displaySummary").asString("");
             }
-            if (!node.path("displayDetails").asText("").isBlank()) {
-                displayDetails = node.path("displayDetails").asText("");
+            if (!node.path("displayDetails").asString("").isBlank()) {
+                displayDetails = node.path("displayDetails").asString("");
             }
-            if (!node.path("policyReasonCode").asText("").isBlank()) {
-                policyReasonCode = node.path("policyReasonCode").asText("");
+            if (!node.path("policyReasonCode").asString("").isBlank()) {
+                policyReasonCode = node.path("policyReasonCode").asString("");
             }
             updatedTime = eventTime;
         }
@@ -2317,9 +2317,9 @@ public class AgentApplicationService {
         int fromIndex = Math.max(0, allMessages.size() - CONVERSATION_CONTEXT_LIMIT);
         List<ChatMessage> memory = new ArrayList<>();
         for (AgentMessage message : allMessages.subList(fromIndex, allMessages.size())) {
-            boolean hasText = message.content() != null && !message.content().isBlank();
+            boolean hasString = message.content() != null && !message.content().isBlank();
             boolean hasAttachments = !conversationAttachmentAppService.listByMessageUid(message.messageUid()).isEmpty();
-            if (!hasText && !hasAttachments) {
+            if (!hasString && !hasAttachments) {
                 continue;
             }
             if ("user".equals(message.role())) {
@@ -2466,7 +2466,7 @@ public class AgentApplicationService {
                 JsonNode modelIdsNode = node == null ? null : node.path("modelIds");
                 if (modelIdsNode != null && modelIdsNode.isArray()) {
                     for (JsonNode item : modelIdsNode) {
-                        String modelId = item == null ? "" : trim(item.asText(""));
+                        String modelId = item == null ? "" : trim(item.asString(""));
                         if (!modelId.isBlank()) {
                             modelIds.add(modelId);
                         }
@@ -2680,7 +2680,7 @@ public class AgentApplicationService {
 
     private String readAvatarColor(String extConfigRaw) {
         ObjectNode node = readExtConfigObject(extConfigRaw);
-        String color = node.path("avatarColor").asText("");
+        String color = node.path("avatarColor").asString("");
         return color == null || color.isBlank() ? "#2F6FED" : color;
     }
 
@@ -2728,7 +2728,7 @@ public class AgentApplicationService {
         LinkedHashSet<String> modelIds = new LinkedHashSet<>();
         if (modelIdsNode.isArray()) {
             for (JsonNode node : modelIdsNode) {
-                String modelId = node == null ? "" : node.asText("");
+                String modelId = node == null ? "" : node.asString("");
                 if (modelId != null && !modelId.isBlank()) {
                     modelIds.add(modelId.trim());
                 }
@@ -2872,7 +2872,7 @@ public class AgentApplicationService {
             List<String> values = new ArrayList<>();
             node.forEach(item -> {
                 if (item != null && item.isTextual()) {
-                    values.add(item.asText());
+                    values.add(item.asString());
                 }
             });
             return values;

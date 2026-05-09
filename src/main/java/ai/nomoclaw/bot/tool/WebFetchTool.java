@@ -39,8 +39,8 @@ public class WebFetchTool implements Tool {
     public ToolResult execute(ToolRequest request) {
         long start = System.currentTimeMillis();
         try {
-            String url = request.args().path("url").asText("");
-            String prompt = request.args().path("prompt").asText("");
+            String url = request.args().path("url").asString("");
+            String prompt = request.args().path("prompt").asString("");
             if (url.isBlank()) {
                 return ToolResult.failure("INVALID_ARGS", "url is required", metric(start, 0));
             }

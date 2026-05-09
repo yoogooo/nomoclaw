@@ -1,14 +1,7 @@
 package ai.nomoclaw.bot.api;
 
-import ai.nomoclaw.bot.orchestrator.AgentCatalogAppService;
-import ai.nomoclaw.bot.orchestrator.ApprovalAppService;
-import ai.nomoclaw.bot.orchestrator.ConversationAttachmentAppService;
-import ai.nomoclaw.bot.orchestrator.ConversationAppService;
-import ai.nomoclaw.bot.orchestrator.MessageRunAppService;
-import ai.nomoclaw.bot.orchestrator.ModelConfigAppService;
-import ai.nomoclaw.bot.orchestrator.PermissionAppService;
-import ai.nomoclaw.bot.orchestrator.SystemAppService;
 import ai.nomoclaw.bot.mcp.McpApplicationService;
+import ai.nomoclaw.bot.orchestrator.*;
 import ai.nomoclaw.bot.scheduler.CronChannelTargetDirectoryService;
 import ai.nomoclaw.bot.scheduler.CronJobApplicationService;
 import jakarta.validation.Valid;
@@ -19,16 +12,7 @@ import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -460,7 +444,6 @@ public class AgentController {
                 request.modelName(),
                 request.approvalMode()
         );
-        var message = messageRunAppService.getMessage(messageUid);
         int maxRounds = messageRunAppService.maxLoopRounds();
         log.info("[AgentAPI] submitMessage accepted conversationUid={} messageUid={} round={}/{}",
                 conversationUid, messageUid, 1, maxRounds);

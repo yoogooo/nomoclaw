@@ -18,12 +18,12 @@ public class CodexAuthFileTokenProvider implements CodexTokenProvider {
 
     @Override
     public String accessToken() {
-        return trim(authRoot().path("tokens").path("access_token").asText(""));
+        return trim(authRoot().path("tokens").path("access_token").asString(""));
     }
 
     @Override
     public String accountId() {
-        return trim(authRoot().path("tokens").path("account_id").asText(""));
+        return trim(authRoot().path("tokens").path("account_id").asString(""));
     }
 
     @Override
@@ -42,7 +42,7 @@ public class CodexAuthFileTokenProvider implements CodexTokenProvider {
                 return new AuthStatus(false, "missing", "Codex 未登录，请先运行 codex login");
             }
             JsonNode root = authRoot();
-            String accessToken = trim(root.path("tokens").path("access_token").asText(""));
+            String accessToken = trim(root.path("tokens").path("access_token").asString(""));
             if (accessToken.isBlank()) {
                 return new AuthStatus(false, "missing", "Codex 登录 token 缺失，请重新运行 codex login");
             }

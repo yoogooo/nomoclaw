@@ -125,7 +125,7 @@ public class BrowserTool implements Tool {
             if (cancellationRegistry.isCanceled(request.messageUid())) {
                 return ToolResult.failure("CANCELLED", "message canceled", metric(start));
             }
-            String action = request.args().path("action").asText("");
+            String action = request.args().path("action").asString("");
             log.info("[Tool][browser] execute conversationUid={} messageUid={} stepUid={} action={}",
                     request.conversationUid(), request.messageUid(), request.stepUid(), action);
             return executeWithRecovery(request, profileKey, start);
@@ -159,16 +159,16 @@ public class BrowserTool implements Tool {
     }
 
     private ToolResult executeAction(ToolRequest request, Page page, long start) throws Exception {
-        String action = request.args().path("action").asText("");
+        String action = request.args().path("action").asString("");
         return switch (action) {
             case "open" -> {
-                String url = request.args().path("url").asText("");
+                String url = request.args().path("url").asString("");
                 page.navigate(url);
                 page.waitForLoadState(LoadState.NETWORKIDLE);
                 yield ToolResult.success("opened " + url, textArtifacts("url", url), metric(start));
             }
             case "navigate" -> {
-                String url = request.args().path("url").asText("");
+                String url = request.args().path("url").asString("");
                 page.navigate(url);
                 page.waitForLoadState(LoadState.NETWORKIDLE);
                 yield ToolResult.success("navigated " + url, textArtifacts("url", url), metric(start));
@@ -178,25 +178,25 @@ public class BrowserTool implements Tool {
                 yield ToolResult.success("navigated back", textArtifacts("url", page.url()), metric(start));
             }
             case "click" -> {
-                String selector = request.args().path("selector").asText("");
+                String selector = request.args().path("selector").asString("");
                 page.locator(selector).first().click();
                 yield ToolResult.success("clicked " + selector, textArtifacts("selector", selector), metric(start));
             }
             case "type" -> {
-                String selector = request.args().path("selector").asText("");
-                String text = request.args().path("text").asText("");
+                String selector = request.args().path("selector").asString("");
+                String text = request.args().path("text").asString("");
                 page.locator(selector).first().fill(text);
                 yield ToolResult.success("typed into " + selector, textArtifacts("selector", selector), metric(start));
             }
             case "extract_text" -> {
-                String selector = request.args().path("selector").asText("body");
+                String selector = request.args().path("selector").asString("body");
                 String text = page.locator(selector).first().innerText();
                 ObjectNode artifacts = textArtifacts("selector", selector);
                 artifacts.put("length", text.length());
                 yield ToolResult.success(text, artifacts, metric(start));
             }
             case "screenshot" -> {
-                String output = request.args().path("output").asText("");
+                String output = request.args().path("output").asString("");
                 Path outputPath = output == null || output.isBlank()
                         ? request.tmpDirectory().resolve(UUID.randomUUID() + ".png").toAbsolutePath().normalize()
                         : PathResolver.resolveInAgentWorkspace(output, request);
@@ -205,8 +205,8 @@ public class BrowserTool implements Tool {
                 yield ToolResult.success("screenshot saved", textArtifacts("path", outputPath.toString()), metric(start));
             }
             case "download" -> {
-                String selector = request.args().path("selector").asText("");
-                String output = request.args().path("output").asText("");
+                String selector = request.args().path("selector").asString("");
+                String output = request.args().path("output").asString("");
                 Download download = page.waitForDownload(() -> page.locator(selector).first().click());
                 Path targetPath = resolveDownloadPath(request, download, output);
                 Files.createDirectories(targetPath.getParent());
@@ -223,12 +223,12 @@ public class BrowserTool implements Tool {
                 yield ToolResult.success(ToolTextUtils.truncateHead(html), artifacts, metric(start));
             }
             case "wait_for" -> {
-                String selector = request.args().path("selector").asText("");
+                String selector = request.args().path("selector").asString("");
                 page.locator(selector).first().waitFor();
                 yield ToolResult.success("waited for " + selector, textArtifacts("selector", selector), metric(start));
             }
             case "press_key" -> {
-                String key = request.args().path("key").asText("");
+                String key = request.args().path("key").asString("");
                 page.keyboard().press(key);
                 yield ToolResult.success("pressed key " + key, textArtifacts("key", key), metric(start));
             }

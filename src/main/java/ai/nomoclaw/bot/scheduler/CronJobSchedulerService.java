@@ -5,17 +5,7 @@ import ai.nomoclaw.bot.store.entity.AgentCronJobEntity;
 import ai.nomoclaw.bot.store.repository.AgentCronJobRepository;
 import ai.nomoclaw.bot.util.JsonUtil;
 import lombok.extern.slf4j.Slf4j;
-import org.quartz.CronScheduleBuilder;
-import org.quartz.CronTrigger;
-import org.quartz.JobBuilder;
-import org.quartz.JobDataMap;
-import org.quartz.JobDetail;
-import org.quartz.JobKey;
-import org.quartz.Scheduler;
-import org.quartz.SchedulerException;
-import org.quartz.Trigger;
-import org.quartz.TriggerBuilder;
-import org.quartz.TriggerKey;
+import org.quartz.*;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -245,14 +235,14 @@ public class CronJobSchedulerService {
             return null;
         }
         JsonNode extNode = JsonUtil.fromJsonQuietly(extConfigText, JsonNode.class).orElse(JsonNodeFactory.instance.objectNode());
-        String endAt = extNode.path("schedule").path("endAt").asText("");
+        String endAt = extNode.path("schedule").path("endAt").asString("");
         if (endAt == null || endAt.isBlank()) {
             return null;
         }
         try {
             return LocalDateTime.parse(endAt.trim());
         } catch (Exception ex) {
-            log.warn("[Quartz] ignored invalid schedule.endAt jobUid={} value={}", extNode.path("jobUid").asText(""), endAt);
+            log.warn("[Quartz] ignored invalid schedule.endAt jobUid={} value={}", extNode.path("jobUid").asString(""), endAt);
             return null;
         }
     }

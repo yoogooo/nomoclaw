@@ -597,10 +597,10 @@ public class SystemAppService {
             migrated.put("isDefault", true);
             migrated.put("requireMention", feishu.path("requireMention").asBoolean(true));
             migrated.set("allowList", feishu.path("allowList").isArray() ? feishu.path("allowList") : MAPPER.createArrayNode());
-            migrated.put("appId", trim(feishu.path("appId").asText("")));
-            migrated.put("appSecret", trim(feishu.path("appSecret").asText("")));
+            migrated.put("appId", trim(feishu.path("appId").asString("")));
+            migrated.put("appSecret", trim(feishu.path("appSecret").asString("")));
             migrated.put("processingAckReactionEnabled", feishu.path("processingAckReactionEnabled").asBoolean(true));
-            migrated.put("processingAckReactionType", fallback(trim(feishu.path("processingAckReactionType").asText("")), "OK"));
+            migrated.put("processingAckReactionType", fallback(trim(feishu.path("processingAckReactionType").asString("")), "OK"));
             migrated.put("defaultTarget", "");
             migrated.put("defaultTargetDisplayName", "");
             migrated.put("targetResolvedAt", "");
@@ -718,9 +718,9 @@ public class SystemAppService {
             migrated.put("isDefault", true);
             migrated.put("requireMention", dingtalk.path("requireMention").asBoolean(true));
             migrated.set("allowList", dingtalk.path("allowList").isArray() ? dingtalk.path("allowList") : MAPPER.createArrayNode());
-            migrated.put("clientId", trim(dingtalk.path("clientId").asText("")));
-            migrated.put("clientSecret", trim(dingtalk.path("clientSecret").asText("")));
-            migrated.put("robotCode", trim(dingtalk.path("robotCode").asText("")));
+            migrated.put("clientId", trim(dingtalk.path("clientId").asString("")));
+            migrated.put("clientSecret", trim(dingtalk.path("clientSecret").asString("")));
+            migrated.put("robotCode", trim(dingtalk.path("robotCode").asString("")));
             bots.add(migrated);
         }
         dingtalk.removeAll();
@@ -745,8 +745,8 @@ public class SystemAppService {
             migrated.put("isDefault", true);
             migrated.put("requireMention", discord.path("requireMention").asBoolean(true));
             migrated.set("allowList", discord.path("allowList").isArray() ? discord.path("allowList") : MAPPER.createArrayNode());
-            migrated.put("token", trim(discord.path("token").asText("")));
-            migrated.put("botUserId", trim(discord.path("botUserId").asText("")));
+            migrated.put("token", trim(discord.path("token").asString("")));
+            migrated.put("botUserId", trim(discord.path("botUserId").asString("")));
             migrated.put("acceptBotMessages", discord.path("acceptBotMessages").asBoolean(false));
             bots.add(migrated);
         }
@@ -772,8 +772,8 @@ public class SystemAppService {
             migrated.put("isDefault", true);
             migrated.put("requireMention", telegram.path("requireMention").asBoolean(true));
             migrated.set("allowList", telegram.path("allowList").isArray() ? telegram.path("allowList") : MAPPER.createArrayNode());
-            migrated.put("token", trim(telegram.path("token").asText("")));
-            migrated.put("botUsername", normalizeTelegramUsername(telegram.path("botUsername").asText("")));
+            migrated.put("token", trim(telegram.path("token").asString("")));
+            migrated.put("botUsername", normalizeTelegramUsername(telegram.path("botUsername").asString("")));
             bots.add(migrated);
         }
         telegram.removeAll();
@@ -798,9 +798,9 @@ public class SystemAppService {
             migrated.put("isDefault", true);
             migrated.put("requireMention", qq.path("requireMention").asBoolean(true));
             migrated.set("allowList", qq.path("allowList").isArray() ? qq.path("allowList") : MAPPER.createArrayNode());
-            migrated.put("appId", trim(qq.path("appId").asText("")));
-            migrated.put("clientSecret", trim(qq.path("clientSecret").asText(qq.path("token").asText(""))));
-            migrated.put("botUserId", trim(qq.path("botUserId").asText("")));
+            migrated.put("appId", trim(qq.path("appId").asString("")));
+            migrated.put("clientSecret", trim(qq.path("clientSecret").asString(qq.path("token").asString(""))));
+            migrated.put("botUserId", trim(qq.path("botUserId").asString("")));
             migrated.put("sandbox", qq.path("sandbox").asBoolean(false));
             migrated.put("markdownEnabled", qq.path("markdownEnabled").asBoolean(false));
             bots.add(migrated);
@@ -827,8 +827,8 @@ public class SystemAppService {
             migrated.put("isDefault", true);
             migrated.put("requireMention", wecom.path("requireMention").asBoolean(true));
             migrated.set("allowList", wecom.path("allowList").isArray() ? wecom.path("allowList") : MAPPER.createArrayNode());
-            migrated.put("wecomBotId", trim(wecom.path("wecomBotId").asText(wecom.path("botId").asText(""))));
-            migrated.put("secret", trim(wecom.path("secret").asText("")));
+            migrated.put("wecomBotId", trim(wecom.path("wecomBotId").asString(wecom.path("botId").asString(""))));
+            migrated.put("secret", trim(wecom.path("secret").asString("")));
             bots.add(migrated);
         }
         wecom.removeAll();
@@ -853,9 +853,9 @@ public class SystemAppService {
             migrated.put("isDefault", true);
             migrated.put("requireMention", weixin.path("requireMention").asBoolean(true));
             migrated.set("allowList", weixin.path("allowList").isArray() ? weixin.path("allowList") : MAPPER.createArrayNode());
-            migrated.put("botToken", trim(weixin.path("botToken").asText("")));
-            migrated.put("botTokenFile", trim(weixin.path("botTokenFile").asText("")));
-            migrated.put("baseUrl", fallback(trim(weixin.path("baseUrl").asText("")), "https://ilinkai.weixin.qq.com"));
+            migrated.put("botToken", trim(weixin.path("botToken").asString("")));
+            migrated.put("botTokenFile", trim(weixin.path("botTokenFile").asString("")));
+            migrated.put("baseUrl", fallback(trim(weixin.path("baseUrl").asString("")), "https://ilinkai.weixin.qq.com"));
             bots.add(migrated);
         }
         weixin.removeAll();

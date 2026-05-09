@@ -6,12 +6,7 @@ import org.springframework.stereotype.Component;
 
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.regex.Pattern;
 
 @Component
@@ -62,7 +57,7 @@ public class CommandRuleResolver {
     public PermissionContextDetails resolve(ToolPolicyContext context) {
         String tool = normalizeTool(context.toolName());
         if ("commandtool".equals(tool)) {
-            String command = context.toolArgs().path("command").asText("");
+            String command = context.toolArgs().path("command").asString("");
             Path cwd = resolveCommandCwd(context);
             List<Path> targets = extractCommandWriteTargets(command, cwd);
             boolean writeIntent = hasWriteIntent(command);
@@ -79,8 +74,8 @@ public class CommandRuleResolver {
         }
 
         if ("filetool".equals(tool)) {
-            String action = context.toolArgs().path("action").asText("").trim().toLowerCase(Locale.ROOT);
-            String pathRaw = context.toolArgs().path("path").asText("");
+            String action = context.toolArgs().path("action").asString("").trim().toLowerCase(Locale.ROOT);
+            String pathRaw = context.toolArgs().path("path").asString("");
             Path base = context.agentWorkspacePath() == null ? Path.of(".").toAbsolutePath().normalize() : context.agentWorkspacePath();
             Path path = PathResolver.resolve(pathRaw, base);
             boolean write = Set.of("write", "append", "edit").contains(action);
@@ -100,7 +95,7 @@ public class CommandRuleResolver {
         return new PermissionContextDetails(
                 context.toolName(),
                 PermissionResourceType.fromTool(tool),
-                context.toolArgs().path("action").asText("*"),
+                context.toolArgs().path("action").asString("*"),
                 false,
                 false,
                 "",
@@ -115,11 +110,11 @@ public class CommandRuleResolver {
         }
         Path base = context.agentWorkspacePath() == null ? Path.of(".").toAbsolutePath().normalize() : context.agentWorkspacePath();
         LinkedHashSet<Path> out = new LinkedHashSet<>();
-        String pathArg = context.toolArgs().path("path").asText("");
+        String pathArg = context.toolArgs().path("path").asString("");
         if (pathArg != null && !pathArg.isBlank()) {
             out.add(PathResolver.resolve(pathArg, base));
         }
-        String outputArg = context.toolArgs().path("output").asText("");
+        String outputArg = context.toolArgs().path("output").asString("");
         if (outputArg != null && !outputArg.isBlank()) {
             out.add(PathResolver.resolve(outputArg, base));
         }
@@ -166,12 +161,12 @@ public class CommandRuleResolver {
     private boolean matchesHighRiskPattern(String command) {
         String value = " " + normalize(command) + " ";
         return value.contains(" sudo ") || value.contains(" rm -rf") || value.contains(" mkfs ") || value.contains(" dd ")
-                || value.contains(" mount ") || value.contains(" umount ") || value.contains(" launchctl ") || value.contains(" systemctl ")
-                || value.contains(" crontab ") || value.contains(" chmod -r");
+               || value.contains(" mount ") || value.contains(" umount ") || value.contains(" launchctl ") || value.contains(" systemctl ")
+               || value.contains(" crontab ") || value.contains(" chmod -r");
     }
 
     private Path resolveCommandCwd(ToolPolicyContext context) {
-        String raw = context.toolArgs().path("cwd").asText("");
+        String raw = context.toolArgs().path("cwd").asString("");
         Path workspace = context.agentWorkspacePath() == null ? Path.of(".").toAbsolutePath().normalize() : context.agentWorkspacePath().toAbsolutePath().normalize();
         if (raw == null || raw.isBlank()) {
             return workspace;
@@ -255,9 +250,9 @@ public class CommandRuleResolver {
     private boolean containsHighRiskExecutionSignal(String normalizedCommand) {
         String value = " " + normalizedCommand + " ";
         return value.contains(" sudo ")
-                || value.contains(" invoke-expression ")
-                || value.contains(" iex ")
-                || value.contains(" start-process ") && value.contains(" -verb runas");
+               || value.contains(" invoke-expression ")
+               || value.contains(" iex ")
+               || value.contains(" start-process ") && value.contains(" -verb runas");
     }
 
     private boolean hasWriteRedirection(String normalizedCommand) {
@@ -429,7 +424,7 @@ public class CommandRuleResolver {
             return "";
         }
         if (out.length() >= 2
-                && ((out.startsWith("\"") && out.endsWith("\"")) || (out.startsWith("'") && out.endsWith("'")))) {
+            && ((out.startsWith("\"") && out.endsWith("\"")) || (out.startsWith("'") && out.endsWith("'")))) {
             out = out.substring(1, out.length() - 1);
         }
         return out.trim();

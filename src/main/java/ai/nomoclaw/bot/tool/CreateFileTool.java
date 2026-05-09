@@ -26,9 +26,9 @@ public class CreateFileTool implements Tool {
     public ToolResult execute(ToolRequest request) {
         long start = System.currentTimeMillis();
         try {
-            String pathRaw = request.args().path("path").asText("");
-            String mode = request.args().path("mode").asText("create_or_truncate");
-            String content = request.args().path("content").asText("");
+            String pathRaw = request.args().path("path").asString("");
+            String mode = request.args().path("mode").asString("create_or_truncate");
+            String content = request.args().path("content").asString("");
             log.info("[Tool][create-file] execute conversationUid={} messageUid={} stepUid={} mode={} path={}",
                     request.conversationUid(), request.messageUid(), request.stepUid(), mode, pathRaw);
             if (pathRaw.isBlank()) {

@@ -26,9 +26,9 @@ public class EditFileTool implements Tool {
     public ToolResult execute(ToolRequest request) {
         long start = System.currentTimeMillis();
         try {
-            String pathRaw = request.args().path("path").asText("");
-            String oldText = request.args().path("oldText").asText("");
-            String newText = request.args().path("newText").asText("");
+            String pathRaw = request.args().path("path").asString("");
+            String oldText = request.args().path("oldText").asString("");
+            String newText = request.args().path("newText").asString("");
             log.info("[Tool][edit-file] execute conversationUid={} messageUid={} stepUid={} path={}",
                     request.conversationUid(), request.messageUid(), request.stepUid(), pathRaw);
             if (pathRaw.isBlank()) {

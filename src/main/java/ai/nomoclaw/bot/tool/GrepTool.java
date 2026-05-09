@@ -14,12 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -39,18 +34,18 @@ public class GrepTool implements Tool {
     @Override
     public ToolResult execute(ToolRequest request) {
         long start = System.currentTimeMillis();
-        String patternText = request.args().path("pattern").asText("").trim();
+        String patternText = request.args().path("pattern").asString("").trim();
         if (patternText.isBlank()) {
             return ToolResult.failure("INVALID_ARGS", "pattern is required", metrics(start));
         }
-        String outputMode = normalizeOutputMode(request.args().path("output_mode").asText(""));
-        String glob = request.args().path("glob").asText("").trim();
+        String outputMode = normalizeOutputMode(request.args().path("output_mode").asString(""));
+        String glob = request.args().path("glob").asString("").trim();
         boolean caseInsensitive = request.args().path("-i").asBoolean(false)
                 || request.args().path("case_insensitive").asBoolean(false);
         boolean withLineNumber = !request.args().has("-n") || request.args().path("-n").asBoolean(true);
-        int headLimit = parseIntOrDefault(request.args().path("head_limit").asText(""), DEFAULT_HEAD_LIMIT);
-        int offset = Math.max(0, parseIntOrDefault(request.args().path("offset").asText(""), 0));
-        Path root = resolveRoot(request.args().path("path").asText(""), request);
+        int headLimit = parseIntOrDefault(request.args().path("head_limit").asString(""), DEFAULT_HEAD_LIMIT);
+        int offset = Math.max(0, parseIntOrDefault(request.args().path("offset").asString(""), 0));
+        Path root = resolveRoot(request.args().path("path").asString(""), request);
         if (!Files.exists(root)) {
             return ToolResult.failure("INVALID_ARGS", "path does not exist: " + root, metrics(start));
         }
@@ -59,7 +54,7 @@ public class GrepTool implements Tool {
         }
 
         Pattern pattern;
-        Pattern whitespaceTolerantLiteralPattern = null;
+        Pattern whitespaceTolerantLiteralPattern;
         try {
             int flags = (caseInsensitive ? Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE : 0)
                     | Pattern.UNICODE_CHARACTER_CLASS;
@@ -120,7 +115,7 @@ public class GrepTool implements Tool {
                             }
                             return;
                         }
-                        scanFileLines(root, file, pattern, whitespaceTolerantLiteralPattern, outputMode, withLineNumber, lines, matchedFiles, matchCount);
+                        scanFileLines(file, pattern, whitespaceTolerantLiteralPattern, outputMode, withLineNumber, lines, matchedFiles, matchCount);
                     });
         }
 
@@ -135,8 +130,7 @@ public class GrepTool implements Tool {
         return new SearchOutcome(lines, matchedFiles.stream().sorted().toList(), matchedFiles.size(), matchCount.get(), scannedFiles.get());
     }
 
-    private void scanFileLines(Path root,
-                               Path file,
+    private void scanFileLines(Path file,
                                Pattern pattern,
                                Pattern whitespaceTolerantLiteralPattern,
                                String outputMode,

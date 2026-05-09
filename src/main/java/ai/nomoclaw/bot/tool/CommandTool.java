@@ -42,8 +42,8 @@ public class CommandTool implements Tool {
     @Override
     public ToolResult execute(ToolRequest request) {
         long start = System.currentTimeMillis();
-        String command = request.args().path("command").asText("");
-        String cwd = request.args().path("cwd").asText("");
+        String command = request.args().path("command").asString("");
+        String cwd = request.args().path("cwd").asString("");
         log.info("[Tool][command] execute conversationUid={} messageUid={} stepUid={} cwd={} cmd={}",
                 request.conversationUid(), request.messageUid(), request.stepUid(), cwd, command);
         if (command.isBlank()) {

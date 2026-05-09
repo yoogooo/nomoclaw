@@ -8,12 +8,7 @@ import ai.nomoclaw.bot.store.repository.AgentMessageAttachmentRepository;
 import ai.nomoclaw.bot.util.LocalizedMessages;
 import ai.nomoclaw.bot.workspace.NomoClawPaths;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import dev.langchain4j.data.message.AudioContent;
-import dev.langchain4j.data.message.Content;
-import dev.langchain4j.data.message.ImageContent;
-import dev.langchain4j.data.message.PdfFileContent;
-import dev.langchain4j.data.message.TextContent;
-import dev.langchain4j.data.message.VideoContent;
+import dev.langchain4j.data.message.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.unit.DataSize;
@@ -22,21 +17,10 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.FileVisitResult;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -478,7 +462,7 @@ public class ConversationAttachmentAppService {
         if (normalizedContentType.equals("application/pdf") || originalName.toLowerCase(Locale.ROOT).endsWith(".pdf")) {
             return "pdf";
         }
-        if (normalizedContentType.startsWith("text/") || TEXT_MIME_TYPES.contains(normalizedContentType) || hasTextExtension(originalName)) {
+        if (normalizedContentType.startsWith("text/") || TEXT_MIME_TYPES.contains(normalizedContentType) || hasStringExtension(originalName)) {
             return "text";
         }
         if (normalizedContentType.startsWith("audio/")) {
@@ -490,7 +474,7 @@ public class ConversationAttachmentAppService {
         return "other";
     }
 
-    private boolean hasTextExtension(String originalName) {
+    private boolean hasStringExtension(String originalName) {
         String lower = originalName == null ? "" : originalName.toLowerCase(Locale.ROOT);
         return lower.endsWith(".txt") || lower.endsWith(".md") || lower.endsWith(".json") || lower.endsWith(".csv") || lower.endsWith(".yaml") || lower.endsWith(".yml") || lower.endsWith(".xml");
     }

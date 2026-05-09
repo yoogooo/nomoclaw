@@ -48,7 +48,7 @@ class ImageLoaderToolTests {
         assertTrue(result.success());
         assertTrue(result.artifacts().path("matched").asBoolean(false));
         assertEquals(1, result.artifacts().path("resolvedCount").asInt());
-        assertEquals(latest.toString(), result.artifacts().path("images").path(0).path("path").asText(""));
+        assertEquals(latest.toString(), result.artifacts().path("images").path(0).path("path").asString(""));
     }
 
     @Test
@@ -71,7 +71,7 @@ class ImageLoaderToolTests {
         assertTrue(result.success());
         assertTrue(result.artifacts().path("matched").asBoolean(false));
         assertEquals(1, result.artifacts().path("resolvedCount").asInt());
-        assertEquals(round3.toString(), result.artifacts().path("images").path(0).path("path").asText(""));
+        assertEquals(round3.toString(), result.artifacts().path("images").path(0).path("path").asString(""));
         assertEquals(3, result.artifacts().path("images").path(0).path("conversationRoundIndex").asInt());
     }
 
@@ -94,8 +94,8 @@ class ImageLoaderToolTests {
         assertTrue(result.success());
         assertTrue(result.artifacts().path("matched").asBoolean(false));
         assertEquals(1, result.artifacts().path("resolvedCount").asInt());
-        assertEquals(attachmentPath.toString(), result.artifacts().path("images").path(0).path("path").asText(""));
-        assertEquals("m-attach", result.artifacts().path("images").path(0).path("sourceMessageUid").asText(""));
+        assertEquals(attachmentPath.toString(), result.artifacts().path("images").path(0).path("path").asString(""));
+        assertEquals("m-attach", result.artifacts().path("images").path(0).path("sourceMessageUid").asString(""));
     }
 
     @Test
@@ -114,7 +114,7 @@ class ImageLoaderToolTests {
         assertTrue(result.success());
         assertTrue(result.artifacts().path("matched").asBoolean(false));
         assertEquals(1, result.artifacts().path("resolvedCount").asInt());
-        assertEquals(browserImage.toString(), result.artifacts().path("images").path(0).path("path").asText(""));
+        assertEquals(browserImage.toString(), result.artifacts().path("images").path(0).path("path").asString(""));
         assertFalse(result.artifacts().path("images").path(0).path("isExternal").asBoolean(true));
     }
 
@@ -131,10 +131,10 @@ class ImageLoaderToolTests {
 
         assertTrue(result.success());
         assertTrue(result.artifacts().path("matched").asBoolean(false));
-        assertEquals("url", result.artifacts().path("referenceType").asText(""));
+        assertEquals("url", result.artifacts().path("referenceType").asString(""));
         assertEquals(1, result.artifacts().path("resolvedCount").asInt());
-        assertEquals(url, result.artifacts().path("images").path(0).path("path").asText(""));
-        assertEquals(url, result.artifacts().path("images").path(0).path("url").asText(""));
+        assertEquals(url, result.artifacts().path("images").path(0).path("path").asString(""));
+        assertEquals(url, result.artifacts().path("images").path(0).path("url").asString(""));
         assertTrue(result.artifacts().path("images").path(0).path("isExternal").asBoolean(false));
     }
 

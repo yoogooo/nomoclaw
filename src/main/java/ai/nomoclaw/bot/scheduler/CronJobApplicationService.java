@@ -1,29 +1,23 @@
 package ai.nomoclaw.bot.scheduler;
 
+import ai.nomoclaw.bot.application.command.CreateCronJobCommand;
+import ai.nomoclaw.bot.application.command.UpdateCronJobCommand;
 import ai.nomoclaw.bot.application.common.page.PageRequest;
 import ai.nomoclaw.bot.application.common.page.PageResult;
 import ai.nomoclaw.bot.application.common.page.PageResults;
-import ai.nomoclaw.bot.application.dto.BatchDeleteCronJobsDto;
-import ai.nomoclaw.bot.application.dto.CronJobReportDto;
-import ai.nomoclaw.bot.application.dto.CronJobDto;
-import ai.nomoclaw.bot.application.dto.CronJobExecutionResultDto;
-import ai.nomoclaw.bot.application.dto.CronSubscriptionDto;
-import ai.nomoclaw.bot.application.dto.CronExecutionDetailDto;
-import ai.nomoclaw.bot.application.dto.ConversationMessageRunDto;
-import com.baomidou.mybatisplus.core.metadata.IPage;
-import ai.nomoclaw.bot.orchestrator.ConversationAppService;
-import ai.nomoclaw.bot.application.command.CreateCronJobCommand;
-import ai.nomoclaw.bot.application.command.UpdateCronJobCommand;
-import ai.nomoclaw.bot.channel.model.ChannelType;
+import ai.nomoclaw.bot.application.dto.*;
 import ai.nomoclaw.bot.channel.config.AgentChannelsProperties;
 import ai.nomoclaw.bot.channel.config.ChannelBotCredentialResolver;
-import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
+import ai.nomoclaw.bot.channel.model.ChannelType;
+import ai.nomoclaw.bot.orchestrator.ConversationAppService;
 import ai.nomoclaw.bot.store.entity.AgentCronJobEntity;
 import ai.nomoclaw.bot.store.entity.AgentCronJobExecutionEntity;
-import ai.nomoclaw.bot.store.repository.AgentDefinitionRepository;
+import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
 import ai.nomoclaw.bot.store.repository.AgentCronJobExecutionRepository;
 import ai.nomoclaw.bot.store.repository.AgentCronJobRepository;
+import ai.nomoclaw.bot.store.repository.AgentDefinitionRepository;
 import ai.nomoclaw.bot.util.JsonUtil;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
@@ -36,13 +30,7 @@ import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 public class CronJobApplicationService {
@@ -54,7 +42,6 @@ public class CronJobApplicationService {
     private final AgentDefinitionRepository agentDefinitionRepository;
     private final CronSubscriptionRepository cronSubscriptionRepository;
     private final AgentChannelsProperties channelsProperties;
-    private final CronChannelTargetResolver channelTargetResolver;
     private final ChannelBotCredentialResolver botCredentialResolver;
     private final ConversationAppService conversationAppService;
     private final CronJobExecutionService cronJobExecutionService;
@@ -65,7 +52,6 @@ public class CronJobApplicationService {
                                      AgentDefinitionRepository agentDefinitionRepository,
                                      CronSubscriptionRepository cronSubscriptionRepository,
                                      AgentChannelsProperties channelsProperties,
-                                     CronChannelTargetResolver channelTargetResolver,
                                      ChannelBotCredentialResolver botCredentialResolver,
                                      ConversationAppService conversationAppService,
                                      CronJobExecutionService cronJobExecutionService) {
@@ -75,7 +61,6 @@ public class CronJobApplicationService {
         this.agentDefinitionRepository = agentDefinitionRepository;
         this.cronSubscriptionRepository = cronSubscriptionRepository;
         this.channelsProperties = channelsProperties;
-        this.channelTargetResolver = channelTargetResolver;
         this.botCredentialResolver = botCredentialResolver;
         this.conversationAppService = conversationAppService;
         this.cronJobExecutionService = cronJobExecutionService;
@@ -227,7 +212,6 @@ public class CronJobApplicationService {
     }
 
     public CronJobDto runCronJob(String jobUid) {
-        AgentCronJobEntity job = requireJob(jobUid);
         cronJobExecutionService.initializeCurrentExecution(jobUid, LocalDateTime.now());
         cronJobSchedulerService.runNow(jobUid);
         AgentCronJobEntity refreshedJob = requireJob(jobUid);
@@ -491,8 +475,8 @@ public class CronJobApplicationService {
     }
 
     private List<CronJobExecutionResultDto> readLegacyResultsFromJob(AgentCronJobEntity job,
-                                                                      AgentDefinitionEntity agent,
-                                                                      int limit) {
+                                                                     AgentDefinitionEntity agent,
+                                                                     int limit) {
         int safeLimit = limit <= 0 ? 20 : Math.min(limit, 100);
         if (job.getExtConfig() == null || job.getExtConfig().isBlank()) {
             return List.of();
@@ -507,20 +491,20 @@ public class CronJobApplicationService {
             if (item == null || item.isNull()) {
                 continue;
             }
-            String executedText = item.path("executedTime").asText("");
+            String executedText = item.path("executedTime").asString("");
             LocalDateTime executedTime;
             try {
                 executedTime = LocalDateTime.parse(executedText);
             } catch (Exception ignored) {
                 continue;
             }
-            String status = item.path("status").asText("");
-            String summary = item.path("summary").asText("");
-            String reportPath = item.path("reportPath").asText("");
+            String status = item.path("status").asString("");
+            String summary = item.path("summary").asString("");
+            String reportPath = item.path("reportPath").asString("");
             String normalizedReportPath = reportPath.isBlank() ? null : reportPath;
-            String executionUid = item.path("executionUid").asText("");
-            String conversationUid = item.path("conversationUid").asText("");
-            String messageUid = item.path("messageUid").asText("");
+            String executionUid = item.path("executionUid").asString("");
+            String conversationUid = item.path("conversationUid").asString("");
+            String messageUid = item.path("messageUid").asString("");
             boolean unread = !item.path("read").asBoolean(false);
             String normalizedExecutionUid = executionUid.isBlank()
                     ? buildLegacyExecutionUid(job.getJobUid(), executedText, conversationUid, messageUid, normalizedReportPath)
@@ -611,10 +595,10 @@ public class CronJobApplicationService {
     }
 
     private String buildLegacyExecutionUid(String jobUid,
-                                          String executedTime,
-                                          String conversationUid,
-                                          String messageUid,
-                                          String reportPath) {
+                                           String executedTime,
+                                           String conversationUid,
+                                           String messageUid,
+                                           String reportPath) {
         String seed = String.join("|",
                 jobUid == null ? "" : jobUid,
                 executedTime == null ? "" : executedTime,
@@ -671,17 +655,13 @@ public class CronJobApplicationService {
         } else {
             // One-version compatibility fallback for legacy ext_config.currentExecution.
             JsonNode legacyCurrentExecution = extConfig.path("currentExecution");
-            currentExecutionUid = legacyCurrentExecution.path("executionUid").asText("");
-            currentConversationUid = legacyCurrentExecution.path("conversationUid").asText("");
-            currentMessageUid = legacyCurrentExecution.path("messageUid").asText("");
-            currentExecutionStatus = legacyCurrentExecution.path("status").asText("");
-            try {
-                String startedTimeText = legacyCurrentExecution.path("startedTime").asText("");
-                if (!startedTimeText.isBlank()) {
-                    currentExecutionStartedTime = LocalDateTime.parse(startedTimeText);
-                }
-            } catch (Exception ignored) {
-                currentExecutionStartedTime = null;
+            currentExecutionUid = legacyCurrentExecution.path("executionUid").asString("");
+            currentConversationUid = legacyCurrentExecution.path("conversationUid").asString("");
+            currentMessageUid = legacyCurrentExecution.path("messageUid").asString("");
+            currentExecutionStatus = legacyCurrentExecution.path("status").asString("");
+            String startedTimeText = legacyCurrentExecution.path("startedTime").asString("");
+            if (!startedTimeText.isBlank()) {
+                currentExecutionStartedTime = LocalDateTime.parse(startedTimeText);
             }
         }
         String lastReportPath = "";
@@ -690,7 +670,7 @@ public class CronJobApplicationService {
             lastReportPath = lastFinished.getReportPath();
         } else {
             // One-version compatibility fallback for legacy ext_config.lastReportPath.
-            lastReportPath = extConfig.path("lastReportPath").asText("");
+            lastReportPath = extConfig.path("lastReportPath").asString("");
         }
         return new CronJobDto(
                 job.getJobUid(),
@@ -740,7 +720,7 @@ public class CronJobApplicationService {
                 if (!(item instanceof ObjectNode resultNode)) {
                     continue;
                 }
-                String itemExecutionUid = resultNode.path("executionUid").asText("");
+                String itemExecutionUid = resultNode.path("executionUid").asString("");
                 if (executionUid.equals(itemExecutionUid)) {
                     resultNode.put("read", true);
                     changed = true;
@@ -828,7 +808,7 @@ public class CronJobApplicationService {
             return null;
         }
         JsonNode extNode = JsonUtil.fromJsonQuietly(extConfigText, JsonNode.class).orElse(JsonNodeFactory.instance.objectNode());
-        String endAt = extNode.path("schedule").path("endAt").asText("");
+        String endAt = extNode.path("schedule").path("endAt").asString("");
         if (endAt.isBlank()) {
             return null;
         }
@@ -849,12 +829,12 @@ public class CronJobApplicationService {
             schedule.put("endAt", endAt);
         }
         extConfig.withObject("delivery")
-                .put("mode", extConfig.path("delivery").path("mode").asText("report_file"))
-                .put("format", extConfig.path("delivery").path("format").asText("markdown"));
+                .put("mode", extConfig.path("delivery").path("mode").asString("report_file"))
+                .put("format", extConfig.path("delivery").path("format").asString("markdown"));
         ObjectNode notification = extConfig.withObject("notification");
         notification.put("enabled", extConfig.path("notification").path("enabled").asBoolean(true));
-        notification.put("channel", extConfig.path("notification").path("channel").asText("noop"));
-        notification.put("target", extConfig.path("notification").path("target").asText(""));
+        notification.put("channel", extConfig.path("notification").path("channel").asString("noop"));
+        notification.put("target", extConfig.path("notification").path("target").asString(""));
         job.setExtConfig(JsonUtil.toJson(extConfig));
     }
 

@@ -35,8 +35,8 @@ public class CronListTool implements Tool {
     public ToolResult execute(ToolRequest request) {
         long start = System.currentTimeMillis();
         try {
-            String jobUid = request.args().path("jobUid").asText("").trim();
-            String status = request.args().path("status").asText("").trim();
+            String jobUid = request.args().path("jobUid").asString("").trim();
+            String status = request.args().path("status").asString("").trim();
             int limit = normalizeLimit(request.args().path("limit").asInt(DEFAULT_LIMIT));
 
             ObjectNode artifacts = JsonNodeFactory.instance.objectNode();

@@ -9,13 +9,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.FileVisitResult;
-import java.nio.file.FileVisitOption;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.PathMatcher;
-import java.nio.file.SimpleFileVisitor;
+import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Instant;
 import java.util.EnumSet;
@@ -35,7 +29,7 @@ public class FileSearchTool implements Tool {
     @Override
     public ToolResult execute(ToolRequest request) {
         long start = System.currentTimeMillis();
-        String action = request.args().path("action").asText("");
+        String action = request.args().path("action").asString("");
         return switch (action) {
             case "grep" -> grep(request, start);
             case "glob" -> glob(request, start);
@@ -44,8 +38,8 @@ public class FileSearchTool implements Tool {
     }
 
     private ToolResult grep(ToolRequest request, long start) {
-        String query = request.args().path("query").asText("");
-        Path root = resolveRoot(request.args().path("path").asText(""), request);
+        String query = request.args().path("query").asString("");
+        Path root = resolveRoot(request.args().path("path").asString(""), request);
         if (query.isBlank()) {
             return ToolResult.failure("INVALID_ARGS", "query is required", metrics(start));
         }
@@ -95,8 +89,8 @@ public class FileSearchTool implements Tool {
     }
 
     private ToolResult glob(ToolRequest request, long start) {
-        String pattern = request.args().path("pattern").asText("");
-        Path root = resolveRoot(request.args().path("path").asText(""), request);
+        String pattern = request.args().path("pattern").asString("");
+        Path root = resolveRoot(request.args().path("path").asString(""), request);
         if (pattern.isBlank()) {
             return ToolResult.failure("INVALID_ARGS", "pattern is required", metrics(start));
         }
@@ -119,7 +113,7 @@ public class FileSearchTool implements Tool {
     private String toText(ArrayNode matches) {
         StringBuilder builder = new StringBuilder();
         for (int i = 0; i < matches.size(); i++) {
-            builder.append(matches.get(i).asText()).append('\n');
+            builder.append(matches.get(i).asString()).append('\n');
         }
         return builder.toString().trim();
     }

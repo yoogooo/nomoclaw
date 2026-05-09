@@ -1,8 +1,8 @@
 package ai.nomoclaw.bot.scheduler;
 
-import ai.nomoclaw.bot.scheduler.config.CronNotifyProperties;
 import ai.nomoclaw.bot.notification.NotificationRequest;
 import ai.nomoclaw.bot.notification.NotificationSender;
+import ai.nomoclaw.bot.scheduler.config.CronNotifyProperties;
 import ai.nomoclaw.bot.store.entity.AgentCronJobEntity;
 import ai.nomoclaw.bot.util.JsonUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -117,8 +117,8 @@ public class CronNotificationFanoutService {
         JsonNode node = job.getExtConfig() == null || job.getExtConfig().isBlank()
                 ? JsonNodeFactory.instance.objectNode()
                 : JsonUtil.fromJsonQuietly(job.getExtConfig(), JsonNode.class).orElse(JsonNodeFactory.instance.objectNode());
-        String channel = trim(node.path("notification").path("channel").asText("noop"));
-        String target = trim(node.path("notification").path("target").asText(""));
+        String channel = trim(node.path("notification").path("channel").asString("noop"));
+        String target = trim(node.path("notification").path("target").asString(""));
         if (target.isBlank()) {
             return null;
         }

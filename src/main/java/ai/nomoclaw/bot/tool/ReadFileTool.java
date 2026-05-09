@@ -25,7 +25,7 @@ public class ReadFileTool implements Tool {
     public ToolResult execute(ToolRequest request) {
         long start = System.currentTimeMillis();
         try {
-            String pathRaw = request.args().path("path").asText("");
+            String pathRaw = request.args().path("path").asString("");
             log.info("[Tool][read-file] execute conversationUid={} messageUid={} stepUid={} path={}",
                     request.conversationUid(), request.messageUid(), request.stepUid(), pathRaw);
             if (pathRaw.isBlank()) {

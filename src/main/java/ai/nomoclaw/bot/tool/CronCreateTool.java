@@ -37,10 +37,10 @@ public class CronCreateTool implements Tool {
     public ToolResult execute(ToolRequest request) {
         long start = System.currentTimeMillis();
         try {
-            String title = request.args().path("title").asText("");
-            String expression = request.args().path("expression").asText("");
-            String timezone = request.args().path("timezone").asText("Asia/Shanghai");
-            String task = request.args().path("task").asText("");
+            String title = request.args().path("title").asString("");
+            String expression = request.args().path("expression").asString("");
+            String timezone = request.args().path("timezone").asString("Asia/Shanghai");
+            String task = request.args().path("task").asString("");
             if (expression.isBlank() || task.isBlank()) {
                 return ToolResult.failure("INVALID_ARGS", "expression and task are required", metrics(start, false));
             }

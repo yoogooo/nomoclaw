@@ -8,7 +8,6 @@ import ai.nomoclaw.bot.llm.codex.CodexTokenProvider;
 import ai.nomoclaw.bot.llm.config.LlmProperties;
 import ai.nomoclaw.bot.orchestrator.ModelConfigAppService;
 import ai.nomoclaw.bot.prompt.PromptLoader;
-import ai.nomoclaw.bot.store.entity.AgentConversationEntity;
 import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
 import ai.nomoclaw.bot.store.entity.AgentMessageEntity;
 import ai.nomoclaw.bot.store.repository.AgentConversationRepository;
@@ -64,7 +63,9 @@ public class RuntimeChatModelResolver {
 
         String agentName = promptContext == null ? "" : trim(promptContext.agentName());
         AgentDefinitionEntity agent = agentName.isBlank() ? null : agentDefinitionRepository.findByName(agentName);
-        AgentConversationEntity conversation = promptContext == null ? null : agentConversationRepository.findByConversationUid(trim(promptContext.sessionId()));
+        if (promptContext != null) {
+            agentConversationRepository.findByConversationUid(trim(promptContext.sessionId()));
+        }
         AgentMessageEntity message = promptContext == null || trim(promptContext.messageUid()).isBlank()
                 ? null
                 : agentMessageRepository.findByMessageId(trim(promptContext.messageUid()));
@@ -85,7 +86,7 @@ public class RuntimeChatModelResolver {
         }
 
         String runtimeModelId = selectedModelId;
-        if (runtimeModelId.isBlank()) {
+        if (runtimeModelId.isBlank() && provider != null) {
             runtimeModelId = trim(provider.defaultModel());
         }
         if (runtimeModelId.isBlank() && !provider.models().isEmpty()) {
@@ -194,7 +195,7 @@ public class RuntimeChatModelResolver {
                 JsonNode modelIdsNode = node == null ? null : node.path("modelIds");
                 if (modelIdsNode != null && modelIdsNode.isArray()) {
                     for (JsonNode item : modelIdsNode) {
-                        String modelId = item == null ? "" : trim(item.asText(""));
+                        String modelId = item == null ? "" : trim(item.asString(""));
                         if (!modelId.isBlank()) {
                             modelIds.add(modelId);
                         }

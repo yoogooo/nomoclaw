@@ -52,7 +52,7 @@ public class ImageLoaderTool implements Tool {
     @Override
     public ToolResult execute(ToolRequest request) {
         long start = System.currentTimeMillis();
-        String reference = request.args().path("reference").asText("").trim();
+        String reference = request.args().path("reference").asString("").trim();
         if (reference.isBlank()) {
             return ToolResult.failure("INVALID_ARGS", "reference is required", metrics(start, false, 0));
         }
@@ -198,9 +198,9 @@ public class ImageLoaderTool implements Tool {
             if (payload == null || !payload.path("success").asBoolean(false)) {
                 continue;
             }
-            String toolName = payload.path("toolName").asText("");
+            String toolName = payload.path("toolName").asString("");
             boolean isScreenshot = isScreenshotStep(toolName, payload.path("toolArgs"));
-            String pathText = payload.path("artifacts").path("path").asText("");
+            String pathText = payload.path("artifacts").path("path").asString("");
             Path imagePath = resolveLocalImagePath(pathText);
             if (imagePath == null) {
                 continue;
@@ -257,7 +257,7 @@ public class ImageLoaderTool implements Tool {
         if (!"BrowserTool".equals(normalizedTool)) {
             return false;
         }
-        return "screenshot".equals(nullToEmpty(toolArgs.path("action").asText("")));
+        return "screenshot".equals(nullToEmpty(toolArgs.path("action").asString("")));
     }
 
     private Path resolveLocalImagePath(String pathText) {

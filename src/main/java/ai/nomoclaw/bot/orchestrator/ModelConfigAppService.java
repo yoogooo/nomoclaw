@@ -739,40 +739,40 @@ public class ModelConfigAppService {
         }
         try {
             JsonNode root = JsonUtil.fromJson(normalized, JsonNode.class);
-            String direct = trim(root.path("message").asText(""));
+            String direct = trim(root.path("message").asString(""));
             if (!direct.isBlank()) {
                 return direct;
             }
-            direct = trim(root.path("reason").asText(""));
+            direct = trim(root.path("reason").asString(""));
             if (!direct.isBlank()) {
                 return direct;
             }
-            direct = trim(root.path("detail").asText(""));
+            direct = trim(root.path("detail").asString(""));
             if (!direct.isBlank()) {
                 return direct;
             }
-            direct = trim(root.path("status").asText(""));
+            direct = trim(root.path("status").asString(""));
             if (!direct.isBlank()) {
                 return direct;
             }
             JsonNode error = root.path("error");
             if (error.isTextual()) {
-                return trim(error.asText(""));
+                return trim(error.asString(""));
             }
             if (error.isObject()) {
-                String nested = trim(error.path("message").asText(""));
+                String nested = trim(error.path("message").asString(""));
                 if (!nested.isBlank()) {
                     return nested;
                 }
-                nested = trim(error.path("reason").asText(""));
+                nested = trim(error.path("reason").asString(""));
                 if (!nested.isBlank()) {
                     return nested;
                 }
-                nested = trim(error.path("detail").asText(""));
+                nested = trim(error.path("detail").asString(""));
                 if (!nested.isBlank()) {
                     return nested;
                 }
-                nested = trim(error.path("code").asText(""));
+                nested = trim(error.path("code").asString(""));
                 if (!nested.isBlank()) {
                     return nested;
                 }
@@ -809,7 +809,7 @@ public class ModelConfigAppService {
         JsonNode models = root.path("models");
         if (models.isArray()) {
             for (JsonNode item : models) {
-                String name = trim(item.path("name").asText(""));
+                String name = trim(item.path("name").asString(""));
                 if (!name.isBlank()) {
                     modelIds.add(name);
                 }

@@ -211,20 +211,20 @@ public class ChannelBotCredentialResolver {
         JsonNode botNodes = feishu.path("bots");
         if (botNodes.isArray()) {
             for (JsonNode bot : botNodes) {
-                String botId = normalizeBotId(bot.path("botId").asText(""));
+                String botId = normalizeBotId(bot.path("botId").asString(""));
                 bots.add(new FeishuBotCredential(
                         botId,
-                        trim(bot.path("displayName").asText("")),
+                        trim(bot.path("displayName").asString("")),
                         channelEnabled && bot.path("enabled").asBoolean(false),
                         bot.path("isDefault").asBoolean(false),
                         bot.path("requireMention").asBoolean(true),
-                        trim(bot.path("appId").asText("")),
-                        trim(bot.path("appSecret").asText("")),
+                        trim(bot.path("appId").asString("")),
+                        trim(bot.path("appSecret").asString("")),
                         bot.path("processingAckReactionEnabled").asBoolean(true),
-                        fallback(trim(bot.path("processingAckReactionType").asText("")), "OK"),
-                        trim(bot.path("defaultTarget").asText("")),
-                        trim(bot.path("defaultTargetDisplayName").asText("")),
-                        trim(bot.path("targetResolvedAt").asText(""))
+                        fallback(trim(bot.path("processingAckReactionType").asString("")), "OK"),
+                        trim(bot.path("defaultTarget").asString("")),
+                        trim(bot.path("defaultTargetDisplayName").asString("")),
+                        trim(bot.path("targetResolvedAt").asString(""))
                 ));
             }
         } else {
@@ -235,10 +235,10 @@ public class ChannelBotCredentialResolver {
                     channelEnabled,
                     true,
                     feishu.path("requireMention").asBoolean(true),
-                    trim(feishu.path("appId").asText("")),
-                    trim(feishu.path("appSecret").asText("")),
+                    trim(feishu.path("appId").asString("")),
+                    trim(feishu.path("appSecret").asString("")),
                     feishu.path("processingAckReactionEnabled").asBoolean(true),
-                    fallback(trim(feishu.path("processingAckReactionType").asText("")), "OK"),
+                    fallback(trim(feishu.path("processingAckReactionType").asString("")), "OK"),
                     "",
                     "",
                     ""
@@ -254,16 +254,16 @@ public class ChannelBotCredentialResolver {
         JsonNode botNodes = dingtalk.path("bots");
         if (botNodes.isArray()) {
             for (JsonNode bot : botNodes) {
-                String botId = normalizeBotId(bot.path("botId").asText(""));
+                String botId = normalizeBotId(bot.path("botId").asString(""));
                 bots.add(new DingTalkBotCredential(
                         botId,
-                        trim(bot.path("displayName").asText("")),
+                        trim(bot.path("displayName").asString("")),
                         channelEnabled && bot.path("enabled").asBoolean(false),
                         bot.path("isDefault").asBoolean(false),
                         bot.path("requireMention").asBoolean(true),
-                        trim(bot.path("clientId").asText("")),
-                        trim(bot.path("clientSecret").asText("")),
-                        trim(bot.path("robotCode").asText(""))
+                        trim(bot.path("clientId").asString("")),
+                        trim(bot.path("clientSecret").asString("")),
+                        trim(bot.path("robotCode").asString(""))
                 ));
             }
         } else {
@@ -274,9 +274,9 @@ public class ChannelBotCredentialResolver {
                     channelEnabled,
                     true,
                     dingtalk.path("requireMention").asBoolean(true),
-                    trim(dingtalk.path("clientId").asText("")),
-                    trim(dingtalk.path("clientSecret").asText("")),
-                    trim(dingtalk.path("robotCode").asText(""))
+                    trim(dingtalk.path("clientId").asString("")),
+                    trim(dingtalk.path("clientSecret").asString("")),
+                    trim(dingtalk.path("robotCode").asString(""))
             ));
         }
         return List.copyOf(bots);
@@ -289,15 +289,15 @@ public class ChannelBotCredentialResolver {
         JsonNode botNodes = discord.path("bots");
         if (botNodes.isArray()) {
             for (JsonNode bot : botNodes) {
-                String botId = normalizeBotId(bot.path("botId").asText(""));
+                String botId = normalizeBotId(bot.path("botId").asString(""));
                 bots.add(new DiscordBotCredential(
                         botId,
-                        trim(bot.path("displayName").asText("")),
+                        trim(bot.path("displayName").asString("")),
                         channelEnabled && bot.path("enabled").asBoolean(false),
                         bot.path("isDefault").asBoolean(false),
                         bot.path("requireMention").asBoolean(true),
-                        trim(bot.path("token").asText("")),
-                        trim(bot.path("botUserId").asText("")),
+                        trim(bot.path("token").asString("")),
+                        trim(bot.path("botUserId").asString("")),
                         bot.path("acceptBotMessages").asBoolean(false)
                 ));
             }
@@ -308,8 +308,8 @@ public class ChannelBotCredentialResolver {
                     channelEnabled,
                     true,
                     discord.path("requireMention").asBoolean(true),
-                    trim(discord.path("token").asText("")),
-                    trim(discord.path("botUserId").asText("")),
+                    trim(discord.path("token").asString("")),
+                    trim(discord.path("botUserId").asString("")),
                     discord.path("acceptBotMessages").asBoolean(false)
             ));
         }
@@ -323,15 +323,15 @@ public class ChannelBotCredentialResolver {
         JsonNode botNodes = telegram.path("bots");
         if (botNodes.isArray()) {
             for (JsonNode bot : botNodes) {
-                String botId = normalizeBotId(bot.path("botId").asText(""));
+                String botId = normalizeBotId(bot.path("botId").asString(""));
                 bots.add(new TelegramBotCredential(
                         botId,
-                        trim(bot.path("displayName").asText("")),
+                        trim(bot.path("displayName").asString("")),
                         channelEnabled && bot.path("enabled").asBoolean(false),
                         bot.path("isDefault").asBoolean(false),
                         bot.path("requireMention").asBoolean(true),
-                        trim(bot.path("token").asText("")),
-                        normalizeUsername(bot.path("botUsername").asText(""))
+                        trim(bot.path("token").asString("")),
+                        normalizeUsername(bot.path("botUsername").asString(""))
                 ));
             }
         } else {
@@ -341,8 +341,8 @@ public class ChannelBotCredentialResolver {
                     channelEnabled,
                     true,
                     telegram.path("requireMention").asBoolean(true),
-                    trim(telegram.path("token").asText("")),
-                    normalizeUsername(telegram.path("botUsername").asText(""))
+                    trim(telegram.path("token").asString("")),
+                    normalizeUsername(telegram.path("botUsername").asString(""))
             ));
         }
         return List.copyOf(bots);
@@ -356,14 +356,14 @@ public class ChannelBotCredentialResolver {
         if (botNodes.isArray()) {
             for (JsonNode bot : botNodes) {
                 bots.add(new QqBotCredential(
-                        normalizeBotId(bot.path("botId").asText("")),
-                        trim(bot.path("displayName").asText("")),
+                        normalizeBotId(bot.path("botId").asString("")),
+                        trim(bot.path("displayName").asString("")),
                         channelEnabled && bot.path("enabled").asBoolean(false),
                         bot.path("isDefault").asBoolean(false),
                         bot.path("requireMention").asBoolean(true),
-                        trim(bot.path("appId").asText("")),
-                        trim(bot.path("clientSecret").asText(bot.path("token").asText(""))),
-                        trim(bot.path("botUserId").asText("")),
+                        trim(bot.path("appId").asString("")),
+                        trim(bot.path("clientSecret").asString(bot.path("token").asString(""))),
+                        trim(bot.path("botUserId").asString("")),
                         bot.path("sandbox").asBoolean(false),
                         bot.path("markdownEnabled").asBoolean(false)
                 ));
@@ -375,9 +375,9 @@ public class ChannelBotCredentialResolver {
                     channelEnabled,
                     true,
                     qq.path("requireMention").asBoolean(true),
-                    trim(qq.path("appId").asText("")),
-                    trim(qq.path("clientSecret").asText(qq.path("token").asText(""))),
-                    trim(qq.path("botUserId").asText("")),
+                    trim(qq.path("appId").asString("")),
+                    trim(qq.path("clientSecret").asString(qq.path("token").asString(""))),
+                    trim(qq.path("botUserId").asString("")),
                     qq.path("sandbox").asBoolean(false),
                     qq.path("markdownEnabled").asBoolean(false)
             ));
@@ -393,13 +393,13 @@ public class ChannelBotCredentialResolver {
         if (botNodes.isArray()) {
             for (JsonNode bot : botNodes) {
                 bots.add(new WeComBotCredential(
-                        normalizeBotId(bot.path("botId").asText("")),
-                        trim(bot.path("displayName").asText("")),
+                        normalizeBotId(bot.path("botId").asString("")),
+                        trim(bot.path("displayName").asString("")),
                         channelEnabled && bot.path("enabled").asBoolean(false),
                         bot.path("isDefault").asBoolean(false),
                         bot.path("requireMention").asBoolean(true),
-                        trim(bot.path("wecomBotId").asText(bot.path("botId").asText(""))),
-                        trim(bot.path("secret").asText(""))
+                        trim(bot.path("wecomBotId").asString(bot.path("botId").asString(""))),
+                        trim(bot.path("secret").asString(""))
                 ));
             }
         } else {
@@ -409,8 +409,8 @@ public class ChannelBotCredentialResolver {
                     channelEnabled,
                     true,
                     wecom.path("requireMention").asBoolean(true),
-                    trim(wecom.path("wecomBotId").asText(wecom.path("botId").asText(""))),
-                    trim(wecom.path("secret").asText(""))
+                    trim(wecom.path("wecomBotId").asString(wecom.path("botId").asString(""))),
+                    trim(wecom.path("secret").asString(""))
             ));
         }
         return List.copyOf(bots);
@@ -424,14 +424,14 @@ public class ChannelBotCredentialResolver {
         if (botNodes.isArray()) {
             for (JsonNode bot : botNodes) {
                 bots.add(new WeixinBotCredential(
-                        normalizeBotId(bot.path("botId").asText("")),
-                        trim(bot.path("displayName").asText("")),
+                        normalizeBotId(bot.path("botId").asString("")),
+                        trim(bot.path("displayName").asString("")),
                         channelEnabled && bot.path("enabled").asBoolean(false),
                         bot.path("isDefault").asBoolean(false),
                         bot.path("requireMention").asBoolean(true),
-                        trim(bot.path("botToken").asText("")),
-                        trim(bot.path("botTokenFile").asText("")),
-                        fallback(trim(bot.path("baseUrl").asText("")), "https://ilinkai.weixin.qq.com")
+                        trim(bot.path("botToken").asString("")),
+                        trim(bot.path("botTokenFile").asString("")),
+                        fallback(trim(bot.path("baseUrl").asString("")), "https://ilinkai.weixin.qq.com")
                 ));
             }
         } else {
@@ -441,9 +441,9 @@ public class ChannelBotCredentialResolver {
                     channelEnabled,
                     true,
                     weixin.path("requireMention").asBoolean(true),
-                    trim(weixin.path("botToken").asText("")),
-                    trim(weixin.path("botTokenFile").asText("")),
-                    fallback(trim(weixin.path("baseUrl").asText("")), "https://ilinkai.weixin.qq.com")
+                    trim(weixin.path("botToken").asString("")),
+                    trim(weixin.path("botTokenFile").asString("")),
+                    fallback(trim(weixin.path("baseUrl").asString("")), "https://ilinkai.weixin.qq.com")
             ));
         }
         return List.copyOf(bots);

@@ -1,35 +1,16 @@
 package ai.nomoclaw.bot.api;
 
-import ai.nomoclaw.bot.application.command.CreateAgentCommand;
-import ai.nomoclaw.bot.application.command.CreateAgentTipCommand;
-import ai.nomoclaw.bot.application.command.CreateCronJobCommand;
-import ai.nomoclaw.bot.application.command.CreateSkillCommand;
-import ai.nomoclaw.bot.application.command.ImportSkillFromUrlCommand;
-import ai.nomoclaw.bot.application.command.UpdateAgentBasicInfoCommand;
-import ai.nomoclaw.bot.application.command.UpdateAgentTipCommand;
-import ai.nomoclaw.bot.application.command.UpdateCronJobCommand;
-import ai.nomoclaw.bot.application.command.UpdateSkillBindingsCommand;
+import ai.nomoclaw.bot.application.command.*;
 import ai.nomoclaw.bot.application.dto.*;
 import ai.nomoclaw.bot.mcp.McpServerDto;
 import ai.nomoclaw.bot.mcp.McpToolDto;
 import ai.nomoclaw.bot.mcp.SaveMcpServerCommand;
 import ai.nomoclaw.bot.orchestrator.ModelCatalogStatusDto;
-import ai.nomoclaw.bot.application.dto.AgentSkillDto;
-import ai.nomoclaw.bot.application.dto.AgentTipDto;
-import ai.nomoclaw.bot.application.dto.BatchDeleteCronJobsDto;
-import ai.nomoclaw.bot.application.dto.ChannelConfigDto;
-import ai.nomoclaw.bot.application.dto.CronJobDto;
-import ai.nomoclaw.bot.application.dto.CronJobExecutionResultDto;
-import ai.nomoclaw.bot.application.dto.CronJobReportDto;
-import ai.nomoclaw.bot.application.dto.CronExecutionDetailDto;
-import ai.nomoclaw.bot.application.dto.MessageFileLinkDto;
-import ai.nomoclaw.bot.application.dto.SystemConfigDto;
-import ai.nomoclaw.bot.application.dto.SystemErrorLogDto;
-import ai.nomoclaw.bot.application.dto.SystemErrorLogSummaryDto;
 import ai.nomoclaw.bot.scheduler.CronChannelTargetDirectoryService;
 import ai.nomoclaw.bot.scheduler.CronSubscriptionRepository;
 
 import java.util.List;
+import java.util.Objects;
 
 // TODO: Consider migrating manual mappings to MapStruct when mapper count grows,
 // to reduce boilerplate and lower missing-field mapping risk.
@@ -553,19 +534,19 @@ public final class ApiDtoMapper {
                                 "",
                                 provider.defaultModel(),
                                 provider.models() == null ? List.of() : provider.models().stream()
-                                        .map(model -> new ModelConfigDto.Model(
-                                                model.id(),
-                                                model.name(),
-                                                model.capabilities(),
-                                                model.reasoning(),
-                                                model.contextWindow(),
-                                                model.maxInputTokens(),
-                                                model.maxOutputTokens(),
-                                                toUploadPolicy(model.uploadPolicy()),
-                                                false,
-                                                "request"
-                                        ))
-                                        .toList()
+                                                                        .map(model -> new ModelConfigDto.Model(
+                                                                                model.id(),
+                                                                                model.name(),
+                                                                                model.capabilities(),
+                                                                                model.reasoning(),
+                                                                                model.contextWindow(),
+                                                                                model.maxInputTokens(),
+                                                                                model.maxOutputTokens(),
+                                                                                toUploadPolicy(model.uploadPolicy()),
+                                                                                false,
+                                                                                "request"
+                                                                        ))
+                                                                        .toList()
                         ))
                         .toList()
         );
@@ -668,17 +649,6 @@ public final class ApiDtoMapper {
                         item.reportContent()
                 ))
                 .toList();
-    }
-
-    public static <T, R> PageResponse<R> toPageResponse(ai.nomoclaw.bot.application.common.page.PageResult<T> dto,
-                                                        java.util.function.Function<T, R> mapper) {
-        return new PageResponse<>(
-                dto.items().stream().map(mapper).toList(),
-                dto.total(),
-                dto.page(),
-                dto.pageSize(),
-                dto.totalPages()
-        );
     }
 
     public static PageResponse<CronJobExecutionResultResponse> toCronJobExecutionHistoryPage(ai.nomoclaw.bot.application.common.page.PageResult<CronJobExecutionResultDto> dto) {
@@ -832,12 +802,12 @@ public final class ApiDtoMapper {
                 request == null || request.agentBindings() == null
                         ? List.of()
                         : request.agentBindings().stream()
-                        .filter(item -> item != null)
-                        .map(item -> new UpdateSkillBindingsCommand.SkillBindingAgentCommand(
-                                item.agentUid(),
-                                Boolean.TRUE.equals(item.enabled())
-                        ))
-                        .toList()
+                          .filter(Objects::nonNull)
+                          .map(item -> new UpdateSkillBindingsCommand.SkillBindingAgentCommand(
+                                  item.agentUid(),
+                                  Boolean.TRUE.equals(item.enabled())
+                          ))
+                          .toList()
         );
     }
 
@@ -858,7 +828,7 @@ public final class ApiDtoMapper {
             return List.of();
         }
         return request.subscriptions().stream()
-                .filter(item -> item != null)
+                .filter(Objects::nonNull)
                 .map(item -> new CronSubscriptionRepository.CronSubscriptionUpsert(
                         item.channel(),
                         item.target(),
@@ -873,8 +843,8 @@ public final class ApiDtoMapper {
             throw new IllegalArgumentException("channels must not be null");
         }
         if (request.channels().feishu() == null || request.channels().dingtalk() == null
-                || request.channels().discord() == null || request.channels().telegram() == null
-                || request.channels().qq() == null || request.channels().wecom() == null || request.channels().weixin() == null) {
+            || request.channels().discord() == null || request.channels().telegram() == null
+            || request.channels().qq() == null || request.channels().wecom() == null || request.channels().weixin() == null) {
             throw new IllegalArgumentException("channels.feishu, channels.dingtalk, channels.discord, channels.telegram, channels.qq, channels.wecom and channels.weixin must not be null");
         }
         return new ChannelConfigDto(
@@ -884,130 +854,130 @@ public final class ApiDtoMapper {
                                 request.channels().feishu().bots() == null
                                         ? List.of()
                                         : request.channels().feishu().bots().stream()
-                                        .map(bot -> new ChannelConfigDto.FeishuBot(
-                                                bot.botId(),
-                                                bot.displayName(),
-                                                bot.enabled(),
-                                                bot.isDefault(),
-                                                bot.requireMention(),
-                                                bot.allowList(),
-                                                bot.appId(),
-                                                bot.appSecret(),
-                                                bot.processingAckReactionEnabled(),
-                                                bot.processingAckReactionType(),
-                                                bot.defaultTarget(),
-                                                bot.defaultTargetDisplayName(),
-                                                bot.targetResolvedAt()
-                                        ))
-                                        .toList()
+                                          .map(bot -> new ChannelConfigDto.FeishuBot(
+                                                  bot.botId(),
+                                                  bot.displayName(),
+                                                  bot.enabled(),
+                                                  bot.isDefault(),
+                                                  bot.requireMention(),
+                                                  bot.allowList(),
+                                                  bot.appId(),
+                                                  bot.appSecret(),
+                                                  bot.processingAckReactionEnabled(),
+                                                  bot.processingAckReactionType(),
+                                                  bot.defaultTarget(),
+                                                  bot.defaultTargetDisplayName(),
+                                                  bot.targetResolvedAt()
+                                          ))
+                                          .toList()
                         ),
                         new ChannelConfigDto.DingTalk(
                                 request.channels().dingtalk().enabled(),
                                 request.channels().dingtalk().bots() == null
                                         ? List.of()
                                         : request.channels().dingtalk().bots().stream()
-                                        .map(bot -> new ChannelConfigDto.DingTalkBot(
-                                                bot.botId(),
-                                                bot.displayName(),
-                                                bot.enabled(),
-                                                bot.isDefault(),
-                                                bot.requireMention(),
-                                                bot.allowList(),
-                                                bot.clientId(),
-                                                bot.clientSecret(),
-                                                bot.robotCode()
-                                        ))
-                                        .toList()
+                                          .map(bot -> new ChannelConfigDto.DingTalkBot(
+                                                  bot.botId(),
+                                                  bot.displayName(),
+                                                  bot.enabled(),
+                                                  bot.isDefault(),
+                                                  bot.requireMention(),
+                                                  bot.allowList(),
+                                                  bot.clientId(),
+                                                  bot.clientSecret(),
+                                                  bot.robotCode()
+                                          ))
+                                          .toList()
                         ),
                         new ChannelConfigDto.Discord(
                                 request.channels().discord().enabled(),
                                 request.channels().discord().bots() == null
                                         ? List.of()
                                         : request.channels().discord().bots().stream()
-                                        .map(bot -> new ChannelConfigDto.DiscordBot(
-                                                bot.botId(),
-                                                bot.displayName(),
-                                                bot.enabled(),
-                                                bot.isDefault(),
-                                                bot.requireMention(),
-                                                bot.allowList(),
-                                                bot.token(),
-                                                bot.botUserId(),
-                                                bot.acceptBotMessages()
-                                        ))
-                                        .toList()
+                                          .map(bot -> new ChannelConfigDto.DiscordBot(
+                                                  bot.botId(),
+                                                  bot.displayName(),
+                                                  bot.enabled(),
+                                                  bot.isDefault(),
+                                                  bot.requireMention(),
+                                                  bot.allowList(),
+                                                  bot.token(),
+                                                  bot.botUserId(),
+                                                  bot.acceptBotMessages()
+                                          ))
+                                          .toList()
                         ),
                         new ChannelConfigDto.Telegram(
                                 request.channels().telegram().enabled(),
                                 request.channels().telegram().bots() == null
                                         ? List.of()
                                         : request.channels().telegram().bots().stream()
-                                        .map(bot -> new ChannelConfigDto.TelegramBot(
-                                                bot.botId(),
-                                                bot.displayName(),
-                                                bot.enabled(),
-                                                bot.isDefault(),
-                                                bot.requireMention(),
-                                                bot.allowList(),
-                                                bot.token(),
-                                                bot.botUsername()
-                                        ))
-                                        .toList()
+                                          .map(bot -> new ChannelConfigDto.TelegramBot(
+                                                  bot.botId(),
+                                                  bot.displayName(),
+                                                  bot.enabled(),
+                                                  bot.isDefault(),
+                                                  bot.requireMention(),
+                                                  bot.allowList(),
+                                                  bot.token(),
+                                                  bot.botUsername()
+                                          ))
+                                          .toList()
                         ),
                         new ChannelConfigDto.Qq(
                                 request.channels().qq().enabled(),
                                 request.channels().qq().bots() == null
                                         ? List.of()
                                         : request.channels().qq().bots().stream()
-                                        .map(bot -> new ChannelConfigDto.QqBot(
-                                                bot.botId(),
-                                                bot.displayName(),
-                                                bot.enabled(),
-                                                bot.isDefault(),
-                                                bot.requireMention(),
-                                                bot.allowList(),
-                                                bot.appId(),
-                                                bot.clientSecret(),
-                                                bot.botUserId(),
-                                                bot.sandbox(),
-                                                bot.markdownEnabled()
-                                        ))
-                                        .toList()
+                                          .map(bot -> new ChannelConfigDto.QqBot(
+                                                  bot.botId(),
+                                                  bot.displayName(),
+                                                  bot.enabled(),
+                                                  bot.isDefault(),
+                                                  bot.requireMention(),
+                                                  bot.allowList(),
+                                                  bot.appId(),
+                                                  bot.clientSecret(),
+                                                  bot.botUserId(),
+                                                  bot.sandbox(),
+                                                  bot.markdownEnabled()
+                                          ))
+                                          .toList()
                         ),
                         new ChannelConfigDto.WeCom(
                                 request.channels().wecom().enabled(),
                                 request.channels().wecom().bots() == null
                                         ? List.of()
                                         : request.channels().wecom().bots().stream()
-                                        .map(bot -> new ChannelConfigDto.WeComBot(
-                                                bot.botId(),
-                                                bot.displayName(),
-                                                bot.enabled(),
-                                                bot.isDefault(),
-                                                bot.requireMention(),
-                                                bot.allowList(),
-                                                bot.wecomBotId(),
-                                                bot.secret()
-                                        ))
-                                        .toList()
+                                          .map(bot -> new ChannelConfigDto.WeComBot(
+                                                  bot.botId(),
+                                                  bot.displayName(),
+                                                  bot.enabled(),
+                                                  bot.isDefault(),
+                                                  bot.requireMention(),
+                                                  bot.allowList(),
+                                                  bot.wecomBotId(),
+                                                  bot.secret()
+                                          ))
+                                          .toList()
                         ),
                         new ChannelConfigDto.Weixin(
                                 request.channels().weixin().enabled(),
                                 request.channels().weixin().bots() == null
                                         ? List.of()
                                         : request.channels().weixin().bots().stream()
-                                        .map(bot -> new ChannelConfigDto.WeixinBot(
-                                                bot.botId(),
-                                                bot.displayName(),
-                                                bot.enabled(),
-                                                bot.isDefault(),
-                                                bot.requireMention(),
-                                                bot.allowList(),
-                                                bot.botToken(),
-                                                bot.botTokenFile(),
-                                                bot.baseUrl()
-                                        ))
-                                        .toList()
+                                          .map(bot -> new ChannelConfigDto.WeixinBot(
+                                                  bot.botId(),
+                                                  bot.displayName(),
+                                                  bot.enabled(),
+                                                  bot.isDefault(),
+                                                  bot.requireMention(),
+                                                  bot.allowList(),
+                                                  bot.botToken(),
+                                                  bot.botTokenFile(),
+                                                  bot.baseUrl()
+                                          ))
+                                          .toList()
                         )
                 )
         );

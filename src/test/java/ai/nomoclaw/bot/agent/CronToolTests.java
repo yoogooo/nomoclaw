@@ -20,9 +20,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 class CronToolTests {
 
@@ -62,8 +60,8 @@ class CronToolTests {
         assertEquals("0 */5 * * * ?", saved.getExpression());
         assertEquals("ACTIVE", saved.getStatus());
         assertTrue(result.success());
-        assertEquals("ACTIVE", result.artifacts().path("status").asText());
-        assertTrue(!result.artifacts().path("jobUid").asText("").isBlank());
+        assertEquals("ACTIVE", result.artifacts().path("status").asString());
+        assertTrue(!result.artifacts().path("jobUid").asString("").isBlank());
     }
 
     @Test
@@ -85,7 +83,7 @@ class CronToolTests {
         AgentCronJobEntity saved = captor.getValue();
         assertTrue(result.success());
         assertEquals("0 36 22 26 4 ? 2099", saved.getExpression());
-        assertEquals("0 36 22 26 4 ? 2099", result.artifacts().path("expression").asText());
+        assertEquals("0 36 22 26 4 ? 2099", result.artifacts().path("expression").asString());
     }
 
     @Test
@@ -106,7 +104,7 @@ class CronToolTests {
 
         assertTrue(result.success());
         assertEquals("CronDeleteTool", tool.name());
-        assertEquals("job-1", result.artifacts().path("jobUid").asText());
+        assertEquals("job-1", result.artifacts().path("jobUid").asString());
         assertTrue(result.artifacts().path("deleted").asBoolean(false));
         verify(schedulerService).deleteJob("job-1");
         verify(subscriptionRepository).deleteByJobUid("job-1");
@@ -130,8 +128,8 @@ class CronToolTests {
         assertTrue(listResult.success());
         assertEquals("CronListTool", tool.name());
         assertEquals(1, listResult.artifacts().path("count").asInt());
-        assertEquals("job-active", listResult.artifacts().path("jobs").get(0).path("jobUid").asText());
-        assertEquals("active task", listResult.artifacts().path("jobs").get(0).path("task").asText());
+        assertEquals("job-active", listResult.artifacts().path("jobs").get(0).path("jobUid").asString());
+        assertEquals("active task", listResult.artifacts().path("jobs").get(0).path("task").asString());
 
         ObjectNode getArgs = JsonNodeFactory.instance.objectNode();
         getArgs.put("jobUid", "job-paused");
@@ -139,8 +137,8 @@ class CronToolTests {
 
         assertTrue(getResult.success());
         assertEquals(1, getResult.artifacts().path("count").asInt());
-        assertEquals("job-paused", getResult.artifacts().path("jobs").get(0).path("jobUid").asText());
-        assertEquals("0 0 6 * * *", getResult.artifacts().path("jobs").get(0).path("expression").asText());
+        assertEquals("job-paused", getResult.artifacts().path("jobs").get(0).path("jobUid").asString());
+        assertEquals("0 0 6 * * *", getResult.artifacts().path("jobs").get(0).path("expression").asString());
     }
 
     private ToolRequest request(ObjectNode args) {

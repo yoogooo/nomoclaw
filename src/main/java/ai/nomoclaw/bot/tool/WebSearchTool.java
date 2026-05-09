@@ -58,7 +58,7 @@ public class WebSearchTool implements Tool {
     public ToolResult execute(ToolRequest request) {
         long start = System.currentTimeMillis();
         try {
-            String query = request.args().path("query").asText("");
+            String query = request.args().path("query").asString("");
             if (query.isBlank()) {
                 return ToolResult.failure("INVALID_ARGS", "query is required", metric(start, 0));
             }
@@ -98,9 +98,7 @@ public class WebSearchTool implements Tool {
                 }
             }
             if (response == null) {
-                String message = failures.isEmpty()
-                        ? "all search endpoints failed"
-                        : "all search endpoints failed: " + String.join("; ", failures);
+                String message = "all search endpoints failed: " + String.join("; ", failures);
                 return ToolResult.failure("WEB_SEARCH_ERROR", message, metric(start, 0));
             }
 
@@ -131,8 +129,8 @@ public class WebSearchTool implements Tool {
         if (node == null || node.isNull()) {
             return List.of();
         }
-        if (node.isTextual()) {
-            String raw = node.asText("");
+        if (node.isString()) {
+            String raw = node.asString("");
             if (raw.isBlank()) {
                 return List.of();
             }
@@ -147,7 +145,7 @@ public class WebSearchTool implements Tool {
         }
         List<String> out = new ArrayList<>();
         for (JsonNode item : node) {
-            String value = item == null ? "" : item.asText("").trim();
+            String value = item == null ? "" : item.asString("").trim();
             if (!value.isBlank()) {
                 out.add(value.toLowerCase(Locale.ROOT));
             }
@@ -168,9 +166,8 @@ public class WebSearchTool implements Tool {
 
     private String buildEndpointUrl(String template, String query) {
         String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8);
-        String raw = query == null ? "" : query;
         if (template.contains("{query}") || template.contains("{rawQuery}")) {
-            return template.replace("{query}", encoded).replace("{rawQuery}", raw);
+            return template.replace("{query}", encoded).replace("{rawQuery}", query);
         }
         String separator = template.contains("?") ? "&" : "?";
         return template + separator + "q=" + encoded;

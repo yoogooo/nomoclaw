@@ -1,10 +1,10 @@
 package ai.nomoclaw.bot.tool;
 
-import ai.nomoclaw.bot.store.repository.AgentMessageRepository;
-import ai.nomoclaw.bot.store.entity.AgentMessageEntity;
-import org.springframework.stereotype.Component;
 import ai.nomoclaw.bot.model.ToolRequest;
 import ai.nomoclaw.bot.model.ToolResult;
+import ai.nomoclaw.bot.store.entity.AgentMessageEntity;
+import ai.nomoclaw.bot.store.repository.AgentMessageRepository;
+import org.springframework.stereotype.Component;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
@@ -33,9 +33,9 @@ public class TokenUsageTool implements Tool {
     @Override
     public ToolResult execute(ToolRequest request) {
         long start = System.currentTimeMillis();
-        int days = Math.max(1, Math.min(365, request.args().path("days").asInt(30)));
-        String modelName = request.args().path("modelName").asText("");
-        String provider = request.args().path("provider").asText("");
+        int days = Math.clamp(request.args().path("days").asInt(30), 1, 365);
+        String modelName = request.args().path("modelName").asString("");
+        String provider = request.args().path("provider").asString("");
         LocalDateTime since = LocalDateTime.now().minusDays(days);
 
         List<AgentMessageEntity> messages = messageRepository.lambdaQuery()
@@ -61,7 +61,7 @@ public class TokenUsageTool implements Tool {
 
         ArrayNode modelStats = JsonNodeFactory.instance.arrayNode();
         byModel.entrySet().stream()
-                .sorted(Map.Entry.<String, Integer>comparingByValue(Comparator.reverseOrder()))
+                .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
                 .forEach(entry -> {
                     ObjectNode node = JsonNodeFactory.instance.objectNode();
                     node.put("modelName", entry.getKey());

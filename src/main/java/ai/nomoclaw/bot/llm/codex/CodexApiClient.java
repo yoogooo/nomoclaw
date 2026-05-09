@@ -3,27 +3,11 @@ package ai.nomoclaw.bot.llm.codex;
 import ai.nomoclaw.bot.util.JsonUtil;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
-import dev.langchain4j.data.message.AiMessage;
-import dev.langchain4j.data.message.ChatMessage;
-import dev.langchain4j.data.message.Content;
-import dev.langchain4j.data.message.ImageContent;
-import dev.langchain4j.data.message.SystemMessage;
-import dev.langchain4j.data.message.TextContent;
-import dev.langchain4j.data.message.ToolExecutionResultMessage;
-import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.data.image.Image;
+import dev.langchain4j.data.message.*;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.request.ToolChoice;
-import dev.langchain4j.model.chat.request.json.JsonArraySchema;
-import dev.langchain4j.model.chat.request.json.JsonBooleanSchema;
-import dev.langchain4j.model.chat.request.json.JsonEnumSchema;
-import dev.langchain4j.model.chat.request.json.JsonIntegerSchema;
-import dev.langchain4j.model.chat.request.json.JsonNumberSchema;
-import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
-import dev.langchain4j.model.chat.request.json.JsonRawSchema;
-import dev.langchain4j.model.chat.request.json.JsonReferenceSchema;
-import dev.langchain4j.model.chat.request.json.JsonSchemaElement;
-import dev.langchain4j.model.chat.request.json.JsonStringSchema;
+import dev.langchain4j.model.chat.request.json.*;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.chat.response.ChatResponseMetadata;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
@@ -224,35 +208,41 @@ final class CodexApiClient {
 
     private Map<String, Object> toJsonSchemaElement(JsonSchemaElement element) {
         Map<String, Object> out = new LinkedHashMap<>();
-        if (element instanceof JsonStringSchema stringSchema) {
-            out.put("type", "string");
-            putDescription(out, stringSchema.description());
-        } else if (element instanceof JsonIntegerSchema integerSchema) {
-            out.put("type", "integer");
-            putDescription(out, integerSchema.description());
-        } else if (element instanceof JsonNumberSchema numberSchema) {
-            out.put("type", "number");
-            putDescription(out, numberSchema.description());
-        } else if (element instanceof JsonBooleanSchema booleanSchema) {
-            out.put("type", "boolean");
-            putDescription(out, booleanSchema.description());
-        } else if (element instanceof JsonEnumSchema enumSchema) {
-            out.put("type", "string");
-            putDescription(out, enumSchema.description());
-            out.put("enum", enumSchema.enumValues() == null ? List.of() : enumSchema.enumValues());
-        } else if (element instanceof JsonArraySchema arraySchema) {
-            out.put("type", "array");
-            putDescription(out, arraySchema.description());
-            out.put("items", arraySchema.items() == null ? Map.of("type", "string") : toJsonSchemaElement(arraySchema.items()));
-        } else if (element instanceof JsonObjectSchema objectSchema) {
-            out.putAll(toJsonSchema(objectSchema));
-        } else if (element instanceof JsonRawSchema rawSchema) {
-            JsonUtil.fromJsonQuietly(rawSchema.schema(), Map.class).ifPresent(out::putAll);
-        } else if (element instanceof JsonReferenceSchema referenceSchema) {
-            out.put("$ref", referenceSchema.reference());
-            putDescription(out, referenceSchema.description());
-        } else {
-            out.put("type", "string");
+        switch (element) {
+            case JsonStringSchema stringSchema -> {
+                out.put("type", "string");
+                putDescription(out, stringSchema.description());
+            }
+            case JsonIntegerSchema integerSchema -> {
+                out.put("type", "integer");
+                putDescription(out, integerSchema.description());
+            }
+            case JsonNumberSchema numberSchema -> {
+                out.put("type", "number");
+                putDescription(out, numberSchema.description());
+            }
+            case JsonBooleanSchema booleanSchema -> {
+                out.put("type", "boolean");
+                putDescription(out, booleanSchema.description());
+            }
+            case JsonEnumSchema enumSchema -> {
+                out.put("type", "string");
+                putDescription(out, enumSchema.description());
+                out.put("enum", enumSchema.enumValues() == null ? List.of() : enumSchema.enumValues());
+            }
+            case JsonArraySchema arraySchema -> {
+                out.put("type", "array");
+                putDescription(out, arraySchema.description());
+                out.put("items", arraySchema.items() == null ? Map.of("type", "string") : toJsonSchemaElement(arraySchema.items()));
+            }
+            case JsonObjectSchema objectSchema -> out.putAll(toJsonSchema(objectSchema));
+            case JsonRawSchema rawSchema ->
+                    JsonUtil.fromJsonQuietly(rawSchema.schema(), Map.class).ifPresent(out::putAll);
+            case JsonReferenceSchema referenceSchema -> {
+                out.put("$ref", referenceSchema.reference());
+                putDescription(out, referenceSchema.description());
+            }
+            case null, default -> out.put("type", "string");
         }
         return out;
     }
@@ -636,7 +626,7 @@ final class CodexApiClient {
     }
 
     private String text(JsonNode node) {
-        return node == null || node.isMissingNode() || node.isNull() ? "" : node.asText("");
+        return node == null || node.isMissingNode() || node.isNull() ? "" : node.asString("");
     }
 
     private boolean isSuccess(int statusCode) {

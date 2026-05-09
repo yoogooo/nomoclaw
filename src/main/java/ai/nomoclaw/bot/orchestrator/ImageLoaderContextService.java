@@ -4,20 +4,12 @@ import ai.nomoclaw.bot.application.dto.ModelConfigDto;
 import ai.nomoclaw.bot.domain.AgentMessage;
 import ai.nomoclaw.bot.model.PlanStep;
 import ai.nomoclaw.bot.model.ToolResult;
-import dev.langchain4j.data.message.ChatMessage;
-import dev.langchain4j.data.message.Content;
-import dev.langchain4j.data.message.ImageContent;
-import dev.langchain4j.data.message.TextContent;
-import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.data.message.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
+import java.util.*;
 
 @Service
 @Slf4j
@@ -111,8 +103,8 @@ public class ImageLoaderContextService {
         Set<String> localPaths = new LinkedHashSet<>();
         Set<String> externalUrls = new LinkedHashSet<>();
         for (JsonNode image : images) {
-            String path = image.path("path").asText("");
-            String url = image.path("url").asText("");
+            String path = image.path("path").asString("");
+            String url = image.path("url").asString("");
             boolean external = image.path("isExternal").asBoolean(false);
             String normalizedPath = path == null ? "" : path.trim();
             String normalizedUrl = url == null ? "" : url.trim();

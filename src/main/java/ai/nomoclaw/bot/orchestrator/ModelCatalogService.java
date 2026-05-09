@@ -99,8 +99,8 @@ public class ModelCatalogService {
         try {
             String manifestBody = requestText(remoteUrl);
             JsonNode manifest = JsonUtil.fromJson(manifestBody, JsonNode.class);
-            String catalogUrl = trim(manifest.path("catalogUrl").asText(""));
-            String sha256 = trim(manifest.path("sha256").asText(""));
+            String catalogUrl = trim(manifest.path("catalogUrl").asString(""));
+            String sha256 = trim(manifest.path("sha256").asString(""));
             String catalogBody = catalogUrl.isBlank() ? manifestBody : requestText(catalogUrl);
             if (!sha256.isBlank() && !sha256Hex(catalogBody).equalsIgnoreCase(sha256)) {
                 throw new IllegalArgumentException("remote catalog sha256 mismatch");

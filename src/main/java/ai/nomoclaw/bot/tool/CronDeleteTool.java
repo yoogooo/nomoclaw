@@ -36,7 +36,7 @@ public class CronDeleteTool implements Tool {
     public ToolResult execute(ToolRequest request) {
         long start = System.currentTimeMillis();
         try {
-            String jobUid = request.args().path("jobUid").asText("").trim();
+            String jobUid = request.args().path("jobUid").asString("").trim();
             if (jobUid.isBlank()) {
                 return ToolResult.failure("INVALID_ARGS", "jobUid is required", metrics(start, false));
             }

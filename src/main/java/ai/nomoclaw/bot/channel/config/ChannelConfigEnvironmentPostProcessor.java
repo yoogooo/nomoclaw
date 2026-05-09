@@ -99,10 +99,10 @@ public class ChannelConfigEnvironmentPostProcessor implements ApplicationContext
             defaultBot.put("isDefault", true);
             defaultBot.put("requireMention", feishu.path("requireMention").asBoolean(true));
             defaultBot.set("allowList", feishu.path("allowList").isArray() ? feishu.path("allowList") : MAPPER.createArrayNode());
-            defaultBot.put("appId", trim(feishu.path("appId").asText("")));
-            defaultBot.put("appSecret", trim(feishu.path("appSecret").asText("")));
+            defaultBot.put("appId", trim(feishu.path("appId").asString("")));
+            defaultBot.put("appSecret", trim(feishu.path("appSecret").asString("")));
             defaultBot.put("processingAckReactionEnabled", feishu.path("processingAckReactionEnabled").asBoolean(true));
-            defaultBot.put("processingAckReactionType", fallback(trim(feishu.path("processingAckReactionType").asText("")), "OK"));
+            defaultBot.put("processingAckReactionType", fallback(trim(feishu.path("processingAckReactionType").asString("")), "OK"));
             bots.add(defaultBot);
         }
         feishu.removeAll();
@@ -127,9 +127,9 @@ public class ChannelConfigEnvironmentPostProcessor implements ApplicationContext
             defaultBot.put("isDefault", true);
             defaultBot.put("requireMention", dingtalk.path("requireMention").asBoolean(true));
             defaultBot.set("allowList", dingtalk.path("allowList").isArray() ? dingtalk.path("allowList") : MAPPER.createArrayNode());
-            defaultBot.put("clientId", trim(dingtalk.path("clientId").asText("")));
-            defaultBot.put("clientSecret", trim(dingtalk.path("clientSecret").asText("")));
-            defaultBot.put("robotCode", trim(dingtalk.path("robotCode").asText("")));
+            defaultBot.put("clientId", trim(dingtalk.path("clientId").asString("")));
+            defaultBot.put("clientSecret", trim(dingtalk.path("clientSecret").asString("")));
+            defaultBot.put("robotCode", trim(dingtalk.path("robotCode").asString("")));
             bots.add(defaultBot);
         }
         dingtalk.removeAll();
@@ -154,8 +154,8 @@ public class ChannelConfigEnvironmentPostProcessor implements ApplicationContext
             defaultBot.put("isDefault", true);
             defaultBot.put("requireMention", discord.path("requireMention").asBoolean(true));
             defaultBot.set("allowList", discord.path("allowList").isArray() ? discord.path("allowList") : MAPPER.createArrayNode());
-            defaultBot.put("token", trim(discord.path("token").asText("")));
-            defaultBot.put("botUserId", trim(discord.path("botUserId").asText("")));
+            defaultBot.put("token", trim(discord.path("token").asString("")));
+            defaultBot.put("botUserId", trim(discord.path("botUserId").asString("")));
             defaultBot.put("acceptBotMessages", discord.path("acceptBotMessages").asBoolean(false));
             bots.add(defaultBot);
         }
@@ -181,8 +181,8 @@ public class ChannelConfigEnvironmentPostProcessor implements ApplicationContext
             defaultBot.put("isDefault", true);
             defaultBot.put("requireMention", telegram.path("requireMention").asBoolean(true));
             defaultBot.set("allowList", telegram.path("allowList").isArray() ? telegram.path("allowList") : MAPPER.createArrayNode());
-            defaultBot.put("token", trim(telegram.path("token").asText("")));
-            defaultBot.put("botUsername", normalizeUsername(telegram.path("botUsername").asText("")));
+            defaultBot.put("token", trim(telegram.path("token").asString("")));
+            defaultBot.put("botUsername", normalizeUsername(telegram.path("botUsername").asString("")));
             bots.add(defaultBot);
         }
         telegram.removeAll();
@@ -207,9 +207,9 @@ public class ChannelConfigEnvironmentPostProcessor implements ApplicationContext
             defaultBot.put("isDefault", true);
             defaultBot.put("requireMention", qq.path("requireMention").asBoolean(true));
             defaultBot.set("allowList", qq.path("allowList").isArray() ? qq.path("allowList") : MAPPER.createArrayNode());
-            defaultBot.put("appId", trim(qq.path("appId").asText("")));
-            defaultBot.put("clientSecret", trim(qq.path("clientSecret").asText(qq.path("token").asText(""))));
-            defaultBot.put("botUserId", trim(qq.path("botUserId").asText("")));
+            defaultBot.put("appId", trim(qq.path("appId").asString("")));
+            defaultBot.put("clientSecret", trim(qq.path("clientSecret").asString(qq.path("token").asString(""))));
+            defaultBot.put("botUserId", trim(qq.path("botUserId").asString("")));
             defaultBot.put("sandbox", qq.path("sandbox").asBoolean(false));
             defaultBot.put("markdownEnabled", qq.path("markdownEnabled").asBoolean(false));
             bots.add(defaultBot);
@@ -236,8 +236,8 @@ public class ChannelConfigEnvironmentPostProcessor implements ApplicationContext
             defaultBot.put("isDefault", true);
             defaultBot.put("requireMention", wecom.path("requireMention").asBoolean(true));
             defaultBot.set("allowList", wecom.path("allowList").isArray() ? wecom.path("allowList") : MAPPER.createArrayNode());
-            defaultBot.put("wecomBotId", trim(wecom.path("wecomBotId").asText(wecom.path("botId").asText(""))));
-            defaultBot.put("secret", trim(wecom.path("secret").asText("")));
+            defaultBot.put("wecomBotId", trim(wecom.path("wecomBotId").asString(wecom.path("botId").asString(""))));
+            defaultBot.put("secret", trim(wecom.path("secret").asString("")));
             bots.add(defaultBot);
         }
         wecom.removeAll();
@@ -262,9 +262,9 @@ public class ChannelConfigEnvironmentPostProcessor implements ApplicationContext
             defaultBot.put("isDefault", true);
             defaultBot.put("requireMention", weixin.path("requireMention").asBoolean(true));
             defaultBot.set("allowList", weixin.path("allowList").isArray() ? weixin.path("allowList") : MAPPER.createArrayNode());
-            defaultBot.put("botToken", trim(weixin.path("botToken").asText("")));
-            defaultBot.put("botTokenFile", trim(weixin.path("botTokenFile").asText("")));
-            defaultBot.put("baseUrl", fallback(trim(weixin.path("baseUrl").asText("")), "https://ilinkai.weixin.qq.com"));
+            defaultBot.put("botToken", trim(weixin.path("botToken").asString("")));
+            defaultBot.put("botTokenFile", trim(weixin.path("botTokenFile").asString("")));
+            defaultBot.put("baseUrl", fallback(trim(weixin.path("baseUrl").asString("")), "https://ilinkai.weixin.qq.com"));
             bots.add(defaultBot);
         }
         weixin.removeAll();
@@ -308,45 +308,45 @@ public class ChannelConfigEnvironmentPostProcessor implements ApplicationContext
         props.put("agent.channels.feishu.processing-ack-reaction-enabled",
                 feishuDefaultBot != null && feishuDefaultBot.path("processingAckReactionEnabled").asBoolean(true));
         props.put("agent.channels.feishu.processing-ack-reaction-type",
-                feishuDefaultBot == null ? "OK" : fallback(trim(feishuDefaultBot.path("processingAckReactionType").asText("")), "OK"));
-        props.put("agent.channels.feishu.app-id", feishuDefaultBot == null ? "" : trim(feishuDefaultBot.path("appId").asText("")));
-        props.put("agent.channels.feishu.app-secret", feishuDefaultBot == null ? "" : trim(feishuDefaultBot.path("appSecret").asText("")));
+                feishuDefaultBot == null ? "OK" : fallback(trim(feishuDefaultBot.path("processingAckReactionType").asString("")), "OK"));
+        props.put("agent.channels.feishu.app-id", feishuDefaultBot == null ? "" : trim(feishuDefaultBot.path("appId").asString("")));
+        props.put("agent.channels.feishu.app-secret", feishuDefaultBot == null ? "" : trim(feishuDefaultBot.path("appSecret").asString("")));
         props.put("agent.channels.dingtalk.enabled", dingtalkEnabled && dingtalkDefaultBot != null);
         props.put("agent.channels.dingtalk.require-mention", dingtalkDefaultBot != null && dingtalkDefaultBot.path("requireMention").asBoolean(true));
         props.put("agent.channels.dingtalk.allow-list", dingtalkDefaultBot == null ? "" : joinList(dingtalkDefaultBot.path("allowList")));
-        props.put("agent.channels.dingtalk.client-id", dingtalkDefaultBot == null ? "" : trim(dingtalkDefaultBot.path("clientId").asText("")));
-        props.put("agent.channels.dingtalk.client-secret", dingtalkDefaultBot == null ? "" : trim(dingtalkDefaultBot.path("clientSecret").asText("")));
-        props.put("agent.channels.dingtalk.robot-code", dingtalkDefaultBot == null ? "" : trim(dingtalkDefaultBot.path("robotCode").asText("")));
+        props.put("agent.channels.dingtalk.client-id", dingtalkDefaultBot == null ? "" : trim(dingtalkDefaultBot.path("clientId").asString("")));
+        props.put("agent.channels.dingtalk.client-secret", dingtalkDefaultBot == null ? "" : trim(dingtalkDefaultBot.path("clientSecret").asString("")));
+        props.put("agent.channels.dingtalk.robot-code", dingtalkDefaultBot == null ? "" : trim(dingtalkDefaultBot.path("robotCode").asString("")));
         props.put("agent.channels.discord.enabled", discordEnabled && discordDefaultBot != null);
         props.put("agent.channels.discord.require-mention", discordDefaultBot != null && discordDefaultBot.path("requireMention").asBoolean(true));
         props.put("agent.channels.discord.allow-list", discordDefaultBot == null ? "" : joinList(discordDefaultBot.path("allowList")));
-        props.put("agent.channels.discord.token", discordDefaultBot == null ? "" : trim(discordDefaultBot.path("token").asText("")));
-        props.put("agent.channels.discord.bot-user-id", discordDefaultBot == null ? "" : trim(discordDefaultBot.path("botUserId").asText("")));
+        props.put("agent.channels.discord.token", discordDefaultBot == null ? "" : trim(discordDefaultBot.path("token").asString("")));
+        props.put("agent.channels.discord.bot-user-id", discordDefaultBot == null ? "" : trim(discordDefaultBot.path("botUserId").asString("")));
         props.put("agent.channels.discord.accept-bot-messages", discordDefaultBot != null && discordDefaultBot.path("acceptBotMessages").asBoolean(false));
         props.put("agent.channels.telegram.enabled", telegramEnabled && telegramDefaultBot != null);
         props.put("agent.channels.telegram.require-mention", telegramDefaultBot != null && telegramDefaultBot.path("requireMention").asBoolean(true));
         props.put("agent.channels.telegram.allow-list", telegramDefaultBot == null ? "" : joinList(telegramDefaultBot.path("allowList")));
-        props.put("agent.channels.telegram.token", telegramDefaultBot == null ? "" : trim(telegramDefaultBot.path("token").asText("")));
-        props.put("agent.channels.telegram.bot-username", telegramDefaultBot == null ? "" : normalizeUsername(telegramDefaultBot.path("botUsername").asText("")));
+        props.put("agent.channels.telegram.token", telegramDefaultBot == null ? "" : trim(telegramDefaultBot.path("token").asString("")));
+        props.put("agent.channels.telegram.bot-username", telegramDefaultBot == null ? "" : normalizeUsername(telegramDefaultBot.path("botUsername").asString("")));
         props.put("agent.channels.qq.enabled", qqEnabled && qqDefaultBot != null);
         props.put("agent.channels.qq.require-mention", qqDefaultBot != null && qqDefaultBot.path("requireMention").asBoolean(true));
         props.put("agent.channels.qq.allow-list", qqDefaultBot == null ? "" : joinList(qqDefaultBot.path("allowList")));
-        props.put("agent.channels.qq.app-id", qqDefaultBot == null ? "" : trim(qqDefaultBot.path("appId").asText("")));
-        props.put("agent.channels.qq.client-secret", qqDefaultBot == null ? "" : trim(qqDefaultBot.path("clientSecret").asText(qqDefaultBot.path("token").asText(""))));
-        props.put("agent.channels.qq.bot-user-id", qqDefaultBot == null ? "" : trim(qqDefaultBot.path("botUserId").asText("")));
+        props.put("agent.channels.qq.app-id", qqDefaultBot == null ? "" : trim(qqDefaultBot.path("appId").asString("")));
+        props.put("agent.channels.qq.client-secret", qqDefaultBot == null ? "" : trim(qqDefaultBot.path("clientSecret").asString(qqDefaultBot.path("token").asString(""))));
+        props.put("agent.channels.qq.bot-user-id", qqDefaultBot == null ? "" : trim(qqDefaultBot.path("botUserId").asString("")));
         props.put("agent.channels.qq.sandbox", qqDefaultBot != null && qqDefaultBot.path("sandbox").asBoolean(false));
         props.put("agent.channels.qq.markdown-enabled", qqDefaultBot != null && qqDefaultBot.path("markdownEnabled").asBoolean(false));
         props.put("agent.channels.wecom.enabled", wecomEnabled && wecomDefaultBot != null);
         props.put("agent.channels.wecom.require-mention", wecomDefaultBot != null && wecomDefaultBot.path("requireMention").asBoolean(true));
         props.put("agent.channels.wecom.allow-list", wecomDefaultBot == null ? "" : joinList(wecomDefaultBot.path("allowList")));
-        props.put("agent.channels.wecom.wecom-bot-id", wecomDefaultBot == null ? "" : trim(wecomDefaultBot.path("wecomBotId").asText(wecomDefaultBot.path("botId").asText(""))));
-        props.put("agent.channels.wecom.secret", wecomDefaultBot == null ? "" : trim(wecomDefaultBot.path("secret").asText("")));
+        props.put("agent.channels.wecom.wecom-bot-id", wecomDefaultBot == null ? "" : trim(wecomDefaultBot.path("wecomBotId").asString(wecomDefaultBot.path("botId").asString(""))));
+        props.put("agent.channels.wecom.secret", wecomDefaultBot == null ? "" : trim(wecomDefaultBot.path("secret").asString("")));
         props.put("agent.channels.weixin.enabled", weixinEnabled && weixinDefaultBot != null);
         props.put("agent.channels.weixin.require-mention", weixinDefaultBot != null && weixinDefaultBot.path("requireMention").asBoolean(true));
         props.put("agent.channels.weixin.allow-list", weixinDefaultBot == null ? "" : joinList(weixinDefaultBot.path("allowList")));
-        props.put("agent.channels.weixin.bot-token", weixinDefaultBot == null ? "" : trim(weixinDefaultBot.path("botToken").asText("")));
-        props.put("agent.channels.weixin.bot-token-file", weixinDefaultBot == null ? "" : trim(weixinDefaultBot.path("botTokenFile").asText("")));
-        props.put("agent.channels.weixin.base-url", weixinDefaultBot == null ? "https://ilinkai.weixin.qq.com" : fallback(trim(weixinDefaultBot.path("baseUrl").asText("")), "https://ilinkai.weixin.qq.com"));
+        props.put("agent.channels.weixin.bot-token", weixinDefaultBot == null ? "" : trim(weixinDefaultBot.path("botToken").asString("")));
+        props.put("agent.channels.weixin.bot-token-file", weixinDefaultBot == null ? "" : trim(weixinDefaultBot.path("botTokenFile").asString("")));
+        props.put("agent.channels.weixin.base-url", weixinDefaultBot == null ? "https://ilinkai.weixin.qq.com" : fallback(trim(weixinDefaultBot.path("baseUrl").asString("")), "https://ilinkai.weixin.qq.com"));
         return props;
     }
 
@@ -381,7 +381,7 @@ public class ChannelConfigEnvironmentPostProcessor implements ApplicationContext
         }
         StringBuilder builder = new StringBuilder();
         node.forEach(item -> {
-            String value = trim(item.asText(""));
+            String value = trim(item.asString(""));
             if (value.isBlank()) {
                 return;
             }

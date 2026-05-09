@@ -1,40 +1,27 @@
 package ai.nomoclaw.bot.orchestrator;
 
-import ai.nomoclaw.bot.util.JsonUtil;
+import ai.nomoclaw.bot.mcp.McpApplicationService;
 import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
 import ai.nomoclaw.bot.store.entity.AgentToolRelationEntity;
 import ai.nomoclaw.bot.store.entity.McpToolSnapshotEntity;
 import ai.nomoclaw.bot.store.entity.ToolDefinitionEntity;
-import ai.nomoclaw.bot.mcp.McpApplicationService;
 import ai.nomoclaw.bot.store.repository.AgentDefinitionRepository;
 import ai.nomoclaw.bot.store.repository.AgentToolRelationRepository;
 import ai.nomoclaw.bot.store.repository.ToolDefinitionRepository;
+import ai.nomoclaw.bot.util.JsonUtil;
 import dev.langchain4j.agent.tool.ToolSpecification;
-import dev.langchain4j.model.chat.request.json.JsonArraySchema;
-import dev.langchain4j.model.chat.request.json.JsonBooleanSchema;
-import dev.langchain4j.model.chat.request.json.JsonEnumSchema;
-import dev.langchain4j.model.chat.request.json.JsonIntegerSchema;
-import dev.langchain4j.model.chat.request.json.JsonNumberSchema;
-import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
-import dev.langchain4j.model.chat.request.json.JsonSchemaElement;
-import dev.langchain4j.model.chat.request.json.JsonStringSchema;
+import dev.langchain4j.model.chat.request.json.*;
+import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Component
 public class ToolSpecificationRegistry {
 
-    private final List<ToolSpecification> toolSpecifications;
     private final Map<String, ToolSpecification> toolSpecificationsByName;
     private final AgentDefinitionRepository agentDefinitionRepository;
     private final ToolDefinitionRepository toolDefinitionRepository;
@@ -49,7 +36,7 @@ public class ToolSpecificationRegistry {
         this.toolDefinitionRepository = toolDefinitionRepository;
         this.agentToolRelationRepository = agentToolRelationRepository;
         this.mcpApplicationService = mcpApplicationService;
-        this.toolSpecifications = List.of(
+        List<ToolSpecification> toolSpecifications = List.of(
                 ToolSpecification.builder()
                         .name("CommandTool")
                         .description("Execute a local shell command on the current machine. Relative cwd values are resolved from the current agent workspace.")
@@ -318,7 +305,7 @@ public class ToolSpecificationRegistry {
                 .toList();
         Set<String> activeDefinitionKeys = toolDefinitionRepository.listActiveByKeys(relationToolKeys)
                 .stream()
-                .map(definition -> definition.getToolKey())
+                .map(ToolDefinitionEntity::getToolKey)
                 .collect(Collectors.toSet());
 
         return relationToolKeys.stream()
@@ -386,7 +373,7 @@ public class ToolSpecificationRegistry {
         if (required.isArray()) {
             List<String> requiredFields = new ArrayList<>();
             required.forEach(item -> {
-                String value = item.asText("").trim();
+                String value = item.asString("").trim();
                 if (!value.isBlank()) {
                     requiredFields.add(value);
                 }
@@ -407,7 +394,7 @@ public class ToolSpecificationRegistry {
         JsonNode enumNode = node.path("enum");
         if (enumNode.isArray() && !enumNode.isEmpty()) {
             List<String> values = new ArrayList<>();
-            enumNode.forEach(item -> values.add(item.asText("")));
+            enumNode.forEach(item -> values.add(item.asString("")));
             return JsonEnumSchema.builder()
                     .description(text(node.path("description")))
                     .enumValues(values)
@@ -444,7 +431,7 @@ public class ToolSpecificationRegistry {
             JsonNode requiredNode = root.path("required");
             if (requiredNode.isArray()) {
                 requiredNode.forEach(item -> {
-                    String name = item.asText("").trim();
+                    String name = item.asString("").trim();
                     if (!name.isBlank()) {
                         required.add(name);
                     }
@@ -452,23 +439,15 @@ public class ToolSpecificationRegistry {
             }
             Map<String, Map<String, Object>> propertyMap = JsonUtil.fromJsonQuietly(
                     properties.toString(),
-                    new TypeReference<Map<String, Map<String, Object>>>() {}
+                    new TypeReference<Map<String, Map<String, Object>>>() {
+                    }
             ).orElseGet(LinkedHashMap::new);
             List<String> paramSummaries = new ArrayList<>();
             for (Map.Entry<String, Map<String, Object>> entry : propertyMap.entrySet()) {
                 if (paramSummaries.size() >= 8) {
                     break;
                 }
-                String name = entry.getKey();
-                Map<String, Object> node = entry.getValue() == null ? Map.of() : entry.getValue();
-                String type = String.valueOf(node.getOrDefault("type", "any"));
-                Object descRaw = node.get("description");
-                String desc = descRaw == null ? "" : descRaw.toString().trim();
-                String requiredText = required.contains(name) ? "required" : "optional";
-                String text = name + " (" + type + ", " + requiredText + ")";
-                if (!desc.isBlank()) {
-                    text += ": " + desc;
-                }
+                String text = getString(entry, required);
                 paramSummaries.add(text);
             }
             if (paramSummaries.isEmpty()) {
@@ -484,8 +463,22 @@ public class ToolSpecificationRegistry {
         }
     }
 
+    private static @NonNull String getString(Map.Entry<String, Map<String, Object>> entry, Set<String> required) {
+        String name = entry.getKey();
+        Map<String, Object> node = entry.getValue() == null ? Map.of() : entry.getValue();
+        String type = String.valueOf(node.getOrDefault("type", "any"));
+        Object descRaw = node.get("description");
+        String desc = descRaw == null ? "" : descRaw.toString().trim();
+        String requiredText = required.contains(name) ? "required" : "optional";
+        String text = name + " (" + type + ", " + requiredText + ")";
+        if (!desc.isBlank()) {
+            text += ": " + desc;
+        }
+        return text;
+    }
+
     private String text(JsonNode node) {
-        return node == null || node.isMissingNode() || node.isNull() ? "" : node.asText("").trim();
+        return node == null || node.isMissingNode() || node.isNull() ? "" : node.asString("").trim();
     }
 
     private String firstNonBlank(String... values) {

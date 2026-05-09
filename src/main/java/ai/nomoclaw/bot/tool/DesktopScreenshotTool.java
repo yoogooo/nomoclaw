@@ -7,12 +7,7 @@ import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
 import javax.imageio.ImageIO;
-import java.awt.AWTException;
-import java.awt.GraphicsDevice;
-import java.awt.GraphicsEnvironment;
-import java.awt.HeadlessException;
-import java.awt.Rectangle;
-import java.awt.Robot;
+import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -32,7 +27,7 @@ public class DesktopScreenshotTool implements Tool {
     public ToolResult execute(ToolRequest request) {
         long start = System.currentTimeMillis();
         try {
-            String output = request.args().path("path").asText("");
+            String output = request.args().path("path").asString("");
             boolean captureWindow = request.args().path("captureWindow").asBoolean(false);
             Path outputPath = output == null || output.isBlank()
                     ? request.tmpDirectory().resolve(UUID.randomUUID() + ".png").toAbsolutePath().normalize()
