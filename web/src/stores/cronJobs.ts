@@ -15,30 +15,16 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
   const currentResults = ref<CronJobExecutionResult[]>([]);
   const loading = ref(false);
   const recentGlobalResults = ref<CronJobExecutionResult[]>([]);
+  const runningGlobalResults = ref<CronJobExecutionResult[]>([]);
 
   const currentJob = computed(() => jobs.value.find((job) => job.jobUid === selectedJobUid.value) || null);
-  const ACTIVE_EXECUTION_STATUSES = new Set(["RUNNING", "IN_PROGRESS", "WAITING_APPROVAL"]);
+  const ACTIVE_EXECUTION_STATUSES = new Set(["RUNNING", "WAITING_APPROVAL"]);
 
   function isJobExecutionActive(job: CronJob | undefined) {
     if (!job) return false;
-    const executionUid = String(job.currentExecutionUid || "").trim();
-    if (!executionUid) return false;
-    const completedExecutionUids = new Set(
-      recentGlobalResults.value
-        .map((item) => String(item.executionUid || "").trim())
-        .filter((uid) => uid.length > 0)
-    );
-    if (completedExecutionUids.has(executionUid)) {
-      return false;
-    }
-    const normalizedStatus = String(job.currentExecutionStatus || "").toUpperCase();
-    if (ACTIVE_EXECUTION_STATUSES.has(normalizedStatus)) {
-      return true;
-    }
-    if (String(job.triggerState || "").toUpperCase() === "BLOCKED") {
-      return true;
-    }
-    return !completedExecutionUids.has(executionUid);
+    const jobUid = String(job.jobUid || "").trim();
+    if (!jobUid) return false;
+    return runningGlobalResults.value.some((item) => String(item.jobUid || "").trim() === jobUid);
   }
 
   function markJobRunningLocally(jobUid: string) {
@@ -72,20 +58,46 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
   async function refresh(preferredJobUid: string | null = selectedJobUid.value) {
     loading.value = true;
     try {
-      const [nextJobs, nextGroups, recentResults] = await Promise.all([
+      const [nextJobs, nextGroups, recentResults, runningResults] = await Promise.all([
         cronApi.listCronJobs(),
         cronApi.listAgentGroups(),
-        cronApi.listGlobalRecentResults(20)
+        cronApi.listGlobalRecentResults(20),
+        cronApi.listGlobalRunningResults(100)
       ]);
-      jobs.value = nextJobs;
+      const statusByExecutionUid = new Map<string, string>();
+      await Promise.all(runningResults.map(async (item) => {
+        const executionUid = String(item.executionUid || "").trim();
+        if (!executionUid) return;
+        try {
+          const detail = await cronApi.getExecutionDetail(executionUid, { suppressErrorToast: true });
+          const normalizedStatus = String(detail?.status || "").trim();
+          if (normalizedStatus) {
+            statusByExecutionUid.set(executionUid, normalizedStatus);
+          }
+        } catch {
+          // Best-effort sync.
+        }
+      }));
+
+      jobs.value = nextJobs.map((job) => {
+        const executionUid = String(job.currentExecutionUid || "").trim();
+        const syncedStatus = executionUid ? statusByExecutionUid.get(executionUid) : undefined;
+        return syncedStatus ? { ...job, currentExecutionStatus: syncedStatus } : job;
+      });
       agentGroups.value = nextGroups;
       recentGlobalResults.value = recentResults;
+      runningGlobalResults.value = runningResults.map((item) => {
+        const executionUid = String(item.executionUid || "").trim();
+        const syncedStatus = executionUid ? statusByExecutionUid.get(executionUid) : undefined;
+        return syncedStatus ? { ...item, status: syncedStatus } : item;
+      });
 
       if (!jobs.value.length) {
         selectedJobUid.value = null;
         currentSubscriptions.value = [];
         currentResults.value = [];
         recentGlobalResults.value = [];
+        runningGlobalResults.value = [];
         return;
       }
 
@@ -109,36 +121,14 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
   }
 
   async function refreshExecutionState() {
-    const [nextJobs, recentResults] = await Promise.all([
+    const [nextJobs, recentResults, runningResults] = await Promise.all([
       cronApi.listCronJobs(),
-      cronApi.listGlobalRecentResults(20)
+      cronApi.listGlobalRecentResults(20),
+      cronApi.listGlobalRunningResults(100)
     ]);
-    const completedExecutionUids = new Set(
-      recentResults
-        .map((item) => String(item.executionUid || "").trim())
-        .filter((uid) => uid.length > 0)
-    );
-    const runningJobs = nextJobs.filter((job) => {
-      const executionUid = String(job.currentExecutionUid || "").trim();
-      if (!executionUid) {
-        return false;
-      }
-      if (completedExecutionUids.has(executionUid)) {
-        return false;
-      }
-      const normalizedStatus = String(job.currentExecutionStatus || "").toUpperCase();
-      if (ACTIVE_EXECUTION_STATUSES.has(normalizedStatus)) {
-        return true;
-      }
-      if (String(job.triggerState || "").toUpperCase() === "BLOCKED") {
-        return true;
-      }
-      // Fallback: if it has an execution uid and is not in completed results yet, keep tracking it as active.
-      return !completedExecutionUids.has(executionUid);
-    });
     const statusByExecutionUid = new Map<string, string>();
-    await Promise.all(runningJobs.map(async (job) => {
-      const executionUid = String(job.currentExecutionUid || "").trim();
+    await Promise.all(runningResults.map(async (item) => {
+      const executionUid = String(item.executionUid || "").trim();
       if (!executionUid) return;
       try {
         const detail = await cronApi.getExecutionDetail(executionUid, { suppressErrorToast: true });
@@ -156,6 +146,11 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
       return syncedStatus ? { ...job, currentExecutionStatus: syncedStatus } : job;
     });
     recentGlobalResults.value = recentResults;
+    runningGlobalResults.value = runningResults.map((item) => {
+      const executionUid = String(item.executionUid || "").trim();
+      const syncedStatus = executionUid ? statusByExecutionUid.get(executionUid) : undefined;
+      return syncedStatus ? { ...item, status: syncedStatus } : item;
+    });
     if (selectedJobUid.value && !jobs.value.some((job) => job.jobUid === selectedJobUid.value)) {
       selectedJobUid.value = null;
       currentSubscriptions.value = [];
@@ -272,6 +267,7 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
     currentSubscriptions,
     currentResults,
     recentGlobalResults,
+    runningGlobalResults,
     currentJob,
     loading,
     refresh,

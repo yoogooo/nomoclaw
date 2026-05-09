@@ -1025,6 +1025,7 @@ export const useConversationStore = defineStore("conversation", () => {
     };
     try {
       await conversationApi.decideStep(currentConversationUid.value, stepUid, { action, scope });
+      clearApproval();
       if (action === "allow") {
         message.success(tr("toast.approveSuccess"));
       } else {

@@ -102,7 +102,7 @@ async function applyConversationRouteContext() {
     const conversationSummary = conversationStore.conversations.find(
       (item) => item.conversationUid === targetConversationUid
     );
-    const targetAgentUid = String(conversationSummary?.agentUid || "").trim() || routeAgentUid.value;
+    const targetAgentUid = routeAgentUid.value || String(conversationSummary?.agentUid || "").trim();
     if (targetAgentUid) {
       const targetAgent = agentCatalogStore.allAgents.find((item) => item.agentUid === targetAgentUid);
       if (targetAgent && targetAgent.agentUid !== agentCatalogStore.selectedAgentUid) {
@@ -119,6 +119,8 @@ async function applyConversationRouteContext() {
     if (conversationStore.currentConversationUid !== targetConversationUid) {
       await conversationStore.selectConversation(targetConversationUid);
     }
+    if (token !== applyRouteToken) return;
+    await conversationStore.refreshConversations(targetConversationUid);
   } finally {
     if (token === applyRouteToken) {
       if (conversationStore.currentConversationUid === targetConversationUid) {
@@ -158,17 +160,19 @@ watch(
   (currentConversationUid) => {
     const current = String(currentConversationUid || "").trim();
     if (!current) return;
-    if (routeSource.value !== "cron") return;
-    if (!cronRouteBootstrapDone.value) return;
     if (!routeConversationUid.value) return;
     if (current === routeConversationUid.value) return;
-    // User switched away from cron deep-link target: clear sticky cron query params
-    // so refresh will stay on current conversation instead of jumping back.
+    if (routeSource.value === "cron" && !cronRouteBootstrapDone.value) return;
+
     const nextQuery = { ...route.query } as Record<string, any>;
-    delete nextQuery.source;
-    delete nextQuery.executionUid;
-    delete nextQuery.jobUid;
-    delete nextQuery.messageUid;
+    // User switched away from deep-linked target: keep URL in sync with current conversation
+    // so refresh won't jump back to stale conversationUid.
+    if (routeSource.value === "cron") {
+      delete nextQuery.source;
+      delete nextQuery.executionUid;
+      delete nextQuery.jobUid;
+      delete nextQuery.messageUid;
+    }
     nextQuery.conversationUid = current;
     void router.replace({ path: route.path, query: nextQuery });
   }

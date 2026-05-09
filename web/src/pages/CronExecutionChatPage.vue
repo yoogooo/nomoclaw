@@ -59,7 +59,7 @@ function clearStatusPollTimer() {
 
 function syncExecutionRunningStatus(execution?: CronExecutionDetail | null) {
   const status = String(execution?.status || "").toUpperCase();
-  isExecutionRunning.value = status === "RUNNING" || status === "IN_PROGRESS";
+  isExecutionRunning.value = status === "RUNNING";
 }
 
 async function refreshExecutionStatus(silent = true) {

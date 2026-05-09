@@ -1,6 +1,7 @@
 package ai.nomoclaw.bot.api;
 
 import ai.nomoclaw.bot.application.command.*;
+import ai.nomoclaw.bot.application.common.page.PageResult;
 import ai.nomoclaw.bot.application.dto.*;
 import ai.nomoclaw.bot.mcp.McpServerDto;
 import ai.nomoclaw.bot.mcp.McpToolDto;
@@ -651,7 +652,7 @@ public final class ApiDtoMapper {
                 .toList();
     }
 
-    public static PageResponse<CronJobExecutionResultResponse> toCronJobExecutionHistoryPage(ai.nomoclaw.bot.application.common.page.PageResult<CronJobExecutionResultDto> dto) {
+    public static PageResponse<CronJobExecutionResultResponse> toCronJobExecutionHistoryPage(PageResult<CronJobExecutionResultDto> dto) {
         return new PageResponse<>(
                 toCronJobExecutionResults(dto.items()),
                 dto.total(),

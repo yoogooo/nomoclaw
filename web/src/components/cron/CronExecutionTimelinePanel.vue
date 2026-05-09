@@ -12,8 +12,7 @@ const cronJobsStore = useCronJobsStore();
 const router = useRouter();
 const { t } = useI18n();
 const COMPLETED_VISIBLE_LIMIT = 10;
-
-const RUNNING_EXECUTION_STATUSES = new Set(["RUNNING", "IN_PROGRESS", "WAITING_APPROVAL"]);
+const FINISHED_EXECUTION_STATUSES = new Set(["COMPLETED", "FAILED", "CANCELED"]);
 
 function normalizeId(value?: string | null) {
   const normalized = String(value || "").trim();
@@ -21,44 +20,21 @@ function normalizeId(value?: string | null) {
 }
 
 const runningJobs = computed(() => {
-  const finishedExecutionUids = new Set(
-    cronJobsStore.recentGlobalResults
-      .map((item) => String(item.executionUid || "").trim())
-      .filter((uid) => uid.length > 0)
-  );
-  return cronJobsStore.jobs
-    .filter((job) => {
-      const executionUid = String(job.currentExecutionUid || "").trim();
-      if (!executionUid) {
-        return false;
-      }
-      if (finishedExecutionUids.has(executionUid)) {
-        return false;
-      }
-      const normalizedStatus = String(job.currentExecutionStatus || "").toUpperCase();
-      if (RUNNING_EXECUTION_STATUSES.has(normalizedStatus)) {
-        return true;
-      }
-      if (String(job.triggerState || "").toUpperCase() === "BLOCKED") {
-        return true;
-      }
-      // Fallback for status-sync delay: keep it in running list until it appears in completed results.
-      return !finishedExecutionUids.has(executionUid);
-    })
-    .map((job) => ({
-      jobUid: job.jobUid,
-      agentUid: normalizeId(job.agentUid),
-      jobTitle: displayCronJobTitle(job),
-      triggerState: job.triggerState || "UNKNOWN",
-      executionStatus: String(job.currentExecutionStatus || "").toUpperCase(),
-      executionUid: normalizeId(job.currentExecutionUid),
-      conversationUid: normalizeId(job.currentConversationUid),
-      messageUid: normalizeId(job.currentMessageUid),
-      startedTime: normalizeId(job.currentExecutionStartedTime)
-    }));
+  return cronJobsStore.runningGlobalResults.map((item, index) => ({
+    rowKey: normalizeId(item.executionUid) || normalizeId(item.jobUid) || `running-${index}`,
+    jobUid: item.jobUid,
+    agentUid: normalizeId(item.agentUid),
+    jobTitle: item.jobTitle || t("format.fallbackNoName"),
+    executionStatus: String(item.status || "").toUpperCase(),
+    executionUid: normalizeId(item.executionUid),
+    conversationUid: normalizeId(item.conversationUid),
+    messageUid: normalizeId(item.messageUid),
+    startedTime: normalizeId(item.executedTime)
+  }));
 });
 
 const completedResults = computed(() => [...cronJobsStore.recentGlobalResults]
+  .filter((item) => FINISHED_EXECUTION_STATUSES.has(String(item.status || "").toUpperCase()))
   .sort((a, b) => new Date(b.executedTime).getTime() - new Date(a.executedTime).getTime()));
 const completedVisibleResults = computed(() => completedResults.value.slice(0, COMPLETED_VISIBLE_LIMIT));
 
@@ -153,7 +129,7 @@ function runningStatusText(status?: string | null) {
   if (normalized === "WAITING_APPROVAL") {
     return "待人工审核";
   }
-  if (normalized === "RUNNING" || normalized === "IN_PROGRESS" || !normalized) {
+  if (normalized === "RUNNING" || !normalized) {
     return "运行中";
   }
   if (normalized === "FAILED") {
@@ -187,7 +163,7 @@ function runningStatusTagType(status?: string | null) {
         <div class="execution-list">
           <div
             v-for="item in runningJobs"
-            :key="item.jobUid"
+            :key="item.rowKey"
             class="execution-item running-item"
             :class="{ 'is-clickable': !!(item.executionUid && item.conversationUid) }"
             :role="item.executionUid && item.conversationUid ? 'button' : undefined"
@@ -562,7 +538,7 @@ function runningStatusTagType(status?: string | null) {
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 520px) {
   .running-item {
     grid-template-columns: auto minmax(0, 1fr);
     align-items: start;
@@ -578,26 +554,6 @@ function runningStatusTagType(status?: string | null) {
     flex-direction: column;
     align-items: flex-start;
     gap: var(--space-2);
-  }
-
-  .completed-table,
-  .completed-table tbody,
-  .completed-table tr,
-  .completed-table td {
-    display: block;
-    width: 100%;
-  }
-
-  .completed-table-row {
-    padding: var(--space-2_5) var(--space-3);
-  }
-
-  .completed-cell {
-    padding: var(--space-1) 0;
-  }
-
-  .completed-cell-title {
-    width: 100%;
   }
 
 }

@@ -63,6 +63,9 @@ export const cronApi = {
   listGlobalRecentResults(limit = 20) {
     return requestJson<CronJobExecutionResult[]>(`/api/cron-jobs/results/recent?limit=${limit}`);
   },
+  listGlobalRunningResults(limit = 50) {
+    return requestJson<CronJobExecutionResult[]>(`/api/cron-jobs/results/running?limit=${limit}`);
+  },
   listGlobalExecutionHistory(params?: {
     agentUid?: string;
     status?: string;

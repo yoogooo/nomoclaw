@@ -814,10 +814,7 @@ public class AgentApplicationService {
             store.updateStepStatus(stepUid, StepStatus.CREATED, 0, null, null);
             log.info("[Agent] step approved conversationUid={} stepUid={} round={} scope={} note={}",
                     conversationUid, stepUid, step.roundIndex(), appliedScope, nullToEmpty(note));
-            boolean hasPendingSteps = store.listSteps(messageUid, step.roundIndex()).stream()
-                    .anyMatch(item -> item.status() != StepStatus.COMPLETED);
-            if (message.status() == MessageStatus.WAITING_APPROVAL
-                    || (message.status() == MessageStatus.FAILED && hasPendingSteps)) {
+            if (message.status() != MessageStatus.COMPLETED && message.status() != MessageStatus.CANCELED) {
                 executeMessageAsync(message.messageUid());
             }
             return new ApprovalDecisionDto("accepted", appliedScope.name().toLowerCase(Locale.ROOT), appliedScope != PermissionScope.ONCE, matchedRuleId);

@@ -3,6 +3,7 @@ import { computed, h, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { NButton, NDataTable, NDatePicker, NEmpty, NPagination, NSelect, NTag, type DataTableColumns } from "naive-ui";
 import { useRouter } from "vue-router";
+import { ChevronLeft } from "lucide-vue-next";
 import DirectoryRail from "@/components/chat/DirectoryRail.vue";
 import AppPageHeader from "@/components/layout/AppPageHeader.vue";
 import { cronApi } from "@/api/cronApi";
@@ -57,7 +58,7 @@ function quickDateRange(type: "7d" | "30d") {
 function statusTagType(value?: string | null) {
   const normalized = String(value || "").toUpperCase();
   if (normalized === "FAILED" || normalized === "CANCELED") return "error";
-  if (normalized === "RUNNING" || normalized === "IN_PROGRESS") return "warning";
+  if (normalized === "RUNNING") return "warning";
   if (normalized === "WAITING_APPROVAL") return "warning";
   return "success";
 }
@@ -68,7 +69,6 @@ function statusLabel(value?: string | null) {
   if (normalized === "FAILED") return t("common.failed");
   if (normalized === "CANCELED") return t("cron.history.statusCanceled");
   if (normalized === "RUNNING") return t("cron.execution.runningTag");
-  if (normalized === "IN_PROGRESS") return t("cron.history.statusInProgress");
   if (normalized === "WAITING_APPROVAL") return t("cron.history.statusWaitingApproval");
   return normalized || t("common.unknown");
 }
@@ -196,6 +196,14 @@ async function applyFilters() {
   await loadHistory();
 }
 
+function goBack() {
+  if (window.history.length > 1) {
+    router.back();
+    return;
+  }
+  void router.push("/cron");
+}
+
 onMounted(() => {
   void refresh();
 });
@@ -207,6 +215,12 @@ onMounted(() => {
       <DirectoryRail />
       <main class="app-main-content">
         <div class="app-page-content cron-history-page">
+          <div class="history-back-row">
+            <button type="button" class="history-back-btn" @click="goBack">
+              <ChevronLeft :size="14" />
+              <span>返回</span>
+            </button>
+          </div>
           <AppPageHeader :title="t('cron.history.title')" :subtitle="t('cron.history.subtitle')" />
 
           <section class="panel">
@@ -284,32 +298,54 @@ onMounted(() => {
   min-height: 0;
 }
 
-.history-filters {
+.history-back-row {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
+}
+
+.history-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--text-body-size);
+  cursor: pointer;
+}
+
+.history-back-btn:hover {
+  color: var(--color-brand-400);
+}
+
+.history-filters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   align-items: center;
   gap: var(--space-3);
 }
 
 .history-filter-item {
-  flex: 0 0 auto;
+  min-width: 0;
 }
 
 .history-filter-agent,
 .history-filter-status {
-  width: 150px;
+  width: 100%;
 }
 
 .history-filter-date {
-  width: 320px;
+  width: 100%;
 }
 
 .history-filter-quick {
-  width: 150px;
+  width: 100%;
 }
 
 .history-filter-action {
-  min-width: 80px;
+  width: 100%;
+  min-width: 96px;
 }
 
 .history-filter-date :deep(.n-date-picker-daterange .n-date-picker-input) {
@@ -344,17 +380,32 @@ onMounted(() => {
 }
 
 @media (max-width: 1080px) {
+  .history-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .history-filter-action {
+    justify-self: end;
+    width: auto;
+  }
+
   .history-filter-date {
-    width: 280px;
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 720px) {
+  .history-filters {
+    grid-template-columns: 1fr;
   }
 
-  .history-filter-quick {
-    width: 140px;
+  .history-filter-date {
+    grid-column: span 1;
   }
 
-  .history-filter-agent,
-  .history-filter-status {
-    width: 140px;
+  .history-filter-action {
+    justify-self: stretch;
+    width: 100%;
   }
 }
 

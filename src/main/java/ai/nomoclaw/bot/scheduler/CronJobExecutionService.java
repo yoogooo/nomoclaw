@@ -71,11 +71,12 @@ public class CronJobExecutionService {
                 messageUid = agentApplicationService.submitMessage(conversationUid, job.getTaskContent(), "cron");
                 markCurrentExecution(job, executionUid, conversationUid, messageUid, now);
             }
-            AgentMessage completedMessage = waitForCompletion(messageUid);
+            AgentMessage completedMessage = waitForCompletion(messageUid, executionUid);
+            String executionStatus = toExecutionStatus(completedMessage);
             String finalContent = loadFinalAnswer(conversationUid, messageUid, completedMessage);
-            Path reportPath = writeReport(job, finalContent, executedAt, completedMessage.status().name());
-            notifyCompletion(job, finalContent, reportPath, executedAt, completedMessage.status().name());
-            updateJobResult(job, now, summarize(finalContent), reportPath, "COMPLETED", executionUid, conversationUid, messageUid);
+            Path reportPath = writeReport(job, finalContent, executedAt, executionStatus);
+            notifyCompletion(job, finalContent, reportPath, executedAt, executionStatus);
+            updateJobResult(job, now, summarize(finalContent), reportPath, executionStatus, executionUid, conversationUid, messageUid);
         } catch (Exception ex) {
             Path reportPath = writeFailureReportSafely(job, ex, executedAt);
             String failureSummary = summarize(ex.getMessage() == null ? "cron execution failed" : ex.getMessage());
@@ -159,10 +160,16 @@ public class CronJobExecutionService {
                 .set(AgentCronJobEntity::getUpdatedTime, now));
     }
 
-    private AgentMessage waitForCompletion(String messageUid) throws InterruptedException {
+    private AgentMessage waitForCompletion(String messageUid, String executionUid) throws InterruptedException {
         long deadline = System.currentTimeMillis() + 10 * 60_000L;
+        String lastExecutionStatus = "";
         while (System.currentTimeMillis() < deadline) {
             AgentMessage message = agentApplicationService.getMessage(messageUid);
+            String currentExecutionStatus = toExecutionStatusWhileRunning(message);
+            if (!currentExecutionStatus.equals(lastExecutionStatus)) {
+                touchExecutionStatus(executionUid, currentExecutionStatus);
+                lastExecutionStatus = currentExecutionStatus;
+            }
             switch (message.status()) {
                 case COMPLETED, FAILED, CANCELED -> {
                     return message;
@@ -171,6 +178,41 @@ public class CronJobExecutionService {
             }
         }
         throw new IllegalStateException("cron execution timed out");
+    }
+
+    private String toExecutionStatusWhileRunning(AgentMessage message) {
+        if (message == null || message.status() == null) {
+            return "RUNNING";
+        }
+        return switch (message.status()) {
+            case WAITING_APPROVAL -> "WAITING_APPROVAL";
+            case RUNNING, CREATED, PLANNED, REPLANNING -> "RUNNING";
+            case COMPLETED -> "COMPLETED";
+            case FAILED -> "FAILED";
+            case CANCELED -> "CANCELED";
+        };
+    }
+
+    private void touchExecutionStatus(String executionUid, String status) {
+        if (executionUid == null || executionUid.isBlank() || status == null || status.isBlank()) {
+            return;
+        }
+        agentCronJobExecutionRepository.update(new LambdaUpdateWrapper<AgentCronJobExecutionEntity>()
+                .eq(AgentCronJobExecutionEntity::getExecutionUid, executionUid)
+                .set(AgentCronJobExecutionEntity::getStatus, status)
+                .set(AgentCronJobExecutionEntity::getUpdatedTime, LocalDateTime.now()));
+    }
+
+    private String toExecutionStatus(AgentMessage message) {
+        if (message == null || message.status() == null) {
+            return "FAILED";
+        }
+        return switch (message.status()) {
+            case COMPLETED -> "COMPLETED";
+            case CANCELED -> "CANCELED";
+            case FAILED -> "FAILED";
+            default -> "FAILED";
+        };
     }
 
     private String loadFinalAnswer(String conversationUid, String messageUid, AgentMessage completedMessage) {

@@ -10,6 +10,8 @@ import ai.nomoclaw.bot.channel.config.AgentChannelsProperties;
 import ai.nomoclaw.bot.channel.config.ChannelBotCredentialResolver;
 import ai.nomoclaw.bot.channel.model.ChannelType;
 import ai.nomoclaw.bot.orchestrator.ConversationAppService;
+import ai.nomoclaw.bot.orchestrator.AgentApplicationService;
+import ai.nomoclaw.bot.domain.AgentMessage;
 import ai.nomoclaw.bot.store.entity.AgentCronJobEntity;
 import ai.nomoclaw.bot.store.entity.AgentCronJobExecutionEntity;
 import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
@@ -45,6 +47,7 @@ public class CronJobApplicationService {
     private final ChannelBotCredentialResolver botCredentialResolver;
     private final ConversationAppService conversationAppService;
     private final CronJobExecutionService cronJobExecutionService;
+    private final AgentApplicationService agentApplicationService;
 
     public CronJobApplicationService(AgentCronJobRepository agentCronJobRepository,
                                      AgentCronJobExecutionRepository agentCronJobExecutionRepository,
@@ -54,7 +57,8 @@ public class CronJobApplicationService {
                                      AgentChannelsProperties channelsProperties,
                                      ChannelBotCredentialResolver botCredentialResolver,
                                      ConversationAppService conversationAppService,
-                                     CronJobExecutionService cronJobExecutionService) {
+                                     CronJobExecutionService cronJobExecutionService,
+                                     AgentApplicationService agentApplicationService) {
         this.agentCronJobRepository = agentCronJobRepository;
         this.agentCronJobExecutionRepository = agentCronJobExecutionRepository;
         this.cronJobSchedulerService = cronJobSchedulerService;
@@ -64,6 +68,7 @@ public class CronJobApplicationService {
         this.botCredentialResolver = botCredentialResolver;
         this.conversationAppService = conversationAppService;
         this.cronJobExecutionService = cronJobExecutionService;
+        this.agentApplicationService = agentApplicationService;
     }
 
     public List<CronJobDto> listCronJobs() {
@@ -331,6 +336,23 @@ public class CronJobApplicationService {
                 .toList();
     }
 
+    public List<CronJobExecutionResultDto> listGlobalRunningResults(int limit) {
+        int safeLimit = limit <= 0 ? 20 : Math.min(limit, 200);
+        List<AgentCronJobEntity> jobs = agentCronJobRepository.listAllJobs();
+        Map<String, AgentCronJobEntity> jobsByUid = new LinkedHashMap<>();
+        for (AgentCronJobEntity job : jobs) {
+            jobsByUid.put(job.getJobUid(), job);
+        }
+        List<AgentCronJobExecutionEntity> runningExecutions = agentCronJobExecutionRepository.listRunning(safeLimit);
+        Map<String, AgentDefinitionEntity> agentsByUid = loadAgentsByUids(runningExecutions.stream()
+                .map(AgentCronJobExecutionEntity::getAgentUid)
+                .filter(uid -> uid != null && !uid.isBlank())
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new)));
+        return runningExecutions.stream()
+                .map(item -> toResultDto(item, jobsByUid.get(item.getJobUid()), agentsByUid.get(item.getAgentUid())))
+                .toList();
+    }
+
     public PageResult<CronJobExecutionResultDto> listExecutionHistory(String agentUid,
                                                                       String status,
                                                                       String startDate,
@@ -343,7 +365,7 @@ public class CronJobApplicationService {
         }
         String normalizedAgentUid = agentUid == null ? "" : agentUid.trim();
         String normalizedStatus = status == null ? "" : status.trim().toUpperCase();
-        if (!normalizedStatus.isBlank() && !List.of("COMPLETED", "FAILED", "CANCELED", "RUNNING", "IN_PROGRESS", "WAITING_APPROVAL").contains(normalizedStatus)) {
+        if (!normalizedStatus.isBlank() && !List.of("COMPLETED", "FAILED", "CANCELED").contains(normalizedStatus)) {
             throw new IllegalArgumentException("invalid status: " + status);
         }
         LocalDateTime startTime = parseStartDate(startDate);
@@ -542,6 +564,11 @@ public class CronJobApplicationService {
         String normalizedReportPath = reportPath.isBlank() ? null : reportPath;
         String conversationUid = nullToEmpty(execution.getConversationUid());
         String messageUid = nullToEmpty(execution.getMessageUid());
+        String correctedStatus = reconcileExecutionStatus(status, messageUid);
+        if (!correctedStatus.equalsIgnoreCase(status)) {
+            status = correctedStatus;
+            syncExecutionStatus(executionUid, status);
+        }
         String jobUid = job == null ? nullToEmpty(execution.getJobUid()) : job.getJobUid();
         String jobTitle = defaultCronJobTitle(job == null ? "" : job.getTitle(), job == null ? "" : job.getTaskContent());
         String agentUid = nullToEmpty(execution.getAgentUid());
@@ -561,6 +588,43 @@ public class CronJobApplicationService {
                 normalizedReportPath,
                 readReportPreview(normalizedReportPath)
         );
+    }
+
+    private String reconcileExecutionStatus(String executionStatus, String messageUid) {
+        String normalized = executionStatus == null ? "" : executionStatus.trim().toUpperCase();
+        if (!List.of("RUNNING", "WAITING_APPROVAL").contains(normalized)) {
+            return normalized.isBlank() ? "RUNNING" : normalized;
+        }
+        String normalizedMessageUid = messageUid == null ? "" : messageUid.trim();
+        if (normalizedMessageUid.isBlank()) {
+            return normalized;
+        }
+        try {
+            AgentMessage message = agentApplicationService.getMessage(normalizedMessageUid);
+            if (message == null || message.status() == null) {
+                return normalized;
+            }
+            return switch (message.status()) {
+                case WAITING_APPROVAL -> "WAITING_APPROVAL";
+                case RUNNING, CREATED, PLANNED, REPLANNING -> "RUNNING";
+                case COMPLETED -> "COMPLETED";
+                case FAILED -> "FAILED";
+                case CANCELED -> "CANCELED";
+            };
+        } catch (Exception ignored) {
+            return normalized;
+        }
+    }
+
+    private void syncExecutionStatus(String executionUid, String status) {
+        if (executionUid == null || executionUid.isBlank() || status == null || status.isBlank()) {
+            return;
+        }
+        agentCronJobExecutionRepository.lambdaUpdate()
+                .eq(AgentCronJobExecutionEntity::getExecutionUid, executionUid)
+                .set(AgentCronJobExecutionEntity::getStatus, status)
+                .set(AgentCronJobExecutionEntity::getUpdatedTime, LocalDateTime.now())
+                .update();
     }
 
     private List<ConversationMessageRunDto> resolveConversationRuns(String conversationUid, String messageUid) {

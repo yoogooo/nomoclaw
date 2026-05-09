@@ -146,9 +146,12 @@ async function refreshHistoryConversations() {
 
 async function refreshCronConversationBindings() {
   try {
-    const recentResults = await cronApi.listGlobalRecentResults(200);
+    const [recentResults, runningResults] = await Promise.all([
+      cronApi.listGlobalRecentResults(200),
+      cronApi.listGlobalRunningResults(200)
+    ]);
     const nextMap: Record<string, string> = {};
-    for (const item of recentResults) {
+    for (const item of [...runningResults, ...recentResults]) {
       const conversationUid = String(item.conversationUid || "").trim();
       if (!conversationUid || nextMap[conversationUid]) {
         continue;
@@ -165,6 +168,45 @@ async function refreshCronConversationBindings() {
 }
 
 void refreshCronConversationBindings();
+
+watch(
+  () => [
+    String(route.query.source || "").trim().toLowerCase(),
+    String(route.query.conversationUid || "").trim(),
+    String(route.query.executionUid || "").trim(),
+    String(route.query.jobUid || "").trim()
+  ],
+  async ([source, conversationUid, executionUid, jobUid]) => {
+    if (source !== "cron" || !conversationUid) return;
+    if (cronTaskByConversationUid.value[conversationUid]) return;
+
+    let title = "";
+    if (executionUid) {
+      try {
+        const detail = await cronApi.getExecutionDetail(executionUid, { suppressErrorToast: true });
+        title = String(detail?.jobTitle || "").trim();
+      } catch {
+        // best effort
+      }
+    }
+    if (!title && jobUid) {
+      try {
+        const jobs = await cronApi.listCronJobs();
+        const matched = jobs.find((item) => String(item.jobUid || "").trim() === jobUid);
+        title = String(matched?.title || matched?.taskContent || "").trim();
+      } catch {
+        // best effort
+      }
+    }
+    if (title) {
+      cronTaskByConversationUid.value = {
+        ...cronTaskByConversationUid.value,
+        [conversationUid]: title
+      };
+    }
+  },
+  { immediate: true }
+);
 
 async function scrollActiveConversationIntoViewIfNeeded() {
   const source = String(route.query.source || "").trim().toLowerCase();

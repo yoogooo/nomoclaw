@@ -19,30 +19,8 @@ const createTemplateId = ref<string | null>(null);
 const showEditModal = ref(false);
 const editingJob = ref<CronJob | null>(null);
 const hasJobs = computed(() => cronJobsStore.jobs.length > 0);
-const ACTIVE_EXECUTION_STATUSES = new Set(["RUNNING", "IN_PROGRESS", "WAITING_APPROVAL"]);
 const hasRunningJobs = computed(() => {
-  const completedExecutionUids = new Set(
-    cronJobsStore.recentGlobalResults
-      .map((item) => String(item.executionUid || "").trim())
-      .filter((uid) => uid.length > 0)
-  );
-  return cronJobsStore.jobs.some((job) => {
-    const executionUid = String(job.currentExecutionUid || "").trim();
-    if (!executionUid) {
-      return false;
-    }
-    if (completedExecutionUids.has(executionUid)) {
-      return false;
-    }
-    const normalizedStatus = String(job.currentExecutionStatus || "").toUpperCase();
-    if (ACTIVE_EXECUTION_STATUSES.has(normalizedStatus)) {
-      return true;
-    }
-    if (String(job.triggerState || "").toUpperCase() === "BLOCKED") {
-      return true;
-    }
-    return !completedExecutionUids.has(executionUid);
-  });
+  return cronJobsStore.runningGlobalResults.length > 0;
 });
 const { t } = useI18n();
 const cronTaskTemplates = computed(() => buildCronTaskTemplates(t));

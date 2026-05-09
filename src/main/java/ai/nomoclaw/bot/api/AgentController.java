@@ -587,6 +587,12 @@ public class AgentController {
         return ApiDtoMapper.toCronJobExecutionResults(cronJobApplicationService.listGlobalRecentResults(limit));
     }
 
+    @GetMapping("/cron-jobs/results/running")
+    public List<CronJobExecutionResultResponse> listRunningCronJobResults(@RequestParam(required = false, defaultValue = "50") int limit) {
+        log.info("[AgentAPI] listRunningCronJobResults limit={}", limit);
+        return ApiDtoMapper.toCronJobExecutionResults(cronJobApplicationService.listGlobalRunningResults(limit));
+    }
+
     @GetMapping("/cron-jobs/results/history")
     public PageResponse<CronJobExecutionResultResponse> listCronJobExecutionHistory(
             @RequestParam(required = false, defaultValue = "") String agentUid,

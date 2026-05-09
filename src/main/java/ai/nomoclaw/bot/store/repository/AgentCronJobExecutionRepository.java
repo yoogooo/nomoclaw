@@ -30,6 +30,15 @@ public class AgentCronJobExecutionRepository extends CrudRepository<AgentCronJob
 
     public List<AgentCronJobExecutionEntity> listRecent(int limit) {
         return lambdaQuery()
+                .in(AgentCronJobExecutionEntity::getStatus, List.of("COMPLETED", "FAILED", "CANCELED"))
+                .orderByDesc(AgentCronJobExecutionEntity::getStartedTime, AgentCronJobExecutionEntity::getId)
+                .last("LIMIT " + Math.max(limit, 1))
+                .list();
+    }
+
+    public List<AgentCronJobExecutionEntity> listRunning(int limit) {
+        return lambdaQuery()
+                .in(AgentCronJobExecutionEntity::getStatus, List.of("RUNNING", "WAITING_APPROVAL"))
                 .orderByDesc(AgentCronJobExecutionEntity::getStartedTime, AgentCronJobExecutionEntity::getId)
                 .last("LIMIT " + Math.max(limit, 1))
                 .list();
@@ -47,6 +56,8 @@ public class AgentCronJobExecutionRepository extends CrudRepository<AgentCronJob
         }
         if (status != null && !status.isBlank()) {
             query = query.eq(AgentCronJobExecutionEntity::getStatus, status.trim().toUpperCase());
+        } else {
+            query = query.in(AgentCronJobExecutionEntity::getStatus, List.of("COMPLETED", "FAILED", "CANCELED"));
         }
         if (startTime != null) {
             query = query.ge(AgentCronJobExecutionEntity::getStartedTime, startTime);
@@ -62,7 +73,7 @@ public class AgentCronJobExecutionRepository extends CrudRepository<AgentCronJob
     public AgentCronJobExecutionEntity findLatestRunningByJobUid(String jobUid) {
         return lambdaQuery()
                 .eq(AgentCronJobExecutionEntity::getJobUid, jobUid)
-                .eq(AgentCronJobExecutionEntity::getStatus, "RUNNING")
+                .in(AgentCronJobExecutionEntity::getStatus, List.of("RUNNING", "WAITING_APPROVAL"))
                 .orderByDesc(AgentCronJobExecutionEntity::getStartedTime, AgentCronJobExecutionEntity::getId)
                 .last("LIMIT 1")
                 .one();

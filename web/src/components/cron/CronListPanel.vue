@@ -301,7 +301,7 @@ function onJobMouseLeave(jobUid: string) {
   padding: var(--space-2) var(--space-3);
   border-bottom: var(--size-1) solid var(--color-border-slate-subtle);
   color: var(--text-muted);
-  font-size: var(--text-caption-size);
+  font-size: var(--text-body-size);
   font-weight: 500;
   text-align: left;
 }
