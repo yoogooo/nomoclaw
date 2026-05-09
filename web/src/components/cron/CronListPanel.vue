@@ -316,7 +316,11 @@ function onJobMouseLeave(jobUid: string) {
   color: var(--color-text-secondary);
   font-size: var(--text-body-size);
   vertical-align: middle;
-  transition: background-color 0.16s ease;
+  transition: background-color 0.18s ease, border-color 0.18s ease;
+}
+
+.cron-job-row:last-child td {
+  border-bottom: 0;
 }
 
 .cron-job-row td:first-child {
@@ -324,12 +328,18 @@ function onJobMouseLeave(jobUid: string) {
 }
 
 .cron-job-row:hover td {
-  background: color-mix(in srgb, var(--color-overlay-brand-16) 48%, transparent);
+  background: var(--color-bg-soft-hover);
+  border-bottom-color: var(--color-border-slate-subtle);
 }
 
-.cron-agent-tag :deep(.n-tag) {
-  background: color-mix(in srgb, var(--color-brand-500) 16%, transparent);
+.cron-job-row:hover .cron-main {
+  cursor: pointer;
+}
+
+:deep(.n-tag.cron-agent-tag) {
+  background: color-mix(in srgb, var(--color-text-secondary) 8%, transparent);
   color: var(--color-text-secondary);
+  border: var(--size-1) solid color-mix(in srgb, var(--color-text-secondary) 30%, transparent);
 }
 
 .cron-cycle-cell {
@@ -342,6 +352,8 @@ function onJobMouseLeave(jobUid: string) {
 
 .cron-cycle-text {
   display: block;
+  font-size: var(--text-caption-size);
+  line-height: 1.5;
   transition: opacity 0.12s ease;
 }
 
@@ -397,7 +409,7 @@ function onJobMouseLeave(jobUid: string) {
 
 .cron-title {
   font-size: var(--text-body-size);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .cron-empty {

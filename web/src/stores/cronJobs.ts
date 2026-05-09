@@ -23,6 +23,14 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
     if (!job) return false;
     const executionUid = String(job.currentExecutionUid || "").trim();
     if (!executionUid) return false;
+    const completedExecutionUids = new Set(
+      recentGlobalResults.value
+        .map((item) => String(item.executionUid || "").trim())
+        .filter((uid) => uid.length > 0)
+    );
+    if (completedExecutionUids.has(executionUid)) {
+      return false;
+    }
     const normalizedStatus = String(job.currentExecutionStatus || "").toUpperCase();
     if (ACTIVE_EXECUTION_STATUSES.has(normalizedStatus)) {
       return true;
@@ -30,11 +38,6 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
     if (String(job.triggerState || "").toUpperCase() === "BLOCKED") {
       return true;
     }
-    const completedExecutionUids = new Set(
-      recentGlobalResults.value
-        .map((item) => String(item.executionUid || "").trim())
-        .filter((uid) => uid.length > 0)
-    );
     return !completedExecutionUids.has(executionUid);
   }
 
@@ -118,6 +121,9 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
     const runningJobs = nextJobs.filter((job) => {
       const executionUid = String(job.currentExecutionUid || "").trim();
       if (!executionUid) {
+        return false;
+      }
+      if (completedExecutionUids.has(executionUid)) {
         return false;
       }
       const normalizedStatus = String(job.currentExecutionStatus || "").toUpperCase();

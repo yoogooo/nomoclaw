@@ -670,6 +670,27 @@ public final class ApiDtoMapper {
                 .toList();
     }
 
+    public static <T, R> PageResponse<R> toPageResponse(ai.nomoclaw.bot.application.common.page.PageResult<T> dto,
+                                                        java.util.function.Function<T, R> mapper) {
+        return new PageResponse<>(
+                dto.items().stream().map(mapper).toList(),
+                dto.total(),
+                dto.page(),
+                dto.pageSize(),
+                dto.totalPages()
+        );
+    }
+
+    public static PageResponse<CronJobExecutionResultResponse> toCronJobExecutionHistoryPage(ai.nomoclaw.bot.application.common.page.PageResult<CronJobExecutionResultDto> dto) {
+        return new PageResponse<>(
+                toCronJobExecutionResults(dto.items()),
+                dto.total(),
+                dto.page(),
+                dto.pageSize(),
+                dto.totalPages()
+        );
+    }
+
     public static CronExecutionDetailResponse toCronExecutionDetail(CronExecutionDetailDto dto) {
         return new CronExecutionDetailResponse(
                 dto.executionUid(),

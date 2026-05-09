@@ -2,6 +2,7 @@ import type {
   AgentCatalogGroup,
   BatchDeleteCronJobsResponse,
   CronJob,
+  CronJobExecutionHistoryPage,
   CronJobExecutionResult,
   CronJobReport,
   CronSubscription,
@@ -61,6 +62,23 @@ export const cronApi = {
   },
   listGlobalRecentResults(limit = 20) {
     return requestJson<CronJobExecutionResult[]>(`/api/cron-jobs/results/recent?limit=${limit}`);
+  },
+  listGlobalExecutionHistory(params?: {
+    agentUid?: string;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
+    const query = new URLSearchParams();
+    if (params?.agentUid) query.set("agentUid", params.agentUid);
+    if (params?.status) query.set("status", params.status);
+    if (params?.startDate) query.set("startDate", params.startDate);
+    if (params?.endDate) query.set("endDate", params.endDate);
+    query.set("page", String(params?.page && params.page > 0 ? params.page : 1));
+    query.set("pageSize", String(params?.pageSize && params.pageSize > 0 ? params.pageSize : 20));
+    return requestJson<CronJobExecutionHistoryPage>(`/api/cron-jobs/results/history?${query.toString()}`);
   },
   getExecutionDetail(executionUid: string, options?: { suppressErrorToast?: boolean }) {
     return requestJson<CronExecutionDetail>(

@@ -604,6 +604,21 @@ public class AgentController {
         return ApiDtoMapper.toCronJobExecutionResults(cronJobApplicationService.listGlobalRecentResults(limit));
     }
 
+    @GetMapping("/cron-jobs/results/history")
+    public PageResponse<CronJobExecutionResultResponse> listCronJobExecutionHistory(
+            @RequestParam(required = false, defaultValue = "") String agentUid,
+            @RequestParam(required = false, defaultValue = "") String status,
+            @RequestParam(required = false, defaultValue = "") String startDate,
+            @RequestParam(required = false, defaultValue = "") String endDate,
+            @RequestParam(required = false, defaultValue = "1") int page,
+            @RequestParam(required = false, defaultValue = "20") int pageSize) {
+        log.info("[AgentAPI] listCronJobExecutionHistory agentUid={} status={} startDate={} endDate={} page={} pageSize={}",
+                agentUid, status, startDate, endDate, page, pageSize);
+        return ApiDtoMapper.toCronJobExecutionHistoryPage(
+                cronJobApplicationService.listExecutionHistory(agentUid, status, startDate, endDate, page, pageSize)
+        );
+    }
+
     @GetMapping("/cron-jobs/executions/{executionUid}")
     public CronExecutionDetailResponse getCronExecutionDetail(@PathVariable String executionUid) {
         log.info("[AgentAPI] getCronExecutionDetail executionUid={}", executionUid);

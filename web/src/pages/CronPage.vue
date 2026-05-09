@@ -31,6 +31,9 @@ const hasRunningJobs = computed(() => {
     if (!executionUid) {
       return false;
     }
+    if (completedExecutionUids.has(executionUid)) {
+      return false;
+    }
     const normalizedStatus = String(job.currentExecutionStatus || "").toUpperCase();
     if (ACTIVE_EXECUTION_STATUSES.has(normalizedStatus)) {
       return true;
@@ -105,7 +108,6 @@ onBeforeUnmount(() => {
         <div class="app-page-content cron-page-content">
           <AppPageHeader
             :title="t('pages.cron.title')"
-            :subtitle="t('pages.cron.subtitle')"
           >
             <template #actions>
               <n-button :loading="cronJobsStore.loading" @click="refreshJobs">{{ t("common.refresh") }}</n-button>

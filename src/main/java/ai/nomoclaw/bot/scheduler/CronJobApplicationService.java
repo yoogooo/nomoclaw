@@ -1,5 +1,8 @@
 package ai.nomoclaw.bot.scheduler;
 
+import ai.nomoclaw.bot.application.common.page.PageRequest;
+import ai.nomoclaw.bot.application.common.page.PageResult;
+import ai.nomoclaw.bot.application.common.page.PageResults;
 import ai.nomoclaw.bot.application.dto.BatchDeleteCronJobsDto;
 import ai.nomoclaw.bot.application.dto.CronJobReportDto;
 import ai.nomoclaw.bot.application.dto.CronJobDto;
@@ -7,6 +10,7 @@ import ai.nomoclaw.bot.application.dto.CronJobExecutionResultDto;
 import ai.nomoclaw.bot.application.dto.CronSubscriptionDto;
 import ai.nomoclaw.bot.application.dto.CronExecutionDetailDto;
 import ai.nomoclaw.bot.application.dto.ConversationMessageRunDto;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import ai.nomoclaw.bot.orchestrator.ConversationAppService;
 import ai.nomoclaw.bot.application.command.CreateCronJobCommand;
 import ai.nomoclaw.bot.application.command.UpdateCronJobCommand;
@@ -29,6 +33,7 @@ import tools.jackson.databind.node.ObjectNode;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -314,12 +319,16 @@ public class CronJobApplicationService {
     public List<CronJobExecutionResultDto> listGlobalRecentResults(int limit) {
         int safeLimit = limit <= 0 ? 20 : Math.min(limit, 100);
         List<AgentCronJobEntity> jobs = agentCronJobRepository.listAllJobs();
-        Map<String, AgentDefinitionEntity> agentsByUid = loadAgentsByUid(jobs);
         Map<String, AgentCronJobEntity> jobsByUid = new LinkedHashMap<>();
         for (AgentCronJobEntity job : jobs) {
             jobsByUid.put(job.getJobUid(), job);
         }
-        List<CronJobExecutionResultDto> all = agentCronJobExecutionRepository.listRecent(safeLimit)
+        List<AgentCronJobExecutionEntity> recentExecutions = agentCronJobExecutionRepository.listRecent(safeLimit);
+        Map<String, AgentDefinitionEntity> agentsByUid = loadAgentsByUids(recentExecutions.stream()
+                .map(AgentCronJobExecutionEntity::getAgentUid)
+                .filter(uid -> uid != null && !uid.isBlank())
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new)));
+        List<CronJobExecutionResultDto> all = recentExecutions
                 .stream()
                 .map(item -> toResultDto(item, jobsByUid.get(item.getJobUid()), agentsByUid.get(item.getAgentUid())))
                 .toList();
@@ -336,6 +345,59 @@ public class CronJobApplicationService {
                 .sorted(Comparator.comparing(CronJobExecutionResultDto::executedTime).reversed())
                 .limit(safeLimit)
                 .toList();
+    }
+
+    public PageResult<CronJobExecutionResultDto> listExecutionHistory(String agentUid,
+                                                                      String status,
+                                                                      String startDate,
+                                                                      String endDate,
+                                                                      int page,
+                                                                      int pageSize) {
+        PageRequest normalizedRequest = new PageRequest(page, pageSize).normalize(20, 20);
+        if (pageSize > 0 && normalizedRequest.pageSize() != pageSize) {
+            throw new IllegalArgumentException("pageSize must be 20");
+        }
+        String normalizedAgentUid = agentUid == null ? "" : agentUid.trim();
+        String normalizedStatus = status == null ? "" : status.trim().toUpperCase();
+        if (!normalizedStatus.isBlank() && !List.of("COMPLETED", "FAILED", "CANCELED", "RUNNING", "IN_PROGRESS", "WAITING_APPROVAL").contains(normalizedStatus)) {
+            throw new IllegalArgumentException("invalid status: " + status);
+        }
+        LocalDateTime startTime = parseStartDate(startDate);
+        LocalDateTime endTime = parseEndDate(endDate);
+        if (startTime != null && endTime != null && startTime.isAfter(endTime)) {
+            throw new IllegalArgumentException("startDate cannot be later than endDate");
+        }
+        IPage<AgentCronJobExecutionEntity> executionPage = agentCronJobExecutionRepository.pageHistory(
+                normalizedAgentUid,
+                normalizedStatus,
+                startTime,
+                endTime,
+                normalizedRequest.page(),
+                normalizedRequest.pageSize()
+        );
+        List<AgentCronJobExecutionEntity> executions = executionPage.getRecords();
+        List<String> jobUids = executions.stream()
+                .map(AgentCronJobExecutionEntity::getJobUid)
+                .filter(item -> item != null && !item.isBlank())
+                .distinct()
+                .toList();
+        Map<String, AgentCronJobEntity> jobsByUid = new LinkedHashMap<>();
+        for (String jobUid : jobUids) {
+            AgentCronJobEntity job = agentCronJobRepository.findByJobUid(jobUid);
+            if (job != null) {
+                jobsByUid.put(jobUid, job);
+            }
+        }
+        Map<String, AgentDefinitionEntity> agentsByUid = loadAgentsByUids(executions.stream()
+                .map(AgentCronJobExecutionEntity::getAgentUid)
+                .filter(uid -> uid != null && !uid.isBlank())
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new)));
+        return PageResults.fromMpPage(executionPage, item -> {
+            AgentCronJobEntity job = jobsByUid.get(item.getJobUid());
+            String resultAgentUid = nullToEmpty(item.getAgentUid());
+            AgentDefinitionEntity agent = agentsByUid.get(resultAgentUid);
+            return toResultDto(item, job, agent);
+        });
     }
 
     public CronExecutionDetailDto getExecutionDetail(String executionUid) {
@@ -498,7 +560,7 @@ public class CronJobApplicationService {
         String messageUid = nullToEmpty(execution.getMessageUid());
         String jobUid = job == null ? nullToEmpty(execution.getJobUid()) : job.getJobUid();
         String jobTitle = defaultCronJobTitle(job == null ? "" : job.getTitle(), job == null ? "" : job.getTaskContent());
-        String agentUid = job == null ? nullToEmpty(execution.getAgentUid()) : nullToEmpty(job.getAgentUid());
+        String agentUid = nullToEmpty(execution.getAgentUid());
         String agentDisplayName = agent == null ? buildFallbackAgentDisplayName(agentUid) : nullToEmpty(agent.getDisplayName());
         return new CronJobExecutionResultDto(
                 executionUid,
@@ -530,6 +592,22 @@ public class CronJobApplicationService {
         } catch (Exception ignored) {
             return List.of();
         }
+    }
+
+    private LocalDateTime parseStartDate(String value) {
+        String normalized = value == null ? "" : value.trim();
+        if (normalized.isBlank()) {
+            return null;
+        }
+        return LocalDate.parse(normalized).atStartOfDay();
+    }
+
+    private LocalDateTime parseEndDate(String value) {
+        String normalized = value == null ? "" : value.trim();
+        if (normalized.isBlank()) {
+            return null;
+        }
+        return LocalDate.parse(normalized).plusDays(1).atStartOfDay().minusNanos(1);
     }
 
     private String buildLegacyExecutionUid(String jobUid,
@@ -686,6 +764,17 @@ public class CronJobApplicationService {
                 .filter(uid -> uid != null && !uid.isBlank())
                 .distinct()
                 .toList();
+        Map<String, AgentDefinitionEntity> agentsByUid = new LinkedHashMap<>();
+        for (AgentDefinitionEntity agent : agentDefinitionRepository.listByUids(agentUids)) {
+            agentsByUid.put(agent.getAgentUid(), agent);
+        }
+        return agentsByUid;
+    }
+
+    private Map<String, AgentDefinitionEntity> loadAgentsByUids(LinkedHashSet<String> agentUids) {
+        if (agentUids == null || agentUids.isEmpty()) {
+            return Map.of();
+        }
         Map<String, AgentDefinitionEntity> agentsByUid = new LinkedHashMap<>();
         for (AgentDefinitionEntity agent : agentDefinitionRepository.listByUids(agentUids)) {
             agentsByUid.put(agent.getAgentUid(), agent);

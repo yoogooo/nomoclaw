@@ -2,6 +2,8 @@ package ai.nomoclaw.bot.store.repository;
 
 import ai.nomoclaw.bot.store.entity.AgentCronJobExecutionEntity;
 import ai.nomoclaw.bot.store.mapper.AgentCronJobExecutionMapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.repository.CrudRepository;
 import org.springframework.stereotype.Repository;
 
@@ -31,6 +33,30 @@ public class AgentCronJobExecutionRepository extends CrudRepository<AgentCronJob
                 .orderByDesc(AgentCronJobExecutionEntity::getStartedTime, AgentCronJobExecutionEntity::getId)
                 .last("LIMIT " + Math.max(limit, 1))
                 .list();
+    }
+
+    public IPage<AgentCronJobExecutionEntity> pageHistory(String agentUid,
+                                                          String status,
+                                                          LocalDateTime startTime,
+                                                          LocalDateTime endTime,
+                                                          int page,
+                                                          int pageSize) {
+        var query = lambdaQuery();
+        if (agentUid != null && !agentUid.isBlank()) {
+            query = query.eq(AgentCronJobExecutionEntity::getAgentUid, agentUid.trim());
+        }
+        if (status != null && !status.isBlank()) {
+            query = query.eq(AgentCronJobExecutionEntity::getStatus, status.trim().toUpperCase());
+        }
+        if (startTime != null) {
+            query = query.ge(AgentCronJobExecutionEntity::getStartedTime, startTime);
+        }
+        if (endTime != null) {
+            query = query.le(AgentCronJobExecutionEntity::getStartedTime, endTime);
+        }
+        return query
+                .orderByDesc(AgentCronJobExecutionEntity::getStartedTime, AgentCronJobExecutionEntity::getId)
+                .page(new Page<>(Math.max(page, 1), Math.max(pageSize, 1)));
     }
 
     public AgentCronJobExecutionEntity findLatestRunningByJobUid(String jobUid) {

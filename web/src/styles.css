@@ -920,7 +920,7 @@ a {
   min-height: 0;
   flex-direction: column;
   border: var(--size-1) solid var(--color-border-soft);
-  border-radius: var(--size-20);
+  border-radius: var(--radius-xl);
   background: var(--color-bg-surface-soft);
   overflow: hidden;
   box-shadow: none;

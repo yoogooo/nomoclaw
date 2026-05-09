@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { LoaderCircle } from "lucide-vue-next";
+import { ChevronRight, LoaderCircle } from "lucide-vue-next";
 import { NEmpty, NTag } from "naive-ui";
 import { useRouter } from "vue-router";
 import { useCronJobsStore } from "@/stores/cronJobs";
@@ -11,6 +11,7 @@ import { displayCronJobTitle, formatRelativeTime } from "@/utils/format";
 const cronJobsStore = useCronJobsStore();
 const router = useRouter();
 const { t } = useI18n();
+const COMPLETED_VISIBLE_LIMIT = 10;
 
 const RUNNING_EXECUTION_STATUSES = new Set(["RUNNING", "IN_PROGRESS", "WAITING_APPROVAL"]);
 
@@ -31,13 +32,16 @@ const runningJobs = computed(() => {
       if (!executionUid) {
         return false;
       }
+      if (finishedExecutionUids.has(executionUid)) {
+        return false;
+      }
       const normalizedStatus = String(job.currentExecutionStatus || "").toUpperCase();
-    if (RUNNING_EXECUTION_STATUSES.has(normalizedStatus)) {
-      return true;
-    }
-    if (String(job.triggerState || "").toUpperCase() === "BLOCKED") {
-      return true;
-    }
+      if (RUNNING_EXECUTION_STATUSES.has(normalizedStatus)) {
+        return true;
+      }
+      if (String(job.triggerState || "").toUpperCase() === "BLOCKED") {
+        return true;
+      }
       // Fallback for status-sync delay: keep it in running list until it appears in completed results.
       return !finishedExecutionUids.has(executionUid);
     })
@@ -56,6 +60,7 @@ const runningJobs = computed(() => {
 
 const completedResults = computed(() => [...cronJobsStore.recentGlobalResults]
   .sort((a, b) => new Date(b.executedTime).getTime() - new Date(a.executedTime).getTime()));
+const completedVisibleResults = computed(() => completedResults.value.slice(0, COMPLETED_VISIBLE_LIMIT));
 
 function completedTagType(status?: string | null) {
   return String(status || "").toUpperCase() === "FAILED" ? "error" : "success";
@@ -129,6 +134,10 @@ function openCompletedExecution(item: {
   jobUid?: string | null;
 }) {
   openExecution(item);
+}
+
+function openHistoryPage() {
+  void router.push("/cron/executions/history");
 }
 
 function runningTimeText(startedTime?: string | null) {
@@ -206,37 +215,58 @@ function runningStatusTagType(status?: string | null) {
       </div>
     </section>
 
-    <section class="panel cron-section">
-      <div class="panel-header cron-section-header">
+    <section class="panel cron-section completed-section">
+      <div class="panel-header cron-section-header with-action">
         <h3 class="cron-section-title">{{ t("cron.execution.completedSectionTitle") }}</h3>
+        <button
+          type="button"
+          class="header-action-btn"
+          @click="openHistoryPage"
+        >
+          <span>{{ t("cron.execution.viewAllCompleted") }}</span>
+          <ChevronRight :size="14" />
+        </button>
       </div>
       <div class="panel-body">
         <n-empty v-if="!completedResults.length" :description="t('cron.execution.noCompletedTasks')" />
-        <div v-else class="execution-list">
-          <div
-            v-for="(item, index) in completedResults"
-            :key="`${item.executionUid || item.executedTime}-${index}`"
-            class="execution-item completed-item"
-            :class="{ 'is-clickable': !!item.executionUid }"
-            :role="item.executionUid ? 'button' : undefined"
-            :tabindex="item.executionUid ? 0 : undefined"
-            @click="openCompletedExecution(item)"
-            @keydown.enter="openCompletedExecution(item)"
-            @keydown.space.prevent="openCompletedExecution(item)"
-          >
-            <div class="execution-main">
-              <div class="execution-title-row">
-                <span v-if="item.unread" class="unread-dot" aria-hidden="true" />
-                <div class="execution-title">{{ item.jobTitle || t("format.fallbackNoName") }}</div>
-                <div class="completed-meta">
+        <div v-else class="completed-table-wrap">
+          <table class="completed-table">
+            <colgroup>
+              <col class="completed-col-title">
+              <col class="completed-col-agent">
+              <col class="completed-col-status">
+              <col class="completed-col-time">
+            </colgroup>
+            <tbody>
+              <tr
+                v-for="(item, index) in completedVisibleResults"
+                :key="`${item.executionUid || item.executedTime}-${index}`"
+                class="completed-table-row"
+                :class="{ 'is-clickable': !!item.executionUid }"
+                :role="item.executionUid ? 'button' : undefined"
+                :tabindex="item.executionUid ? 0 : undefined"
+                @click="openCompletedExecution(item)"
+                @keydown.enter="openCompletedExecution(item)"
+                @keydown.space.prevent="openCompletedExecution(item)"
+              >
+                <td class="completed-cell completed-cell-title">
+                  <span class="unread-dot" :class="{ 'is-hidden': !item.unread }" aria-hidden="true" />
+                  <span class="execution-title">{{ item.jobTitle || t("format.fallbackNoName") }}</span>
+                </td>
+                <td class="completed-cell completed-cell-agent">
+                  <n-tag size="small" type="info" :bordered="false" class="completed-agent-tag">
+                    {{ item.agentDisplayName || t("format.fallbackNoAgent") }}
+                  </n-tag>
+                </td>
+                <td class="completed-cell completed-cell-status">
                   <n-tag :type="completedTagType(item.status)" size="small">
                     {{ completedStatusText(item.status) }}
                   </n-tag>
-                  <div class="execution-time">{{ formatRelativeTime(item.executedTime) }}</div>
-                </div>
-              </div>
-            </div>
-          </div>
+                </td>
+                <td class="completed-cell completed-cell-time">{{ formatRelativeTime(item.executedTime) }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </section>
@@ -253,6 +283,11 @@ function runningStatusTagType(status?: string | null) {
   padding: 0 0 var(--space-4);
 }
 
+.completed-section .panel-body {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
 .panel-header.cron-section-header {
   box-sizing: border-box;
   display: flex;
@@ -261,6 +296,27 @@ function runningStatusTagType(status?: string | null) {
   height: var(--size-48);
   min-height: var(--size-48);
   padding: 0 var(--space-5_5);
+}
+.panel-header.cron-section-header.with-action {
+  justify-content: space-between;
+}
+
+.header-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  border: 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--text-body-size);
+  cursor: pointer;
+  transition: color 0.16s ease;
+}
+
+.header-action-btn:hover {
+  color: var(--color-brand-400);
+  background: color-mix(in srgb, var(--color-brand-500) 8%, transparent);
+  border-radius: var(--radius-md);
 }
 
 .cron-section-title {
@@ -292,32 +348,13 @@ function runningStatusTagType(status?: string | null) {
   background: var(--color-bg-surface);
 }
 
-.completed-item {
-  grid-template-columns: minmax(0, 1fr);
-  align-items: start;
-}
-
-.completed-item.is-clickable {
-  cursor: pointer;
-}
-
-.completed-item.is-clickable:hover {
-  border-color: var(--color-border-brand-light);
-  background: color-mix(in srgb, var(--color-bg-surface) 92%, var(--color-brand-600) 8%);
-}
-
 .running-item.is-clickable {
   cursor: pointer;
 }
 
 .running-item.is-clickable:hover {
-  border-color: var(--color-border-brand-light);
-  background: color-mix(in srgb, var(--color-bg-surface) 92%, var(--color-brand-600) 8%);
-}
-
-.completed-item.is-clickable:focus-visible {
-  outline: var(--size-2) solid var(--color-brand-500);
-  outline-offset: var(--size-2);
+  border-color: var(--color-border-panel);
+  background: var(--color-bg-soft-hover);
 }
 
 .running-item.is-clickable:focus-visible {
@@ -367,15 +404,23 @@ function runningStatusTagType(status?: string | null) {
 }
 
 .unread-dot {
-  width: var(--size-8);
-  height: var(--size-8);
+  position: absolute;
+  left: calc(var(--space-3) - var(--space-2));
+  top: 50%;
+  transform: translateY(-50%);
+  width: var(--size-6);
+  height: var(--size-6);
   border-radius: var(--radius-pill);
   background: var(--color-brand-600);
-  flex: 0 0 auto;
+}
+
+.unread-dot.is-hidden {
+  visibility: hidden;
 }
 
 .execution-main {
   min-width: 0;
+  width: 100%;
 }
 
 .execution-title-row {
@@ -417,18 +462,93 @@ function runningStatusTagType(status?: string | null) {
   white-space: nowrap;
 }
 
-.completed-meta {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-left: auto;
-  min-width: 0;
-  flex: 0 0 auto;
+.execution-time {
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
   white-space: nowrap;
 }
 
-.execution-time {
-  color: var(--color-text-muted);
+.completed-table-wrap {
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+}
+
+.completed-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.completed-col-title {
+  width: 34%;
+}
+
+.completed-col-agent {
+  width: 140px;
+}
+
+.completed-col-status {
+  width: 84px;
+}
+
+.completed-col-time {
+  width: auto;
+}
+
+.completed-table-row {
+  border-bottom: var(--size-1) solid var(--color-border-panel);
+}
+
+.completed-table-row:last-child {
+  border-bottom: 0;
+}
+
+.completed-table-row.is-clickable {
+  cursor: pointer;
+}
+
+.completed-table-row.is-clickable:hover {
+  background: var(--color-bg-soft-hover);
+}
+
+.completed-table-row.is-clickable:focus-visible {
+  outline: var(--size-2) solid var(--color-brand-500);
+  outline-offset: calc(var(--size-2) * -1);
+}
+
+.completed-cell {
+  padding: var(--space-2_5) var(--space-3);
+  vertical-align: middle;
+}
+
+.completed-cell-title {
+  position: relative;
+  padding-left: var(--space-3);
+}
+
+.completed-cell-title .execution-title {
+  display: block;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.completed-cell-agent {
+  color: var(--color-text-secondary);
+  font-size: var(--text-caption-size);
+}
+
+:deep(.n-tag.completed-agent-tag) {
+  background: color-mix(in srgb, var(--color-text-secondary) 8%, transparent);
+  color: var(--color-text-secondary);
+  border: var(--size-1) solid color-mix(in srgb, var(--color-text-secondary) 30%, transparent);
+}
+
+.completed-cell-status {
+}
+
+.completed-cell-time {
+  color: var(--color-text-secondary);
   font-size: var(--text-caption-size);
   white-space: nowrap;
 }
@@ -460,18 +580,26 @@ function runningStatusTagType(status?: string | null) {
     gap: var(--space-2);
   }
 
-  .completed-item .execution-title-row {
-    flex-wrap: wrap;
-  }
-
-  .completed-item .completed-meta {
-    margin-left: 0;
+  .completed-table,
+  .completed-table tbody,
+  .completed-table tr,
+  .completed-table td {
+    display: block;
     width: 100%;
   }
 
-  .execution-uid {
-    max-width: 100%;
+  .completed-table-row {
+    padding: var(--space-2_5) var(--space-3);
   }
+
+  .completed-cell {
+    padding: var(--space-1) 0;
+  }
+
+  .completed-cell-title {
+    width: 100%;
+  }
+
 }
 
 @keyframes running-pulse {

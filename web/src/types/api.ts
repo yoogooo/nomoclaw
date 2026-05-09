@@ -537,6 +537,14 @@ export interface CronJobExecutionResult {
   reportContent?: string | null;
 }
 
+export interface CronJobExecutionHistoryPage {
+  items: CronJobExecutionResult[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
 export interface CronExecutionDetail {
   executionUid: string;
   jobUid: string;
