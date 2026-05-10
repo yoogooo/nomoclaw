@@ -98,6 +98,17 @@ const isRunningCurrentConversation = computed(() =>
   Boolean(conversationStore.currentConversationUid)
   && conversationStore.runningConversationUid === conversationStore.currentConversationUid
 );
+const hasWaitingApprovalInCurrentConversation = computed(() => {
+  if (conversationStore.approval.stepUid) return true;
+  return Object.values(conversationRunsStore.runsByMessageUid).some((run) =>
+    (run.steps || []).some((step) => step.status === "waiting_approval")
+  );
+});
+const shouldShowTypingIndicator = computed(() => {
+  if (props.forceTypingIndicator) return true;
+  if (props.disableAutoTypingIndicator) return false;
+  return isRunningCurrentConversation.value && !hasWaitingApprovalInCurrentConversation.value;
+});
 const starterTemplates = computed(() => [
   {
     id: "project-plan",
@@ -780,17 +791,7 @@ onMounted(() => {
           />
         </div>
 
-        <div
-          v-if="conversationStore.currentConversationUid
-            && (
-              (!props.disableAutoTypingIndicator
-                && conversationStore.runningConversationUid === conversationStore.currentConversationUid
-                && !conversationRunsStore.runsByMessageUid[latestMessageUid])
-              || props.forceTypingIndicator
-            )"
-          class="message-wrap"
-        >
-          <div v-if="!props.hideTypingRoleLabel" class="message-role">ASSISTANT</div>
+        <div v-if="conversationStore.currentConversationUid && shouldShowTypingIndicator" class="message-wrap">
           <div class="typing-indicator">
             <span v-for="index in 3" :key="index" />
           </div>

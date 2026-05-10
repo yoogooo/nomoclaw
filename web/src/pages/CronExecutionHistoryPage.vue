@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, onMounted, ref } from "vue";
+import { computed, h, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { NButton, NDataTable, NDatePicker, NEmpty, NPagination, NSelect, NTag, type DataTableColumns } from "naive-ui";
 import { useRouter } from "vue-router";
@@ -16,7 +16,7 @@ const router = useRouter();
 
 const loading = ref(false);
 const page = ref(1);
-const pageSize = 20;
+const pageSize = ref(10);
 const total = ref(0);
 const items = ref<CronJobExecutionResult[]>([]);
 const agentUid = ref<string>("");
@@ -29,6 +29,11 @@ const dateQuickOptions = computed(() => [
   { label: t("cron.history.quick30d"), value: "30d" },
   { label: t("cron.history.quickCustom"), value: "custom" }
 ]);
+const pageSizeOptions = [
+  { label: "10 条/页", value: 10 },
+  { label: "20 条/页", value: 20 },
+  { label: "50 条/页", value: 50 }
+];
 
 const statusOptions = computed(() => [
   { label: t("cron.history.statusAll"), value: "" },
@@ -178,7 +183,7 @@ async function loadHistory() {
       startDate: startDate || undefined,
       endDate: endDate || undefined,
       page: page.value,
-      pageSize
+      pageSize: pageSize.value
     });
     items.value = response.items;
     total.value = response.total;
@@ -196,6 +201,12 @@ async function applyFilters() {
   await loadHistory();
 }
 
+async function handlePageSizeChange(nextPageSize: number) {
+  pageSize.value = nextPageSize;
+  page.value = 1;
+  await loadHistory();
+}
+
 function goBack() {
   if (window.history.length > 1) {
     router.back();
@@ -206,6 +217,11 @@ function goBack() {
 
 onMounted(() => {
   void refresh();
+});
+
+watch([agentUid, status, dateQuick, dateRange], () => {
+  page.value = 1;
+  void loadHistory();
 });
 </script>
 
@@ -221,7 +237,7 @@ onMounted(() => {
               <span>返回</span>
             </button>
           </div>
-          <AppPageHeader :title="t('cron.history.title')" :subtitle="t('cron.history.subtitle')" />
+          <AppPageHeader :title="t('cron.history.title')" />
 
           <section class="panel">
             <div class="panel-body history-filters">
@@ -281,6 +297,13 @@ onMounted(() => {
                   :page-slot="7"
                   @update:page="loadHistory"
                 />
+                <n-select
+                  :value="pageSize"
+                  size="small"
+                  class="history-page-size-select"
+                  :options="pageSizeOptions"
+                  @update:value="handlePageSizeChange"
+                />
               </div>
             </div>
           </section>
@@ -320,37 +343,39 @@ onMounted(() => {
 }
 
 .history-filters {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
 }
 
 .history-filter-item {
   min-width: 0;
+  flex: 0 0 auto;
 }
 
 .history-filter-agent,
 .history-filter-status {
-  width: 100%;
+  width: 120px;
 }
 
 .history-filter-date {
-  width: 100%;
+  width: 260px;
 }
 
 .history-filter-quick {
-  width: 100%;
+  width: 120px;
 }
 
 .history-filter-action {
-  width: 100%;
-  min-width: 96px;
+  width: auto;
+  min-width: 0;
 }
 
 .history-filter-date :deep(.n-date-picker-daterange .n-date-picker-input) {
-  flex: 1 1 0;
+  flex: 0 0 auto;
   min-width: 0;
+  max-width: 260px;
 }
 
 .history-table-panel {
@@ -372,7 +397,13 @@ onMounted(() => {
 
 .history-pagination {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.history-page-size-select {
+  width: 96px;
 }
 
 .history-empty-state {
@@ -380,47 +411,27 @@ onMounted(() => {
 }
 
 @media (max-width: 1080px) {
-  .history-filters {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .history-filter-action {
-    justify-self: end;
-    width: auto;
-  }
-
   .history-filter-date {
-    grid-column: span 2;
+    width: 260px;
   }
 }
 
 @media (max-width: 720px) {
   .history-filters {
-    grid-template-columns: 1fr;
-  }
-
-  .history-filter-date {
-    grid-column: span 1;
-  }
-
-  .history-filter-action {
-    justify-self: stretch;
-    width: 100%;
-  }
-}
-
-@media (max-width: 768px) {
-  .history-filters {
-    display: grid;
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .history-filter-agent,
   .history-filter-status,
   .history-filter-quick,
-  .history-filter-date,
   .history-filter-action {
     width: 100%;
+  }
+
+  .history-filter-date {
+    width: 260px;
   }
 }
 </style>

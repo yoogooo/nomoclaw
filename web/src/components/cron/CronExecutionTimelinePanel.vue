@@ -143,13 +143,16 @@ function runningStatusText(status?: string | null) {
 
 function runningStatusTagType(status?: string | null) {
   const normalized = String(status || "").toUpperCase();
+  if (normalized === "RUNNING" || !normalized) {
+    return "success";
+  }
   if (normalized === "WAITING_APPROVAL") {
     return "warning";
   }
   if (normalized === "FAILED" || normalized === "CANCELED") {
     return "error";
   }
-  return "warning";
+  return "success";
 }
 </script>
 
@@ -291,8 +294,6 @@ function runningStatusTagType(status?: string | null) {
 
 .header-action-btn:hover {
   color: var(--color-brand-400);
-  background: color-mix(in srgb, var(--color-brand-500) 8%, transparent);
-  border-radius: var(--radius-md);
 }
 
 .cron-section-title {
@@ -322,6 +323,10 @@ function runningStatusTagType(status?: string | null) {
   border-radius: var(--radius-lg);
   padding: var(--space-3);
   background: var(--color-bg-surface);
+}
+
+.running-item {
+  gap: var(--space-2);
 }
 
 .running-item.is-clickable {
@@ -364,11 +369,15 @@ function runningStatusTagType(status?: string | null) {
   justify-content: center;
   width: var(--size-16);
   height: var(--size-16);
-  color: var(--color-brand-600);
+  color: #0f8f5c;
 }
 
 .running-icon {
   animation: spin 1s linear infinite;
+}
+
+:root[data-theme="dark"] .running-icon-wrap {
+  color: #3dffb5;
 }
 
 .success-dot {
