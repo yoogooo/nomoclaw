@@ -26,6 +26,7 @@ import ai.nomoclaw.bot.store.repository.*;
 import ai.nomoclaw.bot.tool.PlatformSupport;
 import ai.nomoclaw.bot.tool.ToolExecutor;
 import ai.nomoclaw.bot.util.JsonUtil;
+import ai.nomoclaw.bot.util.LocalizedMessages;
 import ai.nomoclaw.bot.workspace.AgentWorkspaceConfig;
 import ai.nomoclaw.bot.workspace.NomoClawPaths;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
@@ -42,6 +43,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.stereotype.Service;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.JsonNodeFactory;
@@ -129,6 +131,7 @@ public class AgentApplicationService {
     private final ToolExecutionPolicyGateway toolExecutionPolicyGateway;
     private final ToolPermissionPolicyService toolPermissionPolicyService;
     private final PermissionAppService permissionAppService;
+    private final LocalizedMessages localizedMessages;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final ConcurrentMap<String, Boolean> runningMessages = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, ExecutionState> executionStates = new ConcurrentHashMap<>();
@@ -160,6 +163,7 @@ public class AgentApplicationService {
                                    ToolExecutionPolicyGateway toolExecutionPolicyGateway,
                                    ToolPermissionPolicyService toolPermissionPolicyService,
                                    PermissionAppService permissionAppService,
+                                   LocalizedMessages localizedMessages,
                                    @Qualifier("agentTaskExecutor") TaskExecutor agentTaskExecutor,
                                    ApplicationEventPublisher applicationEventPublisher) {
         this.store = store;
@@ -187,6 +191,7 @@ public class AgentApplicationService {
         this.toolExecutionPolicyGateway = toolExecutionPolicyGateway;
         this.toolPermissionPolicyService = toolPermissionPolicyService;
         this.permissionAppService = permissionAppService;
+        this.localizedMessages = localizedMessages;
         this.taskExecutor = agentTaskExecutor;
         this.applicationEventPublisher = applicationEventPublisher;
     }
@@ -837,9 +842,11 @@ public class AgentApplicationService {
         log.info("[Agent] step rejected conversationUid={} stepUid={} round={} scope={} note={}",
                 conversationUid, stepUid, step.roundIndex(), appliedScope, nullToEmpty(note));
         ObjectNode rejectedPayload = stepPayload(step, "approval rejected by user");
-        applyUserFacingFields(rejectedPayload, step, "rejected", "已停止执行", "这一步已被你拒绝，系统不会继续执行。");
+            applyUserFacingFields(rejectedPayload, step, "rejected",
+                    i18n("agent.step.summary.rejected"),
+                    i18n("agent.step.details.rejected"));
         publishEvent(AgentEventType.STEP_REJECTED, conversationUid, messageUid, stepUid, rejectedPayload);
-        failMessage(message, "你已拒绝待确认操作，当前任务已停止。", "APPROVAL_REJECTED");
+        failMessage(message, i18n("agent.message.failed.approvalRejected"), "APPROVAL_REJECTED");
         return new ApprovalDecisionDto("accepted", appliedScope.name().toLowerCase(Locale.ROOT), appliedScope != PermissionScope.ONCE, matchedRuleId);
     }
 
@@ -854,7 +861,7 @@ public class AgentApplicationService {
         String partialAnswer = streamingAnswerBuffers.getOrDefault(message.messageUid(), new StringBuilder()).toString().trim();
         payload.put("answer", partialAnswer);
         publishEvent(AgentEventType.MESSAGE_CANCELED, conversationUid, message.messageUid(), null, payload);
-        publishChannelMessageCompletedEvent(message, MessageStatus.CANCELED, "任务已取消。");
+        publishChannelMessageCompletedEvent(message, MessageStatus.CANCELED, i18n("agent.message.canceled"));
         streamingAnswerBuffers.remove(message.messageUid());
     }
 
@@ -864,7 +871,16 @@ public class AgentApplicationService {
 
     private void executeMessageAsync(String messageUid) {
         log.info("[Agent] queue message execution messageUid={}", messageUid);
-        taskExecutor.execute(() -> executeMessage(messageUid));
+        Locale locale = LocaleContextHolder.getLocale();
+        taskExecutor.execute(() -> {
+            Locale previous = LocaleContextHolder.getLocale();
+            try {
+                LocaleContextHolder.setLocale(locale);
+                executeMessage(messageUid);
+            } finally {
+                LocaleContextHolder.setLocale(previous);
+            }
+        });
     }
 
     /**
@@ -1090,7 +1106,7 @@ public class AgentApplicationService {
                         latestStep.title());
                 ObjectNode approvalPayload = stepPayload(latestStep, "approval required");
                 String approvalDetails = buildStepApprovalDetails(latestStep);
-                applyUserFacingFields(approvalPayload, latestStep, "waiting_approval", "等待你确认", approvalDetails);
+                applyUserFacingFields(approvalPayload, latestStep, "waiting_approval", i18n("agent.step.summary.waitingApproval"), approvalDetails);
                 approvalPayload.put("policyReasonCode", policyDecision.reasonCode().name());
                 publishEvent(AgentEventType.STEP_WAITING_APPROVAL, message.conversationUid(), message.messageUid(), latestStep.stepUid(),
                         approvalPayload);
@@ -1144,7 +1160,7 @@ public class AgentApplicationService {
                     currentAttempt,
                     maxAttempts);
             ObjectNode startedPayload = stepPayload(step, "attempt " + currentAttempt);
-            applyUserFacingFields(startedPayload, step, "running", "正在执行", buildStepStartedDetails(step));
+            applyUserFacingFields(startedPayload, step, "running", i18n("agent.step.summary.running"), buildStepStartedDetails(step));
             publishEvent(AgentEventType.STEP_STARTED, message.conversationUid(), message.messageUid(), step.stepUid(),
                     startedPayload);
 
@@ -1323,7 +1339,7 @@ public class AgentApplicationService {
             return;
         }
         ObjectNode payload = stepPayload(step, "attempt " + currentAttempt + " progress");
-        String summary = hasMeaningfulText(progress.summary()) ? progress.summary().trim() : "正在执行";
+        String summary = hasMeaningfulText(progress.summary()) ? progress.summary().trim() : i18n("agent.step.summary.running");
         String details = hasMeaningfulText(progress.details()) ? progress.details().trim() : summary;
         applyUserFacingFields(payload, step, "running", summary, details);
         payload.put("roundIndex", roundIndex);
@@ -1396,7 +1412,7 @@ public class AgentApplicationService {
         return switch (nullToEmpty(toolName)) {
             case "CommandTool" -> {
                 String command = toolArgs.path("command").asString("");
-                yield command.isBlank() ? "执行命令" : "执行命令: " + abbreviate(command, 96);
+                yield command.isBlank() ? i18n("agent.step.title.command") : i18n("agent.step.title.command.withArg", abbreviate(command, 96));
             }
             case "BrowserTool" -> {
                 String action = toolArgs.path("action").asString("");
@@ -1404,7 +1420,11 @@ public class AgentApplicationService {
                 if (target.isBlank()) {
                     target = toolArgs.path("url").asString("");
                 }
-                yield "浏览器" + (action.isBlank() ? "操作" : action) + (target.isBlank() ? "" : ": " + abbreviate(target, 48));
+                yield i18n(
+                        target.isBlank() ? "agent.step.title.browser" : "agent.step.title.browser.withTarget",
+                        action.isBlank() ? i18n("agent.step.title.browser.defaultAction") : action,
+                        abbreviate(target, 48)
+                );
             }
             case "ReadFileTool", "ListFileTool", "CreateFileTool", "EditFileTool" -> {
                 String action = switch (nullToEmpty(toolName)) {
@@ -1415,30 +1435,34 @@ public class AgentApplicationService {
                     default -> "";
                 };
                 String path = toolArgs.path("path").asString("");
-                yield "文件" + (action.isBlank() ? "操作" : action) + (path.isBlank() ? "" : ": " + abbreviate(path, 48));
+                yield i18n(
+                        path.isBlank() ? "agent.step.title.file" : "agent.step.title.file.withPath",
+                        action.isBlank() ? i18n("agent.step.title.file.defaultAction") : action,
+                        abbreviate(path, 48)
+                );
             }
             case "CronCreateTool" -> {
                 String task = toolArgs.path("task").asString("");
-                yield task.isBlank() ? "创建定时任务" : "创建定时任务: " + abbreviate(task, 48);
+                yield task.isBlank() ? i18n("agent.step.title.cron.create") : i18n("agent.step.title.cron.create.withTask", abbreviate(task, 48));
             }
             case "CronDeleteTool" -> {
                 String jobUid = toolArgs.path("jobUid").asString("");
-                yield jobUid.isBlank() ? "删除定时任务" : "删除定时任务: " + abbreviate(jobUid, 48);
+                yield jobUid.isBlank() ? i18n("agent.step.title.cron.delete") : i18n("agent.step.title.cron.delete.withId", abbreviate(jobUid, 48));
             }
-            case "CronListTool" -> "查询定时任务";
+            case "CronListTool" -> i18n("agent.step.title.cron.list");
             case "ImageLoaderTool" -> {
                 String reference = toolArgs.path("reference").asString("");
-                yield reference.isBlank() ? "分析图片" : "分析图片: " + abbreviate(reference, 48);
+                yield reference.isBlank() ? i18n("agent.step.title.image") : i18n("agent.step.title.image.withRef", abbreviate(reference, 48));
             }
             case "WebSearchTool" -> {
                 String query = toolArgs.path("query").asString("");
-                yield query.isBlank() ? "网页搜索" : "网页搜索: " + abbreviate(query, 48);
+                yield query.isBlank() ? i18n("agent.step.title.web.search") : i18n("agent.step.title.web.search.withQuery", abbreviate(query, 48));
             }
             case "WebFetchTool" -> {
                 String url = toolArgs.path("url").asString("");
-                yield url.isBlank() ? "网页抓取" : "网页抓取: " + abbreviate(url, 48);
+                yield url.isBlank() ? i18n("agent.step.title.web.fetch") : i18n("agent.step.title.web.fetch.withUrl", abbreviate(url, 48));
             }
-            default -> "执行工具: " + nullToEmpty(toolName);
+            default -> i18n("agent.step.title.tool.default", nullToEmpty(toolName));
         };
     }
 
@@ -1447,33 +1471,33 @@ public class AgentApplicationService {
         return switch (nullToEmpty(step.toolName())) {
             case "CommandTool" -> {
                 String command = toolArgs.path("command").asString("");
-                yield command.isBlank() ? "正在执行本地命令" : "正在执行命令: " + command;
+                yield command.isBlank() ? i18n("agent.step.display.command.running") : i18n("agent.step.display.command.running.withCommand", command);
             }
             case "BrowserTool" -> switch (toolArgs.path("action").asString("")) {
-                case "open", "navigate" -> "正在打开网页";
-                case "click" -> "正在操作网页元素";
-                case "type" -> "正在填写网页内容";
-                case "extract_text" -> "正在提取网页信息";
-                case "screenshot" -> "正在保存网页截图";
-                case "download" -> "正在下载网页文件";
-                case "wait_for" -> "正在等待页面内容出现";
-                case "press_key" -> "正在向页面发送按键";
-                case "snapshot" -> "正在整理当前页面内容";
-                default -> "正在处理网页内容";
+                case "open", "navigate" -> i18n("agent.step.display.browser.open");
+                case "click" -> i18n("agent.step.display.browser.click");
+                case "type" -> i18n("agent.step.display.browser.type");
+                case "extract_text" -> i18n("agent.step.display.browser.extractText");
+                case "screenshot" -> i18n("agent.step.display.browser.screenshot");
+                case "download" -> i18n("agent.step.display.browser.download");
+                case "wait_for" -> i18n("agent.step.display.browser.waitFor");
+                case "press_key" -> i18n("agent.step.display.browser.pressKey");
+                case "snapshot" -> i18n("agent.step.display.browser.snapshot");
+                default -> i18n("agent.step.display.browser.default");
             };
-            case "ReadFileTool" -> "正在读取文件内容";
-            case "ListFileTool" -> "正在查看文件列表";
-            case "CreateFileTool" -> "正在写入文件";
-            case "EditFileTool" -> "正在修改文件";
-            case "CronCreateTool" -> "正在创建定时任务";
-            case "CronDeleteTool" -> "正在删除定时任务";
-            case "CronListTool" -> "正在查询定时任务";
-            case "ImageLoaderTool" -> "正在分析图片";
-            case "DesktopScreenshotTool" -> "正在截取桌面画面";
-            case "FileSearchTool" -> "正在搜索文件内容";
-            case "WebSearchTool" -> "正在搜索网页信息";
-            case "WebFetchTool" -> "正在抓取网页内容";
-            default -> step.title() == null || step.title().isBlank() ? "正在处理任务步骤" : step.title();
+            case "ReadFileTool" -> i18n("agent.step.display.file.read");
+            case "ListFileTool" -> i18n("agent.step.display.file.list");
+            case "CreateFileTool" -> i18n("agent.step.display.file.create");
+            case "EditFileTool" -> i18n("agent.step.display.file.edit");
+            case "CronCreateTool" -> i18n("agent.step.display.cron.create");
+            case "CronDeleteTool" -> i18n("agent.step.display.cron.delete");
+            case "CronListTool" -> i18n("agent.step.display.cron.list");
+            case "ImageLoaderTool" -> i18n("agent.step.display.image");
+            case "DesktopScreenshotTool" -> i18n("agent.step.display.desktopScreenshot");
+            case "FileSearchTool" -> i18n("agent.step.display.fileSearch");
+            case "WebSearchTool" -> i18n("agent.step.display.web.search");
+            case "WebFetchTool" -> i18n("agent.step.display.web.fetch");
+            default -> step.title() == null || step.title().isBlank() ? i18n("agent.step.display.default") : step.title();
         };
     }
 
@@ -1483,8 +1507,10 @@ public class AgentApplicationService {
                 String command = step.toolArgs().path("command").asString("");
                 String cwd = step.toolArgs().path("cwd").asString("");
                 yield command.isBlank()
-                        ? "系统已规划一条本地命令，稍后会开始执行。"
-                        : "系统准备执行本地命令“" + command + "”" + (cwd.isBlank() ? "。" : "，工作目录为 " + cwd + "。");
+                        ? i18n("agent.step.plan.command.planned")
+                        : (cwd.isBlank()
+                            ? i18n("agent.step.plan.command.withCommand", command)
+                            : i18n("agent.step.plan.command.withCommandAndCwd", command, cwd));
             }
             case "BrowserTool" -> {
                 String action = step.toolArgs().path("action").asString("");
@@ -1492,70 +1518,72 @@ public class AgentApplicationService {
                 String selector = step.toolArgs().path("selector").asString("");
                 String target = !url.isBlank() ? abbreviate(url, 72) : abbreviate(selector, 48);
                 yield target.isBlank()
-                        ? "系统已规划一个网页处理步骤，稍后会开始执行。"
-                        : "系统准备在网页上执行“" + (action.isBlank() ? "操作" : action) + "”，目标为 " + target + "。";
+                        ? i18n("agent.step.plan.browser.planned")
+                        : i18n("agent.step.plan.browser.withTarget",
+                        action.isBlank() ? i18n("agent.step.title.browser.defaultAction") : action,
+                        target);
             }
             case "ReadFileTool", "ListFileTool", "CreateFileTool", "EditFileTool" -> {
                 String action = switch (nullToEmpty(step.toolName())) {
-                    case "ReadFileTool" -> "读取";
-                    case "ListFileTool" -> "列举";
+                    case "ReadFileTool" -> i18n("agent.step.plan.file.action.read");
+                    case "ListFileTool" -> i18n("agent.step.plan.file.action.list");
                     case "CreateFileTool" -> {
                         String mode = step.toolArgs().path("mode").asString("create_or_truncate");
-                        yield "append".equals(mode) ? "追加" : "写入";
+                        yield "append".equals(mode) ? i18n("agent.step.plan.file.action.append") : i18n("agent.step.plan.file.action.write");
                     }
-                    case "EditFileTool" -> "编辑";
-                    default -> "处理";
+                    case "EditFileTool" -> i18n("agent.step.plan.file.action.edit");
+                    default -> i18n("agent.step.plan.file.action.default");
                 };
                 String path = step.toolArgs().path("path").asString("");
                 yield path.isBlank()
-                        ? "系统已规划一个文件处理步骤，稍后会开始执行。"
-                        : "系统准备对文件执行“" + (action.isBlank() ? "处理" : action) + "”，目标路径为 " + abbreviate(path, 72) + "。";
+                        ? i18n("agent.step.plan.file.planned")
+                        : i18n("agent.step.plan.file.withPath", action.isBlank() ? i18n("agent.step.plan.file.action.default") : action, abbreviate(path, 72));
             }
             case "CronCreateTool" -> {
                 String task = step.toolArgs().path("task").asString("");
-                yield task.isBlank() ? "系统准备创建一个定时任务。" : "系统准备创建定时任务：“" + abbreviate(task, 72) + "”。";
+                yield task.isBlank() ? i18n("agent.step.plan.cron.create") : i18n("agent.step.plan.cron.create.withTask", abbreviate(task, 72));
             }
             case "CronDeleteTool" -> {
                 String jobUid = step.toolArgs().path("jobUid").asString("");
-                yield jobUid.isBlank() ? "系统准备删除一个定时任务。" : "系统准备删除定时任务 " + abbreviate(jobUid, 72) + "。";
+                yield jobUid.isBlank() ? i18n("agent.step.plan.cron.delete") : i18n("agent.step.plan.cron.delete.withId", abbreviate(jobUid, 72));
             }
             case "CronListTool" -> {
                 String jobUid = step.toolArgs().path("jobUid").asString("");
-                yield jobUid.isBlank() ? "系统准备查询定时任务列表。" : "系统准备查询定时任务 " + abbreviate(jobUid, 72) + "。";
+                yield jobUid.isBlank() ? i18n("agent.step.plan.cron.list") : i18n("agent.step.plan.cron.list.withId", abbreviate(jobUid, 72));
             }
             case "ImageLoaderTool" -> {
                 String reference = step.toolArgs().path("reference").asString("");
                 yield reference.isBlank()
-                        ? "系统准备加载图片并进行视觉分析。"
-                        : "系统准备根据“" + abbreviate(reference, 72) + "”加载图片并进行视觉分析。";
+                        ? i18n("agent.step.plan.image")
+                        : i18n("agent.step.plan.image.withRef", abbreviate(reference, 72));
             }
             case "WebSearchTool" -> {
                 String query = step.toolArgs().path("query").asString("");
                 yield query.isBlank()
-                        ? "系统准备执行一次网页搜索。"
-                        : "系统准备执行网页搜索，关键词为“" + abbreviate(query, 72) + "”。";
+                        ? i18n("agent.step.plan.web.search")
+                        : i18n("agent.step.plan.web.search.withQuery", abbreviate(query, 72));
             }
             case "WebFetchTool" -> {
                 String url = step.toolArgs().path("url").asString("");
                 yield url.isBlank()
-                        ? "系统准备抓取网页内容。"
-                        : "系统准备抓取网页内容，目标地址为 " + abbreviate(url, 72) + "。";
+                        ? i18n("agent.step.plan.web.fetch")
+                        : i18n("agent.step.plan.web.fetch.withUrl", abbreviate(url, 72));
             }
-            default -> "系统已规划这一步，稍后会开始执行。";
+            default -> i18n("agent.step.plan.default");
         };
     }
 
     private String buildStepStartedDetails(PlanStep step) {
         return switch (nullToEmpty(step.toolName())) {
             case "CommandTool", "BrowserTool", "ReadFileTool", "ListFileTool", "CreateFileTool", "EditFileTool", "WebSearchTool", "WebFetchTool", "CronCreateTool", "CronDeleteTool", "CronListTool" -> buildStepPlanDetails(step)
-                    .replace("系统准备", "系统正在")
-                    .replace("已规划", "正在执行");
-            default -> "系统正在执行这一步。";
+                    .replace(i18n("agent.step.plan.systemPreparing"), i18n("agent.step.started.systemRunning"))
+                    .replace(i18n("agent.step.plan.systemPlanned"), i18n("agent.step.started.systemRunning"));
+            default -> i18n("agent.step.started.default");
         };
     }
 
     private String buildStepApprovalDetails(PlanStep step) {
-        return formatApprovalAction(step.toolName(), step.toolArgs()) + " 请确认是否继续。";
+        return i18n("agent.step.approval.prompt", formatApprovalAction(step.toolName(), step.toolArgs()));
     }
 
     private String buildStepSuccessDetails(PlanStep step, ToolResult result) {
@@ -1563,53 +1591,53 @@ public class AgentApplicationService {
             case "BrowserTool" -> {
                 String path = result.artifacts() == null ? "" : result.artifacts().path("path").asString("");
                 if (!path.isBlank()) {
-                    yield "网页操作已完成，生成的文件已保存到 " + path + "。";
+                    yield i18n("agent.step.success.browser.saved", path);
                 }
-                yield hasMeaningfulText(result.output()) ? "网页操作已完成：" + abbreviate(result.output(), 120) : "网页操作已顺利完成。";
+                yield hasMeaningfulText(result.output()) ? i18n("agent.step.success.browser.withOutput", abbreviate(result.output(), 120)) : i18n("agent.step.success.browser");
             }
             case "ReadFileTool", "ListFileTool", "CreateFileTool", "EditFileTool" -> {
                 String path = result.artifacts() == null ? "" : result.artifacts().path("path").asString("");
-                yield path.isBlank() ? "文件处理已完成。" : "文件处理已完成，目标路径为 " + abbreviate(path, 96) + "。";
+                yield path.isBlank() ? i18n("agent.step.success.file") : i18n("agent.step.success.file.withPath", abbreviate(path, 96));
             }
             case "CommandTool" -> {
                 String command = step.toolArgs().path("command").asString("");
                 String stdout = result.artifacts() == null ? "" : result.artifacts().path("stdout").asString("");
                 String stderr = result.artifacts() == null ? "" : result.artifacts().path("stderr").asString("");
                 String outputBody = hasMeaningfulText(stdout) ? stdout : (hasMeaningfulText(result.output()) ? result.output() : stderr);
-                String prefix = command.isBlank() ? "本地命令已执行完成。" : "本地命令已执行完成：\"" + command + "\"。";
+                String prefix = command.isBlank() ? i18n("agent.step.success.command") : i18n("agent.step.success.command.withCommand", command);
                 if (!hasMeaningfulText(outputBody)) {
                     yield prefix;
                 }
-                yield prefix + " 输出如下：\n" + abbreviate(outputBody, 1200);
+                yield i18n("agent.step.success.command.withOutput", prefix, abbreviate(outputBody, 1200));
             }
-            case "CronCreateTool" -> "定时任务已创建完成。";
-            case "CronDeleteTool" -> "定时任务已删除。";
-            case "CronListTool" -> "定时任务查询已完成。";
+            case "CronCreateTool" -> i18n("agent.step.success.cron.create");
+            case "CronDeleteTool" -> i18n("agent.step.success.cron.delete");
+            case "CronListTool" -> i18n("agent.step.success.cron.list");
             case "ImageLoaderTool" -> {
                 int resolved = result.artifacts() == null ? 0 : result.artifacts().path("resolvedCount").asInt(0);
                 boolean matched = result.artifacts() != null && result.artifacts().path("matched").asBoolean(false);
                 if (!matched || resolved <= 0) {
-                    yield "未匹配到可分析的图片。";
+                    yield i18n("agent.step.success.image.noMatch");
                 }
-                yield "图片分析完成，共匹配 " + resolved + " 张图片。";
+                yield i18n("agent.step.success.image.withCount", resolved);
             }
-            case "WebSearchTool" -> "网页搜索已完成。";
-            case "WebFetchTool" -> "网页抓取已完成。";
-            default -> hasMeaningfulText(result.output()) ? abbreviate(result.output(), 140) : "这一步已顺利完成。";
+            case "WebSearchTool" -> i18n("agent.step.success.web.search");
+            case "WebFetchTool" -> i18n("agent.step.success.web.fetch");
+            default -> hasMeaningfulText(result.output()) ? abbreviate(result.output(), 140) : i18n("agent.step.success.default");
         };
     }
 
     private String buildStepFailureDetails(PlanStep step, ToolResult result) {
         String message = hasMeaningfulText(result.errorMessage()) ? result.errorMessage() : result.output();
         if (!hasMeaningfulText(message)) {
-            message = "执行过程中出现异常，暂时无法完成这一步。";
+            message = i18n("agent.step.failure.default");
         }
         if ("CommandTool".equals(nullToEmpty(step.toolName()))) {
             String command = step.toolArgs().path("command").asString("");
             String stderr = result.artifacts() == null ? "" : result.artifacts().path("stderr").asString("");
             String suffix = hasMeaningfulText(stderr) ? "\nstderr:\n" + abbreviate(stderr, 800) : "";
             if (!command.isBlank()) {
-                return abbreviate("命令执行失败：\"" + command + "\"。错误：" + message + suffix, 1600);
+                return abbreviate(i18n("agent.step.failure.command", command, message) + suffix, 1600);
             }
         }
         return abbreviate(message, 180);
@@ -1623,63 +1651,73 @@ public class AgentApplicationService {
                 String selector = toolArgs.path("selector").asString("");
                 String text = toolArgs.path("text").asString("");
                 if ("open".equals(action) || "navigate".equals(action)) {
-                    yield "系统将打开网页 " + (url.isBlank() ? "（未提供地址）" : abbreviate(url, 96)) + "。";
+                    yield i18n("agent.step.approval.browser.open", url.isBlank() ? i18n("agent.step.approval.notProvided.url") : abbreviate(url, 96));
                 }
                 if ("click".equals(action)) {
-                    yield "系统将点击网页元素 " + (selector.isBlank() ? "（未提供目标）" : abbreviate(selector, 72)) + "。";
+                    yield i18n("agent.step.approval.browser.click", selector.isBlank() ? i18n("agent.step.approval.notProvided.target") : abbreviate(selector, 72));
                 }
                 if ("type".equals(action)) {
-                    yield "系统将向网页元素 " + (selector.isBlank() ? "（未提供目标）" : abbreviate(selector, 72)) + " 输入内容" + (text.isBlank() ? "。" : "：“" + abbreviate(text, 60) + "”。");
+                    yield text.isBlank()
+                            ? i18n("agent.step.approval.browser.type", selector.isBlank() ? i18n("agent.step.approval.notProvided.target") : abbreviate(selector, 72))
+                            : i18n("agent.step.approval.browser.type.withText",
+                            selector.isBlank() ? i18n("agent.step.approval.notProvided.target") : abbreviate(selector, 72),
+                            abbreviate(text, 60));
                 }
                 if ("screenshot".equals(action)) {
                     String output = toolArgs.path("output").asString("");
-                    yield "系统将保存当前页面截图" + (output.isBlank() ? "到默认临时目录。" : "到 " + abbreviate(output, 96) + "。");
+                    yield output.isBlank()
+                            ? i18n("agent.step.approval.browser.screenshot.default")
+                            : i18n("agent.step.approval.browser.screenshot.output", abbreviate(output, 96));
                 }
-                yield "系统将执行一项网页操作。";
+                yield i18n("agent.step.approval.browser.default");
             }
             case "CommandTool" -> {
                 String command = toolArgs.path("command").asString("");
                 String cwd = toolArgs.path("cwd").asString("");
-                yield "系统将执行本地命令 " + (command.isBlank() ? "（未提供命令）" : "“" + command + "”")
-                        + (cwd.isBlank() ? "。" : "，工作目录为 " + cwd + "。");
+                String renderedCommand = command.isBlank() ? i18n("agent.step.approval.notProvided.command") : command;
+                yield cwd.isBlank()
+                        ? i18n("agent.step.approval.command", renderedCommand)
+                        : i18n("agent.step.approval.command.withCwd", renderedCommand, cwd);
             }
             case "ReadFileTool", "ListFileTool", "CreateFileTool", "EditFileTool" -> {
                 String action = switch (nullToEmpty(toolName)) {
-                    case "ReadFileTool" -> "读取";
-                    case "ListFileTool" -> "列举";
+                    case "ReadFileTool" -> i18n("agent.step.plan.file.action.read");
+                    case "ListFileTool" -> i18n("agent.step.plan.file.action.list");
                     case "CreateFileTool" -> {
                         String mode = toolArgs.path("mode").asString("create_or_truncate");
-                        yield "append".equals(mode) ? "追加" : "写入";
+                        yield "append".equals(mode) ? i18n("agent.step.plan.file.action.append") : i18n("agent.step.plan.file.action.write");
                     }
-                    case "EditFileTool" -> "编辑";
-                    default -> "处理";
+                    case "EditFileTool" -> i18n("agent.step.plan.file.action.edit");
+                    default -> i18n("agent.step.plan.file.action.default");
                 };
                 String path = toolArgs.path("path").asString("");
-                yield "系统将对文件执行“" + action + "”操作" + (path.isBlank() ? "。" : "，目标路径为 " + abbreviate(path, 96) + "。");
+                yield path.isBlank()
+                        ? i18n("agent.step.approval.file", action)
+                        : i18n("agent.step.approval.file.withPath", action, abbreviate(path, 96));
             }
             case "CronCreateTool" -> {
                 String task = toolArgs.path("task").asString("");
-                yield "系统将创建定时任务" + (task.isBlank() ? "。" : "：“" + abbreviate(task, 72) + "”。");
+                yield task.isBlank() ? i18n("agent.step.approval.cron.create") : i18n("agent.step.approval.cron.create.withTask", abbreviate(task, 72));
             }
             case "CronDeleteTool" -> {
                 String jobUid = toolArgs.path("jobUid").asString("");
-                yield "系统将删除定时任务" + (jobUid.isBlank() ? "。" : " " + abbreviate(jobUid, 72) + "。");
+                yield jobUid.isBlank() ? i18n("agent.step.approval.cron.delete") : i18n("agent.step.approval.cron.delete.withId", abbreviate(jobUid, 72));
             }
-            case "CronListTool" -> "系统将查询定时任务。";
+            case "CronListTool" -> i18n("agent.step.approval.cron.list");
             case "WebSearchTool" -> {
                 String query = toolArgs.path("query").asString("");
-                yield "系统将执行网页搜索" + (query.isBlank() ? "。" : "，关键词为“" + abbreviate(query, 72) + "”。");
+                yield query.isBlank() ? i18n("agent.step.approval.web.search") : i18n("agent.step.approval.web.search.withQuery", abbreviate(query, 72));
             }
             case "WebFetchTool" -> {
                 String url = toolArgs.path("url").asString("");
-                yield "系统将抓取网页内容" + (url.isBlank() ? "。" : "，目标地址为 " + abbreviate(url, 96) + "。");
+                yield url.isBlank() ? i18n("agent.step.approval.web.fetch") : i18n("agent.step.approval.web.fetch.withUrl", abbreviate(url, 96));
             }
-            default -> "系统将执行一项待确认操作。";
+            default -> i18n("agent.step.approval.default");
         };
     }
 
     private void completeMessage(AgentMessage message, String answer, int roundsUsed) {
-        String finalAnswer = answer == null || answer.isBlank() ? "任务已完成。" : answer.trim();
+        String finalAnswer = answer == null || answer.isBlank() ? i18n("agent.message.completed") : answer.trim();
         store.updateMessageStatus(message.messageUid(), MessageStatus.COMPLETED);
         persistAssistantReply(message, finalAnswer);
         ObjectNode payload = basePayload("message completed");
@@ -1772,7 +1810,7 @@ public class AgentApplicationService {
 
     private void failMessage(AgentMessage message, String answer, String stopReason) {
         store.updateMessageStatus(message.messageUid(), MessageStatus.FAILED);
-        String finalAnswer = answer == null || answer.isBlank() ? "任务失败。" : answer.trim();
+        String finalAnswer = answer == null || answer.isBlank() ? i18n("agent.message.failed") : answer.trim();
         persistAssistantReply(message, finalAnswer);
         ObjectNode payload = basePayload(finalAnswer);
         payload.put("status", MessageStatus.FAILED.name());
@@ -1833,7 +1871,7 @@ public class AgentApplicationService {
         ));
         payload.set("displaySteps", JsonNodeFactory.instance.arrayNode().addAll(
                 steps.stream()
-                        .map(step -> userFacingStepNode(step, "planned", "已规划，等待开始执行", buildStepPlanDetails(step), null))
+                        .map(step -> userFacingStepNode(step, "planned", i18n("agent.step.summary.planned"), buildStepPlanDetails(step), null))
                         .toList()
         ));
         return payload;
@@ -1893,9 +1931,9 @@ public class AgentApplicationService {
         payload.set("metrics", result.metrics() == null ? JsonNodeFactory.instance.objectNode() : result.metrics());
         payload.set("artifacts", result.artifacts() == null ? JsonNodeFactory.instance.objectNode() : result.artifacts());
         if (result.success()) {
-            applyUserFacingFields(payload, step, "completed", "执行完成", buildStepSuccessDetails(step, result));
+            applyUserFacingFields(payload, step, "completed", i18n("agent.step.summary.completed"), buildStepSuccessDetails(step, result));
         } else {
-            applyUserFacingFields(payload, step, "failed", "执行失败", buildStepFailureDetails(step, result));
+            applyUserFacingFields(payload, step, "failed", i18n("agent.step.summary.failed"), buildStepFailureDetails(step, result));
         }
         return payload;
     }
@@ -2057,9 +2095,11 @@ public class AgentApplicationService {
             ));
         }
 
+        String defaultTitle = i18n("agent.step.display.default");
+        String plannedSummary = i18n("agent.step.summary.planned");
         List<ConversationRunStepDto> stepResponses = stepMap.values().stream()
                 .sorted(Comparator.comparingInt(RunStepAccumulator::roundIndex).thenComparingInt(RunStepAccumulator::stepIndex))
-                .map(RunStepAccumulator::toResponse)
+                .map(step -> step.toResponse(defaultTitle, plannedSummary))
                 .toList();
         if (stepResponses.isEmpty()) {
             return null;
@@ -2098,13 +2138,17 @@ public class AgentApplicationService {
 
     private String buildRunSummary(String status, int completedSteps, int totalSteps) {
         return switch (nullToEmpty(status)) {
-            case "completed" -> "已完成 " + completedSteps + "/" + totalSteps + " 步";
-            case "failed" -> "执行失败，已完成 " + completedSteps + "/" + totalSteps + " 步";
-            case "canceled" -> "已取消，已完成 " + completedSteps + "/" + totalSteps + " 步";
-            case "waiting_approval" -> "等待确认，已完成 " + completedSteps + "/" + totalSteps + " 步";
-            case "running" -> "正在处理，已完成 " + completedSteps + "/" + totalSteps + " 步";
-            default -> "已规划 " + totalSteps + " 步，等待开始";
+            case "completed" -> i18n("agent.run.summary.completed", completedSteps, totalSteps);
+            case "failed" -> i18n("agent.run.summary.failed", completedSteps, totalSteps);
+            case "canceled" -> i18n("agent.run.summary.canceled", completedSteps, totalSteps);
+            case "waiting_approval" -> i18n("agent.run.summary.waitingApproval", completedSteps, totalSteps);
+            case "running" -> i18n("agent.run.summary.running", completedSteps, totalSteps);
+            default -> i18n("agent.run.summary.planned", totalSteps);
         };
+    }
+
+    private String i18n(String code, Object... args) {
+        return localizedMessages.get(code, args);
     }
 
     private boolean hasMeaningfulText(String text) {
@@ -2181,7 +2225,7 @@ public class AgentApplicationService {
             accumulator.toolName = step.toolName() == null ? "" : step.toolName();
             accumulator.toolArgs = copyJson(step.toolArgs());
             accumulator.displayTitle = displayTitle;
-            accumulator.displaySummary = "已规划，等待开始执行";
+            accumulator.displaySummary = "";
             accumulator.displayDetails = displayDetails;
             return accumulator;
         }
@@ -2258,7 +2302,7 @@ public class AgentApplicationService {
             return stepIndex;
         }
 
-        ConversationRunStepDto toResponse() {
+        ConversationRunStepDto toResponse(String defaultTitle, String plannedSummary) {
             return new ConversationRunStepDto(
                     stepUid,
                     roundIndex,
@@ -2266,8 +2310,8 @@ public class AgentApplicationService {
                     status == null || status.isBlank() ? "planned" : status,
                     toolName == null ? "" : toolName,
                     copyJson(toolArgs),
-                    displayTitle == null || displayTitle.isBlank() ? "正在处理任务步骤" : displayTitle,
-                    displaySummary == null ? "" : displaySummary,
+                    displayTitle == null || displayTitle.isBlank() ? defaultTitle : displayTitle,
+                    displaySummary == null || displaySummary.isBlank() ? plannedSummary : displaySummary,
                     displayDetails == null ? "" : displayDetails,
                     policyReasonCode == null ? "" : policyReasonCode,
                     updatedTime
