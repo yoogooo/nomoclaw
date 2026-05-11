@@ -127,16 +127,16 @@ function runningTimeText(startedTime?: string | null) {
 function runningStatusText(status?: string | null) {
   const normalized = String(status || "").toUpperCase();
   if (normalized === "WAITING_APPROVAL") {
-    return "待人工审核";
+    return t("cron.execution.statusWaitingApproval");
   }
   if (normalized === "RUNNING" || !normalized) {
-    return "运行中";
+    return t("cron.execution.statusRunning");
   }
   if (normalized === "FAILED") {
-    return "失败";
+    return t("cron.execution.statusFailed");
   }
   if (normalized === "CANCELED") {
-    return "已取消";
+    return t("cron.execution.statusCanceled");
   }
   return normalized.toLowerCase();
 }
