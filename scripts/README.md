@@ -19,19 +19,19 @@
   - `BUILD_TARGET_DMG=true|false`（默认 `true`）
   - `TAURI_BUILD_CI=true|false`（默认 `true`）
   - `TAURI_UPDATER_PUBKEY=<pubkey>`（可选；用于 updater 验签）
-  - `DESKTOP_VERSION=yyyy.M.d`（默认当天日期）
+  - `DESKTOP_VERSION=major.minor.patch`（推荐如 `1.0.0`；默认当天日期）
   - `DESKTOP_NAME_PREFIX=<name>`（默认 `NomoClaw`）
 - 示例:
-  - `TARGET_ARCH=arm64 DESKTOP_VERSION=2026.4.14 ./scripts/build-desktop-macos.sh`
+  - `TARGET_ARCH=arm64 DESKTOP_VERSION=1.0.0 ./scripts/build-desktop-macos.sh`
 
 常用平台命令:
 
 ```bash
 # Apple Silicon (arm64)
-TARGET_ARCH=arm64 ./scripts/build-desktop-macos.sh
+TARGET_ARCH=arm64 DESKTOP_VERSION=1.0.0 ./scripts/build-desktop-macos.sh
 
 # Intel (x64)
-TARGET_ARCH=x64 ./scripts/build-desktop-macos.sh
+TARGET_ARCH=x64 DESKTOP_VERSION=1.0.0 ./scripts/build-desktop-macos.sh
 ```
 
 ### `build-desktop-windows-x64.sh`

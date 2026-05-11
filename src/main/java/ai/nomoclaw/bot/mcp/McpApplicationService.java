@@ -200,6 +200,18 @@ public class McpApplicationService {
                     ignored -> {
                     },
                     () -> {
+                    },
+                    () -> {
+                    },
+                    () -> {
+                    },
+                    ignored -> {
+                    },
+                    ignored -> {
+                    },
+                    () -> {
+                    },
+                    () -> {
                     }
             );
             transport.start(handler);
@@ -213,10 +225,7 @@ public class McpApplicationService {
             List<RawMcpTool> tools = new ArrayList<>();
             String cursor = null;
             do {
-                McpListToolsRequest request = new McpListToolsRequest(id++);
-                if (cursor != null && !cursor.isBlank()) {
-                    request.setCursor(cursor);
-                }
+                McpListToolsRequest request = new McpListToolsRequest(id++, cursor);
                 JsonNode response = transport.executeOperationWithResponse(request).get(30, TimeUnit.SECONDS);
                 JsonNode result = response == null ? null : response.path("result");
                 JsonNode toolArray = result == null ? null : result.path("tools");
