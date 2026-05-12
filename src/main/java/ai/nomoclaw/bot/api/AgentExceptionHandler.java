@@ -1,5 +1,6 @@
 package ai.nomoclaw.bot.api;
 
+import ai.nomoclaw.bot.api.dto.common.response.SimpleResponse;
 import ai.nomoclaw.bot.orchestrator.SystemErrorLogService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;

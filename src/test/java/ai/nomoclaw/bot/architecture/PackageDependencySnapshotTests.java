@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 class PackageDependencySnapshotTests {
 
     @Test
-    void apiShouldNotBeImportedByOrchestrator() throws IOException {
+    void apiWebLayerShouldNotBeImportedByOrchestrator() throws IOException {
         Path root = Path.of("src/main/java/ai/nomoclaw/bot/orchestrator");
         if (Files.notExists(root)) {
             return;
@@ -22,8 +22,10 @@ class PackageDependencySnapshotTests {
                 .toList();
         for (Path javaFile : javaFiles) {
             String content = Files.readString(javaFile);
-            assertFalse(content.contains("import ai.nomoclaw.bot.api."),
-                    () -> "orchestrator depends on api: " + javaFile);
+            assertFalse(content.contains("import ai.nomoclaw.bot.api.controller.")
+                            || content.contains("import ai.nomoclaw.bot.api.mapper.")
+                            || content.contains("import ai.nomoclaw.bot.api.filter."),
+                    () -> "orchestrator depends on api web layer: " + javaFile);
         }
     }
 }

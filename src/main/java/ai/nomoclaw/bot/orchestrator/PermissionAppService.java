@@ -1,8 +1,8 @@
 package ai.nomoclaw.bot.orchestrator;
 
-import ai.nomoclaw.bot.api.PermissionRulePayload;
-import ai.nomoclaw.bot.api.PermissionRulesResponse;
-import ai.nomoclaw.bot.api.UpdatePermissionRulesRequest;
+import ai.nomoclaw.bot.api.dto.permission.request.UpdatePermissionRulesRequest;
+import ai.nomoclaw.bot.api.dto.permission.response.PermissionRulePayload;
+import ai.nomoclaw.bot.api.dto.permission.response.PermissionRulesResponse;
 import ai.nomoclaw.bot.policy.tool.ToolPermissionPolicyService;
 import ai.nomoclaw.bot.policy.tool.permission.*;
 import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
