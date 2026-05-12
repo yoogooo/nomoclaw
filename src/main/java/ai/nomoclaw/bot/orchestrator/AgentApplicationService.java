@@ -132,6 +132,9 @@ public class AgentApplicationService {
     private final ToolPermissionPolicyService toolPermissionPolicyService;
     private final PermissionAppService permissionAppService;
     private final LocalizedMessages localizedMessages;
+    private final ExecutionFeedbackBuilder feedbackBuilder;
+    private final RunViewAssembler runViewAssembler;
+    private final StepExecutionService stepExecutionService;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final ConcurrentMap<String, Boolean> runningMessages = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, ExecutionState> executionStates = new ConcurrentHashMap<>();
@@ -164,6 +167,9 @@ public class AgentApplicationService {
                                    ToolPermissionPolicyService toolPermissionPolicyService,
                                    PermissionAppService permissionAppService,
                                    LocalizedMessages localizedMessages,
+                                   ExecutionFeedbackBuilder feedbackBuilder,
+                                   RunViewAssembler runViewAssembler,
+                                   StepExecutionService stepExecutionService,
                                    @Qualifier("agentTaskExecutor") TaskExecutor agentTaskExecutor,
                                    ApplicationEventPublisher applicationEventPublisher) {
         this.store = store;
@@ -192,6 +198,9 @@ public class AgentApplicationService {
         this.toolPermissionPolicyService = toolPermissionPolicyService;
         this.permissionAppService = permissionAppService;
         this.localizedMessages = localizedMessages;
+        this.feedbackBuilder = feedbackBuilder;
+        this.runViewAssembler = runViewAssembler;
+        this.stepExecutionService = stepExecutionService;
         this.taskExecutor = agentTaskExecutor;
         this.applicationEventPublisher = applicationEventPublisher;
     }
@@ -601,7 +610,11 @@ public class AgentApplicationService {
                 .orElseThrow(() -> new IllegalArgumentException("conversation not found: " + conversationUid));
         return store.listMessagesByConversation(conversationUid).stream()
                 .filter(message -> "user".equals(message.role()))
-                .map(this::toMessageRunResponse)
+                .map(message -> runViewAssembler.toMessageRunResponse(
+                        message,
+                        store.listSteps(message.messageUid()),
+                        store.listEventsByMessage(message.messageUid())
+                ))
                 .filter(Objects::nonNull)
                 .toList();
     }
@@ -842,11 +855,11 @@ public class AgentApplicationService {
         log.info("[Agent] step rejected conversationUid={} stepUid={} round={} scope={} note={}",
                 conversationUid, stepUid, step.roundIndex(), appliedScope, nullToEmpty(note));
         ObjectNode rejectedPayload = stepPayload(step, "approval rejected by user");
-            applyUserFacingFields(rejectedPayload, step, "rejected",
-                    i18n("agent.step.summary.rejected"),
-                    i18n("agent.step.details.rejected"));
+        feedbackBuilder.applyUserFacingFields(rejectedPayload, step, "rejected",
+                feedbackBuilder.summaryRejected(),
+                feedbackBuilder.detailsRejected());
         publishEvent(AgentEventType.STEP_REJECTED, conversationUid, messageUid, stepUid, rejectedPayload);
-        failMessage(message, i18n("agent.message.failed.approvalRejected"), "APPROVAL_REJECTED");
+        failMessage(message, feedbackBuilder.messageFailedApprovalRejected(), "APPROVAL_REJECTED");
         return new ApprovalDecisionDto("accepted", appliedScope.name().toLowerCase(Locale.ROOT), appliedScope != PermissionScope.ONCE, matchedRuleId);
     }
 
@@ -861,7 +874,7 @@ public class AgentApplicationService {
         String partialAnswer = streamingAnswerBuffers.getOrDefault(message.messageUid(), new StringBuilder()).toString().trim();
         payload.put("answer", partialAnswer);
         publishEvent(AgentEventType.MESSAGE_CANCELED, conversationUid, message.messageUid(), null, payload);
-        publishChannelMessageCompletedEvent(message, MessageStatus.CANCELED, i18n("agent.message.canceled"));
+        publishChannelMessageCompletedEvent(message, MessageStatus.CANCELED, feedbackBuilder.messageCanceled());
         streamingAnswerBuffers.remove(message.messageUid());
     }
 
@@ -1104,27 +1117,37 @@ public class AgentApplicationService {
                         properties.getLoop().getMaxRounds(),
                         latestStep.stepUid(),
                         latestStep.title());
-                ObjectNode approvalPayload = stepPayload(latestStep, "approval required");
-                String approvalDetails = buildStepApprovalDetails(latestStep);
-                applyUserFacingFields(approvalPayload, latestStep, "waiting_approval", i18n("agent.step.summary.waitingApproval"), approvalDetails);
+                ObjectNode approvalPayload = feedbackBuilder.stepPayload(latestStep, "approval required");
+                String approvalDetails = feedbackBuilder.buildStepApprovalDetails(latestStep);
+                feedbackBuilder.applyUserFacingFields(approvalPayload, latestStep, "waiting_approval", feedbackBuilder.summaryWaitingApproval(), approvalDetails);
                 approvalPayload.put("policyReasonCode", policyDecision.reasonCode().name());
                 publishEvent(AgentEventType.STEP_WAITING_APPROVAL, message.conversationUid(), message.messageUid(), latestStep.stepUid(),
                         approvalPayload);
                 return RoundExecutionResult.pendingApproval();
             }
 
-            StepExecutionOutcome outcome = executeStepWithRetry(message, latestStep, state.currentRound());
+            StepExecutionService.RuntimeContext runtimeContext = new StepExecutionService.RuntimeContext(
+                    conversation,
+                    executionAgent,
+                    workspaceConfig,
+                    messageApprovalModes.getOrDefault(message.messageUid(), APPROVAL_MODE_DEFAULT)
+            );
+            StepExecutionService.StepExecutionOutcome outcome = stepExecutionService.executeStepWithRetry(
+                    message,
+                    latestStep,
+                    state.currentRound(),
+                    runtimeContext
+            );
             if (outcome.canceled()) {
                 return RoundExecutionResult.cancelled();
             }
-            StepExecutionOutcome integratedOutcome = integrateImageLoaderContext(message, latestStep, outcome);
             state.memory().add(ToolExecutionResultMessage.from(
                     toolCallId(latestStep),
                     latestStep.toolName(),
-                    integratedOutcome.memoryText()
+                    outcome.memoryText()
             ));
-            if (integratedOutcome.injectedMemoryMessage() != null) {
-                state.memory().add(integratedOutcome.injectedMemoryMessage());
+            if (outcome.injectedMemoryMessage() != null) {
+                state.memory().add(outcome.injectedMemoryMessage());
             }
         }
 
@@ -1371,7 +1394,7 @@ public class AgentApplicationService {
                     UUID.randomUUID().toString(),
                     roundIndex,
                     stepIndex++,
-                    buildStepTitle(toolCall.name(), toolArgs),
+                    feedbackBuilder.buildStepTitle(toolCall.name(), toolArgs),
                     toolCall.name(),
                     toolArgs,
                     riskLevel,
@@ -1717,7 +1740,7 @@ public class AgentApplicationService {
     }
 
     private void completeMessage(AgentMessage message, String answer, int roundsUsed) {
-        String finalAnswer = answer == null || answer.isBlank() ? i18n("agent.message.completed") : answer.trim();
+        String finalAnswer = answer == null || answer.isBlank() ? feedbackBuilder.messageCompletedDefault() : answer.trim();
         store.updateMessageStatus(message.messageUid(), MessageStatus.COMPLETED);
         persistAssistantReply(message, finalAnswer);
         ObjectNode payload = basePayload("message completed");
@@ -1810,7 +1833,7 @@ public class AgentApplicationService {
 
     private void failMessage(AgentMessage message, String answer, String stopReason) {
         store.updateMessageStatus(message.messageUid(), MessageStatus.FAILED);
-        String finalAnswer = answer == null || answer.isBlank() ? i18n("agent.message.failed") : answer.trim();
+        String finalAnswer = answer == null || answer.isBlank() ? feedbackBuilder.messageFailedDefault() : answer.trim();
         persistAssistantReply(message, finalAnswer);
         ObjectNode payload = basePayload(finalAnswer);
         payload.put("status", MessageStatus.FAILED.name());
@@ -1854,7 +1877,7 @@ public class AgentApplicationService {
      * Event payload / run 视图数据组装（建议后续抽离到 ExecutionFeedbackBuilder）
      */
     private ObjectNode buildPlanPayload(List<PlanStep> steps, int roundIndex) {
-        ObjectNode payload = basePayload("tool calls created");
+        ObjectNode payload = feedbackBuilder.basePayload("tool calls created");
         payload.put("roundIndex", roundIndex);
         payload.set("steps", JsonNodeFactory.instance.arrayNode().addAll(
                 steps.stream().map(step -> {
@@ -1871,7 +1894,13 @@ public class AgentApplicationService {
         ));
         payload.set("displaySteps", JsonNodeFactory.instance.arrayNode().addAll(
                 steps.stream()
-                        .map(step -> userFacingStepNode(step, "planned", i18n("agent.step.summary.planned"), buildStepPlanDetails(step), null))
+                        .map(step -> feedbackBuilder.userFacingStepNode(
+                                step,
+                                "planned",
+                                feedbackBuilder.summaryPlanned(),
+                                feedbackBuilder.buildStepPlanDetails(step),
+                                null
+                        ))
                         .toList()
         ));
         return payload;
@@ -2028,92 +2057,10 @@ public class AgentApplicationService {
      * <p>该方法属于展示层拼装，不参与执行决策。
      */
     private ConversationMessageRunDto toMessageRunResponse(AgentMessage message) {
-        List<PlanStep> steps = store.listSteps(message.messageUid()).stream()
-                .sorted(Comparator.comparingInt(PlanStep::roundIndex).thenComparingInt(PlanStep::stepIndex))
-                .toList();
-        List<AgentEvent> events = store.listEventsByMessage(message.messageUid());
-        if (steps.isEmpty() && events.isEmpty()) {
-            return null;
-        }
-
-        Map<String, RunStepAccumulator> stepMap = new LinkedHashMap<>();
-        for (PlanStep step : steps) {
-            stepMap.put(step.stepUid(), RunStepAccumulator.fromStep(step, buildDisplayTitle(step), buildStepPlanDetails(step)));
-        }
-
-        String runStatus = "planned";
-        Instant updatedTime = message.createdAt();
-        for (AgentEvent event : events) {
-            updatedTime = event.timestamp();
-            if (event.eventType() == AgentEventType.PLAN_CREATED) {
-                JsonNode displaySteps = event.payload() == null ? null : event.payload().path("displaySteps");
-                if (displaySteps != null && displaySteps.isArray()) {
-                    for (JsonNode node : displaySteps) {
-                        String stepUid = node.path("stepUid").asString("");
-                        if (stepUid.isBlank()) {
-                            continue;
-                        }
-                        stepMap.computeIfAbsent(stepUid, ignored -> RunStepAccumulator.fromEventNode(node))
-                                .applyEventNode(node, event.timestamp());
-                    }
-                }
-                runStatus = "planned";
-                continue;
-            }
-            if (event.eventType() == AgentEventType.MESSAGE_COMPLETED) {
-                runStatus = "COMPLETED".equalsIgnoreCase(event.payload().path("status").asString("")) ? "completed" : "failed";
-                continue;
-            }
-            if (event.eventType() == AgentEventType.MESSAGE_CANCELED) {
-                runStatus = "canceled";
-                continue;
-            }
-            if (event.eventType() == AgentEventType.LOOP_LIMIT_REACHED) {
-                runStatus = "failed";
-                continue;
-            }
-            if (event.stepUid() == null || event.stepUid().isBlank()) {
-                continue;
-            }
-            RunStepAccumulator accumulator = stepMap.computeIfAbsent(event.stepUid(), ignored -> RunStepAccumulator.empty(event.stepUid()));
-            accumulator.applyEvent(event);
-            if (event.eventType() == AgentEventType.STEP_WAITING_APPROVAL) {
-                runStatus = "waiting_approval";
-            } else if (event.eventType() == AgentEventType.STEP_STARTED) {
-                runStatus = "running";
-            }
-        }
-
-        Map<String, PlanStep> stepByUid = steps.stream()
-                .collect(Collectors.toMap(PlanStep::stepUid, Function.identity(), (left, right) -> left, LinkedHashMap::new));
-        for (Map.Entry<String, PlanStep> entry : stepByUid.entrySet()) {
-            PlanStep step = entry.getValue();
-            stepMap.computeIfAbsent(step.stepUid(), ignored -> RunStepAccumulator.fromStep(
-                    step,
-                    buildDisplayTitle(step),
-                    buildStepPlanDetails(step)
-            ));
-        }
-
-        String defaultTitle = i18n("agent.step.display.default");
-        String plannedSummary = i18n("agent.step.summary.planned");
-        List<ConversationRunStepDto> stepResponses = stepMap.values().stream()
-                .sorted(Comparator.comparingInt(RunStepAccumulator::roundIndex).thenComparingInt(RunStepAccumulator::stepIndex))
-                .map(step -> step.toResponse(defaultTitle, plannedSummary))
-                .toList();
-        if (stepResponses.isEmpty()) {
-            return null;
-        }
-        int completedSteps = (int) stepResponses.stream().filter(step -> "completed".equals(step.status())).count();
-        String normalizedStatus = normalizeRunStatus(runStatus, stepResponses);
-        return new ConversationMessageRunDto(
-                message.messageUid(),
-                normalizedStatus,
-                buildRunSummary(normalizedStatus, completedSteps, stepResponses.size()),
-                completedSteps,
-                stepResponses.size(),
-                updatedTime,
-                stepResponses
+        return runViewAssembler.toMessageRunResponse(
+                message,
+                store.listSteps(message.messageUid()),
+                store.listEventsByMessage(message.messageUid())
         );
     }
 

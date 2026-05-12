@@ -11,7 +11,7 @@
   - `web/` 下的 Vue 3 前端工程
   - `src/main/resources/static/` 下保留的静态页面版本
 - 通信方式：REST API + SSE
-- Agent 核心：`AgentApplicationService`
+- Agent 核心：`AgentApplicationService`（Facade）
 - 推理层：`Planner` / `TaskPlanner`
 - 执行层：`ToolExecutor` + `ToolRegistry`
 - 存储层：`AgentStore`，当前优先使用 `MybatisPlusAgentStore`
@@ -34,7 +34,10 @@
    `AgentController` 提供对话、消息提交、审批、取消、SSE 订阅接口。
 
 3. 编排层  
-   `AgentApplicationService` 负责消息创建、推理循环、步骤执行、重试、审批暂停、最大轮次保护、事件落库与推送。
+   `AgentApplicationService` 作为 Facade 负责路由与协调；核心执行拆分为：
+   - `StepExecutionService`：单步执行、重试、policy 判定、进度/结果事件
+   - `ExecutionFeedbackBuilder`：步骤展示文案与 payload 组装
+   - `RunViewAssembler`：运行视图聚合（event + step -> run dto）
 
 4. 能力层  
    包括推理器 `TaskPlanner`、风险策略 `RiskPolicy`、结果评审 `StepReviewer`、工具执行器 `ToolExecutor`、工具规格注册器 `ToolSpecificationRegistry` 与具体工具实现。
@@ -53,8 +56,11 @@
 flowchart LR
     A["Frontend (static/index.html + app.js)"]
     B["REST API (AgentController)"]
-    C["Orchestrator (AgentApplicationService)"]
+    C["Orchestrator Facade (AgentApplicationService)"]
     D["Planner / Policy / Reviewer / Executor"]
+    K["StepExecutionService"]
+    L["ExecutionFeedbackBuilder"]
+    M["RunViewAssembler"]
     E["Tool Layer (file / command / browser / cron)"]
     F["AgentStore + EventBus"]
     G["MySQL"]
@@ -66,6 +72,9 @@ flowchart LR
     A --> H
     B --> C
     C --> D
+    C --> K
+    C --> L
+    C --> M
     D --> E
     D --> J
     C --> F
@@ -85,8 +94,9 @@ flowchart LR
 5. 如果模型返回 tool calls，则将其写入 `agent_step` 并发送 `PLAN_CREATED` 事件；如果没有 tool calls，则直接视为最终回答。
 6. 编排层逐步读取当前 round 的步骤并执行：
    - 先做风险审批判断
-   - 再通过 `ToolExecutor` 分发到具体工具
+   - 再由 `StepExecutionService` 调用 `ToolExecutor` 分发到具体工具
    - 再由 `StepReviewer` 判断是否满足完成条件
+   - `ExecutionFeedbackBuilder` 负责组装用户可见文案与步骤 payload
 7. 执行中的每个关键节点都会：
    - 记录状态到数据库
    - 追加 `agent_event`
@@ -145,6 +155,7 @@ Agent loop 的详细控制流、round/retry 区分、审批暂停、失败重规
 - `CANCELED`
 
 消息由 `AgentApplicationService` 驱动，核心控制逻辑是“统一 round loop 下的 reasoning + acting + tool result 回填 + 最大 round 保护”。
+运行视图（`listMessageRuns`）由 `RunViewAssembler` 基于 `agent_step + agent_event` 聚合生成。
 
 ### 4.2 步骤状态
 
