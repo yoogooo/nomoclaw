@@ -67,10 +67,6 @@ public class AgentCatalogAppService {
         skillCatalogApplicationService.deleteSkill(skillKey);
     }
 
-    public List<AgentSkillDto> listAgentSkills(String agentUid) {
-        return facade.listAgentSkills(agentUid);
-    }
-
     public AgentCatalogAgentDto createAgent(CreateAgentCommand command) {
         return facade.createAgent(command);
     }
@@ -81,10 +77,6 @@ public class AgentCatalogAppService {
 
     public AgentCatalogAgentDto updateAgentBasicInfo(String agentUid, UpdateAgentBasicInfoCommand command) {
         return facade.updateAgentBasicInfo(agentUid, command);
-    }
-
-    public AgentSkillDto updateAgentSkillStatus(String agentUid, String skillKey, boolean enabled) {
-        return facade.updateAgentSkillStatus(agentUid, skillKey, enabled);
     }
 
     public AgentSkillDto importSkillFromUrl(String agentUid, ImportSkillFromUrlCommand command) {

@@ -168,12 +168,6 @@ public class AgentController {
         return ApiDtoMapper.toSkillBindings(agentCatalogAppService.getSkillBindings(skillKey));
     }
 
-    @GetMapping("/agents/{agentUid}/skills")
-    public List<AgentSkillResponse> listAgentSkills(@PathVariable String agentUid) {
-        log.info("[AgentAPI] listAgentSkills agentUid={}", agentUid);
-        return ApiDtoMapper.toAgentSkills(agentCatalogAppService.listAgentSkills(agentUid));
-    }
-
     @PostMapping("/agents")
     public AgentCatalogAgentResponse createAgent(@Valid @RequestBody CreateAgentRequest request) {
         log.info("[AgentAPI] createAgent agentName={} displayName={}", request.agentName(), request.displayName());
@@ -319,15 +313,6 @@ public class AgentController {
         log.info("[AgentAPI] startCodexLogin");
         ModelConfigAppService.ProbeResult result = modelConfigAppService.startCodexLogin();
         return new ModelProviderTestResponse(result.success(), result.message());
-    }
-
-    @PatchMapping("/agents/{agentUid}/skills/{skillKey}")
-    public AgentSkillResponse updateAgentSkillStatus(@PathVariable String agentUid,
-                                                     @PathVariable String skillKey,
-                                                     @Valid @RequestBody UpdateAgentSkillStatusRequest request) {
-        log.info("[AgentAPI] updateAgentSkillStatus agentUid={} skillKey={} enabled={}",
-                agentUid, skillKey, request.enabled());
-        return ApiDtoMapper.toAgentSkill(agentCatalogAppService.updateAgentSkillStatus(agentUid, skillKey, request.enabled()));
     }
 
     @PatchMapping("/skills/{skillKey}")

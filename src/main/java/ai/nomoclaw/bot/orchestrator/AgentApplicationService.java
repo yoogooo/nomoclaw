@@ -119,7 +119,6 @@ public class AgentApplicationService {
     private final AgentGroupDefinitionRepository agentGroupDefinitionRepository;
     private final AgentGroupMemberRepository agentGroupMemberRepository;
     private final AgentDefinitionRepository agentDefinitionRepository;
-    private final SkillDefinitionRepository skillDefinitionRepository;
     private final AgentSkillRelationRepository agentSkillRelationRepository;
     private final AgentTipApplicationService agentTipApplicationService;
     private final ToolDefinitionRepository toolDefinitionRepository;
@@ -154,7 +153,6 @@ public class AgentApplicationService {
                                    AgentGroupDefinitionRepository agentGroupDefinitionRepository,
                                    AgentGroupMemberRepository agentGroupMemberRepository,
                                    AgentDefinitionRepository agentDefinitionRepository,
-                                   SkillDefinitionRepository skillDefinitionRepository,
                                    AgentSkillRelationRepository agentSkillRelationRepository,
                                    AgentTipApplicationService agentTipApplicationService,
                                    ToolDefinitionRepository toolDefinitionRepository,
@@ -185,7 +183,6 @@ public class AgentApplicationService {
         this.agentGroupDefinitionRepository = agentGroupDefinitionRepository;
         this.agentGroupMemberRepository = agentGroupMemberRepository;
         this.agentDefinitionRepository = agentDefinitionRepository;
-        this.skillDefinitionRepository = skillDefinitionRepository;
         this.agentSkillRelationRepository = agentSkillRelationRepository;
         this.agentTipApplicationService = agentTipApplicationService;
         this.toolDefinitionRepository = toolDefinitionRepository;
@@ -295,34 +292,6 @@ public class AgentApplicationService {
                         buildMessageFileLinks(message),
                         attachmentsByMessage.getOrDefault(message.messageUid(), List.of())
                 ))
-                .toList();
-    }
-
-    public List<AgentSkillDto> listAgentSkills(String agentUid) {
-        String normalizedAgentUid = normalizeAgentUid(agentUid);
-        List<SkillDefinitionEntity> skillDefinitions = skillDefinitionRepository.listAllActive();
-        Map<String, AgentSkillRelationEntity> relationsBySkillKey = agentSkillRelationRepository.listByAgentUid(normalizedAgentUid)
-                .stream()
-                .collect(Collectors.toMap(
-                        AgentSkillRelationEntity::getSkillKey,
-                        relation -> relation,
-                        (left, right) -> left,
-                        LinkedHashMap::new
-                ));
-        return skillDefinitions.stream()
-                .map(skill -> {
-                    AgentSkillRelationEntity relation = relationsBySkillKey.get(skill.getSkillKey());
-                    boolean enabled = relation != null && "ACTIVE".equalsIgnoreCase(relation.getStatus());
-                    LocalDateTime updatedTime = relation == null ? skill.getUpdatedTime() : relation.getUpdatedTime();
-                    return new AgentSkillDto(
-                            skill.getSkillKey(),
-                            skill.getDisplayName(),
-                            skill.getDescription(),
-                            skill.getSkillPath(),
-                            enabled,
-                            updatedTime
-                    );
-                })
                 .toList();
     }
 
@@ -454,47 +423,6 @@ public class AgentApplicationService {
             member.setIsPrimary(0);
         }
         return toAgentCatalogItem(member, agent);
-    }
-
-    public AgentSkillDto updateAgentSkillStatus(String agentUid, String skillKey, boolean enabled) {
-        String normalizedAgentUid = normalizeAgentUid(agentUid);
-        String normalizedSkillKey = skillKey == null ? "" : skillKey.trim();
-        if (normalizedSkillKey.isBlank()) {
-            throw new IllegalArgumentException("skillKey must not be blank");
-        }
-        SkillDefinitionEntity skill = skillDefinitionRepository.findActiveByKey(normalizedSkillKey);
-        if (skill == null) {
-            throw new IllegalArgumentException("skill not found: " + normalizedSkillKey);
-        }
-
-        AgentSkillRelationEntity relation = agentSkillRelationRepository.findByAgentUidAndSkillKey(normalizedAgentUid, normalizedSkillKey);
-        LocalDateTime now = LocalDateTime.now();
-        String nextStatus = enabled ? "ACTIVE" : "DISABLED";
-        if (relation == null) {
-            relation = new AgentSkillRelationEntity();
-            relation.setRelationUid(UUID.randomUUID().toString());
-            relation.setAgentUid(normalizedAgentUid);
-            relation.setSkillKey(normalizedSkillKey);
-            relation.setStatus(nextStatus);
-            relation.setSortIndex(0);
-            relation.setConfigJson("{}");
-            relation.setCreatedTime(now);
-            relation.setUpdatedTime(now);
-            agentSkillRelationRepository.save(relation);
-        } else {
-            relation.setStatus(nextStatus);
-            relation.setUpdatedTime(now);
-            agentSkillRelationRepository.updateById(relation);
-        }
-
-        return new AgentSkillDto(
-                skill.getSkillKey(),
-                skill.getDisplayName(),
-                skill.getDescription(),
-                skill.getSkillPath(),
-                enabled,
-                relation.getUpdatedTime()
-        );
     }
 
     public List<AgentToolDto> listAgentTools(String agentUid) {
