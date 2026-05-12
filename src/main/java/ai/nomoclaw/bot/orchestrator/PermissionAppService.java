@@ -1,8 +1,8 @@
 package ai.nomoclaw.bot.orchestrator;
 
-import ai.nomoclaw.bot.api.dto.permission.request.UpdatePermissionRulesRequest;
-import ai.nomoclaw.bot.api.dto.permission.response.PermissionRulePayload;
-import ai.nomoclaw.bot.api.dto.permission.response.PermissionRulesResponse;
+import ai.nomoclaw.bot.application.command.UpdatePermissionRulesCommand;
+import ai.nomoclaw.bot.application.dto.PermissionRuleDto;
+import ai.nomoclaw.bot.application.dto.PermissionRulesDto;
 import ai.nomoclaw.bot.policy.tool.ToolPermissionPolicyService;
 import ai.nomoclaw.bot.policy.tool.permission.*;
 import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
@@ -42,15 +42,15 @@ public class PermissionAppService {
         this.hardGuardService = hardGuardService;
     }
 
-    public PermissionRulesResponse getEffectiveRules(String conversationUid, String agentUid) {
+    public PermissionRulesDto getEffectiveRules(String conversationUid, String agentUid) {
         AgentDefinitionEntity agent = resolveAgent(agentUid);
         String agentName = agent == null ? NomoClawPaths.DEFAULT_AGENT_NAME : agent.getAgentName();
         String resolvedAgentUid = agent == null ? "" : agent.getAgentUid();
         List<PermissionRule> effective = toolPermissionPolicyService.effectiveRules(agentName, conversationUid == null ? "" : conversationUid);
 
-        List<PermissionRulePayload> sessionRules = new ArrayList<>();
-        List<PermissionRulePayload> agentRules = new ArrayList<>();
-        List<PermissionRulePayload> userRules = new ArrayList<>();
+        List<PermissionRuleDto> sessionRules = new ArrayList<>();
+        List<PermissionRuleDto> agentRules = new ArrayList<>();
+        List<PermissionRuleDto> userRules = new ArrayList<>();
         for (PermissionRule rule : effective) {
             if (rule.source() == PermissionSource.SESSION) {
                 sessionRules.add(toPayload(rule));
@@ -61,7 +61,7 @@ public class PermissionAppService {
             }
         }
 
-        return new PermissionRulesResponse(
+        return new PermissionRulesDto(
                 resolvedAgentUid,
                 agentName,
                 sessionRules,
@@ -73,7 +73,7 @@ public class PermissionAppService {
         );
     }
 
-    public PermissionRulesResponse updateAgentRules(String agentUid, UpdatePermissionRulesRequest request) {
+    public PermissionRulesDto updateAgentRules(String agentUid, UpdatePermissionRulesCommand request) {
         AgentDefinitionEntity agent = resolveAgent(agentUid);
         if (agent == null) {
             throw new IllegalArgumentException("agent not found: " + agentUid);
@@ -89,7 +89,7 @@ public class PermissionAppService {
         return getEffectiveRules("", agentUid);
     }
 
-    public PermissionRulesResponse updateUserRules(String agentUid, UpdatePermissionRulesRequest request) {
+    public PermissionRulesDto updateUserRules(String agentUid, UpdatePermissionRulesCommand request) {
         List<PermissionRule> rules = parseRules(request, PermissionSource.USER_SETTINGS);
         settingsStore.saveUserRules(rules);
         return getEffectiveRules("", agentUid);
@@ -324,12 +324,12 @@ public class PermissionAppService {
         ));
     }
 
-    private List<PermissionRule> parseRules(UpdatePermissionRulesRequest request, PermissionSource source) {
+    private List<PermissionRule> parseRules(UpdatePermissionRulesCommand request, PermissionSource source) {
         if (request == null || request.rules() == null) {
             return List.of();
         }
         List<PermissionRule> out = new ArrayList<>();
-        for (PermissionRulePayload payload : request.rules()) {
+        for (PermissionRuleDto payload : request.rules()) {
             if (payload == null) {
                 continue;
             }
@@ -362,8 +362,8 @@ public class PermissionAppService {
         return out;
     }
 
-    private PermissionRulePayload toPayload(PermissionRule rule) {
-        return new PermissionRulePayload(
+    private PermissionRuleDto toPayload(PermissionRule rule) {
+        return new PermissionRuleDto(
                 rule.ruleId(),
                 rule.effect().name(),
                 rule.tool(),
