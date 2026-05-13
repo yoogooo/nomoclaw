@@ -5,8 +5,8 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import java.util.List;
 import java.util.function.Function;
 
-public final class PageResults {
-    private PageResults() {
+public final class PageResultMapper {
+    private PageResultMapper() {
     }
 
     public static <S, T> PageResult<T> fromMpPage(IPage<S> page, Function<S, T> converter) {

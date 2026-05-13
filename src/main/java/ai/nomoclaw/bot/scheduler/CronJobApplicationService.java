@@ -4,7 +4,7 @@ import ai.nomoclaw.bot.application.command.CreateCronJobCommand;
 import ai.nomoclaw.bot.application.command.UpdateCronJobCommand;
 import ai.nomoclaw.bot.application.common.page.PageRequest;
 import ai.nomoclaw.bot.application.common.page.PageResult;
-import ai.nomoclaw.bot.application.common.page.PageResults;
+import ai.nomoclaw.bot.application.common.page.PageResultMapper;
 import ai.nomoclaw.bot.application.dto.*;
 import ai.nomoclaw.bot.channel.config.AgentChannelsProperties;
 import ai.nomoclaw.bot.channel.config.ChannelBotCredentialResolver;
@@ -398,7 +398,7 @@ public class CronJobApplicationService {
                 .map(AgentCronJobExecutionEntity::getAgentUid)
                 .filter(uid -> uid != null && !uid.isBlank())
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new)));
-        return PageResults.fromMpPage(executionPage, item -> {
+        return PageResultMapper.fromMpPage(executionPage, item -> {
             AgentCronJobEntity job = jobsByUid.get(item.getJobUid());
             String resultAgentUid = nullToEmpty(item.getAgentUid());
             AgentDefinitionEntity agent = agentsByUid.get(resultAgentUid);
