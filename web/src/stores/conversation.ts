@@ -722,8 +722,13 @@ export const useConversationStore = defineStore("conversation", () => {
     agentCatalogStore.ensureSelection();
   }
 
-  async function refreshConversations(preferredConversationUid: string | null = currentConversationUid.value) {
-    loading.value = true;
+  async function refreshConversations(
+    preferredConversationUid: string | null = currentConversationUid.value,
+    withLoading = true
+  ) {
+    if (withLoading) {
+      loading.value = true;
+    }
     try {
       await loadConversationSummaries();
 
@@ -749,7 +754,9 @@ export const useConversationStore = defineStore("conversation", () => {
 
       syncRuntimeModelSelection();
     } finally {
-      loading.value = false;
+      if (withLoading) {
+        loading.value = false;
+      }
     }
   }
 
@@ -860,7 +867,7 @@ export const useConversationStore = defineStore("conversation", () => {
     const createAgentUid = agentCatalogStore.selectedAgentUid;
     const created = await conversationApi.createConversation(createGroupUid, createAgentUid);
     currentConversationUid.value = created.conversationUid;
-    await refreshConversations(created.conversationUid);
+    await refreshConversations(created.conversationUid, false);
     subscribeEvents();
     return created.conversationUid;
   }
@@ -995,7 +1002,7 @@ export const useConversationStore = defineStore("conversation", () => {
       tempMessage.messageUid = accepted.messageUid;
       runningConversationUid.value = conversationUid;
       runtimeLogStore.append(tr("chat.runtime.messageSubmitted", { messageUid: accepted.messageUid }));
-      await refreshConversations(conversationUid);
+      await refreshConversations(conversationUid, false);
     } catch (error) {
       messages.value = messages.value.filter((item) => item !== tempMessage);
       draftMessage.value = content;
@@ -1239,7 +1246,7 @@ export const useConversationStore = defineStore("conversation", () => {
       if (currentConversationUid.value) {
         await loadMessages(currentConversationUid.value);
         if (!skipConversationListRefresh.value) {
-          await refreshConversations(currentConversationUid.value);
+          await refreshConversations(currentConversationUid.value, false);
         }
       }
       return;
@@ -1266,7 +1273,7 @@ export const useConversationStore = defineStore("conversation", () => {
       if (currentConversationUid.value) {
         await loadMessages(currentConversationUid.value);
         if (!skipConversationListRefresh.value) {
-          await refreshConversations(currentConversationUid.value);
+          await refreshConversations(currentConversationUid.value, false);
         }
       }
     }

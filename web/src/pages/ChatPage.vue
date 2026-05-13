@@ -143,6 +143,16 @@ watch(
 watch(
   () => [routeConversationUid.value, routeAgentUid.value, routeJobUid.value],
   () => {
+    const currentConversationUid = String(conversationStore.currentConversationUid || "").trim();
+    if (
+      routeSource.value !== "cron"
+      && routeConversationUid.value
+      && routeConversationUid.value === currentConversationUid
+    ) {
+      applyingRouteContext.value = false;
+      cronRouteBootstrapDone.value = true;
+      return;
+    }
     if (!routeConversationUid.value) {
       applyingRouteContext.value = false;
       cronRouteBootstrapDone.value = true;
