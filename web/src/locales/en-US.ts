@@ -212,6 +212,16 @@ const enUS = {
       collapseMessage: "Collapse",
       processing: "Processing...",
       runTitle: "Execution",
+      runStatus: {
+        completed: "Completed",
+        failed: "Failed",
+        rejected: "Rejected",
+        canceled: "Canceled",
+        waitingApproval: "Waiting approval",
+        running: "Running",
+        planned: "Planned",
+        preparing: "Preparing"
+      },
       noExtraDetails: "No extra details",
       commandBlockLabel: "Command",
       outputBlockLabel: "Output",

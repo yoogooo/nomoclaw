@@ -212,6 +212,16 @@ const zhCN = {
       collapseMessage: "收起",
       processing: "处理进行中…",
       runTitle: "执行过程",
+      runStatus: {
+        completed: "执行完成",
+        failed: "执行失败",
+        rejected: "已拒绝",
+        canceled: "已取消",
+        waitingApproval: "等待确认",
+        running: "执行中",
+        planned: "已规划",
+        preparing: "准备中"
+      },
       noExtraDetails: "无附加详情",
       commandBlockLabel: "执行命令",
       outputBlockLabel: "输出结果",

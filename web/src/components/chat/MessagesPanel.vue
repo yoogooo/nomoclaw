@@ -138,6 +138,18 @@ function runTone(status: string) {
   return "default";
 }
 
+function runStatusText(status: string) {
+  if (status === "completed") return t("chat.messages.runStatus.completed");
+  if (status === "failed") return t("chat.messages.runStatus.failed");
+  if (status === "rejected") return t("chat.messages.runStatus.rejected");
+  if (status === "canceled") return t("chat.messages.runStatus.canceled");
+  if (status === "waiting_approval") return t("chat.messages.runStatus.waitingApproval");
+  if (status === "running") return t("chat.messages.runStatus.running");
+  if (status === "planned") return t("chat.messages.runStatus.planned");
+  if (status === "preparing") return t("chat.messages.runStatus.preparing");
+  return status;
+}
+
 function runStepStateKey(messageUid: string | undefined, stepUid: string) {
   return `${messageUid || "unknown"}:${stepUid}`;
 }
@@ -708,7 +720,7 @@ onMounted(() => {
                 </template>
                 <template #header-extra>
                   <n-tag size="small" :type="runTone(conversationRunsStore.runsByMessageUid[message.messageUid].status)">
-                    {{ conversationRunsStore.runsByMessageUid[message.messageUid].status }}
+                    {{ runStatusText(conversationRunsStore.runsByMessageUid[message.messageUid].status) }}
                   </n-tag>
                 </template>
                 <div class="run-summary">{{ conversationRunsStore.runsByMessageUid[message.messageUid].summary }}</div>
@@ -720,7 +732,7 @@ onMounted(() => {
                     :name="step.stepUid"
                   >
                     <template #header-extra>
-                      <n-tag size="small" :type="runTone(step.status)">{{ step.status }}</n-tag>
+                      <n-tag size="small" :type="runTone(step.status)">{{ runStatusText(step.status) }}</n-tag>
                     </template>
                     <template v-if="getRunStepRenderData(step).isCommand">
                       <div class="run-command-blocks">
