@@ -430,6 +430,9 @@ CREATE TABLE IF NOT EXISTS agent_cron_job_execution (
     status VARCHAR(32) NOT NULL DEFAULT 'RUNNING',
     summary VARCHAR(1024) NOT NULL DEFAULT '',
     report_path VARCHAR(1024) NOT NULL DEFAULT '',
+    approval_wait_started_time TIMESTAMP(3) NULL,
+    approval_timeout_seconds INT NOT NULL DEFAULT 1800,
+    resume_requested INT NOT NULL DEFAULT 0,
     read_flag INT NOT NULL DEFAULT 0,
     started_time TIMESTAMP(3) NOT NULL,
     finished_time TIMESTAMP(3) NULL,
@@ -439,7 +442,8 @@ CREATE TABLE IF NOT EXISTS agent_cron_job_execution (
     UNIQUE (execution_uid),
     INDEX idx_agent_cron_job_execution_job (job_uid, started_time),
     INDEX idx_agent_cron_job_execution_status_time (status, started_time),
-    INDEX idx_agent_cron_job_execution_conversation (conversation_uid)
+    INDEX idx_agent_cron_job_execution_conversation (conversation_uid),
+    INDEX idx_agent_cron_job_execution_resume (status, resume_requested, updated_time)
 );
 
 INSERT INTO agent_definition (

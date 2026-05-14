@@ -58,7 +58,7 @@ onMounted(() => {
                     <div class="exec-title">{{ detail.jobTitle || detail.jobUid }}</div>
                     <div class="exec-meta">{{ detail.agentDisplayName }} · {{ formatDateTime(detail.executedTime) }}</div>
                   </div>
-                  <n-tag :type="detail.status === 'FAILED' ? 'error' : 'success'">{{ detail.status }}</n-tag>
+                  <n-tag :type="detail.status === 'FAILED' || detail.status === 'TIMED_OUT_APPROVAL' ? 'error' : 'success'">{{ detail.status }}</n-tag>
                 </div>
                 <div class="exec-summary">{{ detail.summary }}</div>
               </n-card>

@@ -12,6 +12,8 @@ import java.util.List;
 
 @Repository
 public class AgentCronJobExecutionRepository extends CrudRepository<AgentCronJobExecutionMapper, AgentCronJobExecutionEntity> {
+    private static final List<String> ACTIVE_STATUSES = List.of("RUNNING", "WAITING_APPROVAL");
+    private static final List<String> FINISHED_STATUSES = List.of("COMPLETED", "FAILED", "CANCELED", "TIMED_OUT_APPROVAL");
 
     public AgentCronJobExecutionEntity findByExecutionUid(String executionUid) {
         return lambdaQuery()
@@ -30,7 +32,7 @@ public class AgentCronJobExecutionRepository extends CrudRepository<AgentCronJob
 
     public List<AgentCronJobExecutionEntity> listRecent(int limit) {
         return lambdaQuery()
-                .in(AgentCronJobExecutionEntity::getStatus, List.of("COMPLETED", "FAILED", "CANCELED"))
+                .in(AgentCronJobExecutionEntity::getStatus, FINISHED_STATUSES)
                 .orderByDesc(AgentCronJobExecutionEntity::getStartedTime, AgentCronJobExecutionEntity::getId)
                 .last("LIMIT " + Math.max(limit, 1))
                 .list();
@@ -38,8 +40,17 @@ public class AgentCronJobExecutionRepository extends CrudRepository<AgentCronJob
 
     public List<AgentCronJobExecutionEntity> listRunning(int limit) {
         return lambdaQuery()
-                .in(AgentCronJobExecutionEntity::getStatus, List.of("RUNNING", "WAITING_APPROVAL"))
+                .in(AgentCronJobExecutionEntity::getStatus, ACTIVE_STATUSES)
                 .orderByDesc(AgentCronJobExecutionEntity::getStartedTime, AgentCronJobExecutionEntity::getId)
+                .last("LIMIT " + Math.max(limit, 1))
+                .list();
+    }
+
+    public List<AgentCronJobExecutionEntity> listActiveForResume(int limit) {
+        return lambdaQuery()
+                .in(AgentCronJobExecutionEntity::getStatus, ACTIVE_STATUSES)
+                .orderByDesc(AgentCronJobExecutionEntity::getResumeRequested)
+                .orderByAsc(AgentCronJobExecutionEntity::getUpdatedTime, AgentCronJobExecutionEntity::getId)
                 .last("LIMIT " + Math.max(limit, 1))
                 .list();
     }
@@ -57,7 +68,7 @@ public class AgentCronJobExecutionRepository extends CrudRepository<AgentCronJob
         if (status != null && !status.isBlank()) {
             query = query.eq(AgentCronJobExecutionEntity::getStatus, status.trim().toUpperCase());
         } else {
-            query = query.in(AgentCronJobExecutionEntity::getStatus, List.of("COMPLETED", "FAILED", "CANCELED"));
+            query = query.in(AgentCronJobExecutionEntity::getStatus, FINISHED_STATUSES);
         }
         if (startTime != null) {
             query = query.ge(AgentCronJobExecutionEntity::getStartedTime, startTime);
@@ -73,7 +84,7 @@ public class AgentCronJobExecutionRepository extends CrudRepository<AgentCronJob
     public AgentCronJobExecutionEntity findLatestRunningByJobUid(String jobUid) {
         return lambdaQuery()
                 .eq(AgentCronJobExecutionEntity::getJobUid, jobUid)
-                .in(AgentCronJobExecutionEntity::getStatus, List.of("RUNNING", "WAITING_APPROVAL"))
+                .in(AgentCronJobExecutionEntity::getStatus, ACTIVE_STATUSES)
                 .orderByDesc(AgentCronJobExecutionEntity::getStartedTime, AgentCronJobExecutionEntity::getId)
                 .last("LIMIT 1")
                 .one();
@@ -82,10 +93,22 @@ public class AgentCronJobExecutionRepository extends CrudRepository<AgentCronJob
     public AgentCronJobExecutionEntity findLatestFinishedByJobUid(String jobUid) {
         return lambdaQuery()
                 .eq(AgentCronJobExecutionEntity::getJobUid, jobUid)
-                .in(AgentCronJobExecutionEntity::getStatus, List.of("COMPLETED", "FAILED", "CANCELED"))
+                .in(AgentCronJobExecutionEntity::getStatus, FINISHED_STATUSES)
                 .orderByDesc(AgentCronJobExecutionEntity::getFinishedTime, AgentCronJobExecutionEntity::getStartedTime, AgentCronJobExecutionEntity::getId)
                 .last("LIMIT 1")
                 .one();
+    }
+
+    public void markResumeRequestedByMessageUid(String messageUid) {
+        if (messageUid == null || messageUid.isBlank()) {
+            return;
+        }
+        lambdaUpdate()
+                .eq(AgentCronJobExecutionEntity::getMessageUid, messageUid)
+                .in(AgentCronJobExecutionEntity::getStatus, ACTIVE_STATUSES)
+                .set(AgentCronJobExecutionEntity::getResumeRequested, 1)
+                .set(AgentCronJobExecutionEntity::getUpdatedTime, LocalDateTime.now())
+                .update();
     }
 
     public void markRead(String executionUid, LocalDateTime now) {

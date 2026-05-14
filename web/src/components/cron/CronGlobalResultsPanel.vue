@@ -16,6 +16,7 @@ function executionStatusText(status: string | null | undefined) {
   const normalized = (status || "").toUpperCase();
   if (normalized === "COMPLETED") return t("common.success");
   if (normalized === "FAILED") return t("common.failed");
+  if (normalized === "TIMED_OUT_APPROVAL") return t("cron.history.statusTimedOutApproval");
   return normalized || t("common.unknown");
 }
 
@@ -65,7 +66,7 @@ function openExecution(result: { executionUid?: string | null; conversationUid?:
         >
           <div class="recent-result-head">
             <div class="recent-result-title">{{ item.jobTitle || "未命名任务" }}</div>
-            <n-tag size="small" :type="item.status === 'FAILED' ? 'error' : 'success'">
+            <n-tag size="small" :type="item.status === 'FAILED' || item.status === 'TIMED_OUT_APPROVAL' ? 'error' : 'success'">
               {{ executionStatusText(item.status) }}
             </n-tag>
           </div>

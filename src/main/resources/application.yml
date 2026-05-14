@@ -67,6 +67,10 @@ agent:
 
 nomoclaw:
   root-dir: "${NOMOCLAW_ROOT_DIR:${user.home}/.nomoclaw}"
+  cron:
+    approval-timeout-seconds: 1800
+    resume-interval-seconds: 3
+    resume-batch-size: 100
   flyway:
     fail-on-migrate-error: false
 

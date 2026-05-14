@@ -763,6 +763,7 @@ public class AgentApplicationService {
             if (message.status() != MessageStatus.COMPLETED && message.status() != MessageStatus.CANCELED) {
                 executeMessageAsync(message.messageUid());
             }
+            applicationEventPublisher.publishEvent(new ApprovalGrantedEvent(message.messageUid()));
             return new ApprovalDecisionDto("accepted", appliedScope.name().toLowerCase(Locale.ROOT), appliedScope != PermissionScope.ONCE, matchedRuleId);
         }
 

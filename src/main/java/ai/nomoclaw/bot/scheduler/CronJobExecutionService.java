@@ -2,17 +2,19 @@ package ai.nomoclaw.bot.scheduler;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import ai.nomoclaw.bot.application.dto.ConversationMessageDto;
-import ai.nomoclaw.bot.workspace.AgentWorkspaceConfig;
-import ai.nomoclaw.bot.workspace.NomoClawPaths;
 import ai.nomoclaw.bot.domain.AgentMessage;
+import ai.nomoclaw.bot.model.MessageStatus;
 import ai.nomoclaw.bot.orchestrator.AgentApplicationService;
-import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
 import ai.nomoclaw.bot.store.entity.AgentCronJobEntity;
 import ai.nomoclaw.bot.store.entity.AgentCronJobExecutionEntity;
-import ai.nomoclaw.bot.store.repository.AgentDefinitionRepository;
+import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
 import ai.nomoclaw.bot.store.repository.AgentCronJobExecutionRepository;
 import ai.nomoclaw.bot.store.repository.AgentCronJobRepository;
+import ai.nomoclaw.bot.store.repository.AgentDefinitionRepository;
+import ai.nomoclaw.bot.workspace.AgentWorkspaceConfig;
+import ai.nomoclaw.bot.workspace.NomoClawPaths;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -37,19 +39,22 @@ public class CronJobExecutionService {
     private final CronNotificationFanoutService cronNotificationFanoutService;
     private final CronJobSchedulerService cronJobSchedulerService;
     private final AgentDefinitionRepository agentDefinitionRepository;
+    private final int defaultApprovalTimeoutSeconds;
 
     public CronJobExecutionService(AgentCronJobRepository agentCronJobRepository,
                                    AgentCronJobExecutionRepository agentCronJobExecutionRepository,
                                    AgentApplicationService agentApplicationService,
                                    CronNotificationFanoutService cronNotificationFanoutService,
                                    CronJobSchedulerService cronJobSchedulerService,
-                                   AgentDefinitionRepository agentDefinitionRepository) {
+                                   AgentDefinitionRepository agentDefinitionRepository,
+                                   @Value("${nomoclaw.cron.approval-timeout-seconds:1800}") int defaultApprovalTimeoutSeconds) {
         this.agentCronJobRepository = agentCronJobRepository;
         this.agentCronJobExecutionRepository = agentCronJobExecutionRepository;
         this.agentApplicationService = agentApplicationService;
         this.cronNotificationFanoutService = cronNotificationFanoutService;
         this.cronJobSchedulerService = cronJobSchedulerService;
         this.agentDefinitionRepository = agentDefinitionRepository;
+        this.defaultApprovalTimeoutSeconds = Math.max(defaultApprovalTimeoutSeconds, 1);
     }
 
     public void executeJob(String jobUid) {
@@ -58,32 +63,19 @@ public class CronJobExecutionService {
             return;
         }
 
-        Instant executedAt = Instant.now();
         LocalDateTime now = LocalDateTime.now();
         CurrentExecutionContext currentExecution = resolveOrCreateCurrentExecution(job, now);
         String executionUid = currentExecution.executionUid();
         String conversationUid = currentExecution.conversationUid();
         String messageUid = currentExecution.messageUid();
-        try {
-            if (conversationUid == null || conversationUid.isBlank() || messageUid == null || messageUid.isBlank()) {
-                // Mark scheduled runs with channel=cron so planner/executor can apply cron-specific safeguards.
-                conversationUid = agentApplicationService.createConversation("", job.getAgentUid(), "cron");
-                messageUid = agentApplicationService.submitMessage(conversationUid, job.getTaskContent(), "cron");
-                markCurrentExecution(job, executionUid, conversationUid, messageUid, now);
-            }
-            AgentMessage completedMessage = waitForCompletion(messageUid, executionUid);
-            String executionStatus = toExecutionStatus(completedMessage);
-            String finalContent = loadFinalAnswer(conversationUid, messageUid, completedMessage);
-            Path reportPath = writeReport(job, finalContent, executedAt, executionStatus);
-            notifyCompletion(job, finalContent, reportPath, executedAt, executionStatus);
-            updateJobResult(job, now, summarize(finalContent), reportPath, executionStatus, executionUid, conversationUid, messageUid);
-        } catch (Exception ex) {
-            Path reportPath = writeFailureReportSafely(job, ex, executedAt);
-            String failureSummary = summarize(ex.getMessage() == null ? "cron execution failed" : ex.getMessage());
-            notifyCompletion(job, failureSummary, reportPath, executedAt, "FAILED");
-            updateJobResult(job, now, failureSummary, reportPath, "FAILED", executionUid, conversationUid, messageUid);
-            log.error("[Quartz] cron job execution failed jobUid={}", jobUid, ex);
+
+        if (conversationUid == null || conversationUid.isBlank() || messageUid == null || messageUid.isBlank()) {
+            conversationUid = agentApplicationService.createConversation("", job.getAgentUid(), "cron");
+            messageUid = agentApplicationService.submitMessage(conversationUid, job.getTaskContent(), "cron");
+            markCurrentExecution(job, executionUid, conversationUid, messageUid, now);
         }
+
+        touchExecutionActiveState(executionUid, "RUNNING", now);
     }
 
     public String initializeCurrentExecution(String jobUid, LocalDateTime now) {
@@ -92,12 +84,141 @@ public class CronJobExecutionService {
             throw new IllegalArgumentException("cron job not found: " + jobUid);
         }
         String executionUid = UUID.randomUUID().toString();
-        // Manual trigger: create conversation/message immediately so UI can open execution chat right away.
         String conversationUid = agentApplicationService.createConversation("", job.getAgentUid(), "cron");
         String messageUid = agentApplicationService.submitMessage(conversationUid, job.getTaskContent(), "cron");
         createRunningExecution(job, executionUid, conversationUid, messageUid, now);
         updateJobConversationPointers(job.getJobUid(), conversationUid, messageUid, now);
         return executionUid;
+    }
+
+    public void resumeActiveExecutions(int limit) {
+        List<AgentCronJobExecutionEntity> activeExecutions = agentCronJobExecutionRepository.listActiveForResume(limit);
+        for (AgentCronJobExecutionEntity execution : activeExecutions) {
+            try {
+                processExecutionState(execution);
+            } catch (Exception ex) {
+                log.warn("[Cron] resume execution failed executionUid={} err={}", execution.getExecutionUid(), ex.toString());
+            }
+        }
+    }
+
+    public void signalResumeByMessageUid(String messageUid) {
+        agentCronJobExecutionRepository.markResumeRequestedByMessageUid(messageUid);
+    }
+
+    private void processExecutionState(AgentCronJobExecutionEntity execution) {
+        String executionUid = blankToNull(execution.getExecutionUid());
+        String messageUid = blankToNull(execution.getMessageUid());
+        if (executionUid == null || messageUid == null) {
+            return;
+        }
+        AgentMessage message = agentApplicationService.getMessage(messageUid);
+        if (message == null || message.status() == null) {
+            return;
+        }
+
+        MessageStatus messageStatus = message.status();
+        LocalDateTime now = LocalDateTime.now();
+        if (messageStatus == MessageStatus.WAITING_APPROVAL) {
+            handleWaitingApproval(execution, now);
+            return;
+        }
+        if (messageStatus == MessageStatus.RUNNING
+                || messageStatus == MessageStatus.CREATED
+                || messageStatus == MessageStatus.PLANNED
+                || messageStatus == MessageStatus.REPLANNING) {
+            touchExecutionActiveState(executionUid, "RUNNING", now);
+            return;
+        }
+        if (messageStatus == MessageStatus.COMPLETED
+                || messageStatus == MessageStatus.FAILED
+                || messageStatus == MessageStatus.CANCELED) {
+            completeExecution(execution, message, now);
+        }
+    }
+
+    private void handleWaitingApproval(AgentCronJobExecutionEntity execution, LocalDateTime now) {
+        String executionUid = blankToNull(execution.getExecutionUid());
+        if (executionUid == null) {
+            return;
+        }
+        LocalDateTime waitStartedAt = execution.getApprovalWaitStartedTime();
+        int timeoutSeconds = execution.getApprovalTimeoutSeconds() == null || execution.getApprovalTimeoutSeconds() <= 0
+                ? defaultApprovalTimeoutSeconds
+                : execution.getApprovalTimeoutSeconds();
+
+        if (waitStartedAt == null) {
+            agentCronJobExecutionRepository.update(new LambdaUpdateWrapper<AgentCronJobExecutionEntity>()
+                    .eq(AgentCronJobExecutionEntity::getExecutionUid, executionUid)
+                    .set(AgentCronJobExecutionEntity::getStatus, "WAITING_APPROVAL")
+                    .set(AgentCronJobExecutionEntity::getApprovalWaitStartedTime, now)
+                    .set(AgentCronJobExecutionEntity::getApprovalTimeoutSeconds, timeoutSeconds)
+                    .set(AgentCronJobExecutionEntity::getResumeRequested, 0)
+                    .set(AgentCronJobExecutionEntity::getUpdatedTime, now));
+            return;
+        }
+
+        if (waitStartedAt.plusSeconds(timeoutSeconds).isAfter(now)) {
+            touchExecutionActiveState(executionUid, "WAITING_APPROVAL", now);
+            return;
+        }
+
+        AgentCronJobEntity job = agentCronJobRepository.findByJobUid(execution.getJobUid());
+        if (job == null) {
+            return;
+        }
+        String timeoutSummary = summarize("等待审批超时，执行已终止。请在会话中手动继续或重试任务。");
+        updateJobResult(
+                job,
+                now,
+                timeoutSummary,
+                null,
+                "TIMED_OUT_APPROVAL",
+                executionUid,
+                blankToNull(execution.getConversationUid()),
+                blankToNull(execution.getMessageUid())
+        );
+    }
+
+    private void completeExecution(AgentCronJobExecutionEntity execution, AgentMessage message, LocalDateTime now) {
+        String executionUid = blankToNull(execution.getExecutionUid());
+        if (executionUid == null || execution.getFinishedTime() != null) {
+            return;
+        }
+        AgentCronJobEntity job = agentCronJobRepository.findByJobUid(execution.getJobUid());
+        if (job == null) {
+            return;
+        }
+
+        String conversationUid = blankToNull(execution.getConversationUid());
+        String messageUid = blankToNull(execution.getMessageUid());
+        String executionStatus = toExecutionStatus(message.status());
+        String finalContent = loadFinalAnswer(conversationUid, messageUid, message);
+        String summary = summarize(finalContent);
+        Instant executedAt = execution.getStartedTime() == null
+                ? Instant.now()
+                : execution.getStartedTime().atZone(ZoneId.systemDefault()).toInstant();
+        Path reportPath = null;
+        try {
+            reportPath = writeReport(job, finalContent, executedAt, executionStatus);
+        } catch (Exception ex) {
+            log.warn("[Cron] write report failed executionUid={} err={}", executionUid, ex.toString());
+        }
+        notifyCompletion(job, finalContent, reportPath, executedAt, executionStatus);
+        updateJobResult(job, now, summary, reportPath, executionStatus, executionUid, conversationUid, messageUid);
+    }
+
+    private String toExecutionStatus(MessageStatus status) {
+        if (status == null) {
+            return "FAILED";
+        }
+        return switch (status) {
+            case COMPLETED -> "COMPLETED";
+            case CANCELED -> "CANCELED";
+            case FAILED -> "FAILED";
+            case WAITING_APPROVAL -> "WAITING_APPROVAL";
+            default -> "RUNNING";
+        };
     }
 
     private CurrentExecutionContext resolveOrCreateCurrentExecution(AgentCronJobEntity job, LocalDateTime now) {
@@ -128,6 +249,9 @@ public class CronJobExecutionService {
         entity.setStatus("RUNNING");
         entity.setSummary("");
         entity.setReportPath("");
+        entity.setApprovalWaitStartedTime(null);
+        entity.setApprovalTimeoutSeconds(defaultApprovalTimeoutSeconds);
+        entity.setResumeRequested(0);
         entity.setReadFlag(0);
         entity.setStartedTime(now);
         entity.setFinishedTime(null);
@@ -148,8 +272,26 @@ public class CronJobExecutionService {
                 .set(AgentCronJobExecutionEntity::getConversationUid, normalizedConversationUid)
                 .set(AgentCronJobExecutionEntity::getMessageUid, normalizedMessageUid)
                 .set(AgentCronJobExecutionEntity::getStatus, "RUNNING")
+                .set(AgentCronJobExecutionEntity::getApprovalWaitStartedTime, null)
+                .set(AgentCronJobExecutionEntity::getApprovalTimeoutSeconds, defaultApprovalTimeoutSeconds)
+                .set(AgentCronJobExecutionEntity::getResumeRequested, 0)
                 .set(AgentCronJobExecutionEntity::getUpdatedTime, now));
         updateJobConversationPointers(job.getJobUid(), normalizedConversationUid, normalizedMessageUid, now);
+    }
+
+    private void touchExecutionActiveState(String executionUid, String status, LocalDateTime now) {
+        if (executionUid == null || executionUid.isBlank()) {
+            return;
+        }
+        LambdaUpdateWrapper<AgentCronJobExecutionEntity> wrapper = new LambdaUpdateWrapper<AgentCronJobExecutionEntity>()
+                .eq(AgentCronJobExecutionEntity::getExecutionUid, executionUid)
+                .set(AgentCronJobExecutionEntity::getStatus, status)
+                .set(AgentCronJobExecutionEntity::getResumeRequested, 0)
+                .set(AgentCronJobExecutionEntity::getUpdatedTime, now);
+        if (!"WAITING_APPROVAL".equals(status)) {
+            wrapper.set(AgentCronJobExecutionEntity::getApprovalWaitStartedTime, null);
+        }
+        agentCronJobExecutionRepository.update(wrapper);
     }
 
     private void updateJobConversationPointers(String jobUid, String conversationUid, String messageUid, LocalDateTime now) {
@@ -160,69 +302,17 @@ public class CronJobExecutionService {
                 .set(AgentCronJobEntity::getUpdatedTime, now));
     }
 
-    private AgentMessage waitForCompletion(String messageUid, String executionUid) throws InterruptedException {
-        long deadline = System.currentTimeMillis() + 10 * 60_000L;
-        String lastExecutionStatus = "";
-        while (System.currentTimeMillis() < deadline) {
-            AgentMessage message = agentApplicationService.getMessage(messageUid);
-            String currentExecutionStatus = toExecutionStatusWhileRunning(message);
-            if (!currentExecutionStatus.equals(lastExecutionStatus)) {
-                touchExecutionStatus(executionUid, currentExecutionStatus);
-                lastExecutionStatus = currentExecutionStatus;
-            }
-            switch (message.status()) {
-                case COMPLETED, FAILED, CANCELED -> {
-                    return message;
-                }
-                default -> Thread.sleep(1000L);
-            }
-        }
-        throw new IllegalStateException("cron execution timed out");
-    }
-
-    private String toExecutionStatusWhileRunning(AgentMessage message) {
-        if (message == null || message.status() == null) {
-            return "RUNNING";
-        }
-        return switch (message.status()) {
-            case WAITING_APPROVAL -> "WAITING_APPROVAL";
-            case RUNNING, CREATED, PLANNED, REPLANNING -> "RUNNING";
-            case COMPLETED -> "COMPLETED";
-            case FAILED -> "FAILED";
-            case CANCELED -> "CANCELED";
-        };
-    }
-
-    private void touchExecutionStatus(String executionUid, String status) {
-        if (executionUid == null || executionUid.isBlank() || status == null || status.isBlank()) {
-            return;
-        }
-        agentCronJobExecutionRepository.update(new LambdaUpdateWrapper<AgentCronJobExecutionEntity>()
-                .eq(AgentCronJobExecutionEntity::getExecutionUid, executionUid)
-                .set(AgentCronJobExecutionEntity::getStatus, status)
-                .set(AgentCronJobExecutionEntity::getUpdatedTime, LocalDateTime.now()));
-    }
-
-    private String toExecutionStatus(AgentMessage message) {
-        if (message == null || message.status() == null) {
-            return "FAILED";
-        }
-        return switch (message.status()) {
-            case COMPLETED -> "COMPLETED";
-            case CANCELED -> "CANCELED";
-            case FAILED -> "FAILED";
-            default -> "FAILED";
-        };
-    }
-
     private String loadFinalAnswer(String conversationUid, String messageUid, AgentMessage completedMessage) {
-        List<ConversationMessageDto> messages = agentApplicationService.listMessages(conversationUid);
-        return messages.stream()
-                .filter(message -> "assistant".equals(message.role()) && messageUid.equals(message.parentMessageUid()))
-                .reduce((first, second) -> second)
-                .map(ConversationMessageDto::content)
-                .filter(text -> text != null && !text.isBlank())
-                .orElseGet(() -> completedMessage.status().name() + ": " + (completedMessage.content() == null ? "" : completedMessage.content()));
+        if (conversationUid != null && !conversationUid.isBlank() && messageUid != null && !messageUid.isBlank()) {
+            List<ConversationMessageDto> messages = agentApplicationService.listMessages(conversationUid);
+            return messages.stream()
+                    .filter(message -> "assistant".equals(message.role()) && messageUid.equals(message.parentMessageUid()))
+                    .reduce((first, second) -> second)
+                    .map(ConversationMessageDto::content)
+                    .filter(text -> text != null && !text.isBlank())
+                    .orElseGet(() -> completedMessage.status().name() + ": " + (completedMessage.content() == null ? "" : completedMessage.content()));
+        }
+        return completedMessage.status().name() + ": " + (completedMessage.content() == null ? "" : completedMessage.content());
     }
 
     private Path writeReport(AgentCronJobEntity job, String content, Instant executedAt, String status) throws Exception {
@@ -265,14 +355,6 @@ public class CronJobExecutionService {
         return reportPath;
     }
 
-    private Path writeFailureReportSafely(AgentCronJobEntity job, Exception ex, Instant executedAt) {
-        try {
-            return writeReport(job, ex.getMessage() == null ? "执行失败" : ex.getMessage(), executedAt, "FAILED");
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
-
     private void notifyCompletion(AgentCronJobEntity job, String content, Path reportPath, Instant executedAt, String status) {
         cronNotificationFanoutService.fanout(job, content, reportPath, executedAt, status);
     }
@@ -297,6 +379,8 @@ public class CronJobExecutionService {
                 .set(AgentCronJobExecutionEntity::getSummary, normalizedSummary)
                 .set(AgentCronJobExecutionEntity::getReportPath, normalizedReportPath)
                 .set(AgentCronJobExecutionEntity::getFinishedTime, now)
+                .set(AgentCronJobExecutionEntity::getApprovalWaitStartedTime, null)
+                .set(AgentCronJobExecutionEntity::getResumeRequested, 0)
                 .set(AgentCronJobExecutionEntity::getUpdatedTime, now));
         LocalDateTime nextRunTime = cronJobSchedulerService.nextRunTime(job.getJobUid(), job.getTimezone());
         String nextStatus = job.getStatus();

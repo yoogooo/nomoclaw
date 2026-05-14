@@ -30,7 +30,7 @@ const isLightMode = computed(() => uiPreferencesStore.themeMode === "light");
 
 function isTerminalExecutionStatus(status?: string | null) {
   const normalized = String(status || "").toUpperCase();
-  return normalized === "COMPLETED" || normalized === "FAILED" || normalized === "CANCELED";
+  return normalized === "COMPLETED" || normalized === "FAILED" || normalized === "CANCELED" || normalized === "TIMED_OUT_APPROVAL";
 }
 
 const isAwaitingFinalAssistantReply = computed(() => {

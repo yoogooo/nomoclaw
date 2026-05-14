@@ -37,6 +37,7 @@ import java.util.*;
 @Service
 public class CronJobApplicationService {
     private static final int RESULT_REPORT_PREVIEW_LIMIT = 16_000;
+    private static final List<String> FINISHED_EXECUTION_STATUSES = List.of("COMPLETED", "FAILED", "CANCELED", "TIMED_OUT_APPROVAL");
 
     private final AgentCronJobRepository agentCronJobRepository;
     private final AgentCronJobExecutionRepository agentCronJobExecutionRepository;
@@ -365,7 +366,7 @@ public class CronJobApplicationService {
         }
         String normalizedAgentUid = agentUid == null ? "" : agentUid.trim();
         String normalizedStatus = status == null ? "" : status.trim().toUpperCase();
-        if (!normalizedStatus.isBlank() && !List.of("COMPLETED", "FAILED", "CANCELED").contains(normalizedStatus)) {
+        if (!normalizedStatus.isBlank() && !FINISHED_EXECUTION_STATUSES.contains(normalizedStatus)) {
             throw new IllegalArgumentException("invalid status: " + status);
         }
         LocalDateTime startTime = parseStartDate(startDate);

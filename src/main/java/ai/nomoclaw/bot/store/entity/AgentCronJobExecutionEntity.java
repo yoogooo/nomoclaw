@@ -21,6 +21,9 @@ public class AgentCronJobExecutionEntity {
     private String status;
     private String summary;
     private String reportPath;
+    private LocalDateTime approvalWaitStartedTime;
+    private Integer approvalTimeoutSeconds;
+    private Integer resumeRequested;
     private Integer readFlag;
     private LocalDateTime startedTime;
     private LocalDateTime finishedTime;

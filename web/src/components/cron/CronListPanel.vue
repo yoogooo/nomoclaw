@@ -218,7 +218,7 @@ function onJobMouseLeave(jobUid: string) {
       <div v-for="(item, index) in resultModalRows" :key="`${item.executedTime}-${index}`" class="result-modal-item">
         <div class="result-modal-head">
           <span>{{ formatDateTime(item.executedTime) }}</span>
-          <n-tag size="small" :type="item.status === 'FAILED' ? 'error' : 'success'">{{ item.status }}</n-tag>
+          <n-tag size="small" :type="item.status === 'FAILED' || item.status === 'TIMED_OUT_APPROVAL' ? 'error' : 'success'">{{ item.status }}</n-tag>
         </div>
         <div class="result-modal-summary">{{ item.summary || "无摘要" }}</div>
       </div>

@@ -38,7 +38,8 @@ const pageSizeOptions = [
 const statusOptions = computed(() => [
   { label: t("cron.history.statusAll"), value: "" },
   { label: t("cron.history.statusCompleted"), value: "COMPLETED" },
-  { label: t("cron.history.statusFailed"), value: "FAILED" }
+  { label: t("cron.history.statusFailed"), value: "FAILED" },
+  { label: t("cron.history.statusTimedOutApproval"), value: "TIMED_OUT_APPROVAL" }
 ]);
 
 function toDateText(timestamp?: number) {
@@ -62,7 +63,7 @@ function quickDateRange(type: "7d" | "30d") {
 
 function statusTagType(value?: string | null) {
   const normalized = String(value || "").toUpperCase();
-  if (normalized === "FAILED" || normalized === "CANCELED") return "error";
+  if (normalized === "FAILED" || normalized === "CANCELED" || normalized === "TIMED_OUT_APPROVAL") return "error";
   if (normalized === "RUNNING") return "warning";
   if (normalized === "WAITING_APPROVAL") return "warning";
   return "success";
@@ -72,6 +73,7 @@ function statusLabel(value?: string | null) {
   const normalized = String(value || "").toUpperCase();
   if (normalized === "COMPLETED") return t("common.success");
   if (normalized === "FAILED") return t("common.failed");
+  if (normalized === "TIMED_OUT_APPROVAL") return t("cron.history.statusTimedOutApproval");
   if (normalized === "CANCELED") return t("cron.history.statusCanceled");
   if (normalized === "RUNNING") return t("cron.execution.runningTag");
   if (normalized === "WAITING_APPROVAL") return t("cron.history.statusWaitingApproval");

@@ -12,7 +12,7 @@ const cronJobsStore = useCronJobsStore();
 const router = useRouter();
 const { t } = useI18n();
 const COMPLETED_VISIBLE_LIMIT = 10;
-const FINISHED_EXECUTION_STATUSES = new Set(["COMPLETED", "FAILED", "CANCELED"]);
+const FINISHED_EXECUTION_STATUSES = new Set(["COMPLETED", "FAILED", "CANCELED", "TIMED_OUT_APPROVAL"]);
 
 function normalizeId(value?: string | null) {
   const normalized = String(value || "").trim();
@@ -39,11 +39,15 @@ const completedResults = computed(() => [...cronJobsStore.recentGlobalResults]
 const completedVisibleResults = computed(() => completedResults.value.slice(0, COMPLETED_VISIBLE_LIMIT));
 
 function completedTagType(status?: string | null) {
-  return String(status || "").toUpperCase() === "FAILED" ? "error" : "success";
+  const normalized = String(status || "").toUpperCase();
+  return normalized === "FAILED" || normalized === "TIMED_OUT_APPROVAL" ? "error" : "success";
 }
 
 function completedStatusText(status?: string | null) {
-  return String(status || "").toUpperCase() === "FAILED" ? t("common.failed") : t("common.success");
+  const normalized = String(status || "").toUpperCase();
+  if (normalized === "FAILED") return t("common.failed");
+  if (normalized === "TIMED_OUT_APPROVAL") return t("cron.history.statusTimedOutApproval");
+  return t("common.success");
 }
 
 function openExecution(params: {
@@ -135,6 +139,9 @@ function runningStatusText(status?: string | null) {
   if (normalized === "FAILED") {
     return t("cron.execution.statusFailed");
   }
+  if (normalized === "TIMED_OUT_APPROVAL") {
+    return t("cron.execution.statusTimedOutApproval");
+  }
   if (normalized === "CANCELED") {
     return t("cron.execution.statusCanceled");
   }
@@ -149,7 +156,7 @@ function runningStatusTagType(status?: string | null) {
   if (normalized === "WAITING_APPROVAL") {
     return "warning";
   }
-  if (normalized === "FAILED" || normalized === "CANCELED") {
+  if (normalized === "FAILED" || normalized === "CANCELED" || normalized === "TIMED_OUT_APPROVAL") {
     return "error";
   }
   return "success";

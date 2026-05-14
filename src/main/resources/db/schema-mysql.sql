@@ -490,9 +490,12 @@ CREATE TABLE IF NOT EXISTS agent_cron_job_execution (
     agent_uid VARCHAR(64) NOT NULL DEFAULT '' COMMENT 'Agent 业务ID',
     conversation_uid VARCHAR(64) NOT NULL DEFAULT '' COMMENT '执行对话ID',
     message_uid VARCHAR(64) NOT NULL DEFAULT '' COMMENT '执行消息ID',
-    status VARCHAR(32) NOT NULL DEFAULT 'RUNNING' COMMENT '状态：RUNNING / COMPLETED / FAILED / CANCELED',
+    status VARCHAR(32) NOT NULL DEFAULT 'RUNNING' COMMENT '状态：RUNNING / WAITING_APPROVAL / COMPLETED / FAILED / CANCELED / TIMED_OUT_APPROVAL',
     summary VARCHAR(1024) NOT NULL DEFAULT '' COMMENT '执行摘要',
     report_path VARCHAR(1024) NOT NULL DEFAULT '' COMMENT '报告文件路径',
+    approval_wait_started_time DATETIME(3) NULL COMMENT '进入等待审批时间',
+    approval_timeout_seconds INT NOT NULL DEFAULT 1800 COMMENT '审批等待超时秒数',
+    resume_requested TINYINT(1) NOT NULL DEFAULT 0 COMMENT '审批通过后恢复信号',
     read_flag TINYINT(1) NOT NULL DEFAULT 0 COMMENT '已读标记',
     started_time DATETIME(3) NOT NULL COMMENT '开始时间',
     finished_time DATETIME(3) NULL COMMENT '结束时间',
@@ -502,7 +505,8 @@ CREATE TABLE IF NOT EXISTS agent_cron_job_execution (
     UNIQUE KEY uk_agent_cron_job_execution_uid (execution_uid),
     KEY idx_agent_cron_job_execution_job (job_uid, started_time DESC),
     KEY idx_agent_cron_job_execution_status_time (status, started_time DESC),
-    KEY idx_agent_cron_job_execution_conversation (conversation_uid)
+    KEY idx_agent_cron_job_execution_conversation (conversation_uid),
+    KEY idx_agent_cron_job_execution_resume (status, resume_requested, updated_time)
 ) ENGINE=InnoDB
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_0900_ai_ci
