@@ -39,11 +39,9 @@ import dev.langchain4j.model.chat.request.ToolChoice;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.output.TokenUsage;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.core.task.TaskExecutor;
-import org.springframework.stereotype.Service;
 import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.JsonNodeFactory;
@@ -63,25 +61,21 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Agent 领域的应用层总入口（历史上承担了较多职责）。
+ * Agent 领域应用层 Facade。
  *
- * <p>当前同时覆盖了以下能力：
- * 1) 会话与消息管理（创建、查询、提交、取消）
- * 2) Agent/Skill/Tool/Tip 管理
- * 3) 消息执行编排（planner -> plan steps -> tool execution -> review）
- * 4) 运行过程事件与前端展示文案组装（SSE payload / step display text）
- * 5) 运行上下文与模型选择解析（agent/group/model/tools）
+ * <p>主要职责：
+ * 1) 对外提供会话/消息/Agent 管理入口
+ * 2) 处理参数归一化、权限决策、持久化协调
+ * 3) 将执行链路路由到独立编排与执行组件
  *
- * <p>后续重构建议：
- * - 保留本类作为 Facade，只做路由与协调
- * - 将执行编排、查询/写入、展示组装、上下文解析拆到独立服务
+ * <p>当前协作边界：
+ * - 消息主循环编排由 {@link MessageExecutionOrchestrator} 负责
+ * - 单步骤执行与重试由 {@link StepExecutionService} 负责
+ * - 运行反馈与展示字段组装由 {@link ExecutionFeedbackBuilder} / {@link RunViewAssembler} 负责
  */
 @Service
 @Slf4j
@@ -115,7 +109,6 @@ public class AgentApplicationService {
     private final MessageCancellationRegistry cancellationRegistry;
     private final AgentProperties properties;
     private final LlmProperties llmProperties;
-    private final TaskExecutor taskExecutor;
     private final AgentGroupDefinitionRepository agentGroupDefinitionRepository;
     private final AgentGroupMemberRepository agentGroupMemberRepository;
     private final AgentDefinitionRepository agentDefinitionRepository;
@@ -134,11 +127,8 @@ public class AgentApplicationService {
     private final ExecutionFeedbackBuilder feedbackBuilder;
     private final RunViewAssembler runViewAssembler;
     private final StepExecutionService stepExecutionService;
+    private final MessageExecutionOrchestrator messageExecutionOrchestrator;
     private final ApplicationEventPublisher applicationEventPublisher;
-    private final ConcurrentMap<String, Boolean> runningMessages = new ConcurrentHashMap<>();
-    private final ConcurrentMap<String, ExecutionState> executionStates = new ConcurrentHashMap<>();
-    private final ConcurrentMap<String, StringBuilder> streamingAnswerBuffers = new ConcurrentHashMap<>();
-    private final ConcurrentMap<String, String> messageApprovalModes = new ConcurrentHashMap<>();
 
     public AgentApplicationService(AgentStore store,
                                    Planner planner,
@@ -168,7 +158,7 @@ public class AgentApplicationService {
                                    ExecutionFeedbackBuilder feedbackBuilder,
                                    RunViewAssembler runViewAssembler,
                                    StepExecutionService stepExecutionService,
-                                   @Qualifier("agentTaskExecutor") TaskExecutor agentTaskExecutor,
+                                   MessageExecutionOrchestrator messageExecutionOrchestrator,
                                    ApplicationEventPublisher applicationEventPublisher) {
         this.store = store;
         this.planner = planner;
@@ -198,7 +188,7 @@ public class AgentApplicationService {
         this.feedbackBuilder = feedbackBuilder;
         this.runViewAssembler = runViewAssembler;
         this.stepExecutionService = stepExecutionService;
-        this.taskExecutor = agentTaskExecutor;
+        this.messageExecutionOrchestrator = messageExecutionOrchestrator;
         this.applicationEventPublisher = applicationEventPublisher;
     }
 
@@ -553,8 +543,7 @@ public class AgentApplicationService {
         List<AgentMessage> messages = store.listMessagesByConversation(conversationUid);
         messages.forEach(message -> {
             cancellationRegistry.cancel(message.messageUid());
-            executionStates.remove(message.messageUid());
-            runningMessages.remove(message.messageUid());
+            messageExecutionOrchestrator.clearRuntime(message.messageUid());
         });
         conversationAttachmentAppService.purgeConversationAttachments(conversationUid);
         store.deleteConversation(conversationUid);
@@ -668,11 +657,10 @@ public class AgentApplicationService {
         }
         log.info("[Agent] message created conversationUid={} messageUid={} channel={} model={}/{} maxRounds={} message={}",
                 conversationUid, messageUid, normalizedChannel, runtimeModel.modelProvider(), runtimeModel.modelName(), maxRounds, summarize(message));
-        messageApprovalModes.put(messageUid, normalizedApprovalMode);
         if (beforeExecuteHook != null) {
             beforeExecuteHook.accept(messageUid);
         }
-        executeMessageAsync(messageUid);
+        messageExecutionOrchestrator.enqueue(messageUid, LocaleContextHolder.getLocale(), normalizedApprovalMode, executionDriver());
         return messageUid;
     }
 
@@ -761,7 +749,7 @@ public class AgentApplicationService {
             log.info("[Agent] step approved conversationUid={} stepUid={} round={} scope={} note={}",
                     conversationUid, stepUid, step.roundIndex(), appliedScope, nullToEmpty(note));
             if (message.status() != MessageStatus.COMPLETED && message.status() != MessageStatus.CANCELED) {
-                executeMessageAsync(message.messageUid());
+                messageExecutionOrchestrator.resume(message.messageUid(), executionDriver());
             }
             applicationEventPublisher.publishEvent(new ApprovalGrantedEvent(message.messageUid()));
             return new ApprovalDecisionDto("accepted", appliedScope.name().toLowerCase(Locale.ROOT), appliedScope != PermissionScope.ONCE, matchedRuleId);
@@ -797,104 +785,96 @@ public class AgentApplicationService {
                 .orElseThrow(() -> new IllegalArgumentException("message not found"));
         store.updateMessageStatus(message.messageUid(), MessageStatus.CANCELED);
         cancellationRegistry.cancel(message.messageUid());
-        executionStates.remove(message.messageUid());
         log.info("[Agent] message canceled conversationUid={} messageUid={}", conversationUid, message.messageUid());
         ObjectNode payload = basePayload("message canceled");
-        String partialAnswer = streamingAnswerBuffers.getOrDefault(message.messageUid(), new StringBuilder()).toString().trim();
+        String partialAnswer = messageExecutionOrchestrator.cancel(message.messageUid()).trim();
         payload.put("answer", partialAnswer);
         publishEvent(AgentEventType.MESSAGE_CANCELED, conversationUid, message.messageUid(), null, payload);
         publishChannelMessageCompletedEvent(message, MessageStatus.CANCELED, feedbackBuilder.messageCanceled());
-        streamingAnswerBuffers.remove(message.messageUid());
     }
 
     public SseEmitter subscribe(String conversationUid) {
         return eventBus.subscribe(conversationUid);
     }
 
-    private void executeMessageAsync(String messageUid) {
-        log.info("[Agent] queue message execution messageUid={}", messageUid);
-        Locale locale = LocaleContextHolder.getLocale();
-        taskExecutor.execute(() -> {
-            Locale previous = LocaleContextHolder.getLocale();
-            try {
-                LocaleContextHolder.setLocale(locale);
-                executeMessage(messageUid);
-            } finally {
-                LocaleContextHolder.setLocale(previous);
-            }
-        });
-    }
-
-    /**
-     * 执行主循环：
-     * 1) 读取/初始化上下文
-     * 2) 规划下一步（若无待执行步骤）
-     * 3) 执行步骤（含审批与重试）
-     * 4) 轮次推进，直至完成/失败/取消/超轮次
-     *
-     * <p>后续可抽取为 MessageExecutionOrchestrator。
-     */
-    private void executeMessage(String messageUid) {
-        if (runningMessages.putIfAbsent(messageUid, true) != null) {
-            log.info("[Agent] message already running messageUid={}", messageUid);
-            return;
-        }
-
-        try {
-            AgentMessage message = store.findMessage(messageUid)
-                    .orElseThrow(() -> new IllegalArgumentException("message not found: " + messageUid));
-            AgentMessage initialMessage = message;
-            ExecutionState state = executionStates.computeIfAbsent(messageUid, ignored -> new ExecutionState(buildConversationMemory(initialMessage)));
-
-            while (state.currentRound() <= properties.getLoop().getMaxRounds()) {
-                message = store.findMessage(messageUid)
+    private MessageExecutionOrchestrator.ExecutionDriver executionDriver() {
+        return new MessageExecutionOrchestrator.ExecutionDriver() {
+            @Override
+            public AgentMessage requireMessage(String messageUid) {
+                return store.findMessage(messageUid)
                         .orElseThrow(() -> new IllegalArgumentException("message not found: " + messageUid));
-                if (isCanceled(messageUid, message.status())) {
-                    log.info("[Agent] stop execution because canceled messageUid={}", messageUid);
-                    cleanupRuntimeState(messageUid);
-                    return;
-                }
-
-                store.updateMessageStatus(messageUid, MessageStatus.RUNNING);
-                log.info("[Agent] reasoning round messageUid={} conversationUid={} round={}/{} memorySize={}",
-                        messageUid,
-                        message.conversationUid(),
-                        state.currentRound(),
-                        properties.getLoop().getMaxRounds(),
-                        state.memory().size());
-
-                List<PlanStep> roundSteps = pendingStepsForRound(messageUid, state.currentRound());
-                if (roundSteps.isEmpty()) {
-                    RoundPlanningResult planningResult = reasonNextAction(message, state);
-                    if (planningResult.completed()) {
-                        if (cancellationRegistry.isCanceled(message.messageUid())) {
-                            cleanupRuntimeState(messageUid);
-                            return;
-                        }
-                        completeMessage(message, planningResult.answer(), state.currentRound());
-                        return;
-                    }
-                    roundSteps = planningResult.steps();
-                }
-
-                RoundExecutionResult executionResult = executeRound(message, state, roundSteps);
-                if (executionResult.waitingApproval()) {
-                    return;
-                }
-                if (executionResult.canceled()) {
-                    cleanupRuntimeState(messageUid);
-                    return;
-                }
-                state.advanceRound();
             }
 
-            handleLoopLimitReached(messageUid);
-        } catch (Exception ex) {
-            log.error("message execution failed messageUid={}", messageUid, ex);
-            store.findMessage(messageUid).ifPresent(message -> failMessage(message, toUserFriendlyFailureMessage(ex, message), ""));
-        } finally {
-            runningMessages.remove(messageUid);
-        }
+            @Override
+            public List<ChatMessage> buildConversationMemory(AgentMessage initialMessage) {
+                return AgentApplicationService.this.buildConversationMemory(initialMessage);
+            }
+
+            @Override
+            public int maxRounds() {
+                return properties.getLoop().getMaxRounds();
+            }
+
+            @Override
+            public List<PlanStep> pendingStepsForRound(String messageUid, int roundIndex) {
+                return AgentApplicationService.this.pendingStepsForRound(messageUid, roundIndex);
+            }
+
+            @Override
+            public RoundPlanningResult reasonNextAction(AgentMessage message,
+                                                        MessageExecutionRuntimeState state,
+                                                        ExecutionRuntimeStateStore runtimeStateStore) {
+                return AgentApplicationService.this.reasonNextAction(message, state, runtimeStateStore);
+            }
+
+            @Override
+            public RoundExecutionResult executeRound(AgentMessage message,
+                                                     MessageExecutionRuntimeState state,
+                                                     List<PlanStep> steps,
+                                                     String approvalMode) {
+                return AgentApplicationService.this.executeRound(message, state, steps, approvalMode);
+            }
+
+            @Override
+            public boolean isCanceled(String messageUid, MessageStatus status) {
+                return AgentApplicationService.this.isCanceled(messageUid, status);
+            }
+
+            @Override
+            public boolean isCancellationRequested(String messageUid) {
+                return cancellationRegistry.isCanceled(messageUid);
+            }
+
+            @Override
+            public void cleanupCancellation(String messageUid) {
+                cancellationRegistry.clear(messageUid);
+            }
+
+            @Override
+            public void markMessageRunning(String messageUid) {
+                store.updateMessageStatus(messageUid, MessageStatus.RUNNING);
+            }
+
+            @Override
+            public void completeMessage(AgentMessage message, String answer, int roundsUsed) {
+                AgentApplicationService.this.completeMessage(message, answer, roundsUsed);
+            }
+
+            @Override
+            public void handleLoopLimitReached(String messageUid, MessageExecutionRuntimeState state) {
+                AgentApplicationService.this.handleLoopLimitReached(messageUid, state);
+            }
+
+            @Override
+            public void handleExecutionFailure(String messageUid, Exception ex) {
+                store.findMessage(messageUid).ifPresent(message -> failMessage(message, toUserFriendlyFailureMessage(ex, message), ""));
+            }
+
+            @Override
+            public String defaultApprovalMode() {
+                return APPROVAL_MODE_DEFAULT;
+            }
+        };
     }
 
     private String toUserFriendlyFailureMessage(Throwable throwable, AgentMessage agentMessage) {
@@ -941,12 +921,14 @@ public class AgentApplicationService {
         return current;
     }
 
-    private RoundPlanningResult reasonNextAction(AgentMessage message, ExecutionState state) {
+    private RoundPlanningResult reasonNextAction(AgentMessage message,
+                                                 MessageExecutionRuntimeState state,
+                                                 ExecutionRuntimeStateStore runtimeStateStore) {
         AgentConversation conversation = requireConversation(message.conversationUid());
         AgentDefinitionEntity executionAgent = resolveExecutionAgent(conversation);
         // For scheduled runs, hide cron management tools from the model to prevent recursive scheduling.
         List<ToolSpecification> availableTools = availableToolsForConversation(conversation, executionAgent);
-        streamingAnswerBuffers.remove(message.messageUid());
+        runtimeStateStore.clearBufferedAnswer(message.messageUid());
         int roundIndex = state.currentRound();
         StringBuilder streamedText = new StringBuilder();
         Planner.StreamReasonResult streamedResult = planner.reasonStream(
@@ -963,8 +945,7 @@ public class AgentApplicationService {
                         return;
                     }
                     String accumulatedText = streamedText.toString();
-                    streamingAnswerBuffers.computeIfAbsent(message.messageUid(), ignored -> new StringBuilder())
-                            .append(textDelta);
+                    runtimeStateStore.appendDelta(message.messageUid(), textDelta);
                     publishMessageDelta(message, roundIndex, textDelta, accumulatedText, false);
                 }
         );
@@ -1002,7 +983,7 @@ public class AgentApplicationService {
             return RoundPlanningResult.completed(answer);
         }
 
-        streamingAnswerBuffers.remove(message.messageUid());
+        runtimeStateStore.clearBufferedAnswer(message.messageUid());
         List<PlanStep> steps = toPlanSteps(message.messageUid(), state.currentRound(), aiMessage.toolExecutionRequests());
         store.saveSteps(message.conversationUid(), message.messageUid(), steps);
         store.updateMessageStatus(message.messageUid(), MessageStatus.PLANNED);
@@ -1010,7 +991,10 @@ public class AgentApplicationService {
         return RoundPlanningResult.requiresAction(steps);
     }
 
-    private RoundExecutionResult executeRound(AgentMessage message, ExecutionState state, List<PlanStep> steps) {
+    private RoundExecutionResult executeRound(AgentMessage message,
+                                              MessageExecutionRuntimeState state,
+                                              List<PlanStep> steps,
+                                              String approvalMode) {
         AgentConversation conversation = requireConversation(message.conversationUid());
         AgentDefinitionEntity executionAgent = resolveExecutionAgent(conversation);
         AgentWorkspaceConfig workspaceConfig = resolveWorkspaceConfig(executionAgent);
@@ -1059,7 +1043,7 @@ public class AgentApplicationService {
                     conversation,
                     executionAgent,
                     workspaceConfig,
-                    messageApprovalModes.getOrDefault(message.messageUid(), APPROVAL_MODE_DEFAULT)
+                    approvalMode
             );
             StepExecutionService.StepExecutionOutcome outcome = stepExecutionService.executeStepWithRetry(
                     message,
@@ -1681,15 +1665,13 @@ public class AgentApplicationService {
         payload.put("stopReason", "");
         publishEvent(AgentEventType.MESSAGE_COMPLETED, message.conversationUid(), message.messageUid(), null, payload);
         publishChannelMessageCompletedEvent(message, MessageStatus.COMPLETED, finalAnswer);
-        cleanupRuntimeState(message.messageUid());
         log.info("[Agent] message completed messageUid={} rounds={}/{}", message.messageUid(), roundsUsed, properties.getLoop().getMaxRounds());
     }
 
-    private void handleLoopLimitReached(String messageUid) {
+    private void handleLoopLimitReached(String messageUid, MessageExecutionRuntimeState state) {
         AgentMessage message = store.findMessage(messageUid)
                 .orElseThrow(() -> new IllegalArgumentException("message not found: " + messageUid));
         AgentConversation conversation = requireConversation(message.conversationUid());
-        ExecutionState state = executionStates.computeIfAbsent(messageUid, ignored -> new ExecutionState(buildConversationMemory(message)));
         int roundsUsed = Math.max(1, state.currentRound() - 1);
 
         ObjectNode loopPayload = basePayload("loop max rounds reached");
@@ -1771,7 +1753,6 @@ public class AgentApplicationService {
         payload.put("stopReason", nullToEmpty(stopReason));
         publishEvent(AgentEventType.MESSAGE_COMPLETED, message.conversationUid(), message.messageUid(), null, payload);
         publishChannelMessageCompletedEvent(message, MessageStatus.FAILED, finalAnswer);
-        cleanupRuntimeState(message.messageUid());
     }
 
     private void publishChannelMessageCompletedEvent(AgentMessage message, MessageStatus status, String finalReply) {
@@ -2404,13 +2385,6 @@ public class AgentApplicationService {
         return status == MessageStatus.CANCELED || cancellationRegistry.isCanceled(messageUid);
     }
 
-    private void cleanupRuntimeState(String messageUid) {
-        executionStates.remove(messageUid);
-        cancellationRegistry.clear(messageUid);
-        streamingAnswerBuffers.remove(messageUid);
-        messageApprovalModes.remove(messageUid);
-    }
-
     private String normalizeApprovalMode(String approvalMode) {
         String normalized = approvalMode == null ? "" : approvalMode.trim().toLowerCase(Locale.ROOT);
         return APPROVAL_MODE_FULL_ACCESS.equals(normalized) ? APPROVAL_MODE_FULL_ACCESS : APPROVAL_MODE_DEFAULT;
@@ -2420,7 +2394,7 @@ public class AgentApplicationService {
         if (decision == null || message == null) {
             return decision;
         }
-        String approvalMode = messageApprovalModes.getOrDefault(message.messageUid(), APPROVAL_MODE_DEFAULT);
+        String approvalMode = messageExecutionOrchestrator.approvalMode(message.messageUid(), APPROVAL_MODE_DEFAULT);
         if (!APPROVAL_MODE_FULL_ACCESS.equals(approvalMode)) {
             return decision;
         }
@@ -2841,30 +2815,6 @@ public class AgentApplicationService {
         return text.length() <= maxLength ? text : text.substring(0, maxLength) + "...";
     }
 
-    private record RoundPlanningResult(boolean completed, String answer, List<PlanStep> steps) {
-        static RoundPlanningResult completed(String answer) {
-            return new RoundPlanningResult(true, answer, List.of());
-        }
-
-        static RoundPlanningResult requiresAction(List<PlanStep> steps) {
-            return new RoundPlanningResult(false, "", steps);
-        }
-    }
-
-    private record RoundExecutionResult(boolean waitingApproval, boolean canceled) {
-        static RoundExecutionResult success() {
-            return new RoundExecutionResult(false, false);
-        }
-
-        static RoundExecutionResult pendingApproval() {
-            return new RoundExecutionResult(true, false);
-        }
-
-        static RoundExecutionResult cancelled() {
-            return new RoundExecutionResult(false, true);
-        }
-    }
-
     private record StepExecutionOutcome(boolean canceled, ToolResult toolResult, String memoryText, ChatMessage injectedMemoryMessage) {
         static StepExecutionOutcome success(ToolResult result, String memoryText) {
             return new StepExecutionOutcome(false, result, memoryText, null);
@@ -2882,24 +2832,4 @@ public class AgentApplicationService {
         }
     }
 
-    private static final class ExecutionState {
-        private final List<ChatMessage> memory = new ArrayList<>();
-        private int currentRound = 1;
-
-        private ExecutionState(List<ChatMessage> initialMemory) {
-            this.memory.addAll(initialMemory);
-        }
-
-        public List<ChatMessage> memory() {
-            return memory;
-        }
-
-        public int currentRound() {
-            return currentRound;
-        }
-
-        public void advanceRound() {
-            currentRound++;
-        }
-    }
 }
