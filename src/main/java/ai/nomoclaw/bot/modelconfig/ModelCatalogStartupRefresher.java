@@ -1,4 +1,4 @@
-package ai.nomoclaw.bot.orchestrator;
+package ai.nomoclaw.bot.modelconfig;
 
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;

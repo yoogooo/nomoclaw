@@ -8,6 +8,7 @@ import ai.nomoclaw.bot.model.PlanStep;
 import ai.nomoclaw.bot.model.RiskLevel;
 import ai.nomoclaw.bot.model.StepStatus;
 import ai.nomoclaw.bot.model.ToolResult;
+import ai.nomoclaw.bot.modelconfig.ModelConfigAppService;
 import dev.langchain4j.data.message.ImageContent;
 import dev.langchain4j.data.message.UserMessage;
 import org.junit.jupiter.api.Test;

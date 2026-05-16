@@ -1,4 +1,4 @@
-package ai.nomoclaw.bot.orchestrator;
+package ai.nomoclaw.bot.modelconfig;
 
 public record ModelCatalogStatusDto(
         String catalogVersion,

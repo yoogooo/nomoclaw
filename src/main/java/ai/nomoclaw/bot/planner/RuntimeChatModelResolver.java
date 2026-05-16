@@ -6,7 +6,7 @@ import ai.nomoclaw.bot.llm.codex.CodexChatModel;
 import ai.nomoclaw.bot.llm.codex.CodexStreamingChatModel;
 import ai.nomoclaw.bot.llm.codex.CodexTokenProvider;
 import ai.nomoclaw.bot.llm.config.LlmProperties;
-import ai.nomoclaw.bot.orchestrator.ModelConfigAppService;
+import ai.nomoclaw.bot.modelconfig.ModelConfigAppService;
 import ai.nomoclaw.bot.prompt.PromptLoader;
 import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
 import ai.nomoclaw.bot.store.entity.AgentMessageEntity;

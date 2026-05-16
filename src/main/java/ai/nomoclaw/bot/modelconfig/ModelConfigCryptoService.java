@@ -1,4 +1,4 @@
-package ai.nomoclaw.bot.orchestrator;
+package ai.nomoclaw.bot.modelconfig;
 
 import ai.nomoclaw.bot.llm.config.ModelConfigCryptoProperties;
 import lombok.extern.slf4j.Slf4j;

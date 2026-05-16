@@ -4,6 +4,7 @@ import ai.nomoclaw.bot.application.dto.ModelConfigDto;
 import ai.nomoclaw.bot.domain.AgentMessage;
 import ai.nomoclaw.bot.model.PlanStep;
 import ai.nomoclaw.bot.model.ToolResult;
+import ai.nomoclaw.bot.modelconfig.ModelConfigAppService;
 import dev.langchain4j.data.message.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

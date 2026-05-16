@@ -2,6 +2,9 @@ package ai.nomoclaw.bot.orchestrator;
 
 import ai.nomoclaw.bot.application.dto.ModelConfigDto;
 import ai.nomoclaw.bot.domain.AgentConversation;
+import ai.nomoclaw.bot.modelconfig.ModelCatalogService;
+import ai.nomoclaw.bot.modelconfig.ModelConfigAppService;
+import ai.nomoclaw.bot.modelconfig.ModelMetadata;
 import ai.nomoclaw.bot.store.AgentStore;
 import ai.nomoclaw.bot.store.repository.AgentMessageAttachmentRepository;
 import ai.nomoclaw.bot.util.LocalizedMessages;

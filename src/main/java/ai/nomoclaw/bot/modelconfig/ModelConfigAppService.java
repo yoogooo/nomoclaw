@@ -1,4 +1,4 @@
-package ai.nomoclaw.bot.orchestrator;
+package ai.nomoclaw.bot.modelconfig;
 
 import ai.nomoclaw.bot.application.dto.ModelConfigDto;
 import ai.nomoclaw.bot.llm.codex.CodexAuthFileTokenProvider;

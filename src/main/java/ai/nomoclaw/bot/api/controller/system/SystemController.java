@@ -12,7 +12,7 @@ import ai.nomoclaw.bot.api.dto.system.response.ModelConfigResponse;
 import ai.nomoclaw.bot.api.dto.system.response.ModelProviderTestResponse;
 import ai.nomoclaw.bot.api.dto.system.response.SystemConfigResponse;
 import ai.nomoclaw.bot.api.mapper.SystemApiMapper;
-import ai.nomoclaw.bot.orchestrator.ModelConfigAppService;
+import ai.nomoclaw.bot.modelconfig.ModelConfigAppService;
 import ai.nomoclaw.bot.orchestrator.SystemAppService;
 import ai.nomoclaw.bot.scheduler.CronChannelTargetDirectoryService;
 import jakarta.validation.Valid;

@@ -14,7 +14,7 @@ import ai.nomoclaw.bot.application.dto.ModelConfigDto;
 import ai.nomoclaw.bot.application.dto.SystemConfigDto;
 import ai.nomoclaw.bot.application.dto.SystemErrorLogDto;
 import ai.nomoclaw.bot.application.dto.SystemErrorLogSummaryDto;
-import ai.nomoclaw.bot.orchestrator.ModelCatalogStatusDto;
+import ai.nomoclaw.bot.modelconfig.ModelCatalogStatusDto;
 import ai.nomoclaw.bot.scheduler.CronChannelTargetDirectoryService;
 
 import java.util.List;
