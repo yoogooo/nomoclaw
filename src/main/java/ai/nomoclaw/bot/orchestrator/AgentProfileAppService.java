@@ -27,12 +27,14 @@ import ai.nomoclaw.bot.util.JsonUtil;
 import ai.nomoclaw.bot.workspace.AgentWorkspaceConfig;
 import ai.nomoclaw.bot.workspace.NomoClawPaths;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -56,10 +58,11 @@ import java.util.stream.Collectors;
 @Slf4j
 public class AgentProfileAppService {
 
+    private static final String DEFAULT_AGENT_PROMPT_RESOURCE_ROOT = "prompts/agents/default";
     private static final String DEFAULT_AGENT_UID = "agent_general_assistant";
     private static final String VIRTUAL_AGENT_GROUP_UID = "group_short_drama";
     private static final String VIRTUAL_AGENT_GROUP_NAME = "all_agents";
-    private static final String VIRTUAL_AGENT_GROUP_DISPLAY_NAME = "全部 Agent";
+    private static final String VIRTUAL_AGENT_GROUP_DISPLAY_NAME = "All Agent";
     private static final Map<String, String> AGENT_DOC_FILES = new LinkedHashMap<>();
 
     static {
@@ -565,14 +568,7 @@ public class AgentProfileAppService {
 
     private void initializeAgentWorkspaceDocs(String agentName, String displayName) {
         Path workspace = NomoClawPaths.ensureAgentHome(agentName);
-        Map<String, String> defaults = new LinkedHashMap<>();
-        String name = (displayName == null || displayName.isBlank()) ? agentName : displayName.trim();
-        defaults.put("SOUL.md", "# SOUL\n\n你是 " + name + " 的内核人格，保持清晰、稳健、可执行。\n");
-        defaults.put("AGENT.md", "# AGENT\n\n## 目标\n- 在当前职责范围内完成任务\n\n## 输出约束\n- 先结论，后细节\n");
-        defaults.put("MEMORY.md", "# MEMORY\n\n- 记录长期偏好\n- 记录高价值上下文\n");
-        defaults.put("TOOLS.md", "# TOOLS\n\n- 列出允许调用的工具\n- 列出工具风险边界\n");
-        defaults.put("IDENTITY.md", "# IDENTITY\n\nname: " + name + "\nrole: 成员\n");
-        defaults.put("USER.md", "# USER\n\n- 记录该 Agent 服务对象的偏好、约束与上下文。\n");
+        Map<String, String> defaults = loadDefaultAgentPromptTemplates();
 
         for (Map.Entry<String, String> entry : defaults.entrySet()) {
             Path file = workspace.resolve(entry.getKey());
@@ -591,6 +587,52 @@ public class AgentProfileAppService {
         } catch (IOException ex) {
             throw new IllegalStateException("failed to cleanup legacy agent doc: " + legacyAgentsDoc, ex);
         }
+    }
+
+    private Map<String, String> loadDefaultAgentPromptTemplates() {
+        LocaleContextHolder.getLocale();
+        String language = normalizeLanguage(LocaleContextHolder.getLocale().getLanguage());
+        List<String> candidates = "en".equals(language)
+                ? List.of("en", "zh")
+                : List.of("zh", "en");
+        for (String candidate : candidates) {
+            Map<String, String> loaded = loadDefaultAgentPromptTemplates(candidate);
+            if (!loaded.isEmpty()) {
+                return loaded;
+            }
+        }
+        throw new IllegalStateException("default agent prompt templates not found under classpath: " + DEFAULT_AGENT_PROMPT_RESOURCE_ROOT);
+    }
+
+    private Map<String, String> loadDefaultAgentPromptTemplates(String language) {
+        Map<String, String> defaults = new LinkedHashMap<>();
+        for (String fileName : AGENT_DOC_FILES.values()) {
+            String content = readClasspathPrompt(language, fileName);
+            if (content == null) {
+                return Map.of();
+            }
+            defaults.put(fileName, content);
+        }
+        return defaults;
+    }
+
+    private String readClasspathPrompt(String language, String fileName) {
+        String resourcePath = DEFAULT_AGENT_PROMPT_RESOURCE_ROOT + "/" + language + "/" + fileName;
+        try (InputStream input = getClass().getClassLoader().getResourceAsStream(resourcePath)) {
+            if (input == null) {
+                return null;
+            }
+            return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException ex) {
+            throw new IllegalStateException("failed to load prompt template from classpath: " + resourcePath, ex);
+        }
+    }
+
+    private String normalizeLanguage(String language) {
+        if (language == null || language.isBlank()) {
+            return "zh";
+        }
+        return "en".equalsIgnoreCase(language.trim()) ? "en" : "zh";
     }
 
     private void initializeAgentToolRelations(String agentUid, LocalDateTime now) {
