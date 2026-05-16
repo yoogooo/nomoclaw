@@ -95,19 +95,7 @@ public class AgentApplicationService {
     private static final String APPROVAL_MODE_DEFAULT = "default";
     private static final String APPROVAL_MODE_FULL_ACCESS = "full_access";
     private static final String DEFAULT_AGENT_UID = "agent_general_assistant";
-    private static final String VIRTUAL_AGENT_GROUP_UID = "group_short_drama";
-    private static final String VIRTUAL_AGENT_GROUP_NAME = "all_agents";
-    private static final String VIRTUAL_AGENT_GROUP_DISPLAY_NAME = "全部 Agent";
     private static final int CONVERSATION_CONTEXT_LIMIT = 30;
-    private static final Map<String, String> AGENT_DOC_FILES = new LinkedHashMap<>();
-    static {
-        AGENT_DOC_FILES.put("soul", "SOUL.md");
-        AGENT_DOC_FILES.put("agent", "AGENT.md");
-        AGENT_DOC_FILES.put("memory", "MEMORY.md");
-        AGENT_DOC_FILES.put("tools", "TOOLS.md");
-        AGENT_DOC_FILES.put("identity", "IDENTITY.md");
-        AGENT_DOC_FILES.put("user", "USER.md");
-    }
 
     private final AgentStore store;
     private final Planner planner;
@@ -137,6 +125,7 @@ public class AgentApplicationService {
     private final StepExecutionService stepExecutionService;
     private final ExecutionScopeResolver executionScopeResolver;
     private final MessageExecutionOrchestrator messageExecutionOrchestrator;
+    private final AgentProfileAppService agentProfileAppService;
     private final ApplicationEventPublisher applicationEventPublisher;
 
     public AgentApplicationService(AgentStore store,
@@ -167,6 +156,7 @@ public class AgentApplicationService {
                                    StepExecutionService stepExecutionService,
                                    ExecutionScopeResolver executionScopeResolver,
                                    MessageExecutionOrchestrator messageExecutionOrchestrator,
+                                   AgentProfileAppService agentProfileAppService,
                                    ApplicationEventPublisher applicationEventPublisher) {
         this.store = store;
         this.planner = planner;
@@ -196,6 +186,7 @@ public class AgentApplicationService {
         this.stepExecutionService = stepExecutionService;
         this.executionScopeResolver = executionScopeResolver;
         this.messageExecutionOrchestrator = messageExecutionOrchestrator;
+        this.agentProfileAppService = agentProfileAppService;
         this.applicationEventPublisher = applicationEventPublisher;
     }
 
@@ -234,36 +225,7 @@ public class AgentApplicationService {
     }
 
     public List<AgentCatalogGroupDto> listAgentGroups() {
-        List<AgentDefinitionEntity> allAgents = agentDefinitionRepository.listAllActive();
-        if (allAgents == null || allAgents.isEmpty()) {
-            return List.of();
-        }
-        allAgents.forEach(this::ensureWorkspaceDocsForExistingAgent);
-
-        List<AgentCatalogAgentDto> agentItems = new ArrayList<>();
-        for (AgentDefinitionEntity agent : allAgents) {
-            String agentUid = agent.getAgentUid();
-            AgentGroupMemberEntity member = withDefaultMember(null, VIRTUAL_AGENT_GROUP_UID, agentUid);
-            member.setMemberRole(DEFAULT_AGENT_UID.equals(agentUid) ? "owner" : "member");
-            member.setResponsibility(DEFAULT_AGENT_UID.equals(agentUid) ? "默认主 Agent" : "");
-            member.setIsPrimary(DEFAULT_AGENT_UID.equals(agentUid) ? 1 : 0);
-            AgentCatalogAgentDto item = toAgentCatalogItem(member, agent);
-            if (item == null) {
-                continue;
-            }
-            agentItems.add(item);
-        }
-
-        return List.of(new AgentCatalogGroupDto(
-                VIRTUAL_AGENT_GROUP_UID,
-                VIRTUAL_AGENT_GROUP_NAME,
-                VIRTUAL_AGENT_GROUP_DISPLAY_NAME,
-                "🧭",
-                "基于 agent_definition 自动聚合",
-                List.of("general"),
-                "single",
-                agentItems
-        ));
+        return agentProfileAppService.listAgentGroups();
     }
 
     public List<ConversationMessageDto> listMessages(String conversationUid) {
@@ -293,229 +255,27 @@ public class AgentApplicationService {
     }
 
     public AgentCatalogAgentDto createAgent(CreateAgentCommand request) {
-        if (request == null) {
-            throw new IllegalArgumentException("request must not be null");
-        }
-        String agentName = request.agentName() == null ? "" : request.agentName().trim();
-        String displayName = request.displayName() == null ? "" : request.displayName().trim();
-        if (agentName.isBlank()) {
-            throw new IllegalArgumentException("agentName must not be blank");
-        }
-        if (displayName.isBlank()) {
-            throw new IllegalArgumentException("displayName must not be blank");
-        }
-        if (agentDefinitionRepository.findByName(agentName) != null) {
-            throw new IllegalArgumentException("agentName already exists: " + agentName);
-        }
-        List<String> modelIds = sanitizeModelIds(request.modelName(), request.modelNames());
-        executionScopeResolver.validateModelSelection(request.modelProvider(), modelIds);
-
-        String avatar = request.avatar() == null ? "" : request.avatar().trim();
-        if (avatar.isBlank()) {
-            avatar = "bot";
-        }
-        String avatarColor = request.avatarColor() == null ? "" : request.avatarColor().trim();
-        if (avatarColor.isBlank()) {
-            avatarColor = "#2F6FED";
-        }
-
-        LocalDateTime now = LocalDateTime.now();
-        String agentUid = "agent_" + UUID.randomUUID().toString().replace("-", "");
-        AgentDefinitionEntity agent = new AgentDefinitionEntity();
-        agent.setAgentUid(agentUid);
-        agent.setAgentName(agentName);
-        agent.setDisplayName(displayName);
-        agent.setAvatar(avatar);
-        agent.setDescription(request.description() == null ? "" : request.description().trim());
-        agent.setCapabilityTags("[]");
-        agent.setPromptProfile("");
-        agent.setModelProviderId(request.modelProvider().trim());
-        agent.setModelId(modelIds.get(0));
-        agent.setSortIndex(nextAgentSortIndex());
-        agent.setIsGroupEntry(0);
-        agent.setStatus("ACTIVE");
-        ObjectNode extConfig = JsonNodeFactory.instance.objectNode();
-        extConfig.put("avatarColor", avatarColor);
-        extConfig.set("modelIds", JsonUtil.fromJson(JsonUtil.toJson(modelIds), JsonNode.class));
-        AgentWorkspaceConfig workspaceConfig = resolveWorkspaceConfigForMutation(
-                agentName,
-                "",
-                request.workspace()
-        ).ensureDirectories();
-        agent.setWorkspace(workspaceConfig.workspaceDir().toString());
-        agent.setExtConfig(JsonUtil.toJson(extConfig));
-        agent.setCreatedTime(now);
-        agent.setUpdatedTime(now);
-        agentDefinitionRepository.save(agent);
-        permissionAppService.syncAgentManagedWorkspaceAllowRule(
-                agentUid,
-                agentName,
-                workspaceConfig.workspaceDir()
-        );
-
-        AgentGroupMemberEntity member = new AgentGroupMemberEntity();
-        member.setAgentUid(agentUid);
-        member.setMemberRole("成员");
-        member.setResponsibility("");
-        member.setIsPrimary(0);
-        initializeAgentToolRelations(agentUid, now);
-        initializeAgentWorkspaceDocs(agentName, displayName);
-        return toAgentCatalogItem(member, agent);
+        return agentProfileAppService.createAgent(request);
     }
 
     public AgentCatalogAgentDto updateAgentBasicInfo(String agentUid, UpdateAgentBasicInfoCommand request) {
-        if (request == null) {
-            throw new IllegalArgumentException("request must not be null");
-        }
-        String normalizedAgentUid = normalizeAgentUid(agentUid);
-        AgentDefinitionEntity agent = agentDefinitionRepository.findByUid(normalizedAgentUid);
-        if (agent == null) {
-            throw new IllegalArgumentException("agent not found: " + normalizedAgentUid);
-        }
-
-        String displayName = request.displayName() == null ? "" : request.displayName().trim();
-        if (displayName.isBlank()) {
-            throw new IllegalArgumentException("displayName must not be blank");
-        }
-
-        String avatar = request.avatar() == null ? "" : request.avatar().trim();
-        if (avatar.isBlank()) {
-            avatar = "bot";
-        }
-        String avatarColor = request.avatarColor() == null ? "" : request.avatarColor().trim();
-        if (avatarColor.isBlank()) {
-            avatarColor = "#2F6FED";
-        }
-        List<String> modelIds = sanitizeModelIds(request.modelName(), request.modelNames());
-        executionScopeResolver.validateModelSelection(request.modelProvider(), modelIds);
-
-        agent.setDisplayName(displayName);
-        agent.setDescription(request.description() == null ? "" : request.description().trim());
-        agent.setAvatar(avatar);
-        agent.setModelProviderId(request.modelProvider().trim());
-        agent.setModelId(modelIds.get(0));
-        agent.setUpdatedTime(LocalDateTime.now());
-        ObjectNode extConfig = readExtConfigObject(agent.getExtConfig());
-        extConfig.put("avatarColor", avatarColor);
-        extConfig.set("modelIds", JsonUtil.fromJson(JsonUtil.toJson(modelIds), JsonNode.class));
-        AgentWorkspaceConfig workspaceConfig = resolveWorkspaceConfigForMutation(
-                agent.getAgentName(),
-                agent.getWorkspace(),
-                request.workspace()
-        ).ensureDirectories();
-        agent.setWorkspace(workspaceConfig.workspaceDir().toString());
-        agent.setExtConfig(JsonUtil.toJson(extConfig));
-        agentDefinitionRepository.updateById(agent);
-        permissionAppService.syncAgentManagedWorkspaceAllowRule(
-                agent.getAgentUid(),
-                agent.getAgentName(),
-                workspaceConfig.workspaceDir()
-        );
-
-        AgentGroupMemberEntity member = agentGroupMemberRepository.findPrimaryByAgentUid(agent.getAgentUid());
-        if (member == null) {
-            member = new AgentGroupMemberEntity();
-            member.setMemberRole("成员");
-            member.setResponsibility("");
-            member.setIsPrimary(0);
-        }
-        return toAgentCatalogItem(member, agent);
+        return agentProfileAppService.updateAgentBasicInfo(agentUid, request);
     }
 
     public List<AgentToolDto> listAgentTools(String agentUid) {
-        String normalizedAgentUid = normalizeAgentUid(agentUid);
-        List<ToolDefinitionEntity> toolDefinitions = toolDefinitionRepository.listAllActive();
-        Map<String, AgentToolRelationEntity> relationsByToolKey = agentToolRelationRepository.listByAgentUid(normalizedAgentUid)
-                .stream()
-                .collect(Collectors.toMap(
-                        AgentToolRelationEntity::getToolKey,
-                        relation -> relation,
-                        (left, right) -> left,
-                        LinkedHashMap::new
-                ));
-        return toolDefinitions.stream()
-                .map(tool -> {
-                    AgentToolRelationEntity relation = relationsByToolKey.get(tool.getToolKey());
-                    boolean enabled = relation != null && "ACTIVE".equalsIgnoreCase(relation.getStatus());
-                    LocalDateTime updatedTime = relation == null ? tool.getUpdatedTime() : relation.getUpdatedTime();
-                    return new AgentToolDto(
-                            tool.getToolKey(),
-                            tool.getDisplayName(),
-                            tool.getDescription(),
-                            enabled,
-                            updatedTime
-                    );
-                })
-                .toList();
+        return agentProfileAppService.listAgentTools(agentUid);
     }
 
     public AgentToolDto updateAgentToolStatus(String agentUid, String toolKey, boolean enabled) {
-        String normalizedAgentUid = normalizeAgentUid(agentUid);
-        String normalizedToolKey = toolKey == null ? "" : toolKey.trim();
-        if (normalizedToolKey.isBlank()) {
-            throw new IllegalArgumentException("toolKey must not be blank");
-        }
-        ToolDefinitionEntity tool = toolDefinitionRepository.findActiveByKey(normalizedToolKey);
-        if (tool == null) {
-            throw new IllegalArgumentException("tool not found: " + normalizedToolKey);
-        }
-
-        AgentToolRelationEntity relation = agentToolRelationRepository.findByAgentUidAndToolKey(normalizedAgentUid, normalizedToolKey);
-        LocalDateTime now = LocalDateTime.now();
-        String nextStatus = enabled ? "ACTIVE" : "DISABLED";
-        if (relation == null) {
-            relation = new AgentToolRelationEntity();
-            relation.setRelationUid(UUID.randomUUID().toString());
-            relation.setAgentUid(normalizedAgentUid);
-            relation.setToolKey(normalizedToolKey);
-            relation.setStatus(nextStatus);
-            relation.setSortIndex(0);
-            relation.setConfigJson("{}");
-            relation.setCreatedTime(now);
-            relation.setUpdatedTime(now);
-            agentToolRelationRepository.save(relation);
-        } else {
-            relation.setStatus(nextStatus);
-            relation.setUpdatedTime(now);
-            agentToolRelationRepository.updateById(relation);
-        }
-
-        return new AgentToolDto(
-                tool.getToolKey(),
-                tool.getDisplayName(),
-                tool.getDescription(),
-                enabled,
-                relation.getUpdatedTime()
-        );
+        return agentProfileAppService.updateAgentToolStatus(agentUid, toolKey, enabled);
     }
 
     public List<AgentDocDto> listAgentDocs(String agentUid) {
-        AgentDefinitionEntity agent = requireAgentByUid(agentUid);
-        ensureWorkspaceDocsForExistingAgent(agent);
-        Path workspace = NomoClawPaths.ensureAgentHome(agent.getAgentName());
-        List<AgentDocDto> docs = new ArrayList<>();
-        for (Map.Entry<String, String> entry : AGENT_DOC_FILES.entrySet()) {
-            docs.add(readAgentDoc(workspace, entry.getKey(), entry.getValue()));
-        }
-        return docs;
+        return agentProfileAppService.listAgentDocs(agentUid);
     }
 
     public AgentDocDto updateAgentDoc(String agentUid, String docKey, String content) {
-        AgentDefinitionEntity agent = requireAgentByUid(agentUid);
-        ensureWorkspaceDocsForExistingAgent(agent);
-        String normalizedDocKey = docKey == null ? "" : docKey.trim().toLowerCase();
-        String fileName = AGENT_DOC_FILES.get(normalizedDocKey);
-        if (fileName == null) {
-            throw new IllegalArgumentException("unsupported doc key: " + normalizedDocKey);
-        }
-        Path workspace = NomoClawPaths.ensureAgentHome(agent.getAgentName());
-        Path file = workspace.resolve(fileName).toAbsolutePath().normalize();
-        try {
-            Files.writeString(file, content == null ? "" : content, StandardCharsets.UTF_8);
-        } catch (IOException ex) {
-            throw new IllegalStateException("failed to save doc file: " + file, ex);
-        }
-        return readAgentDoc(workspace, normalizedDocKey, fileName);
+        return agentProfileAppService.updateAgentDoc(agentUid, docKey, content);
     }
 
     public List<AgentTipDto> listAgentTips(String agentUid) {
@@ -559,34 +319,7 @@ public class AgentApplicationService {
     }
 
     public void deleteAgent(String agentUid) {
-        String normalizedAgentUid = normalizeAgentUid(agentUid);
-        if (DEFAULT_AGENT_UID.equals(normalizedAgentUid)) {
-            throw new IllegalArgumentException("default agent cannot be deleted");
-        }
-        AgentDefinitionEntity agent = agentDefinitionRepository.findByUid(normalizedAgentUid);
-        if (agent == null) {
-            throw new IllegalArgumentException("agent not found: " + normalizedAgentUid);
-        }
-
-        List<String> conversationUids = store.listConversations().stream()
-                .filter(conversation -> normalizedAgentUid.equals(conversation.agentUid()))
-                .map(AgentConversation::conversationUid)
-                .toList();
-        for (String conversationUid : conversationUids) {
-            deleteConversation(conversationUid);
-        }
-
-        agentTipApplicationService.purgeAgentTips(normalizedAgentUid);
-        agentSkillRelationRepository.deleteByAgentUid(normalizedAgentUid);
-        agentToolRelationRepository.deleteByAgentUid(normalizedAgentUid);
-        agentMcpToolRelationRepository.deleteByAgentUid(normalizedAgentUid);
-        agentGroupMemberRepository.deleteByAgentUid(normalizedAgentUid);
-        agentDefinitionRepository.deleteByAgentUid(normalizedAgentUid);
-        permissionAppService.removeAgentManagedWorkspaceRules(agent.getAgentUid(), agent.getAgentName());
-        log.info("[Agent] deleted agentUid={} agentName={} conversations={} workspaceRetained=true",
-                normalizedAgentUid,
-                agent.getAgentName(),
-                conversationUids.size());
+        agentProfileAppService.deleteAgent(agentUid);
     }
 
     public void updateConversationTitle(String conversationUid, String title) {
@@ -2317,248 +2050,6 @@ public class AgentApplicationService {
         return agentUid == null || agentUid.isBlank() ? "" : agentUid.trim();
     }
 
-
-    private AgentCatalogAgentDto toAgentCatalogItem(AgentGroupMemberEntity member, AgentDefinitionEntity agent) {
-        if (agent == null) {
-            return null;
-        }
-        AgentWorkspaceConfig workspaceConfig = resolveWorkspaceConfig(agent);
-        String avatarColor = readAvatarColor(agent.getExtConfig());
-        List<String> modelIds = readModelIds(agent.getExtConfig(), agent.getModelId());
-        return new AgentCatalogAgentDto(
-                agent.getAgentUid(),
-                agent.getAgentName(),
-                agent.getDisplayName(),
-                agent.getAvatar(),
-                avatarColor,
-                agent.getDescription(),
-                nullToEmpty(agent.getModelProviderId()),
-                nullToEmpty(agent.getModelId()),
-                modelIds,
-                workspaceConfig.workspaceDir().toString(),
-                workspaceConfig.reportDir().toString(),
-                workspaceConfig.tmpDir().toString(),
-                agent.getSortIndex() == null ? 0 : agent.getSortIndex(),
-                readStringArray(agent.getCapabilityTags()),
-                member.getMemberRole(),
-                member.getResponsibility(),
-                member.getIsPrimary() != null && member.getIsPrimary() == 1
-        );
-    }
-
-    private AgentGroupMemberEntity withDefaultMember(AgentGroupMemberEntity member, String groupUid, String agentUid) {
-        if (member != null) {
-            return member;
-        }
-        AgentGroupMemberEntity fallback = new AgentGroupMemberEntity();
-        fallback.setAgentGroupUid(groupUid == null ? "" : groupUid);
-        fallback.setAgentUid(agentUid == null ? "" : agentUid);
-        fallback.setMemberRole("成员");
-        fallback.setResponsibility("");
-        fallback.setIsPrimary(0);
-        return fallback;
-    }
-
-    private ObjectNode readExtConfigObject(String extConfigRaw) {
-        if (extConfigRaw == null || extConfigRaw.isBlank()) {
-            return JsonNodeFactory.instance.objectNode();
-        }
-        try {
-            JsonNode node = JsonUtil.fromJson(extConfigRaw, JsonNode.class);
-            if (node != null && node.isObject()) {
-                return (ObjectNode) node.deepCopy();
-            }
-        } catch (Exception ex) {
-            log.warn("[Agent] failed to parse ext config json={}", summarize(extConfigRaw), ex);
-        }
-        return JsonNodeFactory.instance.objectNode();
-    }
-
-    private String readAvatarColor(String extConfigRaw) {
-        ObjectNode node = readExtConfigObject(extConfigRaw);
-        String color = node.path("avatarColor").asString("");
-        return color == null || color.isBlank() ? "#2F6FED" : color;
-    }
-
-    private List<String> sanitizeModelIds(String modelName, List<String> modelNames) {
-        LinkedHashSet<String> values = new LinkedHashSet<>();
-        String primary = modelName == null ? "" : modelName.trim();
-        if (!primary.isBlank()) {
-            values.add(primary);
-        }
-        if (modelNames != null) {
-            for (String modelId : modelNames) {
-                String normalized = modelId == null ? "" : modelId.trim();
-                if (!normalized.isBlank()) {
-                    values.add(normalized);
-                }
-            }
-        }
-        if (values.isEmpty()) {
-            throw new IllegalArgumentException("At least one model must be selected");
-        }
-        return List.copyOf(values);
-    }
-
-    private List<String> readModelIds(String extConfigRaw, String fallbackModelId) {
-        ObjectNode ext = readExtConfigObject(extConfigRaw);
-        JsonNode modelIdsNode = ext.path("modelIds");
-        LinkedHashSet<String> modelIds = new LinkedHashSet<>();
-        if (modelIdsNode.isArray()) {
-            for (JsonNode node : modelIdsNode) {
-                String modelId = node == null ? "" : node.asString("");
-                if (modelId != null && !modelId.isBlank()) {
-                    modelIds.add(modelId.trim());
-                }
-            }
-        }
-        String fallback = fallbackModelId == null ? "" : fallbackModelId.trim();
-        if (!fallback.isBlank()) {
-            modelIds.add(fallback);
-        }
-        return List.copyOf(modelIds);
-    }
-
-    private AgentWorkspaceConfig resolveWorkspaceConfig(AgentDefinitionEntity agent) {
-        if (agent == null) {
-            return AgentWorkspaceConfig.defaults(NomoClawPaths.DEFAULT_AGENT_NAME).ensureDirectories();
-        }
-        return AgentWorkspaceConfig.resolve(agent.getAgentName(), agent.getWorkspace()).ensureDirectories();
-    }
-
-    private AgentWorkspaceConfig resolveWorkspaceConfigForMutation(String agentName,
-                                                                   String currentWorkspaceRaw,
-                                                                   String workspaceRaw) {
-        AgentWorkspaceConfig current = AgentWorkspaceConfig.resolve(agentName, currentWorkspaceRaw);
-        Path workspace = parseAbsolutePathOrDefault(workspaceRaw, current.workspaceDir(), "workspace");
-        return AgentWorkspaceConfig.fromWorkspacePath(workspace);
-    }
-
-    private Path parseAbsolutePathOrDefault(String rawValue, Path fallback, String fieldName) {
-        if (rawValue == null || rawValue.trim().isBlank()) {
-            return fallback.toAbsolutePath().normalize();
-        }
-        String trimmed = rawValue.trim();
-        try {
-            Path parsed = Path.of(trimmed);
-            if (!parsed.isAbsolute()) {
-                throw new IllegalArgumentException(fieldName + " must be an absolute path: " + trimmed);
-            }
-            return parsed.toAbsolutePath().normalize();
-        } catch (IllegalArgumentException ex) {
-            throw ex;
-        } catch (Exception ex) {
-            throw new IllegalArgumentException("invalid " + fieldName + ": " + trimmed, ex);
-        }
-    }
-
-    private int nextAgentSortIndex() {
-        return agentDefinitionRepository.listAllActive().stream()
-                .map(AgentDefinitionEntity::getSortIndex)
-                .filter(Objects::nonNull)
-                .max(Integer::compareTo)
-                .orElse(0) + 10;
-    }
-
-    private void initializeAgentWorkspaceDocs(String agentName, String displayName) {
-        Path workspace = NomoClawPaths.ensureAgentHome(agentName);
-        Map<String, String> defaults = new LinkedHashMap<>();
-        String name = (displayName == null || displayName.isBlank()) ? agentName : displayName.trim();
-        defaults.put("SOUL.md", "# SOUL\n\n你是 " + name + " 的内核人格，保持清晰、稳健、可执行。\n");
-        defaults.put("AGENT.md", "# AGENT\n\n## 目标\n- 在当前职责范围内完成任务\n\n## 输出约束\n- 先结论，后细节\n");
-        defaults.put("MEMORY.md", "# MEMORY\n\n- 记录长期偏好\n- 记录高价值上下文\n");
-        defaults.put("TOOLS.md", "# TOOLS\n\n- 列出允许调用的工具\n- 列出工具风险边界\n");
-        defaults.put("IDENTITY.md", "# IDENTITY\n\nname: " + name + "\nrole: 成员\n");
-        defaults.put("USER.md", "# USER\n\n- 记录该 Agent 服务对象的偏好、约束与上下文。\n");
-
-        for (Map.Entry<String, String> entry : defaults.entrySet()) {
-            Path file = workspace.resolve(entry.getKey());
-            if (Files.exists(file)) {
-                continue;
-            }
-            try {
-                Files.writeString(file, entry.getValue(), StandardCharsets.UTF_8);
-            } catch (IOException ex) {
-                throw new IllegalStateException("failed to initialize agent doc: " + file, ex);
-            }
-        }
-        Path legacyAgentsDoc = workspace.resolve("AGENTS.md");
-        try {
-            Files.deleteIfExists(legacyAgentsDoc);
-        } catch (IOException ex) {
-            throw new IllegalStateException("failed to cleanup legacy agent doc: " + legacyAgentsDoc, ex);
-        }
-    }
-
-    private void initializeAgentToolRelations(String agentUid, LocalDateTime now) {
-        List<ToolDefinitionEntity> tools = toolDefinitionRepository.listAllActive();
-        for (ToolDefinitionEntity tool : tools) {
-            AgentToolRelationEntity relation = new AgentToolRelationEntity();
-            relation.setRelationUid(UUID.randomUUID().toString());
-            relation.setAgentUid(agentUid);
-            relation.setToolKey(tool.getToolKey());
-            relation.setStatus("ACTIVE");
-            relation.setSortIndex(tool.getSortIndex() == null ? 0 : tool.getSortIndex());
-            relation.setConfigJson("{}");
-            relation.setCreatedTime(now);
-            relation.setUpdatedTime(now);
-            agentToolRelationRepository.save(relation);
-        }
-    }
-
-    private AgentDefinitionEntity requireAgentByUid(String agentUid) {
-        String normalizedAgentUid = normalizeAgentUid(agentUid);
-        AgentDefinitionEntity agent = agentDefinitionRepository.findByUid(normalizedAgentUid);
-        if (agent == null) {
-            throw new IllegalArgumentException("agent not found: " + normalizedAgentUid);
-        }
-        return agent;
-    }
-
-    private AgentDocDto readAgentDoc(Path workspace, String key, String fileName) {
-        Path file = workspace.resolve(fileName).toAbsolutePath().normalize();
-        String content;
-        LocalDateTime updatedTime;
-        try {
-            content = Files.exists(file) ? Files.readString(file, StandardCharsets.UTF_8) : "";
-            updatedTime = Files.exists(file)
-                    ? LocalDateTime.ofInstant(Files.getLastModifiedTime(file).toInstant(), ZoneId.systemDefault())
-                    : LocalDateTime.now();
-        } catch (IOException ex) {
-            throw new IllegalStateException("failed to read doc file: " + file, ex);
-        }
-        return new AgentDocDto(key, fileName, content, updatedTime);
-    }
-
-    private void ensureWorkspaceDocsForExistingAgent(AgentDefinitionEntity agent) {
-        if (agent == null) {
-            return;
-        }
-        resolveWorkspaceConfig(agent);
-        initializeAgentWorkspaceDocs(agent.getAgentName(), agent.getDisplayName());
-    }
-
-    private List<String> readStringArray(String rawJson) {
-        if (rawJson == null || rawJson.isBlank()) {
-            return List.of();
-        }
-        try {
-            JsonNode node = JsonUtil.fromJson(rawJson, JsonNode.class);
-            if (!node.isArray()) {
-                return List.of();
-            }
-            List<String> values = new ArrayList<>();
-            node.forEach(item -> {
-                if (item != null && item.isTextual()) {
-                    values.add(item.asString());
-                }
-            });
-            return values;
-        } catch (Exception ex) {
-            log.warn("[Agent] failed to parse string array json={}", summarize(rawJson), ex);
-            return List.of();
-        }
-    }
 
     private String summarize(String text) {
         if (text == null) {
