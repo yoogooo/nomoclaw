@@ -19,7 +19,6 @@ import ai.nomoclaw.bot.policy.tool.ToolPolicyReasonCode;
 import ai.nomoclaw.bot.policy.tool.permission.PermissionEffect;
 import ai.nomoclaw.bot.policy.tool.permission.PermissionScope;
 import ai.nomoclaw.bot.policy.tool.permission.PermissionSource;
-import ai.nomoclaw.bot.prompt.PromptLoader;
 import ai.nomoclaw.bot.store.AgentStore;
 import ai.nomoclaw.bot.store.entity.*;
 import ai.nomoclaw.bot.store.repository.*;
@@ -30,7 +29,6 @@ import ai.nomoclaw.bot.util.LocalizedMessages;
 import ai.nomoclaw.bot.workspace.AgentWorkspaceConfig;
 import ai.nomoclaw.bot.workspace.NomoClawPaths;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
-import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
@@ -104,7 +102,6 @@ public class AgentApplicationService {
     private final RiskPolicy riskPolicy;
     private final ToolExecutor toolExecutor;
     private final StepReviewer stepReviewer;
-    private final ToolSpecificationRegistry toolSpecificationRegistry;
     private final AgentEventBus eventBus;
     private final MessageCancellationRegistry cancellationRegistry;
     private final AgentProperties properties;
@@ -117,7 +114,6 @@ public class AgentApplicationService {
     private final ToolDefinitionRepository toolDefinitionRepository;
     private final AgentToolRelationRepository agentToolRelationRepository;
     private final AgentMcpToolRelationRepository agentMcpToolRelationRepository;
-    private final ModelConfigAppService modelConfigAppService;
     private final ConversationAttachmentAppService conversationAttachmentAppService;
     private final ImageLoaderContextService imageLoaderContextService;
     private final ToolExecutionPolicyGateway toolExecutionPolicyGateway;
@@ -127,6 +123,7 @@ public class AgentApplicationService {
     private final ExecutionFeedbackBuilder feedbackBuilder;
     private final RunViewAssembler runViewAssembler;
     private final StepExecutionService stepExecutionService;
+    private final ExecutionScopeResolver executionScopeResolver;
     private final MessageExecutionOrchestrator messageExecutionOrchestrator;
     private final ApplicationEventPublisher applicationEventPublisher;
 
@@ -135,7 +132,6 @@ public class AgentApplicationService {
                                    RiskPolicy riskPolicy,
                                    ToolExecutor toolExecutor,
                                    StepReviewer stepReviewer,
-                                   ToolSpecificationRegistry toolSpecificationRegistry,
                                    AgentEventBus eventBus,
                                    MessageCancellationRegistry cancellationRegistry,
                                    AgentProperties properties,
@@ -148,7 +144,6 @@ public class AgentApplicationService {
                                    ToolDefinitionRepository toolDefinitionRepository,
                                    AgentToolRelationRepository agentToolRelationRepository,
                                    AgentMcpToolRelationRepository agentMcpToolRelationRepository,
-                                   ModelConfigAppService modelConfigAppService,
                                    ConversationAttachmentAppService conversationAttachmentAppService,
                                    ImageLoaderContextService imageLoaderContextService,
                                    ToolExecutionPolicyGateway toolExecutionPolicyGateway,
@@ -158,6 +153,7 @@ public class AgentApplicationService {
                                    ExecutionFeedbackBuilder feedbackBuilder,
                                    RunViewAssembler runViewAssembler,
                                    StepExecutionService stepExecutionService,
+                                   ExecutionScopeResolver executionScopeResolver,
                                    MessageExecutionOrchestrator messageExecutionOrchestrator,
                                    ApplicationEventPublisher applicationEventPublisher) {
         this.store = store;
@@ -165,7 +161,6 @@ public class AgentApplicationService {
         this.riskPolicy = riskPolicy;
         this.toolExecutor = toolExecutor;
         this.stepReviewer = stepReviewer;
-        this.toolSpecificationRegistry = toolSpecificationRegistry;
         this.eventBus = eventBus;
         this.cancellationRegistry = cancellationRegistry;
         this.properties = properties;
@@ -178,7 +173,6 @@ public class AgentApplicationService {
         this.toolDefinitionRepository = toolDefinitionRepository;
         this.agentToolRelationRepository = agentToolRelationRepository;
         this.agentMcpToolRelationRepository = agentMcpToolRelationRepository;
-        this.modelConfigAppService = modelConfigAppService;
         this.conversationAttachmentAppService = conversationAttachmentAppService;
         this.imageLoaderContextService = imageLoaderContextService;
         this.toolExecutionPolicyGateway = toolExecutionPolicyGateway;
@@ -188,6 +182,7 @@ public class AgentApplicationService {
         this.feedbackBuilder = feedbackBuilder;
         this.runViewAssembler = runViewAssembler;
         this.stepExecutionService = stepExecutionService;
+        this.executionScopeResolver = executionScopeResolver;
         this.messageExecutionOrchestrator = messageExecutionOrchestrator;
         this.applicationEventPublisher = applicationEventPublisher;
     }
@@ -301,7 +296,7 @@ public class AgentApplicationService {
             throw new IllegalArgumentException("agentName already exists: " + agentName);
         }
         List<String> modelIds = sanitizeModelIds(request.modelName(), request.modelNames());
-        validateAgentModelSelection(request.modelProvider(), modelIds);
+        executionScopeResolver.validateModelSelection(request.modelProvider(), modelIds);
 
         String avatar = request.avatar() == null ? "" : request.avatar().trim();
         if (avatar.isBlank()) {
@@ -380,7 +375,7 @@ public class AgentApplicationService {
             avatarColor = "#2F6FED";
         }
         List<String> modelIds = sanitizeModelIds(request.modelName(), request.modelNames());
-        validateAgentModelSelection(request.modelProvider(), modelIds);
+        executionScopeResolver.validateModelSelection(request.modelProvider(), modelIds);
 
         agent.setDisplayName(displayName);
         agent.setDescription(request.description() == null ? "" : request.description().trim());
@@ -634,7 +629,7 @@ public class AgentApplicationService {
         String normalizedApprovalMode = normalizeApprovalMode(approvalMode);
         AgentConversation conversation = store.findConversation(conversationUid)
                 .orElseGet(() -> store.createConversation(conversationUid, "", DEFAULT_AGENT_UID, normalizedChannel));
-        RuntimeModelSelection runtimeModel = resolveRuntimeModelSelection(conversation, modelProvider, modelName);
+        RuntimeModelSelection runtimeModel = executionScopeResolver.resolveForMessageSubmission(conversation, modelProvider, modelName);
         String messageUid = UUID.randomUUID().toString();
         int maxRounds = properties.getLoop().getMaxRounds();
         store.createUserMessage(
@@ -719,13 +714,14 @@ public class AgentApplicationService {
         AgentMessage message = store.findMessage(messageUid)
                 .orElseThrow(() -> new IllegalArgumentException("message not found: " + messageUid));
         AgentConversation conversation = requireConversation(message.conversationUid());
-        AgentDefinitionEntity executionAgent = resolveExecutionAgent(conversation);
+        ExecutionApprovalScope approvalScope = executionScopeResolver.resolveForApproval(conversation, message);
+        AgentDefinitionEntity executionAgent = approvalScope.executionAgent();
         String agentName = executionAgent == null ? NomoClawPaths.DEFAULT_AGENT_NAME : executionAgent.getAgentName();
-        AgentWorkspaceConfig workspaceConfig = resolveWorkspaceConfig(executionAgent);
+        AgentWorkspaceConfig workspaceConfig = approvalScope.workspaceConfig();
         String normalizedAction = action == null ? "" : action.trim().toLowerCase(Locale.ROOT);
         PermissionScope appliedScope = scope == null ? PermissionScope.ONCE : scope;
         String matchedRuleId = "";
-        ToolPolicyReasonCode policyReasonCode = resolveStepPolicyReasonCode(conversation, executionAgent, message, step);
+        ToolPolicyReasonCode policyReasonCode = resolveStepPolicyReasonCode(approvalScope, step);
         if (isHardGuardAskReason(policyReasonCode)
                 && (appliedScope == PermissionScope.AGENT || appliedScope == PermissionScope.USER)) {
             appliedScope = PermissionScope.SESSION;
@@ -925,17 +921,15 @@ public class AgentApplicationService {
                                                  MessageExecutionRuntimeState state,
                                                  ExecutionRuntimeStateStore runtimeStateStore) {
         AgentConversation conversation = requireConversation(message.conversationUid());
-        AgentDefinitionEntity executionAgent = resolveExecutionAgent(conversation);
-        // For scheduled runs, hide cron management tools from the model to prevent recursive scheduling.
-        List<ToolSpecification> availableTools = availableToolsForConversation(conversation, executionAgent);
+        ExecutionScope executionScope = executionScopeResolver.resolveForExecution(conversation, message);
         runtimeStateStore.clearBufferedAnswer(message.messageUid());
         int roundIndex = state.currentRound();
         StringBuilder streamedText = new StringBuilder();
         Planner.StreamReasonResult streamedResult = planner.reasonStream(
                 state.memory(),
-                availableTools,
+                executionScope.availableTools(),
                 ToolChoice.AUTO,
-                buildPromptContext(conversation, executionAgent, message.conversationUid(), message.messageUid()),
+                executionScope.promptContext(),
                 textDelta -> {
                     if (textDelta == null || textDelta.isBlank()) {
                         return;
@@ -971,8 +965,8 @@ public class AgentApplicationService {
                         "MODEL_RETURNED_EMPTY_ANSWER",
                         state.currentRound(),
                         properties.getLoop().getMaxRounds(),
-                        buildPromptContext(conversation, executionAgent, message.conversationUid(), message.messageUid()),
-                        availableTools
+                        executionScope.promptContext(),
+                        executionScope.availableTools()
                 );
                 recordRoundTokenUsage(message, summaryResult.response(), state.currentRound());
                 answer = nullToEmpty(summaryResult.answer()).trim();
@@ -996,8 +990,9 @@ public class AgentApplicationService {
                                               List<PlanStep> steps,
                                               String approvalMode) {
         AgentConversation conversation = requireConversation(message.conversationUid());
-        AgentDefinitionEntity executionAgent = resolveExecutionAgent(conversation);
-        AgentWorkspaceConfig workspaceConfig = resolveWorkspaceConfig(executionAgent);
+        ExecutionScope executionScope = executionScopeResolver.resolveForExecution(conversation, message);
+        AgentDefinitionEntity executionAgent = executionScope.executionAgent();
+        AgentWorkspaceConfig workspaceConfig = executionScope.workspaceConfig();
         Path agentWorkspacePath = workspaceConfig.workspaceDir();
         for (PlanStep step : steps) {
             if (cancellationRegistry.isCanceled(message.messageUid())) {
@@ -1194,8 +1189,9 @@ public class AgentApplicationService {
                 metrics.put("skipped", true);
                 return ToolResult.success("定时触发执行时已禁止管理定时任务。", artifacts, metrics);
             }
-            AgentDefinitionEntity agent = resolveExecutionAgent(conversation);
-            AgentWorkspaceConfig workspaceConfig = resolveWorkspaceConfig(agent);
+            ExecutionScope executionScope = executionScopeResolver.resolveForExecution(conversation, message);
+            AgentDefinitionEntity agent = executionScope.executionAgent();
+            AgentWorkspaceConfig workspaceConfig = executionScope.workspaceConfig();
             Path agentWorkspacePath = workspaceConfig.workspaceDir();
             ToolPolicyDecisionResult policyDecision = toolExecutionPolicyGateway.evaluateStep(
                     step,
@@ -1672,6 +1668,7 @@ public class AgentApplicationService {
         AgentMessage message = store.findMessage(messageUid)
                 .orElseThrow(() -> new IllegalArgumentException("message not found: " + messageUid));
         AgentConversation conversation = requireConversation(message.conversationUid());
+        ExecutionScope executionScope = executionScopeResolver.resolveForExecution(conversation, message);
         int roundsUsed = Math.max(1, state.currentRound() - 1);
 
         ObjectNode loopPayload = basePayload("loop max rounds reached");
@@ -1681,15 +1678,13 @@ public class AgentApplicationService {
         loopPayload.put("maxRounds", properties.getLoop().getMaxRounds());
         publishEvent(AgentEventType.LOOP_LIMIT_REACHED, message.conversationUid(), message.messageUid(), null, loopPayload);
 
-        AgentDefinitionEntity executionAgent = resolveExecutionAgent(conversation);
-        List<ToolSpecification> availableTools = availableToolsForConversation(conversation, executionAgent);
         Planner.SummaryResult summaryResult = planner.summarize(
                 state.memory(),
                 STOP_REASON_MAX_LOOP_REACHED,
                 roundsUsed,
                 properties.getLoop().getMaxRounds(),
-                buildPromptContext(conversation, executionAgent, message.conversationUid(), message.messageUid()),
-                availableTools
+                executionScope.promptContext(),
+                executionScope.availableTools()
         );
         recordRoundTokenUsage(message, summaryResult.response(), roundsUsed);
         failMessage(message, summaryResult.answer(), STOP_REASON_MAX_LOOP_REACHED);
@@ -1698,48 +1693,6 @@ public class AgentApplicationService {
     private AgentConversation requireConversation(String conversationUid) {
         return store.findConversation(conversationUid)
                 .orElseThrow(() -> new IllegalArgumentException("conversation not found: " + conversationUid));
-    }
-
-    private PromptLoader.PromptContext buildPromptContext(AgentConversation conversation,
-                                                          AgentDefinitionEntity executionAgent,
-                                                          String sessionId,
-                                                          String messageUid) {
-        AgentGroupDefinitionEntity group = resolveConversationGroup(conversation);
-        String agentName = executionAgent == null ? NomoClawPaths.DEFAULT_AGENT_NAME : executionAgent.getAgentName();
-        AgentWorkspaceConfig workspaceConfig = resolveWorkspaceConfig(executionAgent);
-        return PromptLoader.PromptContext.forAgent(
-                sessionId,
-                messageUid,
-                conversation.channel() == null || conversation.channel().isBlank() ? "web" : conversation.channel(),
-                group == null ? "" : group.getGroupName(),
-                agentName,
-                NomoClawPaths.root(),
-                NomoClawPaths.agentHome(agentName),
-                workspaceConfig.workspaceDir(),
-                workspaceConfig.tmpDir(),
-                workspaceConfig.reportDir()
-        );
-    }
-
-    /**
-     * 返回当前会话可用工具清单。
-     *
-     * <p>特殊规则：
-     * - cron channel 执行时禁用 cron 管理工具，避免调度递归创建。
-     */
-    private List<ToolSpecification> availableToolsForConversation(AgentConversation conversation,
-                                                                  AgentDefinitionEntity executionAgent) {
-        List<ToolSpecification> tools = toolSpecificationRegistry.listForAgent(
-                executionAgent == null ? "" : executionAgent.getAgentName()
-        );
-        String channel = conversation.channel() == null ? "" : conversation.channel().trim().toLowerCase();
-        if (!"cron".equals(channel)) {
-            return tools;
-        }
-        // Scheduled execution should only run task content; scheduling operations are disabled in this context.
-        return tools.stream()
-                .filter(specification -> !isCronTool(specification.name()))
-                .toList();
     }
 
     private void failMessage(AgentMessage message, String answer, String stopReason) {
@@ -2252,134 +2205,7 @@ public class AgentApplicationService {
                 .orElseThrow(() -> new IllegalArgumentException("conversation not found: " + conversationUid));
     }
 
-    // ===== 运行上下文与模型选择解析（建议后续抽离到 ExecutionScopeResolver） =====
-
-    private RuntimeModelSelection resolveRuntimeModelSelection(AgentConversation conversation, String modelProvider, String modelName) {
-        String providerId = modelProvider == null ? "" : modelProvider.trim();
-        String modelId = modelName == null ? "" : modelName.trim();
-        // Priority 1: request-level override (web API usually passes model info explicitly).
-        // If request-level model is absent (e.g. channel inbound), fallback to conversation agent model.
-        if (providerId.isBlank() || modelId.isBlank()) {
-            RuntimeModelSelection fallback = resolveDefaultRuntimeModel(conversation.agentUid());
-            if (providerId.isBlank()) {
-                providerId = fallback.modelProvider();
-            }
-            if (modelId.isBlank()) {
-                modelId = fallback.modelName();
-            }
-        }
-        // Priority 2: system model config fallback.
-        // This prevents channel messages from failing when default agent model fields are empty.
-        if (providerId.isBlank() || modelId.isBlank()) {
-            RuntimeModelSelection fallback = resolveSystemDefaultRuntimeModel();
-            if (providerId.isBlank()) {
-                providerId = fallback.modelProvider();
-            }
-            if (modelId.isBlank()) {
-                modelId = fallback.modelName();
-            }
-        }
-        validateAgentModelSelection(providerId, List.of(modelId));
-        return new RuntimeModelSelection(providerId, modelId);
-    }
-
-    private RuntimeModelSelection resolveDefaultRuntimeModel(String agentUid) {
-        String normalizedAgentUid = normalizeAgentUid(agentUid);
-        if (normalizedAgentUid.isBlank()) {
-            return new RuntimeModelSelection("", "");
-        }
-        AgentDefinitionEntity agent = agentDefinitionRepository.findByUid(normalizedAgentUid);
-        if (agent == null) {
-            return new RuntimeModelSelection("", "");
-        }
-        return new RuntimeModelSelection(
-                agent.getModelProviderId() == null ? "" : agent.getModelProviderId().trim(),
-                resolveAgentPrimaryModelId(agent)
-        );
-    }
-
-    private RuntimeModelSelection resolveSystemDefaultRuntimeModel() {
-        // Prefer user-configured and currently available providers/models.
-        RuntimeModelSelection fromAvailable = pickRuntimeModelFromConfig(modelConfigAppService.getAvailableModelConfig());
-        if (!fromAvailable.modelProvider().isBlank() && !fromAvailable.modelName().isBlank()) {
-            return fromAvailable;
-        }
-        // Then try full persisted provider config.
-        RuntimeModelSelection fromConfig = pickRuntimeModelFromConfig(modelConfigAppService.getModelConfig());
-        if (!fromConfig.modelProvider().isBlank() && !fromConfig.modelName().isBlank()) {
-            return fromConfig;
-        }
-        // Last resort: built-in provider defaults to avoid blank model selection at runtime.
-        return pickRuntimeModelFromProviders(ModelProviderDefaults.providers());
-    }
-
-    private RuntimeModelSelection pickRuntimeModelFromConfig(ModelConfigDto config) {
-        if (config == null) {
-            return new RuntimeModelSelection("", "");
-        }
-        return pickRuntimeModelFromProviders(config.providers());
-    }
-
-    private RuntimeModelSelection pickRuntimeModelFromProviders(List<ModelConfigDto.Provider> providers) {
-        if (providers == null || providers.isEmpty()) {
-            return new RuntimeModelSelection("", "");
-        }
-        for (ModelConfigDto.Provider provider : providers) {
-            if (provider == null) {
-                continue;
-            }
-            String providerId = trim(provider.id());
-            if (providerId.isBlank()) {
-                continue;
-            }
-            String modelId = trim(provider.defaultModel());
-            if (modelId.isBlank() && provider.models() != null && !provider.models().isEmpty()) {
-                for (ModelConfigDto.Model model : provider.models()) {
-                    String candidate = model == null ? "" : trim(model.id());
-                    if (!candidate.isBlank()) {
-                        modelId = candidate;
-                        break;
-                    }
-                }
-            }
-            if (!modelId.isBlank()) {
-                return new RuntimeModelSelection(providerId, modelId);
-            }
-        }
-        return new RuntimeModelSelection("", "");
-    }
-
-    private record RuntimeModelSelection(String modelProvider, String modelName) {
-    }
-
-    private String resolveAgentPrimaryModelId(AgentDefinitionEntity agent) {
-        if (agent == null) {
-            return "";
-        }
-        LinkedHashSet<String> modelIds = new LinkedHashSet<>();
-        String extConfig = trim(agent.getExtConfig());
-        if (!extConfig.isBlank()) {
-            try {
-                JsonNode node = JsonUtil.fromJson(extConfig, JsonNode.class);
-                JsonNode modelIdsNode = node == null ? null : node.path("modelIds");
-                if (modelIdsNode != null && modelIdsNode.isArray()) {
-                    for (JsonNode item : modelIdsNode) {
-                        String modelId = item == null ? "" : trim(item.asString(""));
-                        if (!modelId.isBlank()) {
-                            modelIds.add(modelId);
-                        }
-                    }
-                }
-            } catch (Exception ignored) {
-                // Ignore malformed ext_config and fallback to model_id column.
-            }
-        }
-        String fallback = trim(agent.getModelId());
-        if (!fallback.isBlank()) {
-            modelIds.add(fallback);
-        }
-        return modelIds.stream().findFirst().orElse("");
-    }
+    // ===== 运行上下文解析已迁移至 ExecutionScopeResolver =====
 
     private boolean isCanceled(String messageUid, MessageStatus status) {
         return status == MessageStatus.CANCELED || cancellationRegistry.isCanceled(messageUid);
@@ -2415,14 +2241,15 @@ public class AgentApplicationService {
         return decision;
     }
 
-    private ToolPolicyReasonCode resolveStepPolicyReasonCode(AgentConversation conversation,
-                                                             AgentDefinitionEntity executionAgent,
-                                                             AgentMessage message,
+    private ToolPolicyReasonCode resolveStepPolicyReasonCode(ExecutionApprovalScope approvalScope,
                                                              PlanStep step) {
-        if (step == null || message == null || conversation == null) {
+        if (step == null || approvalScope == null || approvalScope.conversation() == null || approvalScope.message() == null) {
             return ToolPolicyReasonCode.NONE;
         }
-        AgentWorkspaceConfig workspaceConfig = resolveWorkspaceConfig(executionAgent);
+        AgentConversation conversation = approvalScope.conversation();
+        AgentMessage message = approvalScope.message();
+        AgentDefinitionEntity executionAgent = approvalScope.executionAgent();
+        AgentWorkspaceConfig workspaceConfig = approvalScope.workspaceConfig();
         ToolPolicyDecisionResult decision = toolExecutionPolicyGateway.evaluateStep(
                 step,
                 workspaceConfig.workspaceDir(),
@@ -2478,40 +2305,6 @@ public class AgentApplicationService {
         return agentUid == null || agentUid.isBlank() ? "" : agentUid.trim();
     }
 
-    /**
-     * 解析本次执行 agent 的优先级：
-     * conversation.agentUid -> group owner -> group primary -> default agent。
-     */
-    private AgentDefinitionEntity resolveExecutionAgent(AgentConversation conversation) {
-        if (conversation.agentUid() != null && !conversation.agentUid().isBlank()) {
-            return agentDefinitionRepository.findActiveByUid(conversation.agentUid());
-        }
-        if (conversation.agentGroupUid() == null || conversation.agentGroupUid().isBlank()) {
-            return agentDefinitionRepository.findActiveByUid(DEFAULT_AGENT_UID);
-        }
-        AgentGroupDefinitionEntity group = agentGroupDefinitionRepository.findActiveByUid(conversation.agentGroupUid());
-        if (group != null && group.getOwnerAgentUid() != null && !group.getOwnerAgentUid().isBlank()) {
-            AgentDefinitionEntity owner = agentDefinitionRepository.findActiveByUid(group.getOwnerAgentUid());
-            if (owner != null) {
-                return owner;
-            }
-        }
-        AgentGroupMemberEntity primaryMember = agentGroupMemberRepository.findPrimaryByGroupUid(conversation.agentGroupUid());
-        if (primaryMember != null && primaryMember.getAgentUid() != null && !primaryMember.getAgentUid().isBlank()) {
-            AgentDefinitionEntity primaryAgent = agentDefinitionRepository.findActiveByUid(primaryMember.getAgentUid());
-            if (primaryAgent != null) {
-                return primaryAgent;
-            }
-        }
-        return agentDefinitionRepository.findActiveByUid(DEFAULT_AGENT_UID);
-    }
-
-    private AgentGroupDefinitionEntity resolveConversationGroup(AgentConversation conversation) {
-        if (conversation.agentGroupUid() == null || conversation.agentGroupUid().isBlank()) {
-            return null;
-        }
-        return agentGroupDefinitionRepository.findActiveByUid(conversation.agentGroupUid());
-    }
 
     private AgentCatalogAgentDto toAgentCatalogItem(AgentGroupMemberEntity member, AgentDefinitionEntity agent) {
         if (agent == null) {
@@ -2573,24 +2366,6 @@ public class AgentApplicationService {
         ObjectNode node = readExtConfigObject(extConfigRaw);
         String color = node.path("avatarColor").asString("");
         return color == null || color.isBlank() ? "#2F6FED" : color;
-    }
-
-    private void validateAgentModelSelection(String modelProvider, List<String> modelIds) {
-        String providerId = modelProvider == null ? "" : modelProvider.trim();
-        if (providerId.isBlank() || modelIds == null || modelIds.isEmpty()) {
-            throw new IllegalArgumentException("modelProvider and modelNames must not be blank");
-        }
-        ModelConfigDto config = modelConfigAppService.getModelConfig();
-        ModelConfigDto.Provider provider = config.providers().stream()
-                .filter(item -> providerId.equals(item.id()))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("model provider not found: " + providerId));
-        for (String modelId : modelIds) {
-            boolean modelExists = provider.models().stream().anyMatch(item -> modelId.equals(item.id()));
-            if (!modelExists) {
-                throw new IllegalArgumentException("model not found under provider: " + providerId + "/" + modelId);
-            }
-        }
     }
 
     private List<String> sanitizeModelIds(String modelName, List<String> modelNames) {
