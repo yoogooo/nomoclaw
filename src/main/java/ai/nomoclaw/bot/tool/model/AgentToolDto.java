@@ -1,4 +1,4 @@
-package ai.nomoclaw.bot.agentprofile.model;
+package ai.nomoclaw.bot.tool.model;
 
 import java.time.LocalDateTime;
 

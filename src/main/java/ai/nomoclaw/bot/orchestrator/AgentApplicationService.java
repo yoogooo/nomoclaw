@@ -1,12 +1,12 @@
 package ai.nomoclaw.bot.orchestrator;
 
 import ai.nomoclaw.bot.agentprofile.model.CreateAgentParam;
-import ai.nomoclaw.bot.agentprofile.model.CreateAgentTipParam;
+import ai.nomoclaw.bot.tip.model.CreateAgentTipParam;
 import ai.nomoclaw.bot.agentprofile.model.AgentCatalogAgentDto;
 import ai.nomoclaw.bot.agentprofile.model.AgentCatalogGroupDto;
 import ai.nomoclaw.bot.agentprofile.model.AgentDocDto;
-import ai.nomoclaw.bot.agentprofile.model.AgentTipDto;
-import ai.nomoclaw.bot.agentprofile.model.AgentToolDto;
+import ai.nomoclaw.bot.tip.model.AgentTipDto;
+import ai.nomoclaw.bot.tool.model.AgentToolDto;
 import ai.nomoclaw.bot.agentprofile.model.UpdateAgentBasicInfoParam;
 import ai.nomoclaw.bot.channel.model.ChannelMessageCompletedEvent;
 import ai.nomoclaw.bot.config.AgentProperties;
@@ -30,7 +30,9 @@ import ai.nomoclaw.bot.policy.tool.ToolPolicyReasonCode;
 import ai.nomoclaw.bot.policy.tool.permission.PermissionEffect;
 import ai.nomoclaw.bot.policy.tool.permission.PermissionScope;
 import ai.nomoclaw.bot.policy.tool.permission.PermissionSource;
-import ai.nomoclaw.bot.orchestrator.agentprofile.AgentProfileAppService;
+import ai.nomoclaw.bot.agentprofile.AgentProfileService;
+import ai.nomoclaw.bot.tip.AgentTipService;
+import ai.nomoclaw.bot.tool.AgentToolService;
 import ai.nomoclaw.bot.orchestrator.approval.ApprovalGrantedEvent;
 import ai.nomoclaw.bot.orchestrator.execution.ExecutionApprovalScope;
 import ai.nomoclaw.bot.orchestrator.execution.ExecutionRuntimeStateStore;
@@ -125,7 +127,8 @@ public class AgentApplicationService {
     private final AgentGroupMemberRepository agentGroupMemberRepository;
     private final AgentDefinitionRepository agentDefinitionRepository;
     private final AgentSkillRelationRepository agentSkillRelationRepository;
-    private final AgentTipApplicationService agentTipApplicationService;
+    private final AgentTipService agentTipService;
+    private final AgentToolService agentToolService;
     private final ToolDefinitionRepository toolDefinitionRepository;
     private final AgentToolRelationRepository agentToolRelationRepository;
     private final AgentMcpToolRelationRepository agentMcpToolRelationRepository;
@@ -140,7 +143,7 @@ public class AgentApplicationService {
     private final StepExecutionService stepExecutionService;
     private final ExecutionScopeResolver executionScopeResolver;
     private final MessageExecutionOrchestrator messageExecutionOrchestrator;
-    private final AgentProfileAppService agentProfileAppService;
+    private final AgentProfileService agentProfileService;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final ConversationQueryService conversationQueryService;
     private final MessageCommandService messageCommandService;
@@ -158,7 +161,8 @@ public class AgentApplicationService {
                                    AgentGroupMemberRepository agentGroupMemberRepository,
                                    AgentDefinitionRepository agentDefinitionRepository,
                                    AgentSkillRelationRepository agentSkillRelationRepository,
-                                   AgentTipApplicationService agentTipApplicationService,
+                                   AgentTipService agentTipService,
+                                   AgentToolService agentToolService,
                                    ToolDefinitionRepository toolDefinitionRepository,
                                    AgentToolRelationRepository agentToolRelationRepository,
                                    AgentMcpToolRelationRepository agentMcpToolRelationRepository,
@@ -173,7 +177,7 @@ public class AgentApplicationService {
                                    StepExecutionService stepExecutionService,
                                    ExecutionScopeResolver executionScopeResolver,
                                    MessageExecutionOrchestrator messageExecutionOrchestrator,
-                                   AgentProfileAppService agentProfileAppService,
+                                   AgentProfileService agentProfileService,
                                    ApplicationEventPublisher applicationEventPublisher,
                                    ConversationQueryService conversationQueryService,
                                    MessageCommandService messageCommandService) {
@@ -190,7 +194,8 @@ public class AgentApplicationService {
         this.agentGroupMemberRepository = agentGroupMemberRepository;
         this.agentDefinitionRepository = agentDefinitionRepository;
         this.agentSkillRelationRepository = agentSkillRelationRepository;
-        this.agentTipApplicationService = agentTipApplicationService;
+        this.agentTipService = agentTipService;
+        this.agentToolService = agentToolService;
         this.toolDefinitionRepository = toolDefinitionRepository;
         this.agentToolRelationRepository = agentToolRelationRepository;
         this.agentMcpToolRelationRepository = agentMcpToolRelationRepository;
@@ -205,7 +210,7 @@ public class AgentApplicationService {
         this.stepExecutionService = stepExecutionService;
         this.executionScopeResolver = executionScopeResolver;
         this.messageExecutionOrchestrator = messageExecutionOrchestrator;
-        this.agentProfileAppService = agentProfileAppService;
+        this.agentProfileService = agentProfileService;
         this.applicationEventPublisher = applicationEventPublisher;
         this.conversationQueryService = conversationQueryService;
         this.messageCommandService = messageCommandService;
@@ -224,7 +229,7 @@ public class AgentApplicationService {
     }
 
     public List<AgentCatalogGroupDto> listAgentGroups() {
-        return agentProfileAppService.listAgentGroups();
+        return agentProfileService.listAgentGroups();
     }
 
     public List<ConversationMessageDto> listMessages(String conversationUid) {
@@ -232,39 +237,39 @@ public class AgentApplicationService {
     }
 
     public AgentCatalogAgentDto createAgent(CreateAgentParam request) {
-        return agentProfileAppService.createAgent(request);
+        return agentProfileService.createAgent(request);
     }
 
     public AgentCatalogAgentDto updateAgentBasicInfo(String agentUid, UpdateAgentBasicInfoParam request) {
-        return agentProfileAppService.updateAgentBasicInfo(agentUid, request);
+        return agentProfileService.updateAgentBasicInfo(agentUid, request);
     }
 
     public List<AgentToolDto> listAgentTools(String agentUid) {
-        return agentProfileAppService.listAgentTools(agentUid);
+        return agentToolService.listAgentTools(agentUid);
     }
 
     public AgentToolDto updateAgentToolStatus(String agentUid, String toolKey, boolean enabled) {
-        return agentProfileAppService.updateAgentToolStatus(agentUid, toolKey, enabled);
+        return agentToolService.updateAgentToolStatus(agentUid, toolKey, enabled);
     }
 
     public List<AgentDocDto> listAgentDocs(String agentUid) {
-        return agentProfileAppService.listAgentDocs(agentUid);
+        return agentProfileService.listAgentDocs(agentUid);
     }
 
     public AgentDocDto updateAgentDoc(String agentUid, String docKey, String content) {
-        return agentProfileAppService.updateAgentDoc(agentUid, docKey, content);
+        return agentProfileService.updateAgentDoc(agentUid, docKey, content);
     }
 
     public List<AgentTipDto> listAgentTips(String agentUid) {
-        return agentTipApplicationService.listAgentTips(agentUid);
+        return agentTipService.listAgentTips(agentUid);
     }
 
     public AgentTipDto createAgentTip(String agentUid, CreateAgentTipParam request) {
-        return agentTipApplicationService.createAgentTip(agentUid, request);
+        return agentTipService.createAgentTip(agentUid, request);
     }
 
     public void deleteAgentTip(String agentUid, String tipUid) {
-        agentTipApplicationService.deleteAgentTip(agentUid, tipUid);
+        agentTipService.deleteAgentTip(agentUid, tipUid);
     }
 
     public List<ConversationMessageRunDto> listMessageRuns(String conversationUid) {
@@ -276,7 +281,7 @@ public class AgentApplicationService {
     }
 
     public void deleteAgent(String agentUid) {
-        agentProfileAppService.deleteAgent(agentUid);
+        agentProfileService.deleteAgent(agentUid);
     }
 
     public void updateConversationTitle(String conversationUid, String title) {

@@ -16,7 +16,7 @@ import ai.nomoclaw.bot.api.dto.common.response.SimpleResponse;
 import ai.nomoclaw.bot.api.mapper.AgentApiMapper;
 import ai.nomoclaw.bot.mcp.McpApplicationService;
 import ai.nomoclaw.bot.orchestrator.AgentApplicationService;
-import ai.nomoclaw.bot.orchestrator.AgentTipApplicationService;
+import ai.nomoclaw.bot.tip.AgentTipService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -40,14 +40,14 @@ import java.util.List;
 public class AgentController {
 
     private final AgentApplicationService agentApplicationService;
-    private final AgentTipApplicationService agentTipApplicationService;
+    private final AgentTipService agentTipService;
     private final McpApplicationService mcpApplicationService;
 
     public AgentController(AgentApplicationService agentApplicationService,
-                           AgentTipApplicationService agentTipApplicationService,
+                           AgentTipService agentTipService,
                            McpApplicationService mcpApplicationService) {
         this.agentApplicationService = agentApplicationService;
-        this.agentTipApplicationService = agentTipApplicationService;
+        this.agentTipService = agentTipService;
         this.mcpApplicationService = mcpApplicationService;
     }
 
@@ -111,7 +111,7 @@ public class AgentController {
     @GetMapping("/agents/{agentUid}/tips")
     public List<AgentTipResponse> listAgentTips(@PathVariable String agentUid) {
         log.info("[AgentAPI] listAgentTips agentUid={}", agentUid);
-        return AgentApiMapper.toAgentTips(agentTipApplicationService.listAgentTips(agentUid));
+        return AgentApiMapper.toAgentTips(agentTipService.listAgentTips(agentUid));
     }
 
     @PostMapping("/agents/{agentUid}/tips")
@@ -122,7 +122,7 @@ public class AgentController {
                 request == null ? null : request.sourceConversationUid(),
                 request == null ? null : request.sourceMessageUid(),
                 request == null ? null : request.generateBestPractice());
-        return AgentApiMapper.toAgentTip(agentTipApplicationService.createAgentTip(agentUid, AgentApiMapper.toParam(request)));
+        return AgentApiMapper.toAgentTip(agentTipService.createAgentTip(agentUid, AgentApiMapper.toParam(request)));
     }
 
     @PutMapping("/agents/{agentUid}/tips/{tipUid}")
@@ -130,13 +130,13 @@ public class AgentController {
                                            @PathVariable String tipUid,
                                            @RequestBody(required = false) UpdateAgentTipRequest request) {
         log.info("[AgentAPI] updateAgentTip agentUid={} tipUid={}", agentUid, tipUid);
-        return AgentApiMapper.toAgentTip(agentTipApplicationService.updateAgentTip(agentUid, tipUid, AgentApiMapper.toParam(request)));
+        return AgentApiMapper.toAgentTip(agentTipService.updateAgentTip(agentUid, tipUid, AgentApiMapper.toParam(request)));
     }
 
     @DeleteMapping("/agents/{agentUid}/tips/{tipUid}")
     public SimpleResponse deleteAgentTip(@PathVariable String agentUid, @PathVariable String tipUid) {
         log.info("[AgentAPI] deleteAgentTip agentUid={} tipUid={}", agentUid, tipUid);
-        agentTipApplicationService.deleteAgentTip(agentUid, tipUid);
+        agentTipService.deleteAgentTip(agentUid, tipUid);
         return new SimpleResponse("deleted");
     }
 

@@ -11,14 +11,14 @@ import ai.nomoclaw.bot.api.dto.agent.response.AgentMcpToolResponse;
 import ai.nomoclaw.bot.api.dto.agent.response.AgentTipResponse;
 import ai.nomoclaw.bot.api.dto.agent.response.AgentToolResponse;
 import ai.nomoclaw.bot.agentprofile.model.CreateAgentParam;
-import ai.nomoclaw.bot.agentprofile.model.CreateAgentTipParam;
+import ai.nomoclaw.bot.tip.model.CreateAgentTipParam;
 import ai.nomoclaw.bot.agentprofile.model.UpdateAgentBasicInfoParam;
-import ai.nomoclaw.bot.agentprofile.model.UpdateAgentTipParam;
+import ai.nomoclaw.bot.tip.model.UpdateAgentTipParam;
 import ai.nomoclaw.bot.agentprofile.model.AgentCatalogAgentDto;
 import ai.nomoclaw.bot.agentprofile.model.AgentCatalogGroupDto;
 import ai.nomoclaw.bot.agentprofile.model.AgentDocDto;
-import ai.nomoclaw.bot.agentprofile.model.AgentTipDto;
-import ai.nomoclaw.bot.agentprofile.model.AgentToolDto;
+import ai.nomoclaw.bot.tip.model.AgentTipDto;
+import ai.nomoclaw.bot.tool.model.AgentToolDto;
 import ai.nomoclaw.bot.mcp.AgentMcpToolDto;
 
 import java.util.List;

@@ -1,14 +1,12 @@
-package ai.nomoclaw.bot.orchestrator.agentprofile;
+package ai.nomoclaw.bot.agentprofile;
 
 import ai.nomoclaw.bot.agentprofile.model.CreateAgentParam;
 import ai.nomoclaw.bot.agentprofile.model.UpdateAgentBasicInfoParam;
 import ai.nomoclaw.bot.agentprofile.model.AgentCatalogAgentDto;
 import ai.nomoclaw.bot.agentprofile.model.AgentCatalogGroupDto;
 import ai.nomoclaw.bot.agentprofile.model.AgentDocDto;
-import ai.nomoclaw.bot.agentprofile.model.AgentToolDto;
 import ai.nomoclaw.bot.domain.AgentConversation;
 import ai.nomoclaw.bot.domain.AgentMessage;
-import ai.nomoclaw.bot.orchestrator.AgentTipApplicationService;
 import ai.nomoclaw.bot.orchestrator.ConversationAttachmentAppService;
 import ai.nomoclaw.bot.orchestrator.MessageCancellationRegistry;
 import ai.nomoclaw.bot.orchestrator.PermissionAppService;
@@ -19,14 +17,12 @@ import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
 import ai.nomoclaw.bot.store.entity.AgentGroupMemberEntity;
 import ai.nomoclaw.bot.store.entity.AgentMcpToolRelationEntity;
 import ai.nomoclaw.bot.store.entity.AgentSkillRelationEntity;
-import ai.nomoclaw.bot.store.entity.AgentToolRelationEntity;
-import ai.nomoclaw.bot.store.entity.ToolDefinitionEntity;
 import ai.nomoclaw.bot.store.repository.AgentDefinitionRepository;
 import ai.nomoclaw.bot.store.repository.AgentGroupMemberRepository;
 import ai.nomoclaw.bot.store.repository.AgentMcpToolRelationRepository;
 import ai.nomoclaw.bot.store.repository.AgentSkillRelationRepository;
-import ai.nomoclaw.bot.store.repository.AgentToolRelationRepository;
-import ai.nomoclaw.bot.store.repository.ToolDefinitionRepository;
+import ai.nomoclaw.bot.tip.AgentTipService;
+import ai.nomoclaw.bot.tool.AgentToolService;
 import ai.nomoclaw.bot.util.JsonUtil;
 import ai.nomoclaw.bot.workspace.AgentWorkspaceConfig;
 import ai.nomoclaw.bot.workspace.NomoClawPaths;
@@ -51,16 +47,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 /**
  * Agent 基础档案与配置管理应用服务。
  *
- * <p>负责 Agent 的基本资料、工具开关、文档管理，以及删除清理流程。
+ * <p>负责 Agent 的基本资料、文档管理，以及删除清理流程。
  */
 @Service
 @Slf4j
-public class AgentProfileAppService {
+public class AgentProfileService {
 
     private static final String DEFAULT_AGENT_PROMPT_RESOURCE_ROOT = "prompts/agents/default";
     private static final String DEFAULT_AGENT_UID = "agent_general_assistant";
@@ -82,24 +77,22 @@ public class AgentProfileAppService {
     private final AgentDefinitionRepository agentDefinitionRepository;
     private final AgentGroupMemberRepository agentGroupMemberRepository;
     private final AgentSkillRelationRepository agentSkillRelationRepository;
-    private final AgentToolRelationRepository agentToolRelationRepository;
     private final AgentMcpToolRelationRepository agentMcpToolRelationRepository;
-    private final ToolDefinitionRepository toolDefinitionRepository;
-    private final AgentTipApplicationService agentTipApplicationService;
+    private final AgentTipService agentTipService;
+    private final AgentToolService agentToolService;
     private final PermissionAppService permissionAppService;
     private final ExecutionScopeResolver executionScopeResolver;
     private final ConversationAttachmentAppService conversationAttachmentAppService;
     private final MessageCancellationRegistry cancellationRegistry;
     private final MessageExecutionOrchestrator messageExecutionOrchestrator;
 
-    public AgentProfileAppService(AgentStore store,
+    public AgentProfileService(AgentStore store,
                                   AgentDefinitionRepository agentDefinitionRepository,
                                   AgentGroupMemberRepository agentGroupMemberRepository,
                                   AgentSkillRelationRepository agentSkillRelationRepository,
-                                  AgentToolRelationRepository agentToolRelationRepository,
                                   AgentMcpToolRelationRepository agentMcpToolRelationRepository,
-                                  ToolDefinitionRepository toolDefinitionRepository,
-                                  AgentTipApplicationService agentTipApplicationService,
+                                  AgentTipService agentTipService,
+                                  AgentToolService agentToolService,
                                   PermissionAppService permissionAppService,
                                   ExecutionScopeResolver executionScopeResolver,
                                   ConversationAttachmentAppService conversationAttachmentAppService,
@@ -109,10 +102,9 @@ public class AgentProfileAppService {
         this.agentDefinitionRepository = agentDefinitionRepository;
         this.agentGroupMemberRepository = agentGroupMemberRepository;
         this.agentSkillRelationRepository = agentSkillRelationRepository;
-        this.agentToolRelationRepository = agentToolRelationRepository;
         this.agentMcpToolRelationRepository = agentMcpToolRelationRepository;
-        this.toolDefinitionRepository = toolDefinitionRepository;
-        this.agentTipApplicationService = agentTipApplicationService;
+        this.agentTipService = agentTipService;
+        this.agentToolService = agentToolService;
         this.permissionAppService = permissionAppService;
         this.executionScopeResolver = executionScopeResolver;
         this.conversationAttachmentAppService = conversationAttachmentAppService;
@@ -219,7 +211,7 @@ public class AgentProfileAppService {
         member.setMemberRole("成员");
         member.setResponsibility("");
         member.setIsPrimary(0);
-        initializeAgentToolRelations(agentUid, now);
+        agentToolService.initializeAgentToolRelations(agentUid, now);
         initializeAgentWorkspaceDocs(agentName, displayName);
         return toAgentCatalogItem(member, agent);
     }
@@ -283,73 +275,6 @@ public class AgentProfileAppService {
         return toAgentCatalogItem(member, agent);
     }
 
-    public List<AgentToolDto> listAgentTools(String agentUid) {
-        String normalizedAgentUid = normalizeAgentUid(agentUid);
-        List<ToolDefinitionEntity> toolDefinitions = toolDefinitionRepository.listAllActive();
-        Map<String, AgentToolRelationEntity> relationsByToolKey = agentToolRelationRepository.listByAgentUid(normalizedAgentUid)
-                .stream()
-                .collect(Collectors.toMap(
-                        AgentToolRelationEntity::getToolKey,
-                        relation -> relation,
-                        (left, right) -> left,
-                        LinkedHashMap::new
-                ));
-        return toolDefinitions.stream()
-                .map(tool -> {
-                    AgentToolRelationEntity relation = relationsByToolKey.get(tool.getToolKey());
-                    boolean enabled = relation != null && "ACTIVE".equalsIgnoreCase(relation.getStatus());
-                    LocalDateTime updatedTime = relation == null ? tool.getUpdatedTime() : relation.getUpdatedTime();
-                    return new AgentToolDto(
-                            tool.getToolKey(),
-                            tool.getDisplayName(),
-                            tool.getDescription(),
-                            enabled,
-                            updatedTime
-                    );
-                })
-                .toList();
-    }
-
-    public AgentToolDto updateAgentToolStatus(String agentUid, String toolKey, boolean enabled) {
-        String normalizedAgentUid = normalizeAgentUid(agentUid);
-        String normalizedToolKey = toolKey == null ? "" : toolKey.trim();
-        if (normalizedToolKey.isBlank()) {
-            throw new IllegalArgumentException("toolKey must not be blank");
-        }
-        ToolDefinitionEntity tool = toolDefinitionRepository.findActiveByKey(normalizedToolKey);
-        if (tool == null) {
-            throw new IllegalArgumentException("tool not found: " + normalizedToolKey);
-        }
-
-        AgentToolRelationEntity relation = agentToolRelationRepository.findByAgentUidAndToolKey(normalizedAgentUid, normalizedToolKey);
-        LocalDateTime now = LocalDateTime.now();
-        String nextStatus = enabled ? "ACTIVE" : "DISABLED";
-        if (relation == null) {
-            relation = new AgentToolRelationEntity();
-            relation.setRelationUid(UUID.randomUUID().toString());
-            relation.setAgentUid(normalizedAgentUid);
-            relation.setToolKey(normalizedToolKey);
-            relation.setStatus(nextStatus);
-            relation.setSortIndex(0);
-            relation.setConfigJson("{}");
-            relation.setCreatedTime(now);
-            relation.setUpdatedTime(now);
-            agentToolRelationRepository.save(relation);
-        } else {
-            relation.setStatus(nextStatus);
-            relation.setUpdatedTime(now);
-            agentToolRelationRepository.updateById(relation);
-        }
-
-        return new AgentToolDto(
-                tool.getToolKey(),
-                tool.getDisplayName(),
-                tool.getDescription(),
-                enabled,
-                relation.getUpdatedTime()
-        );
-    }
-
     public List<AgentDocDto> listAgentDocs(String agentUid) {
         AgentDefinitionEntity agent = requireAgentByUid(agentUid);
         ensureWorkspaceDocsForExistingAgent(agent);
@@ -397,9 +322,9 @@ public class AgentProfileAppService {
             deleteConversation(conversationUid);
         }
 
-        agentTipApplicationService.purgeAgentTips(normalizedAgentUid);
+        agentTipService.purgeAgentTips(normalizedAgentUid);
         agentSkillRelationRepository.deleteByAgentUid(normalizedAgentUid);
-        agentToolRelationRepository.deleteByAgentUid(normalizedAgentUid);
+        agentToolService.purgeAgentTools(normalizedAgentUid);
         agentMcpToolRelationRepository.deleteByAgentUid(normalizedAgentUid);
         agentGroupMemberRepository.deleteByAgentUid(normalizedAgentUid);
         agentDefinitionRepository.deleteByAgentUid(normalizedAgentUid);
@@ -637,22 +562,6 @@ public class AgentProfileAppService {
             return "zh";
         }
         return "en".equalsIgnoreCase(language.trim()) ? "en" : "zh";
-    }
-
-    private void initializeAgentToolRelations(String agentUid, LocalDateTime now) {
-        List<ToolDefinitionEntity> tools = toolDefinitionRepository.listAllActive();
-        for (ToolDefinitionEntity tool : tools) {
-            AgentToolRelationEntity relation = new AgentToolRelationEntity();
-            relation.setRelationUid(UUID.randomUUID().toString());
-            relation.setAgentUid(agentUid);
-            relation.setToolKey(tool.getToolKey());
-            relation.setStatus("ACTIVE");
-            relation.setSortIndex(tool.getSortIndex() == null ? 0 : tool.getSortIndex());
-            relation.setConfigJson("{}");
-            relation.setCreatedTime(now);
-            relation.setUpdatedTime(now);
-            agentToolRelationRepository.save(relation);
-        }
     }
 
     private AgentDefinitionEntity requireAgentByUid(String agentUid) {

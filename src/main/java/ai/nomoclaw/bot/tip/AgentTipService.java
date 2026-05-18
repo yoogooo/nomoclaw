@@ -1,13 +1,14 @@
-package ai.nomoclaw.bot.orchestrator;
+package ai.nomoclaw.bot.tip;
 
-import ai.nomoclaw.bot.agentprofile.model.CreateAgentTipParam;
-import ai.nomoclaw.bot.agentprofile.model.UpdateAgentTipParam;
-import ai.nomoclaw.bot.agentprofile.model.AgentTipDto;
+import ai.nomoclaw.bot.tip.model.CreateAgentTipParam;
+import ai.nomoclaw.bot.tip.model.UpdateAgentTipParam;
+import ai.nomoclaw.bot.tip.model.AgentTipDto;
 import ai.nomoclaw.bot.domain.AgentConversation;
 import ai.nomoclaw.bot.domain.AgentMessage;
 import ai.nomoclaw.bot.model.PlanStep;
 import ai.nomoclaw.bot.model.StepStatus;
 import ai.nomoclaw.bot.prompt.PromptLoader;
+import ai.nomoclaw.bot.orchestrator.TipSummaryChatService;
 import ai.nomoclaw.bot.store.AgentStore;
 import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
 import ai.nomoclaw.bot.store.entity.AgentGroupDefinitionEntity;
@@ -23,13 +24,14 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
 @Service
-public class AgentTipApplicationService {
+public class AgentTipService {
 
     private static final String DEFAULT_AGENT_UID = "agent_general_assistant";
 
@@ -40,12 +42,12 @@ public class AgentTipApplicationService {
     private final AgentGroupMemberRepository agentGroupMemberRepository;
     private final AgentTipRepository agentTipRepository;
 
-    public AgentTipApplicationService(AgentStore store,
-                                      TipSummaryChatService tipSummaryChatService,
-                                      AgentDefinitionRepository agentDefinitionRepository,
-                                      AgentGroupDefinitionRepository agentGroupDefinitionRepository,
-                                      AgentGroupMemberRepository agentGroupMemberRepository,
-                                      AgentTipRepository agentTipRepository) {
+    public AgentTipService(AgentStore store,
+                           TipSummaryChatService tipSummaryChatService,
+                           AgentDefinitionRepository agentDefinitionRepository,
+                           AgentGroupDefinitionRepository agentGroupDefinitionRepository,
+                           AgentGroupMemberRepository agentGroupMemberRepository,
+                           AgentTipRepository agentTipRepository) {
         this.store = store;
         this.tipSummaryChatService = tipSummaryChatService;
         this.agentDefinitionRepository = agentDefinitionRepository;
@@ -376,7 +378,7 @@ public class AgentTipApplicationService {
             return LocalDateTime.parse(raw);
         } catch (DateTimeParseException ignore) {
             try {
-                return Instant.parse(raw).atZone(java.time.ZoneId.systemDefault()).toLocalDateTime();
+                return Instant.parse(raw).atZone(ZoneId.systemDefault()).toLocalDateTime();
             } catch (DateTimeParseException ex) {
                 return null;
             }
