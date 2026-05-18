@@ -12,8 +12,7 @@ import ai.nomoclaw.bot.llm.config.LlmProperties;
 import ai.nomoclaw.bot.model.*;
 import ai.nomoclaw.bot.orchestrator.approval.ApprovalGrantedEvent;
 import ai.nomoclaw.bot.orchestrator.execution.*;
-import ai.nomoclaw.bot.orchestrator.message.ConversationQueryService;
-import ai.nomoclaw.bot.orchestrator.message.MessageCommandService;
+import ai.nomoclaw.bot.conversation.service.ConversationService;
 import ai.nomoclaw.bot.orchestrator.view.ExecutionFeedbackBuilder;
 import ai.nomoclaw.bot.planner.Planner;
 import ai.nomoclaw.bot.policy.RiskPolicy;
@@ -26,6 +25,7 @@ import ai.nomoclaw.bot.policy.tool.permission.PermissionScope;
 import ai.nomoclaw.bot.policy.tool.permission.PermissionSource;
 import ai.nomoclaw.bot.store.AgentStore;
 import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
+import ai.nomoclaw.bot.conversation.support.ConversationAttachmentService;
 import ai.nomoclaw.bot.system.model.SystemConfigDto;
 import ai.nomoclaw.bot.tool.PlatformSupport;
 import ai.nomoclaw.bot.util.JsonUtil;
@@ -91,7 +91,7 @@ public class AgentApplicationService {
     private final MessageCancellationRegistry cancellationRegistry;
     private final AgentProperties properties;
     private final LlmProperties llmProperties;
-    private final ConversationAttachmentAppService conversationAttachmentAppService;
+    private final ConversationAttachmentService conversationAttachmentAppService;
     private final ToolExecutionPolicyGateway toolExecutionPolicyGateway;
     private final ToolPermissionPolicyService toolPermissionPolicyService;
     private final PermissionAppService permissionAppService;
@@ -100,8 +100,7 @@ public class AgentApplicationService {
     private final ExecutionScopeResolver executionScopeResolver;
     private final MessageExecutionOrchestrator messageExecutionOrchestrator;
     private final ApplicationEventPublisher applicationEventPublisher;
-    private final ConversationQueryService conversationQueryService;
-    private final MessageCommandService messageCommandService;
+    private final ConversationService conversationService;
 
     public AgentApplicationService(AgentStore store,
                                    Planner planner,
@@ -110,7 +109,7 @@ public class AgentApplicationService {
                                    MessageCancellationRegistry cancellationRegistry,
                                    AgentProperties properties,
                                    LlmProperties llmProperties,
-                                   ConversationAttachmentAppService conversationAttachmentAppService,
+                                   ConversationAttachmentService conversationAttachmentAppService,
                                    ToolExecutionPolicyGateway toolExecutionPolicyGateway,
                                    ToolPermissionPolicyService toolPermissionPolicyService,
                                    PermissionAppService permissionAppService,
@@ -119,8 +118,7 @@ public class AgentApplicationService {
                                    ExecutionScopeResolver executionScopeResolver,
                                    MessageExecutionOrchestrator messageExecutionOrchestrator,
                                    ApplicationEventPublisher applicationEventPublisher,
-                                   ConversationQueryService conversationQueryService,
-                                   MessageCommandService messageCommandService) {
+                                   ConversationService conversationService) {
         this.store = store;
         this.planner = planner;
         this.riskPolicy = riskPolicy;
@@ -137,8 +135,7 @@ public class AgentApplicationService {
         this.executionScopeResolver = executionScopeResolver;
         this.messageExecutionOrchestrator = messageExecutionOrchestrator;
         this.applicationEventPublisher = applicationEventPublisher;
-        this.conversationQueryService = conversationQueryService;
-        this.messageCommandService = messageCommandService;
+        this.conversationService = conversationService;
     }
 
     public String createConversation(String agentGroupUid, String agentUid) {
@@ -146,32 +143,32 @@ public class AgentApplicationService {
     }
 
     public String createConversation(String agentGroupUid, String agentUid, String channel) {
-        return messageCommandService.createConversation(agentGroupUid, agentUid, channel);
+        return conversationService.createConversation(agentGroupUid, agentUid, channel);
     }
 
     public List<ConversationSummaryDto> listConversations() {
-        return conversationQueryService.listConversations();
+        return conversationService.listConversations();
     }
 
 
     public List<ConversationMessageDto> listMessages(String conversationUid) {
-        return conversationQueryService.listMessages(conversationUid);
+        return conversationService.listMessages(conversationUid);
     }
 
     public List<ConversationMessageRunDto> listMessageRuns(String conversationUid) {
-        return conversationQueryService.listMessageRuns(conversationUid);
+        return conversationService.listMessageRuns(conversationUid);
     }
 
     public void deleteConversation(String conversationUid) {
-        messageCommandService.deleteConversation(conversationUid);
+        conversationService.deleteConversation(conversationUid);
     }
 
     public void updateConversationTitle(String conversationUid, String title) {
-        messageCommandService.updateConversationTitle(conversationUid, title);
+        conversationService.updateConversationTitle(conversationUid, title);
     }
 
     public void updateConversationPinned(String conversationUid, boolean pinned) {
-        messageCommandService.updateConversationPinned(conversationUid, pinned);
+        conversationService.updateConversationPinned(conversationUid, pinned);
     }
 
     public String submitMessage(String conversationUid, String message) {
@@ -202,7 +199,7 @@ public class AgentApplicationService {
                                 String approvalMode,
                                 String channel,
                                 Consumer<String> beforeExecuteHook) {
-        return messageCommandService.submitMessage(
+        return conversationService.submitMessage(
                 conversationUid,
                 message,
                 fileUrls,
@@ -216,11 +213,11 @@ public class AgentApplicationService {
     }
 
     public AgentMessage getMessage(String messageUid) {
-        return messageCommandService.getMessage(messageUid);
+        return conversationService.getMessage(messageUid);
     }
 
     public int maxLoopRounds() {
-        return messageCommandService.maxLoopRounds();
+        return conversationService.maxLoopRounds();
     }
 
     public SystemConfigDto getSystemConfig() {

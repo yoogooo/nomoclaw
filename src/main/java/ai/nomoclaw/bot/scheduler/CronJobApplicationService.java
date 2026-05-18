@@ -9,7 +9,7 @@ import ai.nomoclaw.bot.channel.config.AgentChannelsProperties;
 import ai.nomoclaw.bot.channel.config.ChannelBotCredentialResolver;
 import ai.nomoclaw.bot.channel.model.ChannelType;
 import ai.nomoclaw.bot.conversation.model.ConversationMessageRunDto;
-import ai.nomoclaw.bot.orchestrator.ConversationAppService;
+import ai.nomoclaw.bot.conversation.app.ConversationAppService;
 import ai.nomoclaw.bot.orchestrator.AgentApplicationService;
 import ai.nomoclaw.bot.domain.AgentMessage;
 import ai.nomoclaw.bot.scheduler.model.BatchDeleteCronJobsDto;

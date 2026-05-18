@@ -1,4 +1,6 @@
-package ai.nomoclaw.bot.orchestrator;
+package ai.nomoclaw.bot.conversation.app;
+
+import ai.nomoclaw.bot.orchestrator.AgentApplicationService;
 
 import ai.nomoclaw.bot.conversation.model.ConversationMessageDto;
 import ai.nomoclaw.bot.conversation.model.ConversationMessageRunDto;

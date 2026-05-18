@@ -15,9 +15,9 @@ import ai.nomoclaw.bot.api.dto.conversation.response.MessageResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.UploadFilesResponse;
 import ai.nomoclaw.bot.api.mapper.ConversationApiMapper;
 import ai.nomoclaw.bot.orchestrator.approval.ApprovalAppService;
-import ai.nomoclaw.bot.orchestrator.ConversationAppService;
-import ai.nomoclaw.bot.orchestrator.ConversationAttachmentAppService;
-import ai.nomoclaw.bot.orchestrator.MessageRunAppService;
+import ai.nomoclaw.bot.conversation.app.ConversationAppService;
+import ai.nomoclaw.bot.conversation.support.ConversationAttachmentService;
+import ai.nomoclaw.bot.conversation.app.MessageRunAppService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.FileSystemResource;
@@ -50,12 +50,12 @@ import java.util.List;
 public class ConversationController {
 
     private final ConversationAppService conversationAppService;
-    private final ConversationAttachmentAppService conversationAttachmentAppService;
+    private final ConversationAttachmentService conversationAttachmentAppService;
     private final MessageRunAppService messageRunAppService;
     private final ApprovalAppService approvalAppService;
 
     public ConversationController(ConversationAppService conversationAppService,
-                                  ConversationAttachmentAppService conversationAttachmentAppService,
+                                  ConversationAttachmentService conversationAttachmentAppService,
                                   MessageRunAppService messageRunAppService,
                                   ApprovalAppService approvalAppService) {
         this.conversationAppService = conversationAppService;

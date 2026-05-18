@@ -1,5 +1,7 @@
 package ai.nomoclaw.bot.orchestrator;
 
+import ai.nomoclaw.bot.conversation.support.ConversationAttachmentService;
+
 import ai.nomoclaw.bot.modelconfig.model.ModelConfigDto;
 import ai.nomoclaw.bot.domain.AgentMessage;
 import ai.nomoclaw.bot.model.PlanStep;
@@ -18,10 +20,10 @@ public class ImageLoaderContextService {
 
     private static final String MODEL_NOT_MULTIMODAL_CODE = "MODEL_NOT_MULTIMODAL";
 
-    private final ConversationAttachmentAppService conversationAttachmentAppService;
+    private final ConversationAttachmentService conversationAttachmentAppService;
     private final ModelConfigAppService modelConfigAppService;
 
-    public ImageLoaderContextService(ConversationAttachmentAppService conversationAttachmentAppService,
+    public ImageLoaderContextService(ConversationAttachmentService conversationAttachmentAppService,
                                      ModelConfigAppService modelConfigAppService) {
         this.conversationAttachmentAppService = conversationAttachmentAppService;
         this.modelConfigAppService = modelConfigAppService;

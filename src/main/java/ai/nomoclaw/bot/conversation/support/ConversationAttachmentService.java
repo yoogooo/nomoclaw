@@ -1,4 +1,4 @@
-package ai.nomoclaw.bot.orchestrator;
+package ai.nomoclaw.bot.conversation.support;
 
 import ai.nomoclaw.bot.conversation.model.ConversationAttachmentDto;
 import ai.nomoclaw.bot.modelconfig.model.ModelConfigDto;
@@ -27,7 +27,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
-public class ConversationAttachmentAppService {
+public class ConversationAttachmentService {
 
     private static final List<String> TEXT_MIME_TYPES = List.of(
             "application/json",
@@ -45,7 +45,7 @@ public class ConversationAttachmentAppService {
     private final long maxChatUploadFileBytes;
     private final long maxChatUploadRequestBytes;
 
-    public ConversationAttachmentAppService(AgentStore store,
+    public ConversationAttachmentService(AgentStore store,
                                             AgentMessageAttachmentRepository attachmentRepository,
                                             ModelConfigAppService modelConfigAppService,
                                             ModelCatalogService modelCatalogService,

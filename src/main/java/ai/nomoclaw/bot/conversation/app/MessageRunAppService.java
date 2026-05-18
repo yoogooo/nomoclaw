@@ -1,4 +1,6 @@
-package ai.nomoclaw.bot.orchestrator;
+package ai.nomoclaw.bot.conversation.app;
+
+import ai.nomoclaw.bot.orchestrator.AgentApplicationService;
 
 import ai.nomoclaw.bot.domain.AgentMessage;
 import org.springframework.stereotype.Service;

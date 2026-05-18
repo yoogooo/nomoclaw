@@ -7,7 +7,7 @@ import ai.nomoclaw.bot.agentprofile.model.AgentCatalogGroupDto;
 import ai.nomoclaw.bot.agentprofile.model.AgentDocDto;
 import ai.nomoclaw.bot.domain.AgentConversation;
 import ai.nomoclaw.bot.domain.AgentMessage;
-import ai.nomoclaw.bot.orchestrator.ConversationAttachmentAppService;
+import ai.nomoclaw.bot.conversation.support.ConversationAttachmentService;
 import ai.nomoclaw.bot.orchestrator.MessageCancellationRegistry;
 import ai.nomoclaw.bot.orchestrator.PermissionAppService;
 import ai.nomoclaw.bot.orchestrator.execution.ExecutionScopeResolver;
@@ -82,7 +82,7 @@ public class AgentProfileService {
     private final AgentToolService agentToolService;
     private final PermissionAppService permissionAppService;
     private final ExecutionScopeResolver executionScopeResolver;
-    private final ConversationAttachmentAppService conversationAttachmentAppService;
+    private final ConversationAttachmentService conversationAttachmentAppService;
     private final MessageCancellationRegistry cancellationRegistry;
     private final MessageExecutionOrchestrator messageExecutionOrchestrator;
 
@@ -95,7 +95,7 @@ public class AgentProfileService {
                                   AgentToolService agentToolService,
                                   PermissionAppService permissionAppService,
                                   ExecutionScopeResolver executionScopeResolver,
-                                  ConversationAttachmentAppService conversationAttachmentAppService,
+                                  ConversationAttachmentService conversationAttachmentAppService,
                                   MessageCancellationRegistry cancellationRegistry,
                                   MessageExecutionOrchestrator messageExecutionOrchestrator) {
         this.store = store;
