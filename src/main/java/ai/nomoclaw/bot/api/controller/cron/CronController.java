@@ -56,7 +56,7 @@ public class CronController {
                 request == null ? null : request.expression(),
                 request == null ? null : request.timezone(),
                 request == null ? null : request.status());
-        return CronApiMapper.toCronJob(cronJobApplicationService.createCronJob(CronApiMapper.toCommand(request)));
+        return CronApiMapper.toCronJob(cronJobApplicationService.createCronJob(CronApiMapper.toParam(request)));
     }
 
     @GetMapping("/cron-jobs/{jobUid}")
@@ -134,7 +134,7 @@ public class CronController {
                 request == null ? null : request.timezone(),
                 request == null ? null : request.taskContent(),
                 request == null ? null : request.status());
-        return CronApiMapper.toCronJob(cronJobApplicationService.updateCronJob(jobUid, CronApiMapper.toCommand(request)));
+        return CronApiMapper.toCronJob(cronJobApplicationService.updateCronJob(jobUid, CronApiMapper.toParam(request)));
     }
 
     @PostMapping("/cron-jobs/{jobUid}/pause")

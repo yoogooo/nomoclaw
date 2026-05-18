@@ -3,7 +3,7 @@ package ai.nomoclaw.bot.api.controller.skill;
 import ai.nomoclaw.bot.api.dto.skill.request.UpdateAgentSkillStatusRequest;
 import ai.nomoclaw.bot.api.dto.skill.response.AgentSkillResponse;
 import ai.nomoclaw.bot.api.mapper.SkillApiMapper;
-import ai.nomoclaw.bot.orchestrator.AgentSkillService;
+import ai.nomoclaw.bot.skill.AgentSkillService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;

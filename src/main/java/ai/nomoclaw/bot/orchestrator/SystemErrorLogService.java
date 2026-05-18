@@ -1,7 +1,7 @@
 package ai.nomoclaw.bot.orchestrator;
 
-import ai.nomoclaw.bot.application.dto.SystemErrorLogDto;
-import ai.nomoclaw.bot.application.dto.SystemErrorLogSummaryDto;
+import ai.nomoclaw.bot.system.model.SystemErrorLogDto;
+import ai.nomoclaw.bot.system.model.SystemErrorLogSummaryDto;
 import ai.nomoclaw.bot.store.entity.SystemErrorLogEntity;
 import ai.nomoclaw.bot.store.repository.SystemErrorLogRepository;
 import lombok.extern.slf4j.Slf4j;

@@ -14,7 +14,7 @@ import ai.nomoclaw.bot.api.dto.conversation.response.CreateConversationResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.MessageResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.UploadFilesResponse;
 import ai.nomoclaw.bot.api.mapper.ConversationApiMapper;
-import ai.nomoclaw.bot.orchestrator.ApprovalAppService;
+import ai.nomoclaw.bot.orchestrator.approval.ApprovalAppService;
 import ai.nomoclaw.bot.orchestrator.ConversationAppService;
 import ai.nomoclaw.bot.orchestrator.ConversationAttachmentAppService;
 import ai.nomoclaw.bot.orchestrator.MessageRunAppService;

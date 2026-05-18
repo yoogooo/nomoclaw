@@ -136,7 +136,7 @@ public class ExecutionFeedbackBuilder {
         return switch (nullToEmpty(step.toolName())) {
             case "CommandTool" -> {
                 String command = toolArgs.path("command").asString("");
-                yield command.isBlank() ? i18n("agent.step.display.command.running") : i18n("agent.step.display.command.running.withCommand", command);
+                yield command.isBlank() ? i18n("agent.step.display.command.running") : i18n("agent.step.display.command.running.withParam", command);
             }
             case "BrowserTool" -> switch (toolArgs.path("action").asString("")) {
                 case "open", "navigate" -> i18n("agent.step.display.browser.open");
@@ -174,7 +174,7 @@ public class ExecutionFeedbackBuilder {
                 yield command.isBlank()
                         ? i18n("agent.step.plan.command.planned")
                         : (cwd.isBlank()
-                        ? i18n("agent.step.plan.command.withCommand", command)
+                        ? i18n("agent.step.plan.command.withParam", command)
                         : i18n("agent.step.plan.command.withCommandAndCwd", command, cwd));
             }
             case "BrowserTool" -> {
@@ -269,7 +269,7 @@ public class ExecutionFeedbackBuilder {
                 String stdout = result.artifacts() == null ? "" : result.artifacts().path("stdout").asString("");
                 String stderr = result.artifacts() == null ? "" : result.artifacts().path("stderr").asString("");
                 String outputBody = hasMeaningfulText(stdout) ? stdout : (hasMeaningfulText(result.output()) ? result.output() : stderr);
-                String prefix = command.isBlank() ? i18n("agent.step.success.command") : i18n("agent.step.success.command.withCommand", command);
+                String prefix = command.isBlank() ? i18n("agent.step.success.command") : i18n("agent.step.success.command.withParam", command);
                 if (!hasMeaningfulText(outputBody)) {
                     yield prefix;
                 }
@@ -419,10 +419,10 @@ public class ExecutionFeedbackBuilder {
             case "CommandTool" -> {
                 String command = toolArgs.path("command").asString("");
                 String cwd = toolArgs.path("cwd").asString("");
-                String renderedCommand = command.isBlank() ? i18n("agent.step.approval.notProvided.command") : command;
+                String renderedParam = command.isBlank() ? i18n("agent.step.approval.notProvided.command") : command;
                 yield cwd.isBlank()
-                        ? i18n("agent.step.approval.command", renderedCommand)
-                        : i18n("agent.step.approval.command.withCwd", renderedCommand, cwd);
+                        ? i18n("agent.step.approval.command", renderedParam)
+                        : i18n("agent.step.approval.command.withCwd", renderedParam, cwd);
             }
             case "ReadFileTool", "ListFileTool", "CreateFileTool", "EditFileTool" -> {
                 String action = switch (nullToEmpty(toolName)) {

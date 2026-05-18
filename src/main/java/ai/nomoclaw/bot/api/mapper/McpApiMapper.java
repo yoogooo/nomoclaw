@@ -5,7 +5,7 @@ import ai.nomoclaw.bot.api.dto.mcp.response.McpServerResponse;
 import ai.nomoclaw.bot.api.dto.mcp.response.McpToolResponse;
 import ai.nomoclaw.bot.mcp.McpServerDto;
 import ai.nomoclaw.bot.mcp.McpToolDto;
-import ai.nomoclaw.bot.mcp.SaveMcpServerCommand;
+import ai.nomoclaw.bot.mcp.SaveMcpServerParam;
 
 import java.util.List;
 
@@ -17,8 +17,8 @@ public final class McpApiMapper {
     private McpApiMapper() {
     }
 
-    public static SaveMcpServerCommand toCommand(SaveMcpServerRequest request) {
-        return new SaveMcpServerCommand(
+    public static SaveMcpServerParam toParam(SaveMcpServerRequest request) {
+        return new SaveMcpServerParam(
                 request.serverName(),
                 request.transport(),
                 request.timeoutSeconds(),

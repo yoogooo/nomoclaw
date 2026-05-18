@@ -1,8 +1,8 @@
 package ai.nomoclaw.bot.orchestrator;
 
-import ai.nomoclaw.bot.application.command.CreateAgentTipCommand;
-import ai.nomoclaw.bot.application.command.UpdateAgentTipCommand;
-import ai.nomoclaw.bot.application.dto.AgentTipDto;
+import ai.nomoclaw.bot.agentprofile.model.CreateAgentTipParam;
+import ai.nomoclaw.bot.agentprofile.model.UpdateAgentTipParam;
+import ai.nomoclaw.bot.agentprofile.model.AgentTipDto;
 import ai.nomoclaw.bot.domain.AgentConversation;
 import ai.nomoclaw.bot.domain.AgentMessage;
 import ai.nomoclaw.bot.model.PlanStep;
@@ -61,9 +61,9 @@ public class AgentTipApplicationService {
                 .toList();
     }
 
-    public AgentTipDto createAgentTip(String agentUid, CreateAgentTipCommand request) {
+    public AgentTipDto createAgentTip(String agentUid, CreateAgentTipParam request) {
         if (request == null) {
-            request = new CreateAgentTipCommand(null, null, null, null, null, null, false);
+            request = new CreateAgentTipParam(null, null, null, null, null, null, false);
         }
         String normalizedAgentUid = normalizeAgentUid(agentUid);
         if (agentDefinitionRepository.findByUid(normalizedAgentUid) == null) {
@@ -152,7 +152,7 @@ public class AgentTipApplicationService {
         agentTipRepository.deleteByAgentUid(normalizedAgentUid);
     }
 
-    public AgentTipDto updateAgentTip(String agentUid, String tipUid, UpdateAgentTipCommand request) {
+    public AgentTipDto updateAgentTip(String agentUid, String tipUid, UpdateAgentTipParam request) {
         String normalizedAgentUid = normalizeAgentUid(agentUid);
         String normalizedTipUid = tipUid == null ? "" : tipUid.trim();
         if (normalizedTipUid.isBlank()) {

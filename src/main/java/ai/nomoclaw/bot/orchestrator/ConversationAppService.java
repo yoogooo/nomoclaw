@@ -1,9 +1,9 @@
 package ai.nomoclaw.bot.orchestrator;
 
 import ai.nomoclaw.bot.domain.AgentConversation;
-import ai.nomoclaw.bot.application.dto.ConversationMessageDto;
-import ai.nomoclaw.bot.application.dto.ConversationMessageRunDto;
-import ai.nomoclaw.bot.application.dto.ConversationSummaryDto;
+import ai.nomoclaw.bot.conversation.model.ConversationMessageDto;
+import ai.nomoclaw.bot.conversation.model.ConversationMessageRunDto;
+import ai.nomoclaw.bot.conversation.model.ConversationSummaryDto;
 import org.springframework.stereotype.Service;
 
 import java.util.List;

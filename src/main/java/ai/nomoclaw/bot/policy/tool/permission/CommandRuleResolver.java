@@ -147,7 +147,7 @@ public class CommandRuleResolver {
         return List.of();
     }
 
-    public ReadonlyCommandVerdict isReadonlyCommand(ToolPolicyContext context, PermissionContextDetails details) {
+    public ReadonlyCommandVerdict isReadonlyParam(ToolPolicyContext context, PermissionContextDetails details) {
         if (!"commandtool".equals(normalizeTool(context.toolName()))) {
             return ReadonlyCommandVerdict.UNKNOWN;
         }
@@ -219,7 +219,7 @@ public class CommandRuleResolver {
             return ReadonlyCommandVerdict.NOT_READ_ONLY;
         }
 
-        ShellCommand unwrapped = unwrapShellCommand(command, shell);
+        ShellParam unwrapped = unwrapShellParam(command, shell);
         String effective = unwrapped.command();
         ShellKind effectiveShell = unwrapped.shellKind();
         List<String> segments = splitSegments(effective);
@@ -247,19 +247,19 @@ public class CommandRuleResolver {
         return allReadonly ? ReadonlyCommandVerdict.READ_ONLY : ReadonlyCommandVerdict.UNKNOWN;
     }
 
-    private boolean containsHighRiskExecutionSignal(String normalizedCommand) {
-        String value = " " + normalizedCommand + " ";
+    private boolean containsHighRiskExecutionSignal(String normalizedParam) {
+        String value = " " + normalizedParam + " ";
         return value.contains(" sudo ")
                || value.contains(" invoke-expression ")
                || value.contains(" iex ")
                || value.contains(" start-process ") && value.contains(" -verb runas");
     }
 
-    private boolean hasWriteRedirection(String normalizedCommand) {
-        if (!normalizedCommand.contains(">")) {
+    private boolean hasWriteRedirection(String normalizedParam) {
+        if (!normalizedParam.contains(">")) {
             return false;
         }
-        java.util.regex.Matcher matcher = Pattern.compile("(^|\\s)\\d*>>?\\s*([^\\s|;&]+)").matcher(normalizedCommand);
+        java.util.regex.Matcher matcher = Pattern.compile("(^|\\s)\\d*>>?\\s*([^\\s|;&]+)").matcher(normalizedParam);
         boolean found = false;
         while (matcher.find()) {
             found = true;
@@ -293,20 +293,20 @@ public class CommandRuleResolver {
         return os.contains("win") ? ShellKind.CMD : ShellKind.LINUX;
     }
 
-    private ShellCommand unwrapShellCommand(String command, ShellKind shell) {
+    private ShellParam unwrapShellParam(String command, ShellKind shell) {
         List<String> tokens = tokenize(command);
         if (tokens.isEmpty()) {
-            return new ShellCommand(command, shell);
+            return new ShellParam(command, shell);
         }
         String first = normalize(stripQuotes(tokens.get(0)));
         if (!SHELL_WRAPPERS.contains(first)) {
-            return new ShellCommand(command, shell);
+            return new ShellParam(command, shell);
         }
         if (("powershell".equals(first) || "pwsh".equals(first)) && tokens.size() >= 3) {
             for (int i = 1; i < tokens.size() - 1; i++) {
                 String option = normalize(stripQuotes(tokens.get(i)));
                 if ("-command".equals(option) || "-c".equals(option)) {
-                    return new ShellCommand(stripQuotes(tokens.get(i + 1)), ShellKind.POWERSHELL);
+                    return new ShellParam(stripQuotes(tokens.get(i + 1)), ShellKind.POWERSHELL);
                 }
             }
         }
@@ -314,7 +314,7 @@ public class CommandRuleResolver {
             for (int i = 1; i < tokens.size() - 1; i++) {
                 String option = normalize(stripQuotes(tokens.get(i)));
                 if ("/c".equals(option) || "/k".equals(option)) {
-                    return new ShellCommand(stripQuotes(tokens.get(i + 1)), ShellKind.CMD);
+                    return new ShellParam(stripQuotes(tokens.get(i + 1)), ShellKind.CMD);
                 }
             }
         }
@@ -322,11 +322,11 @@ public class CommandRuleResolver {
             for (int i = 1; i < tokens.size() - 1; i++) {
                 String option = normalize(stripQuotes(tokens.get(i)));
                 if ("-c".equals(option)) {
-                    return new ShellCommand(stripQuotes(tokens.get(i + 1)), ShellKind.LINUX);
+                    return new ShellParam(stripQuotes(tokens.get(i + 1)), ShellKind.LINUX);
                 }
             }
         }
-        return new ShellCommand(command, shell);
+        return new ShellParam(command, shell);
     }
 
     private List<String> splitSegments(String command) {
@@ -385,7 +385,7 @@ public class CommandRuleResolver {
         return READONLY_LINUX_COMMANDS.contains(first);
     }
 
-    private record ShellCommand(String command, ShellKind shellKind) {
+    private record ShellParam(String command, ShellKind shellKind) {
     }
 
     private List<String> tokenize(String command) {

@@ -10,15 +10,15 @@ import ai.nomoclaw.bot.api.dto.cron.response.CronJobExecutionResultResponse;
 import ai.nomoclaw.bot.api.dto.cron.response.CronJobReportResponse;
 import ai.nomoclaw.bot.api.dto.cron.response.CronJobResponse;
 import ai.nomoclaw.bot.api.dto.cron.response.CronSubscriptionResponse;
-import ai.nomoclaw.bot.application.command.CreateCronJobCommand;
-import ai.nomoclaw.bot.application.command.UpdateCronJobCommand;
-import ai.nomoclaw.bot.application.common.page.PageResult;
-import ai.nomoclaw.bot.application.dto.BatchDeleteCronJobsDto;
-import ai.nomoclaw.bot.application.dto.CronExecutionDetailDto;
-import ai.nomoclaw.bot.application.dto.CronJobDto;
-import ai.nomoclaw.bot.application.dto.CronJobExecutionResultDto;
-import ai.nomoclaw.bot.application.dto.CronJobReportDto;
-import ai.nomoclaw.bot.application.dto.CronSubscriptionDto;
+import ai.nomoclaw.bot.scheduler.model.CreateCronJobParam;
+import ai.nomoclaw.bot.scheduler.model.UpdateCronJobParam;
+import ai.nomoclaw.bot.common.page.PageResult;
+import ai.nomoclaw.bot.scheduler.model.BatchDeleteCronJobsDto;
+import ai.nomoclaw.bot.scheduler.model.CronExecutionDetailDto;
+import ai.nomoclaw.bot.scheduler.model.CronJobDto;
+import ai.nomoclaw.bot.scheduler.model.CronJobExecutionResultDto;
+import ai.nomoclaw.bot.scheduler.model.CronJobReportDto;
+import ai.nomoclaw.bot.scheduler.model.CronSubscriptionDto;
 import ai.nomoclaw.bot.scheduler.CronSubscriptionRepository;
 
 import java.util.List;
@@ -144,8 +144,8 @@ public final class CronApiMapper {
         );
     }
 
-    public static CreateCronJobCommand toCommand(CreateCronJobRequest request) {
-        return new CreateCronJobCommand(
+    public static CreateCronJobParam toParam(CreateCronJobRequest request) {
+        return new CreateCronJobParam(
                 request == null ? null : request.agentUid(),
                 request == null ? null : request.title(),
                 request == null ? null : request.expression(),
@@ -156,8 +156,8 @@ public final class CronApiMapper {
         );
     }
 
-    public static UpdateCronJobCommand toCommand(UpdateCronJobRequest request) {
-        return new UpdateCronJobCommand(
+    public static UpdateCronJobParam toParam(UpdateCronJobRequest request) {
+        return new UpdateCronJobParam(
                 request == null ? null : request.agentUid(),
                 request == null ? null : request.title(),
                 request == null ? null : request.expression(),

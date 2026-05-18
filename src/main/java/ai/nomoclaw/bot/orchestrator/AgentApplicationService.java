@@ -1,11 +1,22 @@
 package ai.nomoclaw.bot.orchestrator;
 
-import ai.nomoclaw.bot.application.command.CreateAgentCommand;
-import ai.nomoclaw.bot.application.command.CreateAgentTipCommand;
-import ai.nomoclaw.bot.application.command.UpdateAgentBasicInfoCommand;
-import ai.nomoclaw.bot.application.dto.*;
+import ai.nomoclaw.bot.agentprofile.model.CreateAgentParam;
+import ai.nomoclaw.bot.agentprofile.model.CreateAgentTipParam;
+import ai.nomoclaw.bot.agentprofile.model.AgentCatalogAgentDto;
+import ai.nomoclaw.bot.agentprofile.model.AgentCatalogGroupDto;
+import ai.nomoclaw.bot.agentprofile.model.AgentDocDto;
+import ai.nomoclaw.bot.agentprofile.model.AgentTipDto;
+import ai.nomoclaw.bot.agentprofile.model.AgentToolDto;
+import ai.nomoclaw.bot.agentprofile.model.UpdateAgentBasicInfoParam;
 import ai.nomoclaw.bot.channel.model.ChannelMessageCompletedEvent;
 import ai.nomoclaw.bot.config.AgentProperties;
+import ai.nomoclaw.bot.conversation.model.ApprovalDecisionDto;
+import ai.nomoclaw.bot.conversation.model.ConversationMessageDto;
+import ai.nomoclaw.bot.conversation.model.ConversationMessageRunDto;
+import ai.nomoclaw.bot.conversation.model.ConversationRunStepDto;
+import ai.nomoclaw.bot.conversation.model.ConversationSummaryDto;
+import ai.nomoclaw.bot.conversation.model.MessageFileLinkDto;
+import ai.nomoclaw.bot.system.model.SystemConfigDto;
 import ai.nomoclaw.bot.domain.AgentConversation;
 import ai.nomoclaw.bot.domain.AgentMessage;
 import ai.nomoclaw.bot.llm.config.LlmProperties;
@@ -19,6 +30,8 @@ import ai.nomoclaw.bot.policy.tool.ToolPolicyReasonCode;
 import ai.nomoclaw.bot.policy.tool.permission.PermissionEffect;
 import ai.nomoclaw.bot.policy.tool.permission.PermissionScope;
 import ai.nomoclaw.bot.policy.tool.permission.PermissionSource;
+import ai.nomoclaw.bot.orchestrator.agentprofile.AgentProfileAppService;
+import ai.nomoclaw.bot.orchestrator.approval.ApprovalGrantedEvent;
 import ai.nomoclaw.bot.orchestrator.execution.ExecutionApprovalScope;
 import ai.nomoclaw.bot.orchestrator.execution.ExecutionRuntimeStateStore;
 import ai.nomoclaw.bot.orchestrator.execution.ExecutionScope;
@@ -29,6 +42,8 @@ import ai.nomoclaw.bot.orchestrator.execution.RoundExecutionResult;
 import ai.nomoclaw.bot.orchestrator.execution.RoundPlanningResult;
 import ai.nomoclaw.bot.orchestrator.execution.RuntimeModelSelection;
 import ai.nomoclaw.bot.orchestrator.execution.StepExecutionService;
+import ai.nomoclaw.bot.orchestrator.message.ConversationQueryService;
+import ai.nomoclaw.bot.orchestrator.message.MessageCommandService;
 import ai.nomoclaw.bot.orchestrator.view.ExecutionFeedbackBuilder;
 import ai.nomoclaw.bot.orchestrator.view.RunViewAssembler;
 import ai.nomoclaw.bot.store.AgentStore;
@@ -127,6 +142,8 @@ public class AgentApplicationService {
     private final MessageExecutionOrchestrator messageExecutionOrchestrator;
     private final AgentProfileAppService agentProfileAppService;
     private final ApplicationEventPublisher applicationEventPublisher;
+    private final ConversationQueryService conversationQueryService;
+    private final MessageCommandService messageCommandService;
 
     public AgentApplicationService(AgentStore store,
                                    Planner planner,
@@ -157,7 +174,9 @@ public class AgentApplicationService {
                                    ExecutionScopeResolver executionScopeResolver,
                                    MessageExecutionOrchestrator messageExecutionOrchestrator,
                                    AgentProfileAppService agentProfileAppService,
-                                   ApplicationEventPublisher applicationEventPublisher) {
+                                   ApplicationEventPublisher applicationEventPublisher,
+                                   ConversationQueryService conversationQueryService,
+                                   MessageCommandService messageCommandService) {
         this.store = store;
         this.planner = planner;
         this.riskPolicy = riskPolicy;
@@ -188,6 +207,8 @@ public class AgentApplicationService {
         this.messageExecutionOrchestrator = messageExecutionOrchestrator;
         this.agentProfileAppService = agentProfileAppService;
         this.applicationEventPublisher = applicationEventPublisher;
+        this.conversationQueryService = conversationQueryService;
+        this.messageCommandService = messageCommandService;
     }
 
     public String createConversation(String agentGroupUid, String agentUid) {
@@ -195,33 +216,11 @@ public class AgentApplicationService {
     }
 
     public String createConversation(String agentGroupUid, String agentUid, String channel) {
-        String conversationUid = UUID.randomUUID().toString();
-        String normalizedGroupUid = normalizeAgentGroupUid(agentGroupUid);
-        String normalizedAgentUid = normalizeOptionalAgentUid(agentUid);
-        String normalizedChannel = channel == null || channel.isBlank() ? "web" : channel.trim();
-        store.createConversation(
-                conversationUid,
-                normalizedGroupUid,
-                normalizedAgentUid,
-                normalizedChannel
-        );
-        log.info("[Agent] conversation created conversationUid={} agentGroupUid={} agentUid={} channel={}",
-                conversationUid, normalizedGroupUid, normalizedAgentUid, normalizedChannel);
-        return conversationUid;
+        return messageCommandService.createConversation(agentGroupUid, agentUid, channel);
     }
 
     public List<ConversationSummaryDto> listConversations() {
-        return store.listConversations().stream()
-                .map(conversation -> new ConversationSummaryDto(
-                        conversation.conversationUid(),
-                        conversation.agentGroupUid(),
-                        conversation.agentUid(),
-                        conversation.title(),
-                        conversation.pinned(),
-                        conversation.createdAt(),
-                        conversation.updatedAt()
-                ))
-                .toList();
+        return conversationQueryService.listConversations();
     }
 
     public List<AgentCatalogGroupDto> listAgentGroups() {
@@ -229,36 +228,14 @@ public class AgentApplicationService {
     }
 
     public List<ConversationMessageDto> listMessages(String conversationUid) {
-        store.findConversation(conversationUid)
-                .orElseThrow(() -> new IllegalArgumentException("conversation not found: " + conversationUid));
-        List<AgentMessage> messages = store.listMessagesByConversation(conversationUid);
-        Map<String, List<ConversationAttachmentDto>> attachmentsByMessage = conversationAttachmentAppService.listByMessageUids(
-                messages.stream().map(AgentMessage::messageUid).toList()
-        );
-        return messages.stream()
-                .map(message -> new ConversationMessageDto(
-                        message.messageUid(),
-                        emptyToNull(message.parentMessageUid()),
-                        message.role(),
-                        message.content(),
-                        message.status(),
-                        message.provider(),
-                        message.modelName(),
-                        message.inputTokens(),
-                        message.outputTokens(),
-                        message.totalTokens(),
-                        message.createdAt(),
-                        buildMessageFileLinks(message),
-                        attachmentsByMessage.getOrDefault(message.messageUid(), List.of())
-                ))
-                .toList();
+        return conversationQueryService.listMessages(conversationUid);
     }
 
-    public AgentCatalogAgentDto createAgent(CreateAgentCommand request) {
+    public AgentCatalogAgentDto createAgent(CreateAgentParam request) {
         return agentProfileAppService.createAgent(request);
     }
 
-    public AgentCatalogAgentDto updateAgentBasicInfo(String agentUid, UpdateAgentBasicInfoCommand request) {
+    public AgentCatalogAgentDto updateAgentBasicInfo(String agentUid, UpdateAgentBasicInfoParam request) {
         return agentProfileAppService.updateAgentBasicInfo(agentUid, request);
     }
 
@@ -282,7 +259,7 @@ public class AgentApplicationService {
         return agentTipApplicationService.listAgentTips(agentUid);
     }
 
-    public AgentTipDto createAgentTip(String agentUid, CreateAgentTipCommand request) {
+    public AgentTipDto createAgentTip(String agentUid, CreateAgentTipParam request) {
         return agentTipApplicationService.createAgentTip(agentUid, request);
     }
 
@@ -291,31 +268,11 @@ public class AgentApplicationService {
     }
 
     public List<ConversationMessageRunDto> listMessageRuns(String conversationUid) {
-        store.findConversation(conversationUid)
-                .orElseThrow(() -> new IllegalArgumentException("conversation not found: " + conversationUid));
-        return store.listMessagesByConversation(conversationUid).stream()
-                .filter(message -> "user".equals(message.role()))
-                .map(message -> runViewAssembler.toMessageRunResponse(
-                        message,
-                        store.listSteps(message.messageUid()),
-                        store.listEventsByMessage(message.messageUid())
-                ))
-                .filter(Objects::nonNull)
-                .toList();
+        return conversationQueryService.listMessageRuns(conversationUid);
     }
 
     public void deleteConversation(String conversationUid) {
-        AgentConversation conversation = store.findConversation(conversationUid)
-                .orElseThrow(() -> new IllegalArgumentException("conversation not found: " + conversationUid));
-        List<AgentMessage> messages = store.listMessagesByConversation(conversationUid);
-        messages.forEach(message -> {
-            cancellationRegistry.cancel(message.messageUid());
-            messageExecutionOrchestrator.clearRuntime(message.messageUid());
-        });
-        conversationAttachmentAppService.purgeConversationAttachments(conversationUid);
-        store.deleteConversation(conversationUid);
-        log.info("[Agent] conversation deleted conversationUid={} agentGroupUid={} agentUid={}",
-                conversationUid, conversation.agentGroupUid(), conversation.agentUid());
+        messageCommandService.deleteConversation(conversationUid);
     }
 
     public void deleteAgent(String agentUid) {
@@ -323,23 +280,11 @@ public class AgentApplicationService {
     }
 
     public void updateConversationTitle(String conversationUid, String title) {
-        AgentConversation conversation = store.findConversation(conversationUid)
-                .orElseThrow(() -> new IllegalArgumentException("conversation not found: " + conversationUid));
-        String normalizedTitle = title == null ? "" : title.trim();
-        if (normalizedTitle.isBlank()) {
-            throw new IllegalArgumentException("title must not be blank");
-        }
-        store.updateConversationTitle(conversationUid, normalizedTitle);
-        log.info("[Agent] conversation title updated conversationUid={} title={} agentGroupUid={} agentUid={}",
-                conversationUid, normalizedTitle, conversation.agentGroupUid(), conversation.agentUid());
+        messageCommandService.updateConversationTitle(conversationUid, title);
     }
 
     public void updateConversationPinned(String conversationUid, boolean pinned) {
-        AgentConversation conversation = store.findConversation(conversationUid)
-                .orElseThrow(() -> new IllegalArgumentException("conversation not found: " + conversationUid));
-        store.updateConversationPinned(conversationUid, pinned);
-        log.info("[Agent] conversation pin updated conversationUid={} pinned={} agentGroupUid={} agentUid={}",
-                conversationUid, pinned, conversation.agentGroupUid(), conversation.agentUid());
+        messageCommandService.updateConversationPinned(conversationUid, pinned);
     }
 
     public String submitMessage(String conversationUid, String message) {
@@ -370,47 +315,25 @@ public class AgentApplicationService {
                                 String approvalMode,
                                 String channel,
                                 Consumer<String> beforeExecuteHook) {
-        String normalizedChannel = channel == null || channel.isBlank() ? "web" : channel.trim();
-        String normalizedApprovalMode = normalizeApprovalMode(approvalMode);
-        AgentConversation conversation = store.findConversation(conversationUid)
-                .orElseGet(() -> store.createConversation(conversationUid, "", DEFAULT_AGENT_UID, normalizedChannel));
-        RuntimeModelSelection runtimeModel = executionScopeResolver.resolveForMessageSubmission(conversation, modelProvider, modelName);
-        String messageUid = UUID.randomUUID().toString();
-        int maxRounds = properties.getLoop().getMaxRounds();
-        store.createUserMessage(
-                messageUid,
+        return messageCommandService.submitMessage(
                 conversationUid,
                 message,
-                maxRounds,
-                runtimeModel.modelProvider(),
-                runtimeModel.modelName()
-        );
-        conversationAttachmentAppService.attachUploadsToMessage(
-                conversationUid,
-                messageUid,
                 fileUrls,
-                runtimeModel.modelProvider(),
-                runtimeModel.modelName()
+                modelProvider,
+                modelName,
+                approvalMode,
+                channel,
+                beforeExecuteHook,
+                executionDriver()
         );
-        if (conversation.title() == null || conversation.title().isBlank()) {
-            store.updateConversationTitle(conversationUid, buildConversationTitle(message));
-        }
-        log.info("[Agent] message created conversationUid={} messageUid={} channel={} model={}/{} maxRounds={} message={}",
-                conversationUid, messageUid, normalizedChannel, runtimeModel.modelProvider(), runtimeModel.modelName(), maxRounds, summarize(message));
-        if (beforeExecuteHook != null) {
-            beforeExecuteHook.accept(messageUid);
-        }
-        messageExecutionOrchestrator.enqueue(messageUid, LocaleContextHolder.getLocale(), normalizedApprovalMode, executionDriver());
-        return messageUid;
     }
 
     public AgentMessage getMessage(String messageUid) {
-        return store.findMessage(messageUid)
-                .orElseThrow(() -> new IllegalArgumentException("message not found: " + messageUid));
+        return messageCommandService.getMessage(messageUid);
     }
 
     public int maxLoopRounds() {
-        return properties.getLoop().getMaxRounds();
+        return messageCommandService.maxLoopRounds();
     }
 
     public SystemConfigDto getSystemConfig() {
@@ -1148,7 +1071,7 @@ public class AgentApplicationService {
         return switch (nullToEmpty(step.toolName())) {
             case "CommandTool" -> {
                 String command = toolArgs.path("command").asString("");
-                yield command.isBlank() ? i18n("agent.step.display.command.running") : i18n("agent.step.display.command.running.withCommand", command);
+                yield command.isBlank() ? i18n("agent.step.display.command.running") : i18n("agent.step.display.command.running.withParam", command);
             }
             case "BrowserTool" -> switch (toolArgs.path("action").asString("")) {
                 case "open", "navigate" -> i18n("agent.step.display.browser.open");
@@ -1186,7 +1109,7 @@ public class AgentApplicationService {
                 yield command.isBlank()
                         ? i18n("agent.step.plan.command.planned")
                         : (cwd.isBlank()
-                            ? i18n("agent.step.plan.command.withCommand", command)
+                            ? i18n("agent.step.plan.command.withParam", command)
                             : i18n("agent.step.plan.command.withCommandAndCwd", command, cwd));
             }
             case "BrowserTool" -> {
@@ -1281,7 +1204,7 @@ public class AgentApplicationService {
                 String stdout = result.artifacts() == null ? "" : result.artifacts().path("stdout").asString("");
                 String stderr = result.artifacts() == null ? "" : result.artifacts().path("stderr").asString("");
                 String outputBody = hasMeaningfulText(stdout) ? stdout : (hasMeaningfulText(result.output()) ? result.output() : stderr);
-                String prefix = command.isBlank() ? i18n("agent.step.success.command") : i18n("agent.step.success.command.withCommand", command);
+                String prefix = command.isBlank() ? i18n("agent.step.success.command") : i18n("agent.step.success.command.withParam", command);
                 if (!hasMeaningfulText(outputBody)) {
                     yield prefix;
                 }
@@ -1351,10 +1274,10 @@ public class AgentApplicationService {
             case "CommandTool" -> {
                 String command = toolArgs.path("command").asString("");
                 String cwd = toolArgs.path("cwd").asString("");
-                String renderedCommand = command.isBlank() ? i18n("agent.step.approval.notProvided.command") : command;
+                String renderedParam = command.isBlank() ? i18n("agent.step.approval.notProvided.command") : command;
                 yield cwd.isBlank()
-                        ? i18n("agent.step.approval.command", renderedCommand)
-                        : i18n("agent.step.approval.command.withCwd", renderedCommand, cwd);
+                        ? i18n("agent.step.approval.command", renderedParam)
+                        : i18n("agent.step.approval.command.withCwd", renderedParam, cwd);
             }
             case "ReadFileTool", "ListFileTool", "CreateFileTool", "EditFileTool" -> {
                 String action = switch (nullToEmpty(toolName)) {
@@ -1478,7 +1401,7 @@ public class AgentApplicationService {
         if ("BrowserTool".equals(normalizedToolName)) {
             return properties.getBrowser().getStepTimeoutSeconds() * 1000L;
         }
-        return properties.getCommand().getTimeoutSeconds() * 1000L;
+        return properties.getParam().getTimeoutSeconds() * 1000L;
     }
 
     /**
@@ -1946,8 +1869,7 @@ public class AgentApplicationService {
     }
 
     public AgentConversation getConversation(String conversationUid) {
-        return store.findConversation(conversationUid)
-                .orElseThrow(() -> new IllegalArgumentException("conversation not found: " + conversationUid));
+        return conversationQueryService.getConversation(conversationUid);
     }
 
     // ===== 运行上下文解析已迁移至 ExecutionScopeResolver =====

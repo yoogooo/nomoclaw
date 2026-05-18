@@ -183,11 +183,11 @@ public class TelegramPollingConnector implements ChannelStreamConnector {
         }
         String lower = text.toLowerCase(Locale.ROOT);
         return lower.contains("@" + username.toLowerCase(Locale.ROOT))
-                || hasBotCommand(message.path("entities"))
-                || hasBotCommand(message.path("caption_entities"));
+                || hasBotParam(message.path("entities"))
+                || hasBotParam(message.path("caption_entities"));
     }
 
-    private boolean hasBotCommand(JsonNode entities) {
+    private boolean hasBotParam(JsonNode entities) {
         if (!entities.isArray()) {
             return false;
         }

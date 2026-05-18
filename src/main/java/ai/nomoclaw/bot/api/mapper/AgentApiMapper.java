@@ -10,15 +10,15 @@ import ai.nomoclaw.bot.api.dto.agent.response.AgentDocResponse;
 import ai.nomoclaw.bot.api.dto.agent.response.AgentMcpToolResponse;
 import ai.nomoclaw.bot.api.dto.agent.response.AgentTipResponse;
 import ai.nomoclaw.bot.api.dto.agent.response.AgentToolResponse;
-import ai.nomoclaw.bot.application.command.CreateAgentCommand;
-import ai.nomoclaw.bot.application.command.CreateAgentTipCommand;
-import ai.nomoclaw.bot.application.command.UpdateAgentBasicInfoCommand;
-import ai.nomoclaw.bot.application.command.UpdateAgentTipCommand;
-import ai.nomoclaw.bot.application.dto.AgentCatalogAgentDto;
-import ai.nomoclaw.bot.application.dto.AgentCatalogGroupDto;
-import ai.nomoclaw.bot.application.dto.AgentDocDto;
-import ai.nomoclaw.bot.application.dto.AgentTipDto;
-import ai.nomoclaw.bot.application.dto.AgentToolDto;
+import ai.nomoclaw.bot.agentprofile.model.CreateAgentParam;
+import ai.nomoclaw.bot.agentprofile.model.CreateAgentTipParam;
+import ai.nomoclaw.bot.agentprofile.model.UpdateAgentBasicInfoParam;
+import ai.nomoclaw.bot.agentprofile.model.UpdateAgentTipParam;
+import ai.nomoclaw.bot.agentprofile.model.AgentCatalogAgentDto;
+import ai.nomoclaw.bot.agentprofile.model.AgentCatalogGroupDto;
+import ai.nomoclaw.bot.agentprofile.model.AgentDocDto;
+import ai.nomoclaw.bot.agentprofile.model.AgentTipDto;
+import ai.nomoclaw.bot.agentprofile.model.AgentToolDto;
 import ai.nomoclaw.bot.mcp.AgentMcpToolDto;
 
 import java.util.List;
@@ -134,8 +134,8 @@ public final class AgentApiMapper {
         );
     }
 
-    public static UpdateAgentBasicInfoCommand toCommand(UpdateAgentBasicInfoRequest request) {
-        return new UpdateAgentBasicInfoCommand(
+    public static UpdateAgentBasicInfoParam toParam(UpdateAgentBasicInfoRequest request) {
+        return new UpdateAgentBasicInfoParam(
                 request.displayName(),
                 request.description(),
                 request.avatar(),
@@ -147,8 +147,8 @@ public final class AgentApiMapper {
         );
     }
 
-    public static CreateAgentCommand toCommand(CreateAgentRequest request) {
-        return new CreateAgentCommand(
+    public static CreateAgentParam toParam(CreateAgentRequest request) {
+        return new CreateAgentParam(
                 request == null ? null : request.agentName(),
                 request == null ? null : request.displayName(),
                 request == null ? null : request.description(),
@@ -161,8 +161,8 @@ public final class AgentApiMapper {
         );
     }
 
-    public static CreateAgentTipCommand toCommand(CreateAgentTipRequest request) {
-        return new CreateAgentTipCommand(
+    public static CreateAgentTipParam toParam(CreateAgentTipRequest request) {
+        return new CreateAgentTipParam(
                 request == null ? null : request.title(),
                 request == null ? null : request.summary(),
                 request == null ? null : request.sourceContent(),
@@ -173,8 +173,8 @@ public final class AgentApiMapper {
         );
     }
 
-    public static UpdateAgentTipCommand toCommand(UpdateAgentTipRequest request) {
-        return new UpdateAgentTipCommand(
+    public static UpdateAgentTipParam toParam(UpdateAgentTipRequest request) {
+        return new UpdateAgentTipParam(
                 request == null ? null : request.title(),
                 request == null ? null : request.summary(),
                 request == null ? null : request.sourceContent()

@@ -8,14 +8,14 @@ import ai.nomoclaw.bot.api.dto.skill.response.GlobalSkillLinkedAgentResponse;
 import ai.nomoclaw.bot.api.dto.skill.response.GlobalSkillResponse;
 import ai.nomoclaw.bot.api.dto.skill.response.SkillBindingAgentResponse;
 import ai.nomoclaw.bot.api.dto.skill.response.SkillBindingsResponse;
-import ai.nomoclaw.bot.application.command.CreateSkillCommand;
-import ai.nomoclaw.bot.application.command.ImportSkillFromUrlCommand;
-import ai.nomoclaw.bot.application.command.UpdateSkillBindingsCommand;
-import ai.nomoclaw.bot.application.dto.AgentSkillDto;
-import ai.nomoclaw.bot.application.dto.GlobalSkillDto;
-import ai.nomoclaw.bot.application.dto.SkillBindingAgentDto;
-import ai.nomoclaw.bot.application.dto.SkillBindingsDto;
-import ai.nomoclaw.bot.application.dto.SkillLinkedAgentDto;
+import ai.nomoclaw.bot.skill.model.CreateSkillParam;
+import ai.nomoclaw.bot.skill.model.ImportSkillFromUrlParam;
+import ai.nomoclaw.bot.skill.model.UpdateSkillBindingsParam;
+import ai.nomoclaw.bot.skill.model.AgentSkillDto;
+import ai.nomoclaw.bot.skill.model.GlobalSkillDto;
+import ai.nomoclaw.bot.skill.model.SkillBindingAgentDto;
+import ai.nomoclaw.bot.skill.model.SkillBindingsDto;
+import ai.nomoclaw.bot.skill.model.SkillLinkedAgentDto;
 
 import java.util.List;
 import java.util.Objects;
@@ -89,15 +89,15 @@ public final class SkillApiMapper {
         );
     }
 
-    public static ImportSkillFromUrlCommand toCommand(ImportSkillFromUrlRequest request) {
-        return new ImportSkillFromUrlCommand(
+    public static ImportSkillFromUrlParam toParam(ImportSkillFromUrlRequest request) {
+        return new ImportSkillFromUrlParam(
                 request == null ? null : request.url(),
                 request != null && Boolean.TRUE.equals(request.attachToAgent())
         );
     }
 
-    public static CreateSkillCommand toCommand(CreateSkillRequest request) {
-        return new CreateSkillCommand(
+    public static CreateSkillParam toParam(CreateSkillRequest request) {
+        return new CreateSkillParam(
                 request == null ? null : request.skillKey(),
                 request == null ? null : request.displayName(),
                 request == null ? null : request.description(),
@@ -106,14 +106,14 @@ public final class SkillApiMapper {
         );
     }
 
-    public static UpdateSkillBindingsCommand toCommand(UpdateSkillBindingsRequest request) {
-        return new UpdateSkillBindingsCommand(
+    public static UpdateSkillBindingsParam toParam(UpdateSkillBindingsRequest request) {
+        return new UpdateSkillBindingsParam(
                 request != null && Boolean.TRUE.equals(request.enabled()),
                 request == null || request.agentBindings() == null
                         ? List.of()
                         : request.agentBindings().stream()
                         .filter(Objects::nonNull)
-                        .map(item -> new UpdateSkillBindingsCommand.SkillBindingAgentCommand(
+                        .map(item -> new UpdateSkillBindingsParam.SkillBindingAgentParam(
                                 item.agentUid(),
                                 Boolean.TRUE.equals(item.enabled())
                         ))

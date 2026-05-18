@@ -407,7 +407,7 @@ public class PermissionEngine {
         if (!"commandtool".equals(tool)) {
             return false;
         }
-        return commandRuleResolver.isReadonlyCommand(context, details) == CommandRuleResolver.ReadonlyCommandVerdict.READ_ONLY;
+        return commandRuleResolver.isReadonlyParam(context, details) == CommandRuleResolver.ReadonlyCommandVerdict.READ_ONLY;
     }
 
     private boolean isBrowserBaselineAllowed(ToolPolicyContext context) {

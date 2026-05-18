@@ -19,7 +19,7 @@ public class AgentProperties {
     private final Api api = new Api();
     private final WebSearch webSearch = new WebSearch();
 
-    public Command getCommand() {
+    public Command getParam() {
         return command;
     }
 

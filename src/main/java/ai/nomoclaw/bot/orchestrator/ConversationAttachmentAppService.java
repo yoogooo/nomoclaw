@@ -1,7 +1,7 @@
 package ai.nomoclaw.bot.orchestrator;
 
-import ai.nomoclaw.bot.application.dto.ConversationAttachmentDto;
-import ai.nomoclaw.bot.application.dto.ModelConfigDto;
+import ai.nomoclaw.bot.conversation.model.ConversationAttachmentDto;
+import ai.nomoclaw.bot.modelconfig.model.ModelConfigDto;
 import ai.nomoclaw.bot.modelconfig.ModelCatalogService;
 import ai.nomoclaw.bot.modelconfig.ModelConfigAppService;
 import ai.nomoclaw.bot.modelconfig.ModelMetadata;

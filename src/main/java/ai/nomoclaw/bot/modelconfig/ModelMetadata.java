@@ -1,6 +1,6 @@
 package ai.nomoclaw.bot.modelconfig;
 
-import ai.nomoclaw.bot.application.dto.ModelConfigDto;
+import ai.nomoclaw.bot.modelconfig.model.ModelConfigDto;
 
 import java.util.List;
 

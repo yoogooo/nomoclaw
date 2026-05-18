@@ -1,6 +1,6 @@
 package ai.nomoclaw.bot.scheduler;
 
-import ai.nomoclaw.bot.orchestrator.ApprovalGrantedEvent;
+import ai.nomoclaw.bot.orchestrator.approval.ApprovalGrantedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 

@@ -39,7 +39,7 @@ public class PermissionController {
                                                           @RequestBody(required = false) UpdatePermissionRulesRequest request) {
         log.info("[AgentAPI] updateAgentPermissions agentUid={} rules={}", agentUid,
                 request == null || request.rules() == null ? 0 : request.rules().size());
-        return PermissionApiMapper.toResponse(permissionAppService.updateAgentRules(agentUid, PermissionApiMapper.toCommand(request)));
+        return PermissionApiMapper.toResponse(permissionAppService.updateAgentRules(agentUid, PermissionApiMapper.toParam(request)));
     }
 
     @PutMapping("/permissions/user-settings")
@@ -47,6 +47,6 @@ public class PermissionController {
                                                          @RequestBody(required = false) UpdatePermissionRulesRequest request) {
         log.info("[AgentAPI] updateUserPermissions agentUid={} rules={}", agentUid,
                 request == null || request.rules() == null ? 0 : request.rules().size());
-        return PermissionApiMapper.toResponse(permissionAppService.updateUserRules(agentUid, PermissionApiMapper.toCommand(request)));
+        return PermissionApiMapper.toResponse(permissionAppService.updateUserRules(agentUid, PermissionApiMapper.toParam(request)));
     }
 }

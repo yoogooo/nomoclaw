@@ -52,7 +52,7 @@ public class AgentController {
     @PostMapping("/agents")
     public AgentCatalogAgentResponse createAgent(@Valid @RequestBody CreateAgentRequest request) {
         log.info("[AgentAPI] createAgent agentName={} displayName={}", request.agentName(), request.displayName());
-        return AgentApiMapper.toAgentCatalogAgent(agentCatalogAppService.createAgent(AgentApiMapper.toCommand(request)));
+        return AgentApiMapper.toAgentCatalogAgent(agentCatalogAppService.createAgent(AgentApiMapper.toParam(request)));
     }
 
     @DeleteMapping("/agents/{agentUid}")
@@ -67,7 +67,7 @@ public class AgentController {
                                                           @Valid @RequestBody UpdateAgentBasicInfoRequest request) {
         log.info("[AgentAPI] updateAgentBasicInfo agentUid={} displayName={} avatar={} avatarColor={} modelProvider={} modelName={}",
                 agentUid, request.displayName(), request.avatar(), request.avatarColor(), request.modelProvider(), request.modelName());
-        return AgentApiMapper.toAgentCatalogAgent(agentCatalogAppService.updateAgentBasicInfo(agentUid, AgentApiMapper.toCommand(request)));
+        return AgentApiMapper.toAgentCatalogAgent(agentCatalogAppService.updateAgentBasicInfo(agentUid, AgentApiMapper.toParam(request)));
     }
 
     @GetMapping("/agents/{agentUid}/tools")
@@ -114,7 +114,7 @@ public class AgentController {
                 request == null ? null : request.sourceConversationUid(),
                 request == null ? null : request.sourceMessageUid(),
                 request == null ? null : request.generateBestPractice());
-        return AgentApiMapper.toAgentTip(agentCatalogAppService.createAgentTip(agentUid, AgentApiMapper.toCommand(request)));
+        return AgentApiMapper.toAgentTip(agentCatalogAppService.createAgentTip(agentUid, AgentApiMapper.toParam(request)));
     }
 
     @PutMapping("/agents/{agentUid}/tips/{tipUid}")
@@ -122,7 +122,7 @@ public class AgentController {
                                            @PathVariable String tipUid,
                                            @RequestBody(required = false) UpdateAgentTipRequest request) {
         log.info("[AgentAPI] updateAgentTip agentUid={} tipUid={}", agentUid, tipUid);
-        return AgentApiMapper.toAgentTip(agentCatalogAppService.updateAgentTip(agentUid, tipUid, AgentApiMapper.toCommand(request)));
+        return AgentApiMapper.toAgentTip(agentCatalogAppService.updateAgentTip(agentUid, tipUid, AgentApiMapper.toParam(request)));
     }
 
     @DeleteMapping("/agents/{agentUid}/tips/{tipUid}")

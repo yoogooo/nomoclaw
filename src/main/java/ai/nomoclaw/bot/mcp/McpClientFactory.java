@@ -66,16 +66,16 @@ public class McpClientFactory {
     private List<String> withWorkingDirectory(List<String> command, String cwd) {
         String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         if (os.contains("win")) {
-            return List.of("cmd", "/c", "cd /d " + windowsQuote(cwd) + " && " + joinWindowsCommand(command));
+            return List.of("cmd", "/c", "cd /d " + windowsQuote(cwd) + " && " + joinWindowsParam(command));
         }
-        return List.of("/bin/sh", "-lc", "cd " + shellQuote(cwd) + " && exec " + joinShellCommand(command));
+        return List.of("/bin/sh", "-lc", "cd " + shellQuote(cwd) + " && exec " + joinShellParam(command));
     }
 
-    private String joinShellCommand(List<String> command) {
+    private String joinShellParam(List<String> command) {
         return command.stream().map(this::shellQuote).collect(java.util.stream.Collectors.joining(" "));
     }
 
-    private String joinWindowsCommand(List<String> command) {
+    private String joinWindowsParam(List<String> command) {
         return command.stream().map(this::windowsQuote).collect(java.util.stream.Collectors.joining(" "));
     }
 

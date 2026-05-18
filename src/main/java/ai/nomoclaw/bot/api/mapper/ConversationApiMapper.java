@@ -6,12 +6,12 @@ import ai.nomoclaw.bot.api.dto.conversation.response.ConversationMessageRunRespo
 import ai.nomoclaw.bot.api.dto.conversation.response.ConversationRunStepResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.ConversationSummaryResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.MessageFileLinkResponse;
-import ai.nomoclaw.bot.application.dto.ConversationAttachmentDto;
-import ai.nomoclaw.bot.application.dto.ConversationMessageDto;
-import ai.nomoclaw.bot.application.dto.ConversationMessageRunDto;
-import ai.nomoclaw.bot.application.dto.ConversationRunStepDto;
-import ai.nomoclaw.bot.application.dto.ConversationSummaryDto;
-import ai.nomoclaw.bot.application.dto.MessageFileLinkDto;
+import ai.nomoclaw.bot.conversation.model.ConversationAttachmentDto;
+import ai.nomoclaw.bot.conversation.model.ConversationMessageDto;
+import ai.nomoclaw.bot.conversation.model.ConversationMessageRunDto;
+import ai.nomoclaw.bot.conversation.model.ConversationRunStepDto;
+import ai.nomoclaw.bot.conversation.model.ConversationSummaryDto;
+import ai.nomoclaw.bot.conversation.model.MessageFileLinkDto;
 
 import java.util.List;
 

@@ -149,7 +149,7 @@ public final class PromptLoader {
     }
 
     private static OsInfo detectMacOs(String fallbackName, String fallbackVersion) {
-        Map<String, String> swVers = readKeyValueCommand("sw_vers");
+        Map<String, String> swVers = readKeyValueParam("sw_vers");
         String productName = swVers.getOrDefault("ProductName", fallbackName.isBlank() ? "macOS" : fallbackName);
         String productVersion = swVers.getOrDefault("ProductVersion", fallbackVersion);
         String codeName = macOsCodeName(productVersion);
@@ -166,7 +166,7 @@ public final class PromptLoader {
         }
     }
 
-    private static Map<String, String> readKeyValueCommand(String... command) {
+    private static Map<String, String> readKeyValueParam(String... command) {
         Map<String, String> values = new LinkedHashMap<>();
         try {
             Process process = new ProcessBuilder(command).start();

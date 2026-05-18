@@ -84,11 +84,11 @@ public class McpApplicationService {
     }
 
     @Transactional
-    public McpServerDto createServer(SaveMcpServerCommand command) {
+    public McpServerDto createServer(SaveMcpServerParam command) {
         LocalDateTime now = LocalDateTime.now();
         McpServerDefinitionEntity server = new McpServerDefinitionEntity();
         server.setServerUid(UUID.randomUUID().toString());
-        applyCommand(server, command, now, true);
+        applyParam(server, command, now, true);
         ensureServerNameAvailable(server.getServerName(), null);
         server.setCreatedTime(now);
         serverRepository.save(server);
@@ -96,9 +96,9 @@ public class McpApplicationService {
     }
 
     @Transactional
-    public McpServerDto updateServer(String serverUid, SaveMcpServerCommand command) {
+    public McpServerDto updateServer(String serverUid, SaveMcpServerParam command) {
         McpServerDefinitionEntity server = requireServer(serverUid);
-        applyCommand(server, command, LocalDateTime.now(), false);
+        applyParam(server, command, LocalDateTime.now(), false);
         ensureServerNameAvailable(server.getServerName(), server.getId());
         serverRepository.updateById(server);
         return toDto(server, toolSnapshotRepository.listByServerUid(serverUid).size());
@@ -509,8 +509,8 @@ public class McpApplicationService {
         }
     }
 
-    private void applyCommand(McpServerDefinitionEntity server,
-                              SaveMcpServerCommand command,
+    private void applyParam(McpServerDefinitionEntity server,
+                              SaveMcpServerParam command,
                               LocalDateTime now,
                               boolean creating) {
         String serverName = normalizeServerName(command.serverName());

@@ -9,11 +9,11 @@ import ai.nomoclaw.bot.api.dto.system.response.ModelConfigResponse;
 import ai.nomoclaw.bot.api.dto.system.response.SystemConfigResponse;
 import ai.nomoclaw.bot.api.dto.system.response.SystemErrorLogResponse;
 import ai.nomoclaw.bot.api.dto.system.response.SystemErrorLogSummaryResponse;
-import ai.nomoclaw.bot.application.dto.ChannelConfigDto;
-import ai.nomoclaw.bot.application.dto.ModelConfigDto;
-import ai.nomoclaw.bot.application.dto.SystemConfigDto;
-import ai.nomoclaw.bot.application.dto.SystemErrorLogDto;
-import ai.nomoclaw.bot.application.dto.SystemErrorLogSummaryDto;
+import ai.nomoclaw.bot.system.model.ChannelConfigDto;
+import ai.nomoclaw.bot.modelconfig.model.ModelConfigDto;
+import ai.nomoclaw.bot.system.model.SystemConfigDto;
+import ai.nomoclaw.bot.system.model.SystemErrorLogDto;
+import ai.nomoclaw.bot.system.model.SystemErrorLogSummaryDto;
 import ai.nomoclaw.bot.modelconfig.ModelCatalogStatusDto;
 import ai.nomoclaw.bot.scheduler.CronChannelTargetDirectoryService;
 

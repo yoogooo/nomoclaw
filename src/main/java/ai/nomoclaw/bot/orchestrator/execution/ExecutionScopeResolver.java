@@ -1,6 +1,6 @@
 package ai.nomoclaw.bot.orchestrator.execution;
 
-import ai.nomoclaw.bot.application.dto.ModelConfigDto;
+import ai.nomoclaw.bot.modelconfig.model.ModelConfigDto;
 import ai.nomoclaw.bot.domain.AgentConversation;
 import ai.nomoclaw.bot.domain.AgentMessage;
 import ai.nomoclaw.bot.model.ModelProviderDefaults;

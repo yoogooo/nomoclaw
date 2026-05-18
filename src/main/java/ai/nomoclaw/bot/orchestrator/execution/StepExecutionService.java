@@ -351,7 +351,7 @@ public class StepExecutionService {
         if ("BrowserTool".equals(normalizedToolName)) {
             return properties.getBrowser().getStepTimeoutSeconds() * 1000L;
         }
-        return properties.getCommand().getTimeoutSeconds() * 1000L;
+        return properties.getParam().getTimeoutSeconds() * 1000L;
     }
 
     private boolean isCronChannel(String channel) {

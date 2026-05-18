@@ -1,7 +1,7 @@
 package ai.nomoclaw.bot.orchestrator;
 
-import ai.nomoclaw.bot.application.dto.ChannelConfigDto;
-import ai.nomoclaw.bot.application.dto.SystemConfigDto;
+import ai.nomoclaw.bot.system.model.ChannelConfigDto;
+import ai.nomoclaw.bot.system.model.SystemConfigDto;
 import ai.nomoclaw.bot.channel.platform.FeishuBotTargetResolverService;
 import ai.nomoclaw.bot.util.JsonUtil;
 import ai.nomoclaw.bot.workspace.NomoClawPaths;

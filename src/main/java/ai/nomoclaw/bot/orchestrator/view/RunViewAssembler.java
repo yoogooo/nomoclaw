@@ -1,7 +1,7 @@
 package ai.nomoclaw.bot.orchestrator.view;
 
-import ai.nomoclaw.bot.application.dto.ConversationMessageRunDto;
-import ai.nomoclaw.bot.application.dto.ConversationRunStepDto;
+import ai.nomoclaw.bot.conversation.model.ConversationMessageRunDto;
+import ai.nomoclaw.bot.conversation.model.ConversationRunStepDto;
 import ai.nomoclaw.bot.domain.AgentMessage;
 import ai.nomoclaw.bot.model.AgentEvent;
 import ai.nomoclaw.bot.model.AgentEventType;

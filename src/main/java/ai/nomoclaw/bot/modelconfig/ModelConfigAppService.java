@@ -1,6 +1,6 @@
 package ai.nomoclaw.bot.modelconfig;
 
-import ai.nomoclaw.bot.application.dto.ModelConfigDto;
+import ai.nomoclaw.bot.modelconfig.model.ModelConfigDto;
 import ai.nomoclaw.bot.llm.codex.CodexAuthFileTokenProvider;
 import ai.nomoclaw.bot.llm.codex.CodexTokenProvider;
 import ai.nomoclaw.bot.model.ModelProviderDefaults;

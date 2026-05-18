@@ -1,22 +1,24 @@
 package ai.nomoclaw.bot.orchestrator;
 
-import ai.nomoclaw.bot.application.command.CreateAgentCommand;
-import ai.nomoclaw.bot.application.command.CreateAgentTipCommand;
-import ai.nomoclaw.bot.application.command.CreateSkillCommand;
-import ai.nomoclaw.bot.application.command.ImportSkillFromUrlCommand;
-import ai.nomoclaw.bot.application.command.UpdateSkillBindingsCommand;
-import ai.nomoclaw.bot.application.command.UpdateAgentBasicInfoCommand;
-import ai.nomoclaw.bot.application.command.UpdateAgentTipCommand;
-import ai.nomoclaw.bot.application.dto.AgentCatalogAgentDto;
-import ai.nomoclaw.bot.application.dto.AgentCatalogGroupDto;
-import ai.nomoclaw.bot.application.dto.AgentDocDto;
-import ai.nomoclaw.bot.application.dto.AgentSkillDto;
-import ai.nomoclaw.bot.application.dto.AgentTipDto;
-import ai.nomoclaw.bot.application.dto.AgentToolDto;
-import ai.nomoclaw.bot.application.dto.GlobalSkillDto;
-import ai.nomoclaw.bot.application.dto.SkillBindingsDto;
+import ai.nomoclaw.bot.agentprofile.model.CreateAgentParam;
+import ai.nomoclaw.bot.agentprofile.model.CreateAgentTipParam;
+import ai.nomoclaw.bot.skill.model.CreateSkillParam;
+import ai.nomoclaw.bot.skill.model.ImportSkillFromUrlParam;
+import ai.nomoclaw.bot.skill.model.UpdateSkillBindingsParam;
+import ai.nomoclaw.bot.agentprofile.model.UpdateAgentBasicInfoParam;
+import ai.nomoclaw.bot.agentprofile.model.UpdateAgentTipParam;
+import ai.nomoclaw.bot.agentprofile.model.AgentCatalogAgentDto;
+import ai.nomoclaw.bot.agentprofile.model.AgentCatalogGroupDto;
+import ai.nomoclaw.bot.agentprofile.model.AgentDocDto;
+import ai.nomoclaw.bot.skill.model.AgentSkillDto;
+import ai.nomoclaw.bot.agentprofile.model.AgentTipDto;
+import ai.nomoclaw.bot.agentprofile.model.AgentToolDto;
+import ai.nomoclaw.bot.skill.model.GlobalSkillDto;
+import ai.nomoclaw.bot.skill.model.SkillBindingsDto;
 import ai.nomoclaw.bot.mcp.AgentMcpToolDto;
 import ai.nomoclaw.bot.mcp.McpApplicationService;
+import ai.nomoclaw.bot.skill.SkillService;
+import ai.nomoclaw.bot.skill.SkillImportService;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -26,19 +28,19 @@ import java.util.List;
 public class AgentCatalogAppService {
 
     private final AgentApplicationService facade;
-    private final SkillImportApplicationService skillImportApplicationService;
-    private final SkillCatalogApplicationService skillCatalogApplicationService;
+    private final SkillImportService skillImportApplicationService;
+    private final SkillService skillService;
     private final AgentTipApplicationService agentTipApplicationService;
     private final McpApplicationService mcpApplicationService;
 
     public AgentCatalogAppService(AgentApplicationService facade,
-                                  SkillImportApplicationService skillImportApplicationService,
-                                  SkillCatalogApplicationService skillCatalogApplicationService,
+                                  SkillImportService skillImportApplicationService,
+                                  SkillService skillService,
                                   AgentTipApplicationService agentTipApplicationService,
                                   McpApplicationService mcpApplicationService) {
         this.facade = facade;
         this.skillImportApplicationService = skillImportApplicationService;
-        this.skillCatalogApplicationService = skillCatalogApplicationService;
+        this.skillService = skillService;
         this.agentTipApplicationService = agentTipApplicationService;
         this.mcpApplicationService = mcpApplicationService;
     }
@@ -48,26 +50,26 @@ public class AgentCatalogAppService {
     }
 
     public List<GlobalSkillDto> listSkills() {
-        return skillCatalogApplicationService.listSkills();
+        return skillService.listSkills();
     }
 
     public GlobalSkillDto updateSkillStatus(String skillKey, boolean enabled) {
-        return skillCatalogApplicationService.updateSkillStatus(skillKey, enabled);
+        return skillService.updateSkillStatus(skillKey, enabled);
     }
 
     public SkillBindingsDto getSkillBindings(String skillKey) {
-        return skillCatalogApplicationService.getSkillBindings(skillKey);
+        return skillService.getSkillBindings(skillKey);
     }
 
-    public SkillBindingsDto updateSkillBindings(String skillKey, UpdateSkillBindingsCommand command) {
-        return skillCatalogApplicationService.updateSkillBindings(skillKey, command);
+    public SkillBindingsDto updateSkillBindings(String skillKey, UpdateSkillBindingsParam command) {
+        return skillService.updateSkillBindings(skillKey, command);
     }
 
     public void deleteSkill(String skillKey) {
-        skillCatalogApplicationService.deleteSkill(skillKey);
+        skillService.deleteSkill(skillKey);
     }
 
-    public AgentCatalogAgentDto createAgent(CreateAgentCommand command) {
+    public AgentCatalogAgentDto createAgent(CreateAgentParam command) {
         return facade.createAgent(command);
     }
 
@@ -75,11 +77,11 @@ public class AgentCatalogAppService {
         facade.deleteAgent(agentUid);
     }
 
-    public AgentCatalogAgentDto updateAgentBasicInfo(String agentUid, UpdateAgentBasicInfoCommand command) {
+    public AgentCatalogAgentDto updateAgentBasicInfo(String agentUid, UpdateAgentBasicInfoParam command) {
         return facade.updateAgentBasicInfo(agentUid, command);
     }
 
-    public AgentSkillDto importSkillFromUrl(String agentUid, ImportSkillFromUrlCommand command) {
+    public AgentSkillDto importSkillFromUrl(String agentUid, ImportSkillFromUrlParam command) {
         return skillImportApplicationService.importSkillFromUrl(agentUid, command);
     }
 
@@ -87,7 +89,7 @@ public class AgentCatalogAppService {
         return skillImportApplicationService.importSkillArchive(agentUid, file, attachToAgent);
     }
 
-    public AgentSkillDto createSkill(String agentUid, CreateSkillCommand command) {
+    public AgentSkillDto createSkill(String agentUid, CreateSkillParam command) {
         return skillImportApplicationService.createSkill(agentUid, command);
     }
 
@@ -119,11 +121,11 @@ public class AgentCatalogAppService {
         return agentTipApplicationService.listAgentTips(agentUid);
     }
 
-    public AgentTipDto createAgentTip(String agentUid, CreateAgentTipCommand command) {
+    public AgentTipDto createAgentTip(String agentUid, CreateAgentTipParam command) {
         return agentTipApplicationService.createAgentTip(agentUid, command);
     }
 
-    public AgentTipDto updateAgentTip(String agentUid, String tipUid, UpdateAgentTipCommand command) {
+    public AgentTipDto updateAgentTip(String agentUid, String tipUid, UpdateAgentTipParam command) {
         return agentTipApplicationService.updateAgentTip(agentUid, tipUid, command);
     }
 

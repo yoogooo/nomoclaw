@@ -1,7 +1,7 @@
 package ai.nomoclaw.bot.scheduler;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import ai.nomoclaw.bot.application.dto.ConversationMessageDto;
+import ai.nomoclaw.bot.conversation.model.ConversationMessageDto;
 import ai.nomoclaw.bot.domain.AgentMessage;
 import ai.nomoclaw.bot.model.MessageStatus;
 import ai.nomoclaw.bot.orchestrator.AgentApplicationService;

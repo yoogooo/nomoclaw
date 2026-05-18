@@ -9,7 +9,8 @@ import ai.nomoclaw.bot.api.dto.skill.response.AgentSkillResponse;
 import ai.nomoclaw.bot.api.dto.skill.response.GlobalSkillResponse;
 import ai.nomoclaw.bot.api.dto.skill.response.SkillBindingsResponse;
 import ai.nomoclaw.bot.api.mapper.SkillApiMapper;
-import ai.nomoclaw.bot.orchestrator.AgentCatalogAppService;
+import ai.nomoclaw.bot.skill.SkillService;
+import ai.nomoclaw.bot.skill.SkillImportService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -35,29 +36,32 @@ import java.util.List;
 @Slf4j
 public class SkillController {
 
-    private final AgentCatalogAppService agentCatalogAppService;
+    private final SkillService skillService;
+    private final SkillImportService skillImportService;
 
-    public SkillController(AgentCatalogAppService agentCatalogAppService) {
-        this.agentCatalogAppService = agentCatalogAppService;
+    public SkillController(SkillService skillService,
+                           SkillImportService skillImportService) {
+        this.skillService = skillService;
+        this.skillImportService = skillImportService;
     }
 
     @GetMapping("/skills")
     public List<GlobalSkillResponse> listSkills() {
         log.info("[AgentAPI] listSkills");
-        return SkillApiMapper.toGlobalSkills(agentCatalogAppService.listSkills());
+        return SkillApiMapper.toGlobalSkills(skillService.listSkills());
     }
 
     @GetMapping("/skills/{skillKey}/bindings")
     public SkillBindingsResponse getSkillBindings(@PathVariable String skillKey) {
         log.info("[AgentAPI] getSkillBindings skillKey={}", skillKey);
-        return SkillApiMapper.toSkillBindings(agentCatalogAppService.getSkillBindings(skillKey));
+        return SkillApiMapper.toSkillBindings(skillService.getSkillBindings(skillKey));
     }
 
     @PatchMapping("/skills/{skillKey}")
     public GlobalSkillResponse updateSkillStatus(@PathVariable String skillKey,
                                                  @Valid @RequestBody UpdateSkillStatusRequest request) {
         log.info("[AgentAPI] updateSkillStatus skillKey={} enabled={}", skillKey, request.enabled());
-        return SkillApiMapper.toGlobalSkill(agentCatalogAppService.updateSkillStatus(skillKey, request.enabled()));
+        return SkillApiMapper.toGlobalSkill(skillService.updateSkillStatus(skillKey, request.enabled()));
     }
 
     @PutMapping("/skills/{skillKey}/bindings")
@@ -67,13 +71,13 @@ public class SkillController {
                 skillKey,
                 request.enabled(),
                 request.agentBindings() == null ? 0 : request.agentBindings().size());
-        return SkillApiMapper.toSkillBindings(agentCatalogAppService.updateSkillBindings(skillKey, SkillApiMapper.toCommand(request)));
+        return SkillApiMapper.toSkillBindings(skillService.updateSkillBindings(skillKey, SkillApiMapper.toParam(request)));
     }
 
     @DeleteMapping("/skills/{skillKey}")
     public SimpleResponse deleteSkill(@PathVariable String skillKey) {
         log.info("[AgentAPI] deleteSkill skillKey={}", skillKey);
-        agentCatalogAppService.deleteSkill(skillKey);
+        skillService.deleteSkill(skillKey);
         return new SimpleResponse("deleted");
     }
 
@@ -84,7 +88,7 @@ public class SkillController {
                 agentUid,
                 request == null ? null : request.url(),
                 request != null && Boolean.TRUE.equals(request.attachToAgent()));
-        return SkillApiMapper.toAgentSkill(agentCatalogAppService.importSkillFromUrl(agentUid, SkillApiMapper.toCommand(request)));
+        return SkillApiMapper.toAgentSkill(skillImportService.importSkillFromUrl(agentUid, SkillApiMapper.toParam(request)));
     }
 
     @PostMapping(value = "/agents/{agentUid}/skills/import-archive", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -95,7 +99,7 @@ public class SkillController {
                 agentUid,
                 file == null ? null : file.getOriginalFilename(),
                 attachToAgent);
-        return SkillApiMapper.toAgentSkill(agentCatalogAppService.importSkillArchive(agentUid, file, attachToAgent));
+        return SkillApiMapper.toAgentSkill(skillImportService.importSkillArchive(agentUid, file, attachToAgent));
     }
 
     @PostMapping("/agents/{agentUid}/skills/create")
@@ -105,6 +109,6 @@ public class SkillController {
                 agentUid,
                 request == null ? null : request.skillKey(),
                 request != null && Boolean.TRUE.equals(request.attachToAgent()));
-        return SkillApiMapper.toAgentSkill(agentCatalogAppService.createSkill(agentUid, SkillApiMapper.toCommand(request)));
+        return SkillApiMapper.toAgentSkill(skillImportService.createSkill(agentUid, SkillApiMapper.toParam(request)));
     }
 }

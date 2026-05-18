@@ -3,9 +3,9 @@ package ai.nomoclaw.bot.api.mapper;
 import ai.nomoclaw.bot.api.dto.permission.request.UpdatePermissionRulesRequest;
 import ai.nomoclaw.bot.api.dto.permission.response.PermissionRulePayload;
 import ai.nomoclaw.bot.api.dto.permission.response.PermissionRulesResponse;
-import ai.nomoclaw.bot.application.command.UpdatePermissionRulesCommand;
-import ai.nomoclaw.bot.application.dto.PermissionRuleDto;
-import ai.nomoclaw.bot.application.dto.PermissionRulesDto;
+import ai.nomoclaw.bot.permission.model.UpdatePermissionRulesParam;
+import ai.nomoclaw.bot.permission.model.PermissionRuleDto;
+import ai.nomoclaw.bot.permission.model.PermissionRulesDto;
 
 import java.util.List;
 
@@ -17,11 +17,11 @@ public final class PermissionApiMapper {
     private PermissionApiMapper() {
     }
 
-    public static UpdatePermissionRulesCommand toCommand(UpdatePermissionRulesRequest request) {
+    public static UpdatePermissionRulesParam toParam(UpdatePermissionRulesRequest request) {
         if (request == null || request.rules() == null) {
-            return new UpdatePermissionRulesCommand(List.of());
+            return new UpdatePermissionRulesParam(List.of());
         }
-        return new UpdatePermissionRulesCommand(
+        return new UpdatePermissionRulesParam(
                 request.rules().stream()
                         .filter(item -> item != null)
                         .map(PermissionApiMapper::toDto)

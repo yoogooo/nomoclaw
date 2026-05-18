@@ -1,6 +1,6 @@
 package ai.nomoclaw.bot.modelconfig;
 
-import ai.nomoclaw.bot.application.dto.ModelConfigDto;
+import ai.nomoclaw.bot.modelconfig.model.ModelConfigDto;
 import ai.nomoclaw.bot.util.JsonUtil;
 import ai.nomoclaw.bot.workspace.NomoClawPaths;
 import lombok.extern.slf4j.Slf4j;

@@ -44,14 +44,14 @@ public class McpController {
     @PostMapping("/mcp/servers")
     public McpServerResponse createMcpServer(@Valid @RequestBody SaveMcpServerRequest request) {
         log.info("[AgentAPI] createMcpServer serverName={} transport={}", request.serverName(), request.transport());
-        return McpApiMapper.toMcpServer(mcpApplicationService.createServer(McpApiMapper.toCommand(request)));
+        return McpApiMapper.toMcpServer(mcpApplicationService.createServer(McpApiMapper.toParam(request)));
     }
 
     @PutMapping("/mcp/servers/{serverUid}")
     public McpServerResponse updateMcpServer(@PathVariable String serverUid,
                                              @Valid @RequestBody SaveMcpServerRequest request) {
         log.info("[AgentAPI] updateMcpServer serverUid={} serverName={} transport={}", serverUid, request.serverName(), request.transport());
-        return McpApiMapper.toMcpServer(mcpApplicationService.updateServer(serverUid, McpApiMapper.toCommand(request)));
+        return McpApiMapper.toMcpServer(mcpApplicationService.updateServer(serverUid, McpApiMapper.toParam(request)));
     }
 
     @PatchMapping("/mcp/servers/{serverUid}/status")

@@ -68,11 +68,11 @@ public final class CommandShellResolver {
         return fileName == null ? path.toString() : fileName.toString();
     }
 
-    public record CommandShell(String displayName, String executable, List<String> argsBeforeCommand) {
+    public record CommandShell(String displayName, String executable, List<String> argsBeforeParam) {
         public List<String> command(String command) {
-            List<String> result = new ArrayList<>(argsBeforeCommand.size() + 2);
+            List<String> result = new ArrayList<>(argsBeforeParam.size() + 2);
             result.add(executable);
-            result.addAll(argsBeforeCommand);
+            result.addAll(argsBeforeParam);
             result.add(command);
             return result;
         }

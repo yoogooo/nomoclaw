@@ -1,17 +1,23 @@
 package ai.nomoclaw.bot.scheduler;
 
-import ai.nomoclaw.bot.application.command.CreateCronJobCommand;
-import ai.nomoclaw.bot.application.command.UpdateCronJobCommand;
-import ai.nomoclaw.bot.application.common.page.PageRequest;
-import ai.nomoclaw.bot.application.common.page.PageResult;
-import ai.nomoclaw.bot.application.common.page.PageResultMapper;
-import ai.nomoclaw.bot.application.dto.*;
+import ai.nomoclaw.bot.scheduler.model.CreateCronJobParam;
+import ai.nomoclaw.bot.scheduler.model.UpdateCronJobParam;
+import ai.nomoclaw.bot.common.page.PageRequest;
+import ai.nomoclaw.bot.common.page.PageResult;
+import ai.nomoclaw.bot.common.page.PageResultMapper;
 import ai.nomoclaw.bot.channel.config.AgentChannelsProperties;
 import ai.nomoclaw.bot.channel.config.ChannelBotCredentialResolver;
 import ai.nomoclaw.bot.channel.model.ChannelType;
+import ai.nomoclaw.bot.conversation.model.ConversationMessageRunDto;
 import ai.nomoclaw.bot.orchestrator.ConversationAppService;
 import ai.nomoclaw.bot.orchestrator.AgentApplicationService;
 import ai.nomoclaw.bot.domain.AgentMessage;
+import ai.nomoclaw.bot.scheduler.model.BatchDeleteCronJobsDto;
+import ai.nomoclaw.bot.scheduler.model.CronExecutionDetailDto;
+import ai.nomoclaw.bot.scheduler.model.CronJobDto;
+import ai.nomoclaw.bot.scheduler.model.CronJobExecutionResultDto;
+import ai.nomoclaw.bot.scheduler.model.CronJobReportDto;
+import ai.nomoclaw.bot.scheduler.model.CronSubscriptionDto;
 import ai.nomoclaw.bot.store.entity.AgentCronJobEntity;
 import ai.nomoclaw.bot.store.entity.AgentCronJobExecutionEntity;
 import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
@@ -85,7 +91,7 @@ public class CronJobApplicationService {
         return toResponse(job, resolveAgent(job.getAgentUid()));
     }
 
-    public CronJobDto createCronJob(CreateCronJobCommand request) {
+    public CronJobDto createCronJob(CreateCronJobParam request) {
         if (request == null) {
             throw new IllegalArgumentException("request cannot be null");
         }
@@ -146,9 +152,9 @@ public class CronJobApplicationService {
         return toResponse(job, agent);
     }
 
-    public CronJobDto updateCronJob(String jobUid, UpdateCronJobCommand request) {
+    public CronJobDto updateCronJob(String jobUid, UpdateCronJobParam request) {
         if (request == null) {
-            request = new UpdateCronJobCommand(null, null, null, null, null, null, null);
+            request = new UpdateCronJobParam(null, null, null, null, null, null, null);
         }
         AgentCronJobEntity job = requireJob(jobUid);
         String requestedAgentUid = request.agentUid() == null ? "" : request.agentUid().trim();

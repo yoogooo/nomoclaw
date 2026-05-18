@@ -1,8 +1,8 @@
 package ai.nomoclaw.bot.orchestrator;
 
-import ai.nomoclaw.bot.application.command.UpdatePermissionRulesCommand;
-import ai.nomoclaw.bot.application.dto.PermissionRuleDto;
-import ai.nomoclaw.bot.application.dto.PermissionRulesDto;
+import ai.nomoclaw.bot.permission.model.UpdatePermissionRulesParam;
+import ai.nomoclaw.bot.permission.model.PermissionRuleDto;
+import ai.nomoclaw.bot.permission.model.PermissionRulesDto;
 import ai.nomoclaw.bot.policy.tool.ToolPermissionPolicyService;
 import ai.nomoclaw.bot.policy.tool.permission.*;
 import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
@@ -73,7 +73,7 @@ public class PermissionAppService {
         );
     }
 
-    public PermissionRulesDto updateAgentRules(String agentUid, UpdatePermissionRulesCommand request) {
+    public PermissionRulesDto updateAgentRules(String agentUid, UpdatePermissionRulesParam request) {
         AgentDefinitionEntity agent = resolveAgent(agentUid);
         if (agent == null) {
             throw new IllegalArgumentException("agent not found: " + agentUid);
@@ -89,7 +89,7 @@ public class PermissionAppService {
         return getEffectiveRules("", agentUid);
     }
 
-    public PermissionRulesDto updateUserRules(String agentUid, UpdatePermissionRulesCommand request) {
+    public PermissionRulesDto updateUserRules(String agentUid, UpdatePermissionRulesParam request) {
         List<PermissionRule> rules = parseRules(request, PermissionSource.USER_SETTINGS);
         settingsStore.saveUserRules(rules);
         return getEffectiveRules("", agentUid);
@@ -324,7 +324,7 @@ public class PermissionAppService {
         ));
     }
 
-    private List<PermissionRule> parseRules(UpdatePermissionRulesCommand request, PermissionSource source) {
+    private List<PermissionRule> parseRules(UpdatePermissionRulesParam request, PermissionSource source) {
         if (request == null || request.rules() == null) {
             return List.of();
         }
