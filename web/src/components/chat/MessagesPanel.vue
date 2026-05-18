@@ -85,14 +85,7 @@ const displayedMessages = computed(() => {
       start = nearestUserIndex;
     }
   }
-  let end = allMessages.length;
-  for (let i = start + 1; i < allMessages.length; i += 1) {
-    if (allMessages[i].role === "user") {
-      end = i;
-      break;
-    }
-  }
-  return allMessages.slice(start, end);
+  return allMessages.slice(start);
 });
 const isRunningCurrentConversation = computed(() =>
   Boolean(conversationStore.currentConversationUid)
