@@ -1,6 +1,5 @@
 package ai.nomoclaw.bot.orchestrator;
 
-import ai.nomoclaw.bot.domain.AgentConversation;
 import ai.nomoclaw.bot.conversation.model.ConversationMessageDto;
 import ai.nomoclaw.bot.conversation.model.ConversationMessageRunDto;
 import ai.nomoclaw.bot.conversation.model.ConversationSummaryDto;
@@ -43,9 +42,5 @@ public class ConversationAppService {
 
     public void updateConversationPinned(String conversationUid, boolean pinned) {
         facade.updateConversationPinned(conversationUid, pinned);
-    }
-
-    public AgentConversation getConversation(String conversationUid) {
-        return facade.getConversation(conversationUid);
     }
 }
