@@ -1,7 +1,5 @@
 package ai.nomoclaw.bot.orchestrator;
 
-import ai.nomoclaw.bot.agentprofile.AgentProfileService;
-import ai.nomoclaw.bot.agentprofile.model.*;
 import ai.nomoclaw.bot.channel.model.ChannelMessageCompletedEvent;
 import ai.nomoclaw.bot.config.AgentProperties;
 import ai.nomoclaw.bot.conversation.model.ApprovalDecisionDto;
@@ -29,9 +27,7 @@ import ai.nomoclaw.bot.policy.tool.permission.PermissionSource;
 import ai.nomoclaw.bot.store.AgentStore;
 import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
 import ai.nomoclaw.bot.system.model.SystemConfigDto;
-import ai.nomoclaw.bot.tool.AgentToolService;
 import ai.nomoclaw.bot.tool.PlatformSupport;
-import ai.nomoclaw.bot.tool.model.AgentToolDto;
 import ai.nomoclaw.bot.util.JsonUtil;
 import ai.nomoclaw.bot.workspace.AgentWorkspaceConfig;
 import ai.nomoclaw.bot.workspace.NomoClawPaths;
@@ -95,7 +91,6 @@ public class AgentApplicationService {
     private final MessageCancellationRegistry cancellationRegistry;
     private final AgentProperties properties;
     private final LlmProperties llmProperties;
-    private final AgentToolService agentToolService;
     private final ConversationAttachmentAppService conversationAttachmentAppService;
     private final ToolExecutionPolicyGateway toolExecutionPolicyGateway;
     private final ToolPermissionPolicyService toolPermissionPolicyService;
@@ -104,7 +99,6 @@ public class AgentApplicationService {
     private final StepExecutionService stepExecutionService;
     private final ExecutionScopeResolver executionScopeResolver;
     private final MessageExecutionOrchestrator messageExecutionOrchestrator;
-    private final AgentProfileService agentProfileService;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final ConversationQueryService conversationQueryService;
     private final MessageCommandService messageCommandService;
@@ -116,7 +110,6 @@ public class AgentApplicationService {
                                    MessageCancellationRegistry cancellationRegistry,
                                    AgentProperties properties,
                                    LlmProperties llmProperties,
-                                   AgentToolService agentToolService,
                                    ConversationAttachmentAppService conversationAttachmentAppService,
                                    ToolExecutionPolicyGateway toolExecutionPolicyGateway,
                                    ToolPermissionPolicyService toolPermissionPolicyService,
@@ -125,7 +118,6 @@ public class AgentApplicationService {
                                    StepExecutionService stepExecutionService,
                                    ExecutionScopeResolver executionScopeResolver,
                                    MessageExecutionOrchestrator messageExecutionOrchestrator,
-                                   AgentProfileService agentProfileService,
                                    ApplicationEventPublisher applicationEventPublisher,
                                    ConversationQueryService conversationQueryService,
                                    MessageCommandService messageCommandService) {
@@ -136,7 +128,6 @@ public class AgentApplicationService {
         this.cancellationRegistry = cancellationRegistry;
         this.properties = properties;
         this.llmProperties = llmProperties;
-        this.agentToolService = agentToolService;
         this.conversationAttachmentAppService = conversationAttachmentAppService;
         this.toolExecutionPolicyGateway = toolExecutionPolicyGateway;
         this.toolPermissionPolicyService = toolPermissionPolicyService;
@@ -145,7 +136,6 @@ public class AgentApplicationService {
         this.stepExecutionService = stepExecutionService;
         this.executionScopeResolver = executionScopeResolver;
         this.messageExecutionOrchestrator = messageExecutionOrchestrator;
-        this.agentProfileService = agentProfileService;
         this.applicationEventPublisher = applicationEventPublisher;
         this.conversationQueryService = conversationQueryService;
         this.messageCommandService = messageCommandService;
@@ -163,36 +153,9 @@ public class AgentApplicationService {
         return conversationQueryService.listConversations();
     }
 
-    public List<AgentCatalogGroupDto> listAgentGroups() {
-        return agentProfileService.listAgentGroups();
-    }
 
     public List<ConversationMessageDto> listMessages(String conversationUid) {
         return conversationQueryService.listMessages(conversationUid);
-    }
-
-    public AgentCatalogAgentDto createAgent(CreateAgentParam request) {
-        return agentProfileService.createAgent(request);
-    }
-
-    public AgentCatalogAgentDto updateAgentBasicInfo(String agentUid, UpdateAgentBasicInfoParam request) {
-        return agentProfileService.updateAgentBasicInfo(agentUid, request);
-    }
-
-    public List<AgentToolDto> listAgentTools(String agentUid) {
-        return agentToolService.listAgentTools(agentUid);
-    }
-
-    public AgentToolDto updateAgentToolStatus(String agentUid, String toolKey, boolean enabled) {
-        return agentToolService.updateAgentToolStatus(agentUid, toolKey, enabled);
-    }
-
-    public List<AgentDocDto> listAgentDocs(String agentUid) {
-        return agentProfileService.listAgentDocs(agentUid);
-    }
-
-    public AgentDocDto updateAgentDoc(String agentUid, String docKey, String content) {
-        return agentProfileService.updateAgentDoc(agentUid, docKey, content);
     }
 
     public List<ConversationMessageRunDto> listMessageRuns(String conversationUid) {
@@ -201,10 +164,6 @@ public class AgentApplicationService {
 
     public void deleteConversation(String conversationUid) {
         messageCommandService.deleteConversation(conversationUid);
-    }
-
-    public void deleteAgent(String agentUid) {
-        agentProfileService.deleteAgent(agentUid);
     }
 
     public void updateConversationTitle(String conversationUid, String title) {
@@ -967,10 +926,6 @@ public class AgentApplicationService {
             return UserMessage.from(message.content());
         }
         return UserMessage.from(contents);
-    }
-
-    public AgentConversation getConversation(String conversationUid) {
-        return conversationQueryService.getConversation(conversationUid);
     }
 
     private boolean isCanceled(String messageUid, MessageStatus status) {

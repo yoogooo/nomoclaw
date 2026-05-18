@@ -14,9 +14,10 @@ import ai.nomoclaw.bot.api.dto.agent.response.AgentTipResponse;
 import ai.nomoclaw.bot.api.dto.agent.response.AgentToolResponse;
 import ai.nomoclaw.bot.api.dto.common.response.SimpleResponse;
 import ai.nomoclaw.bot.api.mapper.AgentApiMapper;
+import ai.nomoclaw.bot.agentprofile.AgentProfileService;
 import ai.nomoclaw.bot.mcp.McpApplicationService;
-import ai.nomoclaw.bot.orchestrator.AgentApplicationService;
 import ai.nomoclaw.bot.tip.AgentTipService;
+import ai.nomoclaw.bot.tool.AgentToolService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -39,14 +40,17 @@ import java.util.List;
 @Slf4j
 public class AgentController {
 
-    private final AgentApplicationService agentApplicationService;
+    private final AgentProfileService agentProfileService;
+    private final AgentToolService agentToolService;
     private final AgentTipService agentTipService;
     private final McpApplicationService mcpApplicationService;
 
-    public AgentController(AgentApplicationService agentApplicationService,
+    public AgentController(AgentProfileService agentProfileService,
+                           AgentToolService agentToolService,
                            AgentTipService agentTipService,
                            McpApplicationService mcpApplicationService) {
-        this.agentApplicationService = agentApplicationService;
+        this.agentProfileService = agentProfileService;
+        this.agentToolService = agentToolService;
         this.agentTipService = agentTipService;
         this.mcpApplicationService = mcpApplicationService;
     }
@@ -54,19 +58,19 @@ public class AgentController {
     @GetMapping("/agent-groups")
     public List<AgentCatalogGroupResponse> listAgentGroups() {
         log.info("[AgentAPI] listAgentGroups");
-        return AgentApiMapper.toAgentCatalogGroups(agentApplicationService.listAgentGroups());
+        return AgentApiMapper.toAgentCatalogGroups(agentProfileService.listAgentGroups());
     }
 
     @PostMapping("/agents")
     public AgentCatalogAgentResponse createAgent(@Valid @RequestBody CreateAgentRequest request) {
         log.info("[AgentAPI] createAgent agentName={} displayName={}", request.agentName(), request.displayName());
-        return AgentApiMapper.toAgentCatalogAgent(agentApplicationService.createAgent(AgentApiMapper.toParam(request)));
+        return AgentApiMapper.toAgentCatalogAgent(agentProfileService.createAgent(AgentApiMapper.toParam(request)));
     }
 
     @DeleteMapping("/agents/{agentUid}")
     public SimpleResponse deleteAgent(@PathVariable String agentUid) {
         log.info("[AgentAPI] deleteAgent agentUid={}", agentUid);
-        agentApplicationService.deleteAgent(agentUid);
+        agentProfileService.deleteAgent(agentUid);
         return new SimpleResponse("deleted");
     }
 
@@ -75,13 +79,13 @@ public class AgentController {
                                                           @Valid @RequestBody UpdateAgentBasicInfoRequest request) {
         log.info("[AgentAPI] updateAgentBasicInfo agentUid={} displayName={} avatar={} avatarColor={} modelProvider={} modelName={}",
                 agentUid, request.displayName(), request.avatar(), request.avatarColor(), request.modelProvider(), request.modelName());
-        return AgentApiMapper.toAgentCatalogAgent(agentApplicationService.updateAgentBasicInfo(agentUid, AgentApiMapper.toParam(request)));
+        return AgentApiMapper.toAgentCatalogAgent(agentProfileService.updateAgentBasicInfo(agentUid, AgentApiMapper.toParam(request)));
     }
 
     @GetMapping("/agents/{agentUid}/tools")
     public List<AgentToolResponse> listAgentTools(@PathVariable String agentUid) {
         log.info("[AgentAPI] listAgentTools agentUid={}", agentUid);
-        return AgentApiMapper.toAgentTools(agentApplicationService.listAgentTools(agentUid));
+        return AgentApiMapper.toAgentTools(agentToolService.listAgentTools(agentUid));
     }
 
     @PatchMapping("/agents/{agentUid}/tools/{toolKey}")
@@ -90,7 +94,7 @@ public class AgentController {
                                                    @Valid @RequestBody UpdateAgentToolStatusRequest request) {
         log.info("[AgentAPI] updateAgentToolStatus agentUid={} toolKey={} enabled={}",
                 agentUid, toolKey, request.enabled());
-        return AgentApiMapper.toAgentTool(agentApplicationService.updateAgentToolStatus(agentUid, toolKey, request.enabled()));
+        return AgentApiMapper.toAgentTool(agentToolService.updateAgentToolStatus(agentUid, toolKey, request.enabled()));
     }
 
     @GetMapping("/agents/{agentUid}/mcp-tools")
@@ -143,7 +147,7 @@ public class AgentController {
     @GetMapping("/agents/{agentUid}/docs")
     public List<AgentDocResponse> listAgentDocs(@PathVariable String agentUid) {
         log.info("[AgentAPI] listAgentDocs agentUid={}", agentUid);
-        return AgentApiMapper.toAgentDocs(agentApplicationService.listAgentDocs(agentUid));
+        return AgentApiMapper.toAgentDocs(agentProfileService.listAgentDocs(agentUid));
     }
 
     @PutMapping("/agents/{agentUid}/docs/{docKey}")
@@ -151,7 +155,7 @@ public class AgentController {
                                            @PathVariable String docKey,
                                            @RequestBody(required = false) UpdateAgentDocRequest request) {
         log.info("[AgentAPI] updateAgentDoc agentUid={} docKey={}", agentUid, docKey);
-        return AgentApiMapper.toAgentDoc(agentApplicationService.updateAgentDoc(
+        return AgentApiMapper.toAgentDoc(agentProfileService.updateAgentDoc(
                 agentUid,
                 docKey,
                 request == null ? "" : request.content()
