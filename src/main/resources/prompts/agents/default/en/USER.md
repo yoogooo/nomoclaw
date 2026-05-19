@@ -1,4 +1,4 @@
-# USER.md
+# USER
 
 ## User Profile
 Name:

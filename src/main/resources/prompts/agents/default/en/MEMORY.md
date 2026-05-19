@@ -1,4 +1,4 @@
-# MEMORY.md
+# MEMORY
 
 Maintain long-term memory to ensure continuity in collaboration and consistency in execution.
 

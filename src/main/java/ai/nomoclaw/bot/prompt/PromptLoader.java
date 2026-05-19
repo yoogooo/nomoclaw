@@ -67,7 +67,6 @@ public final class PromptLoader {
                 continue;
             }
             hasAnySection = true;
-            builder.append("# ").append(entry.getKey()).append('\n');
             builder.append(entry.getValue().trim()).append("\n\n");
         }
 
