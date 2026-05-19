@@ -22,6 +22,7 @@ import java.util.regex.Pattern;
 public class WebFetchTool implements Tool {
 
     private static final int MAX_OUTPUT_CHARS = 60_000;
+    private static final Pattern TITLE_PATTERN = Pattern.compile("<title[^>]*>(.*?)</title>", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
     private static final Pattern TAGS = Pattern.compile("<[^>]+>");
     private static final Pattern MULTI_WS = Pattern.compile("\\s+");
 
@@ -65,6 +66,7 @@ public class WebFetchTool implements Tool {
             String codeText = response.headers().firstValue(":status-text").orElse("");
             byte[] bytes = response.body() == null ? new byte[0] : response.body();
             String body = new String(bytes, StandardCharsets.UTF_8);
+            String title = extractTitle(body);
 
             String text = normalizeBody(body, contentType);
             String summarized = applyPrompt(prompt, text);
@@ -79,6 +81,7 @@ public class WebFetchTool implements Tool {
             artifacts.put("code", code);
             artifacts.put("codeText", codeText);
             artifacts.put("contentType", contentType);
+            artifacts.put("title", title);
             artifacts.put("durationMs", System.currentTimeMillis() - start);
             return ToolResult.success(output, artifacts, metric(start, bytes.length));
         } catch (Exception ex) {
@@ -104,6 +107,22 @@ public class WebFetchTool implements Tool {
             return "";
         }
         return "Prompt: " + prompt.trim() + "\n\nContent:\n" + content;
+    }
+
+    private String extractTitle(String body) {
+        if (body == null || body.isBlank()) {
+            return "";
+        }
+        var matcher = TITLE_PATTERN.matcher(body);
+        if (!matcher.find()) {
+            return "";
+        }
+        String raw = matcher.group(1);
+        if (raw == null || raw.isBlank()) {
+            return "";
+        }
+        String noTags = TAGS.matcher(raw).replaceAll(" ");
+        return MULTI_WS.matcher(noTags).replaceAll(" ").trim();
     }
 
     private ObjectNode metric(long start, int size) {

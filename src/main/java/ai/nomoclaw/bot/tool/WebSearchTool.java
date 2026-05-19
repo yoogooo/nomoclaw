@@ -21,8 +21,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -32,8 +34,16 @@ import java.util.stream.Collectors;
 public class WebSearchTool implements Tool {
 
     private static final int MAX_RESULTS = 8;
-    private static final Pattern RESULT_LINK_PATTERN = Pattern.compile(
+    private static final Pattern DUCK_RESULT_LINK_PATTERN = Pattern.compile(
             "<a[^>]*class=\"[^\"]*result__a[^\"]*\"[^>]*href=\"([^\"]+)\"[^>]*>(.*?)</a>",
+            Pattern.CASE_INSENSITIVE | Pattern.DOTALL
+    );
+    private static final Pattern BING_RESULT_LINK_PATTERN = Pattern.compile(
+            "<li[^>]*class=\"[^\"]*b_algo[^\"]*\"[^>]*>.*?<h2[^>]*>\\s*<a[^>]*href=\"([^\"]+)\"[^>]*>(.*?)</a>",
+            Pattern.CASE_INSENSITIVE | Pattern.DOTALL
+    );
+    private static final Pattern GENERIC_H2_LINK_PATTERN = Pattern.compile(
+            "<h2[^>]*>\\s*<a[^>]*href=\"([^\"]+)\"[^>]*>(.*?)</a>",
             Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
     private static final Pattern TAGS = Pattern.compile("<[^>]+>");
@@ -70,7 +80,11 @@ public class WebSearchTool implements Tool {
 
             List<String> endpoints = configuredEndpoints();
             if (endpoints.isEmpty()) {
-                return ToolResult.failure("WEB_SEARCH_ERROR", "no configured search endpoints", metric(start, 0));
+                return ToolResult.failure(
+                        "WEB_SEARCH_ERROR",
+                        "no configured search endpoints; configure agent.web-search.endpoints",
+                        metric(start, 0)
+                );
             }
 
             HttpResponse<String> response = null;
@@ -174,15 +188,30 @@ public class WebSearchTool implements Tool {
     }
 
     private List<SearchHit> parseHits(String html, List<String> allowedDomains, List<String> blockedDomains) {
+        String page = html == null ? "" : html;
         List<SearchHit> hits = new ArrayList<>();
-        Matcher matcher = RESULT_LINK_PATTERN.matcher(html == null ? "" : html);
+        Set<String> seen = new LinkedHashSet<>();
+        collectHits(page, DUCK_RESULT_LINK_PATTERN, hits, seen, allowedDomains, blockedDomains);
+        if (hits.isEmpty()) {
+            collectHits(page, BING_RESULT_LINK_PATTERN, hits, seen, allowedDomains, blockedDomains);
+        }
+        if (hits.isEmpty()) {
+            collectHits(page, GENERIC_H2_LINK_PATTERN, hits, seen, allowedDomains, blockedDomains);
+        }
+        return hits;
+    }
+
+    private void collectHits(String html,
+                             Pattern pattern,
+                             List<SearchHit> hits,
+                             Set<String> seen,
+                             List<String> allowedDomains,
+                             List<String> blockedDomains) {
+        Matcher matcher = pattern.matcher(html);
         while (matcher.find() && hits.size() < MAX_RESULTS) {
             String href = decodeDuckDuckGoRedirect(matcher.group(1));
             String title = normalizeText(matcher.group(2));
-            if (href.isBlank() || title.isBlank()) {
-                continue;
-            }
-            if (!isHttpUrl(href)) {
+            if (href.isBlank() || title.isBlank() || !isHttpUrl(href)) {
                 continue;
             }
             String host = hostOf(href).toLowerCase(Locale.ROOT);
@@ -192,9 +221,11 @@ public class WebSearchTool implements Tool {
             if (!blockedDomains.isEmpty() && blockedDomains.stream().anyMatch(host::endsWith)) {
                 continue;
             }
+            if (!seen.add(href)) {
+                continue;
+            }
             hits.add(new SearchHit(title, href));
         }
-        return hits;
     }
 
     private String decodeDuckDuckGoRedirect(String href) {

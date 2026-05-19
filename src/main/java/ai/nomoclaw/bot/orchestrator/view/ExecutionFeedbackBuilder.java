@@ -286,8 +286,41 @@ public class ExecutionFeedbackBuilder {
                 }
                 yield i18n("agent.step.success.image.withCount", resolved);
             }
-            case "WebSearchTool" -> i18n("agent.step.success.web.search");
-            case "WebFetchTool" -> i18n("agent.step.success.web.fetch");
+            case "WebSearchTool" -> {
+                JsonNode results = result.artifacts() == null ? JsonNodeFactory.instance.arrayNode() : result.artifacts().path("results");
+                if (!results.isArray() || results.isEmpty()) {
+                    yield i18n("agent.step.success.web.search");
+                }
+                StringBuilder details = new StringBuilder();
+                int count = 0;
+                for (JsonNode item : results) {
+                    String url = item == null ? "" : item.path("url").asString("").trim();
+                    if (url.isBlank()) {
+                        continue;
+                    }
+                    String title = item.path("title").asString("").trim();
+                    String renderedTitle = title.isBlank() ? i18n("agent.step.success.web.search.untitled") : title;
+                    count++;
+                    details.append(i18n("agent.step.success.web.search.item", count, renderedTitle, url)).append('\n');
+                }
+                if (count <= 0) {
+                    yield i18n("agent.step.success.web.search");
+                }
+                String body = details.toString().trim();
+                yield i18n("agent.step.success.web.search.withCount", count) + "\n" + body;
+            }
+            case "WebFetchTool" -> {
+                String url = result.artifacts() == null ? "" : result.artifacts().path("url").asString("").trim();
+                if (url.isBlank()) {
+                    url = step.toolArgs().path("url").asString("").trim();
+                }
+                String title = result.artifacts() == null ? "" : result.artifacts().path("title").asString("").trim();
+                String renderedTitle = title.isBlank() ? i18n("agent.step.success.web.fetch.untitled") : title;
+                if (url.isBlank()) {
+                    yield i18n("agent.step.success.web.fetch");
+                }
+                yield i18n("agent.step.success.web.fetch.withTitleAndUrl", url, renderedTitle);
+            }
             default -> hasMeaningfulText(result.output()) ? abbreviate(result.output(), 140) : i18n("agent.step.success.default");
         };
     }
@@ -296,6 +329,9 @@ public class ExecutionFeedbackBuilder {
         String message = hasMeaningfulText(result.errorMessage()) ? result.errorMessage() : result.output();
         if (!hasMeaningfulText(message)) {
             message = i18n("agent.step.failure.default");
+        }
+        if ("WebSearchTool".equals(nullToEmpty(step.toolName()))) {
+            return abbreviate(message, 1600);
         }
         if ("CommandTool".equals(nullToEmpty(step.toolName()))) {
             String command = step.toolArgs().path("command").asString("");

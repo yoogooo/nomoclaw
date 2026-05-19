@@ -63,7 +63,8 @@ agent:
       max-file-size: 10MB
       max-request-size: 100MB
   web-search:
-    endpoints: []
+    endpoints:
+      - "https://www.bing.com/search?q={query}&setlang=zh-Hans"
 
 nomoclaw:
   root-dir: "${NOMOCLAW_ROOT_DIR:${user.home}/.nomoclaw}"
