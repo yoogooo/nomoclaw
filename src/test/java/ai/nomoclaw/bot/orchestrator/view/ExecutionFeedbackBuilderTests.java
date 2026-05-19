@@ -36,6 +36,7 @@ class ExecutionFeedbackBuilderTests {
         LocaleContextHolder.setLocale(Locale.US);
         PlanStep step = webSearchStep();
         ObjectNode artifacts = JsonNodeFactory.instance.objectNode();
+        artifacts.put("endpoint", "https://www.bing.com/search?q=test&setlang=zh-Hans");
         ArrayNode results = JsonNodeFactory.instance.arrayNode();
         results.add(resultItem("OpenAI", "https://openai.com"));
         results.add(resultItem("GitHub", "https://github.com"));
@@ -44,6 +45,7 @@ class ExecutionFeedbackBuilderTests {
         String details = feedbackBuilder.buildStepSuccessDetails(step, ToolResult.success("", artifacts, JsonNodeFactory.instance.objectNode()));
 
         assertTrue(details.contains("Web search completed with 2 result(s)."));
+        assertTrue(details.contains("Search URL: https://www.bing.com/search?q=test&setlang=zh-Hans"));
         assertTrue(details.contains("1. OpenAI"));
         assertTrue(details.contains("https://openai.com"));
         assertTrue(details.contains("2. GitHub"));
@@ -55,11 +57,12 @@ class ExecutionFeedbackBuilderTests {
         LocaleContextHolder.setLocale(Locale.US);
         PlanStep step = webSearchStep();
         ObjectNode artifacts = JsonNodeFactory.instance.objectNode();
+        artifacts.put("endpoint", "https://www.bing.com/search?q=test&setlang=zh-Hans");
         artifacts.set("results", JsonNodeFactory.instance.arrayNode());
 
         String details = feedbackBuilder.buildStepSuccessDetails(step, ToolResult.success("", artifacts, JsonNodeFactory.instance.objectNode()));
 
-        assertEquals("Web search completed.", details);
+        assertEquals("Web search completed. Search URL: https://www.bing.com/search?q=test&setlang=zh-Hans", details);
     }
 
     @Test
@@ -67,6 +70,7 @@ class ExecutionFeedbackBuilderTests {
         LocaleContextHolder.setLocale(Locale.US);
         PlanStep step = webSearchStep();
         ObjectNode artifacts = JsonNodeFactory.instance.objectNode();
+        artifacts.put("endpoint", "https://www.bing.com/search?q=test&setlang=zh-Hans");
         ArrayNode results = JsonNodeFactory.instance.arrayNode();
         results.add(resultItem("", "https://example.com/no-title"));
         results.add(resultItem("Missing URL", ""));
@@ -75,6 +79,7 @@ class ExecutionFeedbackBuilderTests {
         String details = feedbackBuilder.buildStepSuccessDetails(step, ToolResult.success("", artifacts, JsonNodeFactory.instance.objectNode()));
 
         assertTrue(details.contains("Web search completed with 1 result(s)."));
+        assertTrue(details.contains("Search URL: https://www.bing.com/search?q=test&setlang=zh-Hans"));
         assertTrue(details.contains("1. (untitled)"));
         assertTrue(details.contains("https://example.com/no-title"));
         assertTrue(!details.contains("Missing URL"));

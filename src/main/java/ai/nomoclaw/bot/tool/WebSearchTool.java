@@ -4,6 +4,7 @@ import ai.nomoclaw.bot.config.AgentProperties;
 import ai.nomoclaw.bot.model.ToolRequest;
 import ai.nomoclaw.bot.model.ToolResult;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
@@ -79,7 +80,12 @@ public class WebSearchTool implements Tool {
             }
 
             List<String> endpoints = configuredEndpoints();
+            String acceptLanguage = resolveAcceptLanguage();
+            log.info("[Tool][web-search] start stepUid={} query=\"{}\" endpoints={} acceptLanguage={}",
+                    request.stepUid(), query, endpoints.size(), acceptLanguage);
             if (endpoints.isEmpty()) {
+                log.warn("[Tool][web-search] no endpoint configured stepUid={} query=\"{}\"",
+                        request.stepUid(), query);
                 return ToolResult.failure(
                         "WEB_SEARCH_ERROR",
                         "no configured search endpoints; configure agent.web-search.endpoints",
@@ -92,23 +98,34 @@ public class WebSearchTool implements Tool {
             List<String> failures = new ArrayList<>();
             for (String endpointTemplate : endpoints) {
                 String resolved = buildEndpointUrl(endpointTemplate, query);
+                log.info("[Tool][web-search] request stepUid={} query=\"{}\" url={}",
+                        request.stepUid(), query, resolved);
+                log.info("[Tool][web-search] request-curl stepUid={} cmd={}",
+                        request.stepUid(), toCurlCommand(resolved, acceptLanguage));
                 try {
                     URI uri = URI.create(resolved);
                     HttpRequest httpRequest = HttpRequest.newBuilder(uri)
                             .timeout(Duration.ofSeconds(30))
                             .header("User-Agent", "NomoClaw-WebSearch/1.0")
+                            .header("Accept-Language", acceptLanguage)
                             .GET()
                             .build();
                     HttpResponse<String> candidate = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
                     if (candidate.statusCode() >= 400) {
                         failures.add(resolved + " -> http " + candidate.statusCode());
+                        log.warn("[Tool][web-search] request failed stepUid={} query=\"{}\" url={} status={}",
+                                request.stepUid(), query, resolved, candidate.statusCode());
                         continue;
                     }
                     response = candidate;
                     selectedEndpoint = resolved;
+                    log.info("[Tool][web-search] request succeeded stepUid={} query=\"{}\" url={} status={}",
+                            request.stepUid(), query, resolved, candidate.statusCode());
                     break;
                 } catch (Exception ex) {
                     failures.add(resolved + " -> " + ex.getMessage());
+                    log.warn("[Tool][web-search] request error stepUid={} query=\"{}\" url={} err={}",
+                            request.stepUid(), query, resolved, ex.getMessage());
                 }
             }
             if (response == null) {
@@ -132,6 +149,8 @@ public class WebSearchTool implements Tool {
                 out.append(i + 1).append(". ").append(hit.title()).append('\n').append(hit.url()).append('\n');
             }
             artifacts.set("results", items);
+            log.info("[Tool][web-search] done stepUid={} query=\"{}\" selectedUrl={} hits={}",
+                    request.stepUid(), query, selectedEndpoint, hits.size());
             return ToolResult.success(ToolTextUtils.truncateHead(out.toString().trim()), artifacts, metric(start, hits.size()));
         } catch (Exception ex) {
             log.warn("[Tool][web-search] failed stepUid={} err={}", request.stepUid(), ex.getMessage());
@@ -276,6 +295,36 @@ public class WebSearchTool implements Tool {
         metrics.put("size", size);
         metrics.put("ts", Instant.now().toString());
         return metrics;
+    }
+
+    private String toCurlCommand(String url, String acceptLanguage) {
+        String escapedUrl = url == null ? "" : url.replace("'", "'\"'\"'");
+        String escapedLanguage = acceptLanguage == null ? "" : acceptLanguage.replace("'", "'\"'\"'");
+        return "curl -sS -L --max-time 30 -H 'User-Agent: NomoClaw-WebSearch/1.0' -H 'Accept-Language: "
+                + escapedLanguage + "' '"
+                + escapedUrl + "'";
+    }
+
+    private String resolveAcceptLanguage() {
+        Locale locale = LocaleContextHolder.getLocale();
+        if (locale == null) {
+            return "zh-CN,zh;q=0.9";
+        }
+        String language = locale.getLanguage();
+        if ("zh".equalsIgnoreCase(language)) {
+            return "zh-CN,zh;q=0.9";
+        }
+        if ("en".equalsIgnoreCase(language)) {
+            return "en-US,en;q=0.9";
+        }
+        if (language == null || language.isBlank()) {
+            return "zh-CN,zh;q=0.9";
+        }
+        String tag = locale.toLanguageTag();
+        if (tag == null || tag.isBlank()) {
+            return language + ";q=0.9";
+        }
+        return tag + "," + language + ";q=0.9";
     }
 
     private record SearchHit(String title, String url) {

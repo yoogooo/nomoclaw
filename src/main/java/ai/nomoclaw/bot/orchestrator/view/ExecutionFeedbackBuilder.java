@@ -287,9 +287,13 @@ public class ExecutionFeedbackBuilder {
                 yield i18n("agent.step.success.image.withCount", resolved);
             }
             case "WebSearchTool" -> {
+                String endpoint = result.artifacts() == null ? "" : result.artifacts().path("endpoint").asString("").trim();
                 JsonNode results = result.artifacts() == null ? JsonNodeFactory.instance.arrayNode() : result.artifacts().path("results");
                 if (!results.isArray() || results.isEmpty()) {
-                    yield i18n("agent.step.success.web.search");
+                    if (endpoint.isBlank()) {
+                        yield i18n("agent.step.success.web.search");
+                    }
+                    yield i18n("agent.step.success.web.search.withEndpoint", endpoint);
                 }
                 StringBuilder details = new StringBuilder();
                 int count = 0;
@@ -304,10 +308,16 @@ public class ExecutionFeedbackBuilder {
                     details.append(i18n("agent.step.success.web.search.item", count, renderedTitle, url)).append('\n');
                 }
                 if (count <= 0) {
-                    yield i18n("agent.step.success.web.search");
+                    if (endpoint.isBlank()) {
+                        yield i18n("agent.step.success.web.search");
+                    }
+                    yield i18n("agent.step.success.web.search.withEndpoint", endpoint);
                 }
                 String body = details.toString().trim();
-                yield i18n("agent.step.success.web.search.withCount", count) + "\n" + body;
+                if (endpoint.isBlank()) {
+                    yield i18n("agent.step.success.web.search.withCount", count) + "\n" + body;
+                }
+                yield i18n("agent.step.success.web.search.withCountAndEndpoint", count, endpoint) + "\n" + body;
             }
             case "WebFetchTool" -> {
                 String url = result.artifacts() == null ? "" : result.artifacts().path("url").asString("").trim();
