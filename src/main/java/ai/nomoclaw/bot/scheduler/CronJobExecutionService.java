@@ -70,7 +70,7 @@ public class CronJobExecutionService {
         String messageUid = currentExecution.messageUid();
 
         if (conversationUid == null || conversationUid.isBlank() || messageUid == null || messageUid.isBlank()) {
-            conversationUid = agentApplicationService.createConversation("", job.getAgentUid(), "cron");
+            conversationUid = createCronConversation(job);
             messageUid = agentApplicationService.submitMessage(conversationUid, job.getTaskContent(), "cron");
             markCurrentExecution(job, executionUid, conversationUid, messageUid, now);
         }
@@ -84,11 +84,20 @@ public class CronJobExecutionService {
             throw new IllegalArgumentException("cron job not found: " + jobUid);
         }
         String executionUid = UUID.randomUUID().toString();
-        String conversationUid = agentApplicationService.createConversation("", job.getAgentUid(), "cron");
+        String conversationUid = createCronConversation(job);
         String messageUid = agentApplicationService.submitMessage(conversationUid, job.getTaskContent(), "cron");
         createRunningExecution(job, executionUid, conversationUid, messageUid, now);
         updateJobConversationPointers(job.getJobUid(), conversationUid, messageUid, now);
         return executionUid;
+    }
+
+    private String createCronConversation(AgentCronJobEntity job) {
+        String conversationUid = agentApplicationService.createConversation("", job.getAgentUid(), "cron");
+        String title = job == null || job.getTitle() == null ? "" : job.getTitle().trim();
+        if (!title.isBlank()) {
+            agentApplicationService.updateConversationTitle(conversationUid, title);
+        }
+        return conversationUid;
     }
 
     public void resumeActiveExecutions(int limit) {
