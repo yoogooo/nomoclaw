@@ -164,13 +164,13 @@ public class BrowserTool implements Tool {
             case "open" -> {
                 String url = request.args().path("url").asString("");
                 page.navigate(url);
-                page.waitForLoadState(LoadState.NETWORKIDLE);
+                page.waitForLoadState(LoadState.DOMCONTENTLOADED);
                 yield ToolResult.success("opened " + url, textArtifacts("url", url), metric(start));
             }
             case "navigate" -> {
                 String url = request.args().path("url").asString("");
                 page.navigate(url);
-                page.waitForLoadState(LoadState.NETWORKIDLE);
+                page.waitForLoadState(LoadState.DOMCONTENTLOADED);
                 yield ToolResult.success("navigated " + url, textArtifacts("url", url), metric(start));
             }
             case "navigate_back" -> {

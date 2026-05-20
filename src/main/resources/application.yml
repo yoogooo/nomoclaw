@@ -48,7 +48,7 @@ agent:
     timeout-seconds: 60
   browser:
     step-timeout-seconds: 10
-    headless: false
+    headless: true
     shared-profile-enabled: true
     shared-profile-name: shared
   retry:
