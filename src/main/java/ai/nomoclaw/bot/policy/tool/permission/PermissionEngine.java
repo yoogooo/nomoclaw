@@ -134,6 +134,17 @@ public class PermissionEngine {
                     false
             );
         }
+        if (isCreateFileNewTargetAllowed(context, details)) {
+            return new PermissionDecision(
+                    PermissionEffect.ALLOW,
+                    ToolPolicyReasonCode.RULE_ALLOW_MATCHED,
+                    "新建文件写入默认放行。",
+                    PermissionSource.COMMAND,
+                    "builtin-file-create-new-allow",
+                    firstPath(details),
+                    false
+            );
+        }
 
         return new PermissionDecision(
                 PermissionEffect.ASK,
@@ -424,5 +435,23 @@ public class PermissionEngine {
 
     private boolean isMcpBaselineAllowed(ToolPolicyContext context) {
         return normalize(context.toolName()).startsWith("mcp_");
+    }
+
+    private boolean isCreateFileNewTargetAllowed(ToolPolicyContext context, PermissionContextDetails details) {
+        if (!"createfiletool".equals(normalize(context.toolName()))) {
+            return false;
+        }
+        String mode = context.toolArgs() == null ? "" : context.toolArgs().path("mode").asString("create_or_truncate");
+        if (!"create_or_truncate".equalsIgnoreCase(mode)) {
+            return false;
+        }
+        if (details == null || details.resolvedPaths() == null || details.resolvedPaths().isEmpty()) {
+            return false;
+        }
+        Path target = details.resolvedPaths().get(0);
+        if (target == null) {
+            return false;
+        }
+        return !Files.exists(target.toAbsolutePath().normalize());
     }
 }

@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -302,6 +303,67 @@ class PermissionEngineTests {
 
         assertEquals(PermissionEffect.DENY, decision.effect());
         assertEquals("r-user-deny-mcp", decision.matchedRuleId());
+    }
+
+    @Test
+    void createFileNewTargetShouldAllowByBaseline() throws Exception {
+        StubSettingsStore settings = new StubSettingsStore();
+        SessionPermissionStore sessionStore = new SessionPermissionStore();
+        PermissionEngine engine = new PermissionEngine(settings, sessionStore, new CommandRuleResolver(), new HardGuardService());
+
+        Path workspace = Files.createTempDirectory("perm-engine-workspace-");
+        Path target = workspace.resolve("report").resolve("A股日报_20260520.md");
+        ObjectNode args = JsonNodeFactory.instance.objectNode();
+        args.put("path", "report/A股日报_20260520.md");
+        args.put("mode", "create_or_truncate");
+        args.put("content", "hello");
+
+        PermissionDecision decision = engine.evaluate(new ToolPolicyContext(
+                "CreateFileTool",
+                args,
+                workspace,
+                "agent-uid",
+                "default",
+                "local",
+                "c-create-new",
+                "m1",
+                "s1"
+        ));
+
+        assertEquals(PermissionEffect.ALLOW, decision.effect());
+        assertEquals("builtin-file-create-new-allow", decision.matchedRuleId());
+        assertTrue(Files.notExists(target));
+    }
+
+    @Test
+    void createFileExistingTargetShouldStillAskByDefault() throws Exception {
+        StubSettingsStore settings = new StubSettingsStore();
+        SessionPermissionStore sessionStore = new SessionPermissionStore();
+        PermissionEngine engine = new PermissionEngine(settings, sessionStore, new CommandRuleResolver(), new HardGuardService());
+
+        Path workspace = Files.createTempDirectory("perm-engine-workspace-");
+        Path target = workspace.resolve("report").resolve("A股日报_20260520.md");
+        Files.createDirectories(target.getParent());
+        Files.writeString(target, "existing");
+        ObjectNode args = JsonNodeFactory.instance.objectNode();
+        args.put("path", "report/A股日报_20260520.md");
+        args.put("mode", "create_or_truncate");
+        args.put("content", "overwrite");
+
+        PermissionDecision decision = engine.evaluate(new ToolPolicyContext(
+                "CreateFileTool",
+                args,
+                workspace,
+                "agent-uid",
+                "default",
+                "local",
+                "c-create-existing",
+                "m1",
+                "s1"
+        ));
+
+        assertEquals(PermissionEffect.ASK, decision.effect());
+        assertEquals(ToolPolicyReasonCode.DEFAULT_REQUIRE_APPROVAL, decision.reasonCode());
     }
 
     private PermissionRule rule(String id, PermissionSource source, PermissionEffect effect) {
