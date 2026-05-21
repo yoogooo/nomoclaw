@@ -15,10 +15,10 @@
     <description>Demo project for Spring Boot</description>
     <properties>
         <java.version>21</java.version>
-        <langchain4j.version>1.14.1</langchain4j.version>
-        <langchain4j.skills.version>1.14.1-beta24</langchain4j.skills.version>
-        <langchain4j.dashscope.version>1.14.1-beta24</langchain4j.dashscope.version>
-        <langchain4j.agentic.version>1.14.1-beta24</langchain4j.agentic.version>
+        <langchain4j.version>1.15.0</langchain4j.version>
+        <langchain4j.skills.version>1.15.0-beta25</langchain4j.skills.version>
+        <langchain4j.dashscope.version>1.15.0-beta25</langchain4j.dashscope.version>
+        <langchain4j.agentic.version>1.15.0-beta25</langchain4j.agentic.version>
         <mybatis-plus.version>3.5.16</mybatis-plus.version>
         <springdoc.version>3.0.2</springdoc.version>
         <jackson.version>3.1.0</jackson.version>
