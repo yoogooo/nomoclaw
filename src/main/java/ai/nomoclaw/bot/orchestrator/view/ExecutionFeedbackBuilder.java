@@ -136,7 +136,7 @@ public class ExecutionFeedbackBuilder {
         return switch (nullToEmpty(step.toolName())) {
             case "CommandTool" -> {
                 String command = toolArgs.path("command").asString("");
-                yield command.isBlank() ? i18n("agent.step.display.command.running") : i18n("agent.step.display.command.running.withParam", command);
+                yield command.isBlank() ? i18n("agent.step.display.command.running") : i18n("agent.step.display.command.running.withCommand", command);
             }
             case "BrowserTool" -> switch (toolArgs.path("action").asString("")) {
                 case "open", "navigate" -> i18n("agent.step.display.browser.open");

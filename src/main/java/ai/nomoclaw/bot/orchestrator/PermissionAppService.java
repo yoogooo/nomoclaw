@@ -117,6 +117,11 @@ public class PermissionAppService {
         if (isScreenshotApproval(normalizedTool, action)) {
             // Screenshot approvals should apply to screenshot behavior, not a single output file path.
             pathPattern = "";
+        } else if (isBrowserOpenLikeAction(normalizedTool, action)) {
+            String host = BrowserPermissionSupport.extractHost(toolArgs == null ? "" : toolArgs.path("url").asString(""));
+            if (!host.isBlank()) {
+                pathPattern = BrowserPermissionSupport.browserDomainPath(host).toString();
+            }
         }
         return new PermissionRule(
                 UUID.randomUUID().toString(),
@@ -130,6 +135,14 @@ public class PermissionAppService {
                 null,
                 true
         );
+    }
+
+    private boolean isBrowserOpenLikeAction(String normalizedTool, String action) {
+        if (!"BrowserTool".equals(normalizedTool)) {
+            return false;
+        }
+        String normalizedAction = action == null ? "" : action.trim().toLowerCase(Locale.ROOT);
+        return "open".equals(normalizedAction) || "navigate".equals(normalizedAction);
     }
 
     private boolean isScreenshotApproval(String normalizedTool, String action) {

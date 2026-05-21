@@ -1,5 +1,6 @@
 package ai.nomoclaw.bot.policy.tool.permission;
 
+import ai.nomoclaw.bot.config.AgentProperties;
 import ai.nomoclaw.bot.policy.tool.ToolPolicyContext;
 import ai.nomoclaw.bot.policy.tool.ToolPolicyReasonCode;
 import org.springframework.stereotype.Component;
@@ -33,15 +34,18 @@ public class PermissionEngine {
     private final SessionPermissionStore sessionPermissionStore;
     private final CommandRuleResolver commandRuleResolver;
     private final HardGuardService hardGuardService;
+    private final AgentProperties agentProperties;
 
     public PermissionEngine(PermissionSettingsStore settingsStore,
                             SessionPermissionStore sessionPermissionStore,
                             CommandRuleResolver commandRuleResolver,
-                            HardGuardService hardGuardService) {
+                            HardGuardService hardGuardService,
+                            AgentProperties agentProperties) {
         this.settingsStore = settingsStore;
         this.sessionPermissionStore = sessionPermissionStore;
         this.commandRuleResolver = commandRuleResolver;
         this.hardGuardService = hardGuardService;
+        this.agentProperties = agentProperties;
     }
 
     public PermissionDecision evaluate(ToolPolicyContext context) {
@@ -69,6 +73,10 @@ public class PermissionEngine {
         decision = matchByBehavior(context, details, PermissionEffect.ASK, rulesBySource);
         if (decision != null) {
             return decision;
+        }
+        PermissionDecision browserLocalBridgeGate = evaluateBrowserLocalBridgeConsent(context, details, rulesBySource);
+        if (browserLocalBridgeGate != null) {
+            return browserLocalBridgeGate;
         }
         decision = matchByBehavior(context, details, PermissionEffect.ALLOW, rulesBySource);
         if (decision != null) {
@@ -453,5 +461,53 @@ public class PermissionEngine {
             return false;
         }
         return !Files.exists(target.toAbsolutePath().normalize());
+    }
+
+    private PermissionDecision evaluateBrowserLocalBridgeConsent(ToolPolicyContext context,
+                                                                 PermissionContextDetails details,
+                                                                 Map<PermissionSource, List<PermissionRule>> rulesBySource) {
+        if (!requiresLocalBridgeConsent(context)) {
+            return null;
+        }
+        PermissionDecision allowDecision = matchByBehavior(context, details, PermissionEffect.ALLOW, rulesBySource);
+        if (allowDecision != null) {
+            return allowDecision;
+        }
+        return new PermissionDecision(
+                PermissionEffect.ASK,
+                ToolPolicyReasonCode.POLICY_REQUIRE_APPROVAL_HIGH_RISK,
+                "local bridge 复用本地登录态访问高风险域名，需要用户确认。",
+                null,
+                "",
+                firstPath(details),
+                false
+        );
+    }
+
+    private boolean requiresLocalBridgeConsent(ToolPolicyContext context) {
+        if (!agentProperties.getBrowser().getLocalBridge().isConsentRequired()) {
+            return false;
+        }
+        if (!"browsertool".equals(normalize(context.toolName()))) {
+            return false;
+        }
+        String action = context.toolArgs().path("action").asString("").trim().toLowerCase(Locale.ROOT);
+        if (!"open".equals(action) && !"navigate".equals(action)) {
+            return false;
+        }
+        String mode = agentProperties.getBrowser().getMode() == null
+                ? "auto"
+                : agentProperties.getBrowser().getMode().trim().toLowerCase(Locale.ROOT);
+        if ("managed".equals(mode)) {
+            return false;
+        }
+        if ("local_bridge".equals(mode)) {
+            return true;
+        }
+        if (!"auto".equals(mode)) {
+            return false;
+        }
+        String host = BrowserPermissionSupport.extractHost(context.toolArgs().path("url").asString(""));
+        return BrowserPermissionSupport.matchesDomain(host, agentProperties.getBrowser().getLocalBridge().getLocalBridgeDomains());
     }
 }

@@ -108,6 +108,16 @@ public class CommandRuleResolver {
         if (context == null || context.toolArgs() == null) {
             return List.of();
         }
+        String tool = normalizeTool(context.toolName());
+        if ("browsertool".equals(tool)) {
+            String action = context.toolArgs().path("action").asString("").trim().toLowerCase(Locale.ROOT);
+            if ("open".equals(action) || "navigate".equals(action)) {
+                String host = BrowserPermissionSupport.extractHost(context.toolArgs().path("url").asString(""));
+                if (!host.isBlank()) {
+                    return List.of(BrowserPermissionSupport.browserDomainPath(host));
+                }
+            }
+        }
         Path base = context.agentWorkspacePath() == null ? Path.of(".").toAbsolutePath().normalize() : context.agentWorkspacePath();
         LinkedHashSet<Path> out = new LinkedHashSet<>();
         String pathArg = context.toolArgs().path("path").asString("");
@@ -129,6 +139,21 @@ public class CommandRuleResolver {
         if (command.isBlank()) {
             return List.of();
         }
+        String normalized = normalize(command);
+        if (containsThirdPartyBrowserCliFallback(normalized)) {
+            return List.of(new PermissionRule(
+                    "command-deny-third-party-browser-cli-" + UUID.randomUUID(),
+                    PermissionSource.COMMAND,
+                    PermissionEffect.DENY,
+                    "CommandTool",
+                    "execute",
+                    PermissionResourceType.COMMAND,
+                    "",
+                    "",
+                    null,
+                    true
+            ));
+        }
 
         if (matchesHighRiskPattern(command)) {
             return List.of(new PermissionRule(
@@ -145,6 +170,16 @@ public class CommandRuleResolver {
             ));
         }
         return List.of();
+    }
+
+    private boolean containsThirdPartyBrowserCliFallback(String normalizedCommand) {
+        if (normalizedCommand == null || normalizedCommand.isBlank()) {
+            return false;
+        }
+        String value = " " + normalizedCommand + " ";
+        return value.contains(" agent-browser ")
+                || value.contains(" npm install -g agent-browser")
+                || value.contains(" npx agent-browser ");
     }
 
     public ReadonlyCommandVerdict isReadonlyParam(ToolPolicyContext context, PermissionContextDetails details) {

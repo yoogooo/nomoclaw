@@ -48,9 +48,19 @@ agent:
     timeout-seconds: 60
   browser:
     step-timeout-seconds: 10
+    click-timeout-seconds: 10
+    mode: auto
     headless: true
+    force-click-fallback-enabled: false
     shared-profile-enabled: true
     shared-profile-name: shared
+    local-bridge:
+      cdp-endpoint: "http://localhost:9222"
+      local-bridge-domains:
+        - "xiaohongshu.com"
+      connect-timeout-ms: 10000
+      fallback-to-managed: true
+      consent-required: false
   retry:
     max-attempts: 2
   loop:
