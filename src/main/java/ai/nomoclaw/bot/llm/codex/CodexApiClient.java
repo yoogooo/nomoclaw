@@ -13,6 +13,8 @@ import dev.langchain4j.model.chat.response.ChatResponseMetadata;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import dev.langchain4j.model.output.FinishReason;
 import dev.langchain4j.model.output.TokenUsage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import tools.jackson.databind.JsonNode;
 
 import java.io.BufferedReader;
@@ -32,6 +34,7 @@ import java.util.Map;
 final class CodexApiClient {
 
     private static final String DEFAULT_BASE_URL = "https://chatgpt.com/backend-api/codex";
+    private static final Logger log = LoggerFactory.getLogger(CodexApiClient.class);
 
     private final HttpClient httpClient;
     private final CodexTokenProvider tokenProvider;
@@ -115,7 +118,7 @@ final class CodexApiClient {
             }
 
             if (completed[0] == null) {
-                completed[0] = chatResponse("", modelName, fullText.toString(), toolExecutionRequests, null, 0, finishReason(toolExecutionRequests));
+                completed[0] = chatResponse("", modelName, fullText.toString(), toolExecutionRequests, null, finishReason(toolExecutionRequests));
             }
             handler.onCompleteResponse(completed[0]);
         } catch (Exception ex) {
@@ -418,7 +421,6 @@ final class CodexApiClient {
                         firstNonBlank(responseWithMaybeTools.aiMessage().text(), fullText.toString()),
                         toolExecutionRequests,
                         responseWithMaybeTools.tokenUsage(),
-                        CodexUsageCacheRegistry.takeCachedInputTokens(responseWithMaybeTools.id()),
                         finishReason(toolExecutionRequests)
                 );
             } else {
@@ -435,14 +437,17 @@ final class CodexApiClient {
         String id = text(root.path("id"));
         String outputText = firstNonBlank(text(root.path("output_text")), extractOutputText(root), fallbackText);
         List<ToolExecutionRequest> toolExecutionRequests = extractToolExecutionRequests(root);
-        ParsedUsage parsedUsage = parseUsage(root.path("usage"));
+        JsonNode usageNode = root.path("usage");
+        if (!usageNode.isMissingNode() && !usageNode.isNull()) {
+            log.info("[Reasoning] raw usage responseId={} usage={}", id, usageNode.toString());
+        }
+        ParsedUsage parsedUsage = parseUsage(usageNode);
         return chatResponse(
                 id,
                 modelName,
                 outputText,
                 toolExecutionRequests,
                 parsedUsage.tokenUsage(),
-                parsedUsage.cachedInputTokens(),
                 finishReason(toolExecutionRequests)
         );
     }
@@ -452,7 +457,6 @@ final class CodexApiClient {
                                       String outputText,
                                       List<ToolExecutionRequest> toolExecutionRequests,
                                       TokenUsage usage,
-                                      Integer cachedInputTokens,
                                       FinishReason finishReason) {
         ChatResponseMetadata metadata = ChatResponseMetadata.builder()
                 .id(id)
@@ -460,7 +464,6 @@ final class CodexApiClient {
                 .tokenUsage(usage)
                 .finishReason(finishReason)
                 .build();
-        CodexUsageCacheRegistry.recordCachedInputTokens(id, cachedInputTokens);
         AiMessage aiMessage = toolExecutionRequests == null || toolExecutionRequests.isEmpty()
                 ? AiMessage.from(outputText)
                 : AiMessage.from(outputText, toolExecutionRequests);
@@ -472,19 +475,19 @@ final class CodexApiClient {
 
     private ParsedUsage parseUsage(JsonNode usage) {
         if (usage == null || usage.isMissingNode() || usage.isNull()) {
-            return new ParsedUsage(null, 0);
+            return new ParsedUsage(null);
         }
-        TokenUsage tokenUsage = new TokenUsage(
-                intOrNull(usage.path("input_tokens")),
-                intOrNull(usage.path("output_tokens")),
-                intOrNull(usage.path("total_tokens"))
-        );
+        Integer inputTokens = intOrNull(usage.path("input_tokens"));
+        Integer outputTokens = intOrNull(usage.path("output_tokens"));
+        Integer totalTokens = intOrNull(usage.path("total_tokens"));
         int cachedInputTokens = maxTokenValue(
                 intOrNull(usage.path("input_cached_tokens")),
                 intOrNull(usage.path("cache_read_input_tokens")),
+                intOrNull(usage.path("input_tokens_details").path("cached_tokens")),
                 intOrNull(usage.path("prompt_tokens_details").path("cached_tokens"))
         );
-        return new ParsedUsage(tokenUsage, cachedInputTokens);
+        TokenUsage tokenUsage = new CodexTokenUsage(inputTokens, outputTokens, totalTokens, cachedInputTokens);
+        return new ParsedUsage(tokenUsage);
     }
 
     private int maxTokenValue(Integer... values) {
@@ -497,7 +500,7 @@ final class CodexApiClient {
         return max;
     }
 
-    private record ParsedUsage(TokenUsage tokenUsage, Integer cachedInputTokens) {
+    private record ParsedUsage(TokenUsage tokenUsage) {
     }
 
     private String extractOutputText(JsonNode root) {

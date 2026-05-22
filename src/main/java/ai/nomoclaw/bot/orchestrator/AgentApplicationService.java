@@ -8,7 +8,6 @@ import ai.nomoclaw.bot.conversation.model.ConversationMessageRunDto;
 import ai.nomoclaw.bot.conversation.model.ConversationSummaryDto;
 import ai.nomoclaw.bot.domain.AgentConversation;
 import ai.nomoclaw.bot.domain.AgentMessage;
-import ai.nomoclaw.bot.llm.codex.CodexUsageCacheRegistry;
 import ai.nomoclaw.bot.llm.config.LlmProperties;
 import ai.nomoclaw.bot.model.*;
 import ai.nomoclaw.bot.orchestrator.approval.ApprovalGrantedEvent;
@@ -851,7 +850,7 @@ public class AgentApplicationService {
         int input = usage == null || usage.inputTokenCount() == null ? 0 : Math.max(0, usage.inputTokenCount());
         int output = usage == null || usage.outputTokenCount() == null ? 0 : Math.max(0, usage.outputTokenCount());
         int total = usage == null || usage.totalTokenCount() == null ? 0 : Math.max(0, usage.totalTokenCount());
-        int cachedInput = CodexUsageCacheRegistry.takeCachedInputTokens(response.metadata().id());
+        int cachedInput = TokenUsageCacheTokenExtractor.extractCachedInputTokens(usage);
         if (total == 0 && (input > 0 || output > 0)) {
             total = input + output;
         }
