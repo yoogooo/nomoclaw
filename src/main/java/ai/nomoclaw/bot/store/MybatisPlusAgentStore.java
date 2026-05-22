@@ -65,12 +65,13 @@ public class MybatisPlusAgentStore implements AgentStore {
         entity.setTitle("");
         entity.setPinned(false);
         entity.setInputTokens(0);
+        entity.setCachedInputTokens(0);
         entity.setOutputTokens(0);
         entity.setTotalTokens(0);
         entity.setCreatedTime(toLocalDateTime(now));
         entity.setUpdatedTime(toLocalDateTime(now));
         conversationRepository.save(entity);
-        return new AgentConversation(conversationUid, agentGroupUid, agentUid, entity.getChannel(), "", false, 0, 0, 0, now, now);
+        return new AgentConversation(conversationUid, agentGroupUid, agentUid, entity.getChannel(), "", false, 0, 0, 0, 0, now, now);
     }
 
     @Override
@@ -135,6 +136,7 @@ public class MybatisPlusAgentStore implements AgentStore {
         entity.setProvider(provider == null ? "" : provider.trim());
         entity.setModelName(modelName == null ? "" : modelName.trim());
         entity.setInputTokens(0);
+        entity.setCachedInputTokens(0);
         entity.setOutputTokens(0);
         entity.setTotalTokens(0);
         entity.setCreatedTime(toLocalDateTime(now));
@@ -157,6 +159,7 @@ public class MybatisPlusAgentStore implements AgentStore {
         entity.setProvider("");
         entity.setModelName("");
         entity.setInputTokens(0);
+        entity.setCachedInputTokens(0);
         entity.setOutputTokens(0);
         entity.setTotalTokens(0);
         entity.setCreatedTime(toLocalDateTime(now));
@@ -199,16 +202,21 @@ public class MybatisPlusAgentStore implements AgentStore {
                                             String provider,
                                             String modelName,
                                             Integer inputTokens,
+                                            Integer cachedInputTokens,
                                             Integer outputTokens,
                                             Integer totalTokens) {
         int input = sanitizeTokenCount(inputTokens);
+        int cachedInput = sanitizeTokenCount(cachedInputTokens);
         int output = sanitizeTokenCount(outputTokens);
         int total = sanitizeTokenCount(totalTokens);
         if (total == 0 && (input > 0 || output > 0)) {
             total = input + output;
         }
+        if (input > 0 && cachedInput > input) {
+            cachedInput = input;
+        }
 
-        if (input <= 0 && output <= 0 && total <= 0) {
+        if (input <= 0 && cachedInput <= 0 && output <= 0 && total <= 0) {
             return;
         }
 
@@ -217,6 +225,9 @@ public class MybatisPlusAgentStore implements AgentStore {
                 .set(AgentMessageEntity::getUpdatedTime, LocalDateTime.now());
         if (input > 0) {
             update.setSql("input_tokens = input_tokens + " + input);
+        }
+        if (cachedInput > 0) {
+            update.setSql("cached_input_tokens = cached_input_tokens + " + cachedInput);
         }
         if (output > 0) {
             update.setSql("output_tokens = output_tokens + " + output);
@@ -235,6 +246,9 @@ public class MybatisPlusAgentStore implements AgentStore {
                 .set(AgentConversationEntity::getUpdatedTime, LocalDateTime.now());
         if (input > 0) {
             conversationUpdate.setSql("input_tokens = input_tokens + " + input);
+        }
+        if (cachedInput > 0) {
+            conversationUpdate.setSql("cached_input_tokens = cached_input_tokens + " + cachedInput);
         }
         if (output > 0) {
             conversationUpdate.setSql("output_tokens = output_tokens + " + output);
@@ -366,6 +380,7 @@ public class MybatisPlusAgentStore implements AgentStore {
                 entity.getTitle(),
                 Boolean.TRUE.equals(entity.getPinned()),
                 entity.getInputTokens() == null ? 0 : entity.getInputTokens(),
+                entity.getCachedInputTokens() == null ? 0 : entity.getCachedInputTokens(),
                 entity.getOutputTokens() == null ? 0 : entity.getOutputTokens(),
                 entity.getTotalTokens() == null ? 0 : entity.getTotalTokens(),
                 toInstant(entity.getCreatedTime()),
@@ -384,6 +399,7 @@ public class MybatisPlusAgentStore implements AgentStore {
                 entity.getProvider(),
                 entity.getModelName(),
                 entity.getInputTokens() == null ? 0 : entity.getInputTokens(),
+                entity.getCachedInputTokens() == null ? 0 : entity.getCachedInputTokens(),
                 entity.getOutputTokens() == null ? 0 : entity.getOutputTokens(),
                 entity.getTotalTokens() == null ? 0 : entity.getTotalTokens(),
                 toInstant(entity.getCreatedTime()),

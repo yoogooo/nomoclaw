@@ -115,7 +115,7 @@ final class CodexApiClient {
             }
 
             if (completed[0] == null) {
-                completed[0] = chatResponse("", modelName, fullText.toString(), toolExecutionRequests, null, finishReason(toolExecutionRequests));
+                completed[0] = chatResponse("", modelName, fullText.toString(), toolExecutionRequests, null, 0, finishReason(toolExecutionRequests));
             }
             handler.onCompleteResponse(completed[0]);
         } catch (Exception ex) {
@@ -418,6 +418,7 @@ final class CodexApiClient {
                         firstNonBlank(responseWithMaybeTools.aiMessage().text(), fullText.toString()),
                         toolExecutionRequests,
                         responseWithMaybeTools.tokenUsage(),
+                        CodexUsageCacheRegistry.takeCachedInputTokens(responseWithMaybeTools.id()),
                         finishReason(toolExecutionRequests)
                 );
             } else {
@@ -434,7 +435,16 @@ final class CodexApiClient {
         String id = text(root.path("id"));
         String outputText = firstNonBlank(text(root.path("output_text")), extractOutputText(root), fallbackText);
         List<ToolExecutionRequest> toolExecutionRequests = extractToolExecutionRequests(root);
-        return chatResponse(id, modelName, outputText, toolExecutionRequests, tokenUsage(root.path("usage")), finishReason(toolExecutionRequests));
+        ParsedUsage parsedUsage = parseUsage(root.path("usage"));
+        return chatResponse(
+                id,
+                modelName,
+                outputText,
+                toolExecutionRequests,
+                parsedUsage.tokenUsage(),
+                parsedUsage.cachedInputTokens(),
+                finishReason(toolExecutionRequests)
+        );
     }
 
     private ChatResponse chatResponse(String id,
@@ -442,6 +452,7 @@ final class CodexApiClient {
                                       String outputText,
                                       List<ToolExecutionRequest> toolExecutionRequests,
                                       TokenUsage usage,
+                                      Integer cachedInputTokens,
                                       FinishReason finishReason) {
         ChatResponseMetadata metadata = ChatResponseMetadata.builder()
                 .id(id)
@@ -449,6 +460,7 @@ final class CodexApiClient {
                 .tokenUsage(usage)
                 .finishReason(finishReason)
                 .build();
+        CodexUsageCacheRegistry.recordCachedInputTokens(id, cachedInputTokens);
         AiMessage aiMessage = toolExecutionRequests == null || toolExecutionRequests.isEmpty()
                 ? AiMessage.from(outputText)
                 : AiMessage.from(outputText, toolExecutionRequests);
@@ -458,15 +470,34 @@ final class CodexApiClient {
                 .build();
     }
 
-    private TokenUsage tokenUsage(JsonNode usage) {
+    private ParsedUsage parseUsage(JsonNode usage) {
         if (usage == null || usage.isMissingNode() || usage.isNull()) {
-            return null;
+            return new ParsedUsage(null, 0);
         }
-        return new TokenUsage(
+        TokenUsage tokenUsage = new TokenUsage(
                 intOrNull(usage.path("input_tokens")),
                 intOrNull(usage.path("output_tokens")),
                 intOrNull(usage.path("total_tokens"))
         );
+        int cachedInputTokens = maxTokenValue(
+                intOrNull(usage.path("input_cached_tokens")),
+                intOrNull(usage.path("cache_read_input_tokens")),
+                intOrNull(usage.path("prompt_tokens_details").path("cached_tokens"))
+        );
+        return new ParsedUsage(tokenUsage, cachedInputTokens);
+    }
+
+    private int maxTokenValue(Integer... values) {
+        int max = 0;
+        for (Integer value : values) {
+            if (value != null && value > max) {
+                max = value;
+            }
+        }
+        return max;
+    }
+
+    private record ParsedUsage(TokenUsage tokenUsage, Integer cachedInputTokens) {
     }
 
     private String extractOutputText(JsonNode root) {

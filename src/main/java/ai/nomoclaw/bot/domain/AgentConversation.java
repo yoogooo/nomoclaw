@@ -10,6 +10,7 @@ public record AgentConversation(
         String title,
         boolean pinned,
         int inputTokens,
+        int cachedInputTokens,
         int outputTokens,
         int totalTokens,
         Instant createdAt,

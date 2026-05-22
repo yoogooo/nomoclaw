@@ -457,20 +457,23 @@ function openAttachment(fileUrl: string) {
 
 function resolveMessageTokenUsage(messageItem: ConversationMessage) {
   const input = Number(messageItem.inputTokens || 0);
+  const cachedInput = Number(messageItem.cachedInputTokens || 0);
   const output = Number(messageItem.outputTokens || 0);
   const total = Number(messageItem.totalTokens || 0);
-  if (input > 0 || output > 0 || total > 0) {
-    return { input, output, total };
+  if (input > 0 || cachedInput > 0 || output > 0 || total > 0) {
+    return { input, cachedInput, output, total };
   }
   if (messageItem.role === "assistant" && messageItem.parentMessageUid) {
     const parent = conversationStore.messages.find((item) => item.messageUid === messageItem.parentMessageUid);
     if (!parent) return null;
     const parentInput = Number(parent.inputTokens || 0);
+    const parentCachedInput = Number(parent.cachedInputTokens || 0);
     const parentOutput = Number(parent.outputTokens || 0);
     const parentTotal = Number(parent.totalTokens || 0);
-    if (parentInput > 0 || parentOutput > 0 || parentTotal > 0) {
+    if (parentInput > 0 || parentCachedInput > 0 || parentOutput > 0 || parentTotal > 0) {
       return {
         input: parentInput,
+        cachedInput: parentCachedInput,
         output: parentOutput,
         total: parentTotal
       };
@@ -658,6 +661,13 @@ onMounted(() => {
               <span class="message-token-item">
                 <ArrowDown :size="12" />
                 <span>{{ resolveMessageTokenUsage(message)?.input ?? 0 }}</span>
+              </span>
+              <span
+                v-if="(resolveMessageTokenUsage(message)?.cachedInput ?? 0) > 0"
+                class="message-token-item"
+              >
+                <span>cache</span>
+                <span>{{ resolveMessageTokenUsage(message)?.cachedInput ?? 0 }}</span>
               </span>
               <span class="message-token-item">
                 <ArrowUp :size="12" />

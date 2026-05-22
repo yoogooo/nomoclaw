@@ -179,6 +179,7 @@ class ExecutionScopeResolverTests {
                 0,
                 0,
                 0,
+                0,
                 Instant.now(),
                 Instant.now()
         );
@@ -194,6 +195,7 @@ class ExecutionScopeResolverTests {
                 MessageStatus.CREATED,
                 provider,
                 modelName,
+                0,
                 0,
                 0,
                 0,

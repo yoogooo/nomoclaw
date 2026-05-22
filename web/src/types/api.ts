@@ -446,6 +446,7 @@ export interface ConversationMessage {
   provider?: string;
   modelName?: string;
   inputTokens?: number;
+  cachedInputTokens?: number;
   outputTokens?: number;
   totalTokens?: number;
   createdTime: string;

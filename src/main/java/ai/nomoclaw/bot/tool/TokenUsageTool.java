@@ -50,6 +50,7 @@ public class TokenUsageTool implements Tool {
         }
 
         int input = messages.stream().mapToInt(it -> safeInt(it.getInputTokens())).sum();
+        int cachedInput = messages.stream().mapToInt(it -> safeInt(it.getCachedInputTokens())).sum();
         int output = messages.stream().mapToInt(it -> safeInt(it.getOutputTokens())).sum();
         int total = messages.stream().mapToInt(it -> safeInt(it.getTotalTokens())).sum();
 
@@ -72,9 +73,11 @@ public class TokenUsageTool implements Tool {
         ObjectNode artifacts = JsonNodeFactory.instance.objectNode();
         artifacts.put("days", days);
         artifacts.put("inputTokens", input);
+        artifacts.put("cachedInputTokens", cachedInput);
         artifacts.put("outputTokens", output);
         artifacts.put("totalTokens", total);
         artifacts.put("messageCount", messages.size());
+        artifacts.put("cachedRatio", input <= 0 ? 0D : (double) cachedInput / (double) input);
         artifacts.set("byModel", modelStats);
 
         String outputText = """
@@ -82,9 +85,10 @@ public class TokenUsageTool implements Tool {
                 - days: %d
                 - total tokens: %d
                 - input tokens: %d
+                - cached input tokens: %d
                 - output tokens: %d
                 - messages: %d
-                """.formatted(days, total, input, output, messages.size()).trim();
+                """.formatted(days, total, input, cachedInput, output, messages.size()).trim();
         return ToolResult.success(outputText, artifacts, metrics(start));
     }
 

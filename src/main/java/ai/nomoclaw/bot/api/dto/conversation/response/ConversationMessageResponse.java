@@ -14,6 +14,7 @@ public record ConversationMessageResponse(
         String provider,
         String modelName,
         int inputTokens,
+        int cachedInputTokens,
         int outputTokens,
         int totalTokens,
         Instant createdTime,

@@ -59,6 +59,7 @@ public interface AgentStore {
                                      String provider,
                                      String modelName,
                                      Integer inputTokens,
+                                     Integer cachedInputTokens,
                                      Integer outputTokens,
                                      Integer totalTokens);
 

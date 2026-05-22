@@ -298,7 +298,7 @@ const enUS = {
       stepFinished: "Step finished: {title}\nOutput: {output}",
       stepFailed: "Step failed: {title}\nError: {errorMessage}",
       stepRejected: "Step rejected: {title}",
-      roundTokenUsage: "Round {round} token usage: input={input}, output={output}, total={total}, model={modelName}",
+      roundTokenUsage: "Round {round} token usage: input={input}, cachedInput={cachedInput}, output={output}, total={total}, model={modelName}",
       messageCompleted: "Message completed: {status} / {message}",
       stopReason: "Stop reason: {reason} ({roundsUsed}/{maxRounds})",
       loopLimitReached: "Loop limit reached ({maxRounds}). Task terminated. Failed step: {failedStepId}",

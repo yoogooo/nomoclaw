@@ -298,7 +298,7 @@ const zhCN = {
       stepFinished: "步骤完成: {title}\n输出: {output}",
       stepFailed: "步骤失败: {title}\n错误: {errorMessage}",
       stepRejected: "步骤已被拒绝: {title}",
-      roundTokenUsage: "Round {round} Token 使用: input={input}, output={output}, total={total}, model={modelName}",
+      roundTokenUsage: "Round {round} Token 使用: input={input}, cachedInput={cachedInput}, output={output}, total={total}, model={modelName}",
       messageCompleted: "消息处理结束: {status} / {message}",
       stopReason: "停止原因: {reason} ({roundsUsed}/{maxRounds})",
       loopLimitReached: "达到最大循环次数({maxRounds})，任务终止。失败步骤: {failedStepId}",

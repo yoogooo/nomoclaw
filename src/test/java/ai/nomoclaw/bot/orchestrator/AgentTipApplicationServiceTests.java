@@ -148,6 +148,7 @@ class AgentTipApplicationServiceTests {
                 0,
                 0,
                 0,
+                0,
                 Instant.parse("2026-04-26T01:00:00Z"),
                 Instant.parse("2026-04-26T01:05:00Z")
         );
@@ -164,6 +165,7 @@ class AgentTipApplicationServiceTests {
                         0,
                         0,
                         0,
+                        0,
                         Instant.parse("2026-04-26T01:01:00Z"),
                         Instant.parse("2026-04-26T01:01:00Z")
                 ),
@@ -176,6 +178,7 @@ class AgentTipApplicationServiceTests {
                         MessageStatus.COMPLETED,
                         null,
                         null,
+                        0,
                         0,
                         0,
                         0,
@@ -292,7 +295,13 @@ class AgentTipApplicationServiceTests {
         }
 
         @Override
-        public void accumulateMessageTokenUsage(String messageUid, String provider, String modelName, Integer inputTokens, Integer outputTokens, Integer totalTokens) {
+        public void accumulateMessageTokenUsage(String messageUid,
+                                                String provider,
+                                                String modelName,
+                                                Integer inputTokens,
+                                                Integer cachedInputTokens,
+                                                Integer outputTokens,
+                                                Integer totalTokens) {
             throw new UnsupportedOperationException();
         }
 

@@ -1222,10 +1222,11 @@ export const useConversationStore = defineStore("conversation", () => {
     if (type === "ROUND_TOKEN_USAGE") {
       const round = Number(event.payload.roundIndex || 1);
       const input = Number(event.payload.inputTokens || 0);
+      const cachedInput = Number(event.payload.cachedInputTokens || 0);
       const output = Number(event.payload.outputTokens || 0);
       const total = Number(event.payload.totalTokens || 0);
       const modelName = event.payload.modelName || "-";
-      runtimeLogStore.append(tr("chat.runtime.roundTokenUsage", { round, input, output, total, modelName }));
+      runtimeLogStore.append(tr("chat.runtime.roundTokenUsage", { round, input, cachedInput, output, total, modelName }));
       return;
     }
     if (type === "MESSAGE_COMPLETED") {

@@ -112,6 +112,7 @@ public class ConversationService {
                         message.provider(),
                         message.modelName(),
                         message.inputTokens(),
+                        message.cachedInputTokens(),
                         message.outputTokens(),
                         message.totalTokens(),
                         message.createdAt(),

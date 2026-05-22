@@ -18,6 +18,7 @@ public class AgentConversationEntity {
     private String title;
     private Boolean pinned;
     private Integer inputTokens;
+    private Integer cachedInputTokens;
     private Integer outputTokens;
     private Integer totalTokens;
     private LocalDateTime createdTime;
@@ -93,6 +94,14 @@ public class AgentConversationEntity {
 
     public void setOutputTokens(Integer outputTokens) {
         this.outputTokens = outputTokens;
+    }
+
+    public Integer getCachedInputTokens() {
+        return cachedInputTokens;
+    }
+
+    public void setCachedInputTokens(Integer cachedInputTokens) {
+        this.cachedInputTokens = cachedInputTokens;
     }
 
     public Integer getTotalTokens() {

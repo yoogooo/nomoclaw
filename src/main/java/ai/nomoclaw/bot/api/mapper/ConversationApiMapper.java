@@ -53,6 +53,7 @@ public final class ConversationApiMapper {
                 dto.provider(),
                 dto.modelName(),
                 dto.inputTokens(),
+                dto.cachedInputTokens(),
                 dto.outputTokens(),
                 dto.totalTokens(),
                 dto.createdTime(),

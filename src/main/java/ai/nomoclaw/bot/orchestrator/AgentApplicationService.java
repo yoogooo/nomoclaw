@@ -8,6 +8,7 @@ import ai.nomoclaw.bot.conversation.model.ConversationMessageRunDto;
 import ai.nomoclaw.bot.conversation.model.ConversationSummaryDto;
 import ai.nomoclaw.bot.domain.AgentConversation;
 import ai.nomoclaw.bot.domain.AgentMessage;
+import ai.nomoclaw.bot.llm.codex.CodexUsageCacheRegistry;
 import ai.nomoclaw.bot.llm.config.LlmProperties;
 import ai.nomoclaw.bot.model.*;
 import ai.nomoclaw.bot.orchestrator.approval.ApprovalGrantedEvent;
@@ -850,11 +851,17 @@ public class AgentApplicationService {
         int input = usage == null || usage.inputTokenCount() == null ? 0 : Math.max(0, usage.inputTokenCount());
         int output = usage == null || usage.outputTokenCount() == null ? 0 : Math.max(0, usage.outputTokenCount());
         int total = usage == null || usage.totalTokenCount() == null ? 0 : Math.max(0, usage.totalTokenCount());
+        int cachedInput = CodexUsageCacheRegistry.takeCachedInputTokens(response.metadata().id());
         if (total == 0 && (input > 0 || output > 0)) {
             total = input + output;
         }
+        if (input > 0 && cachedInput > input) {
+            log.warn("[Agent] cached input token usage exceeded input tokens messageUid={} round={} cachedInput={} input={}",
+                    message.messageUid(), roundIndex, cachedInput, input);
+            cachedInput = input;
+        }
 
-        if (input == 0 && output == 0 && total == 0 && modelName.isBlank() && provider.isBlank()) {
+        if (input == 0 && cachedInput == 0 && output == 0 && total == 0 && modelName.isBlank() && provider.isBlank()) {
             return;
         }
 
@@ -863,6 +870,7 @@ public class AgentApplicationService {
                 provider,
                 modelName,
                 input,
+                cachedInput,
                 output,
                 total
         );
@@ -872,12 +880,13 @@ public class AgentApplicationService {
         payload.put("provider", provider);
         payload.put("modelName", modelName);
         payload.put("inputTokens", input);
+        payload.put("cachedInputTokens", cachedInput);
         payload.put("outputTokens", output);
         payload.put("totalTokens", total);
         publishEvent(AgentEventType.ROUND_TOKEN_USAGE, message.conversationUid(), message.messageUid(), null, payload);
 
-        log.info("[Agent] round token usage messageUid={} round={} provider={} model={} input={} output={} total={}",
-                message.messageUid(), roundIndex, provider, modelName, input, output, total);
+        log.info("[Agent] round token usage messageUid={} round={} provider={} model={} input={} cachedInput={} output={} total={}",
+                message.messageUid(), roundIndex, provider, modelName, input, cachedInput, output, total);
     }
 
     private String toolCallId(PlanStep step) {

@@ -108,6 +108,7 @@ class ImageLoaderContextServiceTests {
                 0,
                 0,
                 0,
+                0,
                 Instant.now(),
                 Instant.now()
         );

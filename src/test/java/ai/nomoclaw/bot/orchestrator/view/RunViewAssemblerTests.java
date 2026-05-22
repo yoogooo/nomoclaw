@@ -67,6 +67,7 @@ class RunViewAssemblerTests {
                 0,
                 0,
                 0,
+                0,
                 Instant.now(),
                 Instant.now()
         );
@@ -102,4 +103,3 @@ class RunViewAssemblerTests {
         assertEquals("running", run.steps().get(0).status());
     }
 }
-
