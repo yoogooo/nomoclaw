@@ -27,6 +27,7 @@ import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -39,8 +40,6 @@ import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-@Component
-@Slf4j
 /**
  * Browser tool backed by Playwright persistent context.
  *
@@ -54,6 +53,8 @@ import java.util.regex.Pattern;
  * progress will be measured against one directory while the actual download is
  * written to another.
  */
+@Component
+@Slf4j
 public class BrowserTool implements Tool {
     private static final long DOWNLOAD_REPORT_INTERVAL_MS = 800L;
     private static final long DOWNLOAD_REPORT_MIN_DELTA_BYTES = 256L * 1024L;
@@ -66,6 +67,8 @@ public class BrowserTool implements Tool {
     private static final Pattern PLAYWRIGHT_DOWNLOAD_START_PATTERN = Pattern.compile("^Downloading\\s+(.+?)\\s+from\\s+.+$", Pattern.CASE_INSENSITIVE);
     private static final Pattern PLAYWRIGHT_DOWNLOAD_DONE_PATTERN = Pattern.compile("^(.+?)\\s+downloaded\\s+to\\s+.+$", Pattern.CASE_INSENSITIVE);
     private static final long PLAYWRIGHT_UNKNOWN_ARTIFACT_ESTIMATED_BYTES = 32L * 1024L * 1024L;
+    private static final String PLAYWRIGHT_DRIVER_TEMP_PREFIX = "playwright-java-";
+    private static final Duration PLAYWRIGHT_DRIVER_TEMP_RETENTION = Duration.ofHours(6);
     private static final List<String> PLAYWRIGHT_DEFAULT_ARTIFACTS = List.of(
             "chromium",
             "ffmpeg",
@@ -1418,7 +1421,7 @@ public class BrowserTool implements Tool {
             return;
         }
         try (var walk = Files.walk(root)) {
-            walk.sorted(java.util.Comparator.reverseOrder()).forEach(path -> {
+            walk.sorted(Comparator.reverseOrder()).forEach(path -> {
                 try {
                     Files.deleteIfExists(path);
                 } catch (Exception ignored) {
@@ -1435,9 +1438,45 @@ public class BrowserTool implements Tool {
                 .normalize();
         try {
             Files.createDirectories(driverTmpDir);
+            cleanupStalePlaywrightDriverTempDirectories(driverTmpDir);
             System.setProperty("playwright.driver.tmpdir", driverTmpDir.toString());
         } catch (Exception ex) {
             log.warn("[Tool][browser] failed to prepare playwright driver temp dir {}", driverTmpDir, ex);
+        }
+    }
+
+    private void cleanupStalePlaywrightDriverTempDirectories(Path driverTmpDir) {
+        if (driverTmpDir == null || !Files.isDirectory(driverTmpDir)) {
+            return;
+        }
+        Instant cutoff = Instant.now().minus(PLAYWRIGHT_DRIVER_TEMP_RETENTION);
+        int removed = 0;
+        try (var stream = Files.list(driverTmpDir)) {
+            List<Path> staleDirs = stream
+                    .filter(Files::isDirectory)
+                    .filter(path -> {
+                        String name = path.getFileName() == null ? "" : path.getFileName().toString();
+                        return name.startsWith(PLAYWRIGHT_DRIVER_TEMP_PREFIX);
+                    })
+                    .filter(path -> isOlderThan(path, cutoff))
+                    .toList();
+            for (Path staleDir : staleDirs) {
+                deleteRecursively(staleDir);
+                removed++;
+            }
+            if (removed > 0) {
+                log.info("[Tool][browser] removed stale playwright driver temp dirs count={} root={}", removed, driverTmpDir);
+            }
+        } catch (Exception ex) {
+            log.warn("[Tool][browser] failed to cleanup playwright driver temp dirs root={} err={}", driverTmpDir, ex.getMessage());
+        }
+    }
+
+    private boolean isOlderThan(Path path, Instant cutoff) {
+        try {
+            return Files.getLastModifiedTime(path).toInstant().isBefore(cutoff);
+        } catch (Exception ex) {
+            return false;
         }
     }
 
