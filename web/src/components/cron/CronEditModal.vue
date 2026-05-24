@@ -2,7 +2,7 @@
 import { computed, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { BellRing, Clock3 } from "lucide-vue-next";
-import { NButton, NForm, NFormItem, NInput, NInputNumber, NModal, NSelect } from "naive-ui";
+import { NButton, NForm, NFormItem, NInput, NInputNumber, NModal, NSelect, NTabPane, NTabs } from "naive-ui";
 import { useCronJobsStore } from "@/stores/cronJobs";
 import { modelApi } from "@/api/modelApi";
 import type { CronJob } from "@/types/api";
@@ -43,10 +43,6 @@ const weekdayOptions = computed(() => [
   { label: t("cron.weekday.friday"), short: t("cron.weekdayShort.friday"), value: "6" },
   { label: t("cron.weekday.saturday"), short: t("cron.weekdayShort.saturday"), value: "7" },
   { label: t("cron.weekday.sunday"), short: t("cron.weekdayShort.sunday"), value: "1" }
-]);
-const executionTypeOptions = computed<Array<{ value: ExecutionType; label: string }>>(() => [
-  { value: "once", label: t("cron.executionType.once") },
-  { value: "recurring", label: t("cron.executionType.recurring") }
 ]);
 const recurringModeOptions = computed<Array<{ value: RecurringMode; label: string }>>(() => [
   { value: "minute", label: t("cron.recurringMode.minute") },
@@ -624,34 +620,38 @@ watch(
               <span>{{ t("cron.form.taskInfo") }}</span>
             </div>
             <div class="basic-meta-grid">
-              <n-form-item :label="t('cron.form.executeAgent')">
-                <n-select
-                  v-model:value="form.agentUid"
-                  :placeholder="t('cron.form.executeAgentPlaceholder')"
-                  :options="agentOptions"
-                  filterable
-                />
-              </n-form-item>
-              <n-form-item :label="t('cron.form.taskTitle')">
-                <n-input
-                  v-model:value="form.title"
-                  :placeholder="t('cron.form.taskTitlePlaceholder')"
-                />
-              </n-form-item>
-              <n-form-item :label="t('cron.form.modelProvider')">
-                <n-select
-                  v-model:value="form.modelProvider"
-                  :placeholder="t('cron.form.modelProviderPlaceholder')"
-                  :options="providerOptions"
-                />
-              </n-form-item>
-              <n-form-item :label="t('cron.form.modelName')">
-                <n-select
-                  v-model:value="form.modelName"
-                  :placeholder="t('cron.form.modelNamePlaceholder')"
-                  :options="modelOptions"
-                />
-              </n-form-item>
+              <div class="meta-inline-row">
+                <n-form-item :label="t('cron.form.executeAgent')" class="meta-inline-item">
+                  <n-select
+                    v-model:value="form.agentUid"
+                    :placeholder="t('cron.form.executeAgentPlaceholder')"
+                    :options="agentOptions"
+                    filterable
+                  />
+                </n-form-item>
+                <n-form-item :label="t('cron.form.taskTitle')" class="meta-inline-item">
+                  <n-input
+                    v-model:value="form.title"
+                    :placeholder="t('cron.form.taskTitlePlaceholder')"
+                  />
+                </n-form-item>
+              </div>
+              <div class="model-inline-row">
+                <n-form-item :label="t('cron.form.modelProvider')" class="model-inline-item">
+                  <n-select
+                    v-model:value="form.modelProvider"
+                    :placeholder="t('cron.form.modelProviderPlaceholder')"
+                    :options="providerOptions"
+                  />
+                </n-form-item>
+                <n-form-item :label="t('cron.form.modelName')" class="model-inline-item">
+                  <n-select
+                    v-model:value="form.modelName"
+                    :placeholder="t('cron.form.modelNamePlaceholder')"
+                    :options="modelOptions"
+                  />
+                </n-form-item>
+              </div>
             </div>
 
             <n-form-item :label="t('cron.form.taskContent')" class="task-content-item" :show-feedback="false">
@@ -674,18 +674,10 @@ watch(
 
             <div class="schedule-field">
               <div class="field-label">{{ t("cron.form.executionType") }}</div>
-              <div class="segmented-group">
-                <button
-                  v-for="option in executionTypeOptions"
-                  :key="option.value"
-                  type="button"
-                  class="segmented-item"
-                  :class="{ active: form.executionType === option.value }"
-                  @click="form.executionType = option.value"
-                >
-                  {{ option.label }}
-                </button>
-              </div>
+              <n-tabs v-model:value="form.executionType" type="segment" animated size="small">
+                <n-tab-pane name="once" :tab="t('cron.executionType.once')" />
+                <n-tab-pane name="recurring" :tab="t('cron.executionType.recurring')" />
+              </n-tabs>
             </div>
 
             <div class="schedule-dynamic-block">
@@ -817,5 +809,37 @@ watch(
   display: flex;
   justify-content: flex-end;
   gap: var(--space-3);
+}
+
+.model-inline-row {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.meta-inline-row {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.meta-inline-item {
+  margin-bottom: 0;
+}
+
+.model-inline-item {
+  margin-bottom: 0;
+}
+
+@media (max-width: 720px) {
+  .meta-inline-row {
+    grid-template-columns: 1fr;
+  }
+
+  .model-inline-row {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

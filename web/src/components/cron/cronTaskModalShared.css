@@ -83,6 +83,12 @@
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
+.segmented-group-multi .segmented-item {
+  min-height: var(--size-36);
+  padding: 0 var(--space-2_5);
+  font-size: var(--text-body-size);
+}
+
 .segmented-item {
   min-height: var(--size-40);
   border: none;
@@ -155,12 +161,18 @@
 }
 
 .weekday-pill {
-  min-height: var(--size-40);
+  width: var(--size-36);
+  height: var(--size-36);
+  min-height: var(--size-36);
+  padding: 0;
   border: var(--size-1) solid var(--color-border-panel);
-  border-radius: var(--radius-pill);
+  border-radius: 50%;
   background: var(--color-bg-surface);
   color: var(--color-text-cool-gray);
   font-size: var(--text-body-size);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
 }
 
@@ -183,7 +195,7 @@
 
 .preview-summary {
   margin-top: var(--space-3);
-  font-size: var(--text-title-sm-size);
+  font-size: var(--text-body-size);
   font-weight: 600;
   color: var(--color-text-heading-deep);
 }
