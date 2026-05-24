@@ -1,8 +1,10 @@
 import { computed, ref } from "vue";
 import { defineStore } from "pinia";
 import { modelApi } from "@/api/modelApi";
+import { HttpRequestError } from "@/utils/http";
 
 const MODEL_GATE_DISMISSED_KEY = "ui:model-gate-dismissed";
+type ModelReadinessCheckErrorKind = "none" | "network" | "backendUnavailable" | "serverError" | "unknown";
 
 function resolveDismissedState() {
   if (typeof window === "undefined") {
@@ -23,15 +25,17 @@ export const useModelGateStore = defineStore("model-gate", () => {
   const checking = ref(false);
   const isModelReady = ref(false);
   const checkError = ref<string>("");
+  const checkErrorKind = ref<ModelReadinessCheckErrorKind>("none");
   const dismissed = ref(resolveDismissedState());
 
   const shouldShowPrompt = computed(() =>
-    ready.value && !checking.value && !isModelReady.value && !dismissed.value
+    ready.value && !checking.value && !isModelReady.value && !checkError.value && !dismissed.value
   );
 
   async function refreshModelReadiness() {
     checking.value = true;
     checkError.value = "";
+    checkErrorKind.value = "none";
     try {
       const config = await modelApi.getAvailableModelConfig();
       isModelReady.value = config.providers.some((provider) =>
@@ -43,7 +47,13 @@ export const useModelGateStore = defineStore("model-gate", () => {
       }
     } catch (error) {
       isModelReady.value = false;
-      checkError.value = error instanceof Error ? error.message : "model readiness check failed";
+      if (error instanceof HttpRequestError) {
+        checkErrorKind.value = resolveCheckErrorKind(error);
+        checkError.value = `model readiness check failed: ${checkErrorKind.value}`;
+      } else {
+        checkErrorKind.value = "unknown";
+        checkError.value = error instanceof Error ? error.message : "model readiness check failed";
+      }
     } finally {
       ready.value = true;
       checking.value = false;
@@ -65,6 +75,7 @@ export const useModelGateStore = defineStore("model-gate", () => {
     checking,
     isModelReady,
     checkError,
+    checkErrorKind,
     dismissed,
     shouldShowPrompt,
     refreshModelReadiness,
@@ -72,3 +83,20 @@ export const useModelGateStore = defineStore("model-gate", () => {
     resetPrompt
   };
 });
+
+function resolveCheckErrorKind(error: HttpRequestError): ModelReadinessCheckErrorKind {
+  if (error.networkError) {
+    return "network";
+  }
+  const reason = error.reason.toLowerCase();
+  if (
+    error.status === 500 &&
+    (reason.includes("econnrefused") || reason.includes("proxy error") || reason.includes("connect refused"))
+  ) {
+    return "backendUnavailable";
+  }
+  if (error.status !== null && error.status >= 500) {
+    return "serverError";
+  }
+  return "unknown";
+}

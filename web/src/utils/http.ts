@@ -10,6 +10,20 @@ export interface RequestJsonOptions {
   suppressErrorToast?: boolean;
 }
 
+export class HttpRequestError extends Error {
+  readonly status: number | null;
+  readonly reason: string;
+  readonly networkError: boolean;
+
+  constructor(message: string, options: { status?: number; reason?: string; networkError?: boolean; cause?: unknown } = {}) {
+    super(message, { cause: options.cause });
+    this.name = "HttpRequestError";
+    this.status = options.status ?? null;
+    this.reason = options.reason ?? "";
+    this.networkError = Boolean(options.networkError);
+  }
+}
+
 export async function requestJson<T>(
   input: RequestInfo | URL,
   init?: RequestInit,
@@ -24,7 +38,10 @@ export async function requestJson<T>(
     if (!suppressErrorToast) {
       showErrorToastDedup(errorMessage);
     }
-    throw new Error(errorMessage, { cause: error });
+    throw new HttpRequestError(errorMessage, {
+      networkError: true,
+      cause: error
+    });
   }
 
   if (!response.ok) {
@@ -41,7 +58,10 @@ export async function requestJson<T>(
     } else if (!suppressErrorToast) {
       showErrorToastDedup(userFriendlyMessage);
     }
-    throw new Error(userFriendlyMessage);
+    throw new HttpRequestError(userFriendlyMessage, {
+      status: response.status,
+      reason
+    });
   }
 
   if (response.status === 204) {
