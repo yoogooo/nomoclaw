@@ -17,6 +17,8 @@ export interface UpdateCronJobPayload {
   expression?: string;
   timezone?: string;
   endAt?: string;
+  modelProvider?: string;
+  modelName?: string;
   taskContent?: string;
   status?: string;
 }
@@ -27,6 +29,8 @@ export interface CreateCronJobPayload {
   expression: string;
   timezone?: string;
   endAt?: string;
+  modelProvider?: string;
+  modelName?: string;
   taskContent: string;
   status?: string;
 }

@@ -49,6 +49,8 @@ public final class CronApiMapper {
                 dto.expression(),
                 dto.timezone(),
                 dto.endAt(),
+                dto.modelProvider(),
+                dto.modelName(),
                 dto.taskContent(),
                 dto.status(),
                 dto.currentExecutionUid(),
@@ -151,6 +153,8 @@ public final class CronApiMapper {
                 request == null ? null : request.expression(),
                 request == null ? null : request.timezone(),
                 request == null ? null : request.endAt(),
+                request == null ? null : request.modelProvider(),
+                request == null ? null : request.modelName(),
                 request == null ? null : request.taskContent(),
                 request == null ? null : request.status()
         );
@@ -163,6 +167,8 @@ public final class CronApiMapper {
                 request == null ? null : request.expression(),
                 request == null ? null : request.timezone(),
                 request == null ? null : request.endAt(),
+                request == null ? null : request.modelProvider(),
+                request == null ? null : request.modelName(),
                 request == null ? null : request.taskContent(),
                 request == null ? null : request.status()
         );

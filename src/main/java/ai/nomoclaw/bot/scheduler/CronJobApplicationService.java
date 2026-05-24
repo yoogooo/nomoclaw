@@ -117,6 +117,8 @@ public class CronJobApplicationService {
                 ? "Asia/Shanghai"
                 : ZoneId.of(request.timezone().trim()).getId();
         String endAt = normalizeEndAt(request.endAt());
+        String modelProvider = normalizeRuntimeField(request.modelProvider());
+        String modelName = normalizeRuntimeField(request.modelName());
         String taskContent = request.taskContent().trim();
         String title = defaultCronJobTitle(request.title(), taskContent);
         String status = normalizeStatus(request.status(), "ACTIVE");
@@ -138,7 +140,7 @@ public class CronJobApplicationService {
         job.setExtConfig("");
         job.setCreatedTime(now);
         job.setUpdatedTime(now);
-        mergeExtConfig(job, expression, timezone, endAt);
+        mergeExtConfig(job, expression, timezone, endAt, modelProvider, modelName);
 
         agentCronJobRepository.save(job);
 
@@ -154,7 +156,7 @@ public class CronJobApplicationService {
 
     public CronJobDto updateCronJob(String jobUid, UpdateCronJobParam request) {
         if (request == null) {
-            request = new UpdateCronJobParam(null, null, null, null, null, null, null);
+            request = new UpdateCronJobParam(null, null, null, null, null, null, null, null, null);
         }
         AgentCronJobEntity job = requireJob(jobUid);
         String requestedAgentUid = request.agentUid() == null ? "" : request.agentUid().trim();
@@ -175,6 +177,14 @@ public class CronJobApplicationService {
         String endAt = request.endAt() == null
                 ? readScheduleEndAt(job.getExtConfig())
                 : normalizeEndAt(request.endAt());
+        String currentModelProvider = readRuntimeModelProvider(job.getExtConfig());
+        String currentModelName = readRuntimeModelName(job.getExtConfig());
+        String modelProvider = request.modelProvider() == null
+                ? currentModelProvider
+                : normalizeRuntimeField(request.modelProvider());
+        String modelName = request.modelName() == null
+                ? currentModelName
+                : normalizeRuntimeField(request.modelName());
         String taskContent = request.taskContent() == null || request.taskContent().isBlank()
                 ? job.getTaskContent()
                 : request.taskContent().trim();
@@ -186,7 +196,7 @@ public class CronJobApplicationService {
         job.setTimezone(timezone);
         job.setTaskContent(taskContent);
         job.setStatus(status);
-        mergeExtConfig(job, expression, timezone, endAt);
+        mergeExtConfig(job, expression, timezone, endAt, modelProvider, modelName);
 
         LocalDateTime nextRunTime;
         if ("PAUSED".equals(status)) {
@@ -755,6 +765,8 @@ public class CronJobApplicationService {
                 job.getExpression(),
                 job.getTimezone(),
                 readScheduleEndAt(job.getExtConfig()),
+                readRuntimeModelProvider(job.getExtConfig()),
+                readRuntimeModelName(job.getExtConfig()),
                 job.getTaskContent(),
                 job.getStatus(),
                 currentExecutionUid.isBlank() ? null : currentExecutionUid,
@@ -886,7 +898,12 @@ public class CronJobApplicationService {
         return endAt.trim();
     }
 
-    private void mergeExtConfig(AgentCronJobEntity job, String expression, String timezone, String endAt) {
+    private void mergeExtConfig(AgentCronJobEntity job,
+                                String expression,
+                                String timezone,
+                                String endAt,
+                                String modelProvider,
+                                String modelName) {
         JsonNode extNode = job.getExtConfig() == null || job.getExtConfig().isBlank()
                 ? JsonNodeFactory.instance.objectNode()
                 : JsonUtil.fromJsonQuietly(job.getExtConfig(), JsonNode.class).orElse(JsonNodeFactory.instance.objectNode());
@@ -906,7 +923,38 @@ public class CronJobApplicationService {
         notification.put("enabled", extConfig.path("notification").path("enabled").asBoolean(true));
         notification.put("channel", extConfig.path("notification").path("channel").asString("noop"));
         notification.put("target", extConfig.path("notification").path("target").asString(""));
+        ObjectNode runtimeModel = extConfig.withObject("runtimeModel");
+        if (modelProvider == null || modelProvider.isBlank()) {
+            runtimeModel.remove("provider");
+        } else {
+            runtimeModel.put("provider", modelProvider);
+        }
+        if (modelName == null || modelName.isBlank()) {
+            runtimeModel.remove("name");
+        } else {
+            runtimeModel.put("name", modelName);
+        }
         job.setExtConfig(JsonUtil.toJson(extConfig));
+    }
+
+    private String readRuntimeModelProvider(String extConfigText) {
+        if (extConfigText == null || extConfigText.isBlank()) {
+            return "";
+        }
+        JsonNode extNode = JsonUtil.fromJsonQuietly(extConfigText, JsonNode.class).orElse(JsonNodeFactory.instance.objectNode());
+        return normalizeRuntimeField(extNode.path("runtimeModel").path("provider").asString(""));
+    }
+
+    private String readRuntimeModelName(String extConfigText) {
+        if (extConfigText == null || extConfigText.isBlank()) {
+            return "";
+        }
+        JsonNode extNode = JsonUtil.fromJsonQuietly(extConfigText, JsonNode.class).orElse(JsonNodeFactory.instance.objectNode());
+        return normalizeRuntimeField(extNode.path("runtimeModel").path("name").asString(""));
+    }
+
+    private String normalizeRuntimeField(String value) {
+        return value == null ? "" : value.trim();
     }
 
     private String buildFallbackAgentDisplayName(String agentUid) {

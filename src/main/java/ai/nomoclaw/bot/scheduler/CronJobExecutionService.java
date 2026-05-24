@@ -11,11 +11,14 @@ import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
 import ai.nomoclaw.bot.store.repository.AgentCronJobExecutionRepository;
 import ai.nomoclaw.bot.store.repository.AgentCronJobRepository;
 import ai.nomoclaw.bot.store.repository.AgentDefinitionRepository;
+import ai.nomoclaw.bot.util.JsonUtil;
 import ai.nomoclaw.bot.workspace.AgentWorkspaceConfig;
 import ai.nomoclaw.bot.workspace.NomoClawPaths;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.JsonNodeFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -71,7 +74,8 @@ public class CronJobExecutionService {
 
         if (conversationUid == null || conversationUid.isBlank() || messageUid == null || messageUid.isBlank()) {
             conversationUid = createCronConversation(job);
-            messageUid = agentApplicationService.submitMessage(conversationUid, job.getTaskContent(), "cron");
+            RuntimeModelSelection runtimeModel = resolveRuntimeModel(job);
+            messageUid = submitCronMessage(conversationUid, job.getTaskContent(), runtimeModel);
             markCurrentExecution(job, executionUid, conversationUid, messageUid, now);
         }
 
@@ -85,7 +89,8 @@ public class CronJobExecutionService {
         }
         String executionUid = UUID.randomUUID().toString();
         String conversationUid = createCronConversation(job);
-        String messageUid = agentApplicationService.submitMessage(conversationUid, job.getTaskContent(), "cron");
+        RuntimeModelSelection runtimeModel = resolveRuntimeModel(job);
+        String messageUid = submitCronMessage(conversationUid, job.getTaskContent(), runtimeModel);
         createRunningExecution(job, executionUid, conversationUid, messageUid, now);
         updateJobConversationPointers(job.getJobUid(), conversationUid, messageUid, now);
         return executionUid;
@@ -428,10 +433,36 @@ public class CronJobExecutionService {
         return text.length() <= 200 ? text : text.substring(0, 200) + "...";
     }
 
+    private RuntimeModelSelection resolveRuntimeModel(AgentCronJobEntity job) {
+        if (job == null || job.getExtConfig() == null || job.getExtConfig().isBlank()) {
+            return new RuntimeModelSelection("", "");
+        }
+        JsonNode extNode = JsonUtil.fromJsonQuietly(job.getExtConfig(), JsonNode.class).orElse(JsonNodeFactory.instance.objectNode());
+        String modelProvider = extNode.path("runtimeModel").path("provider").asString("").trim();
+        String modelName = extNode.path("runtimeModel").path("name").asString("").trim();
+        return new RuntimeModelSelection(modelProvider, modelName);
+    }
+
+    private String submitCronMessage(String conversationUid, String taskContent, RuntimeModelSelection runtimeModel) {
+        return agentApplicationService.submitMessage(
+                conversationUid,
+                taskContent,
+                List.of(),
+                runtimeModel.modelProvider(),
+                runtimeModel.modelName(),
+                "default",
+                "cron",
+                null
+        );
+    }
+
     private String blankToNull(String text) {
         return text == null || text.isBlank() ? null : text;
     }
 
     private record CurrentExecutionContext(String executionUid, String conversationUid, String messageUid) {
+    }
+
+    private record RuntimeModelSelection(String modelProvider, String modelName) {
     }
 }

@@ -203,6 +203,8 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
     expression: string;
     timezone: string;
     endAt?: string;
+    modelProvider?: string;
+    modelName?: string;
     taskContent: string;
     status: string;
   }) {

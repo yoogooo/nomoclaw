@@ -14,6 +14,8 @@ public record CronJobDto(
         String expression,
         String timezone,
         String endAt,
+        String modelProvider,
+        String modelName,
         String taskContent,
         String status,
         String currentExecutionUid,

@@ -4,7 +4,9 @@ import { useI18n } from "vue-i18n";
 import { BellRing, Clock3 } from "lucide-vue-next";
 import { NButton, NForm, NFormItem, NInput, NInputNumber, NModal, NSelect } from "naive-ui";
 import { useCronJobsStore } from "@/stores/cronJobs";
+import { modelApi } from "@/api/modelApi";
 import type { CronJob } from "@/types/api";
+import type { ModelConfig } from "@/types/api";
 import { getSortLocale } from "@/i18n";
 import { humanizeCronExpression } from "@/utils/format";
 
@@ -24,6 +26,8 @@ const emit = defineEmits<{
     expression: string;
     timezone: string;
     endAt?: string;
+    modelProvider?: string;
+    modelName?: string;
     taskContent: string;
     status: string;
   }): void;
@@ -58,6 +62,8 @@ const form = reactive({
   taskContent: "",
   status: "ACTIVE",
   timezone: "Asia/Shanghai",
+  modelProvider: "",
+  modelName: "",
   executionType: "recurring" as ExecutionType,
   recurringMode: "day" as RecurringMode,
   time: "08:30",
@@ -80,6 +86,21 @@ const agentOptions = computed(() =>
     }))
   )
 );
+const modelConfig = ref<ModelConfig>({ providers: [] });
+const providerOptions = computed(() =>
+  modelConfig.value.providers
+    .filter((provider) => String(provider.id || "").trim())
+    .map((provider) => ({ label: provider.name || provider.id, value: provider.id }))
+);
+const modelOptions = computed(() => {
+  const provider = modelConfig.value.providers.find((item) => item.id === form.modelProvider);
+  if (!provider) {
+    return [];
+  }
+  return provider.models
+    .filter((model) => String(model.id || "").trim())
+    .map((model) => ({ label: model.name || model.id, value: model.id }));
+});
 const modalStyle = {
   width: "min(880px, calc(100vw - 32px))",
   height: "min(860px, calc(100dvh - 24px))",
@@ -216,10 +237,22 @@ watch(
     form.taskContent = job?.taskContent || "";
     form.status = job?.status || "ACTIVE";
     form.timezone = job?.timezone || "Asia/Shanghai";
+    form.modelProvider = job?.modelProvider || "";
+    form.modelName = job?.modelName || "";
     form.endAtLocal = toLocalDateTimeInput(job?.endAt || "");
     applyScheduleFromExpression(job?.expression || "");
+    applyDefaultModelSelection();
   },
   { immediate: true }
+);
+
+watch(
+  () => props.show,
+  async (show) => {
+    if (!show) return;
+    await loadModelConfig();
+    applyDefaultModelSelection();
+  }
 );
 
 watch(
@@ -314,6 +347,8 @@ function submit() {
     expression: scheduleExpression.value,
     timezone: form.timezone.trim(),
     endAt: form.executionType === "recurring" ? endAtValue.value : undefined,
+    modelProvider: form.modelProvider || undefined,
+    modelName: form.modelName || undefined,
     taskContent: form.taskContent.trim(),
     status: form.status
   });
@@ -535,6 +570,40 @@ function formatPreviewTime(value: Date) {
     hour12: false
   });
 }
+
+async function loadModelConfig() {
+  const available = await modelApi.getAvailableModelConfig();
+  modelConfig.value = available || { providers: [] };
+}
+
+function applyDefaultModelSelection() {
+  if (!providerOptions.value.length) {
+    form.modelProvider = "";
+    form.modelName = "";
+    return;
+  }
+  if (!providerOptions.value.some((item) => item.value === form.modelProvider)) {
+    form.modelProvider = String(providerOptions.value[0].value || "");
+  }
+  const currentModels = modelOptions.value;
+  if (!currentModels.length) {
+    form.modelName = "";
+    return;
+  }
+  if (!currentModels.some((item) => item.value === form.modelName)) {
+    form.modelName = String(currentModels[0].value || "");
+  }
+}
+
+watch(
+  () => form.modelProvider,
+  () => {
+    const currentModels = modelOptions.value;
+    if (!currentModels.some((item) => item.value === form.modelName)) {
+      form.modelName = currentModels.length ? String(currentModels[0].value || "") : "";
+    }
+  }
+);
 </script>
 
 <template>
@@ -567,6 +636,20 @@ function formatPreviewTime(value: Date) {
                 <n-input
                   v-model:value="form.title"
                   :placeholder="t('cron.form.taskTitlePlaceholder')"
+                />
+              </n-form-item>
+              <n-form-item :label="t('cron.form.modelProvider')">
+                <n-select
+                  v-model:value="form.modelProvider"
+                  :placeholder="t('cron.form.modelProviderPlaceholder')"
+                  :options="providerOptions"
+                />
+              </n-form-item>
+              <n-form-item :label="t('cron.form.modelName')">
+                <n-select
+                  v-model:value="form.modelName"
+                  :placeholder="t('cron.form.modelNamePlaceholder')"
+                  :options="modelOptions"
                 />
               </n-form-item>
             </div>

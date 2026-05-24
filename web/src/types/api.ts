@@ -500,6 +500,8 @@ export interface CronJob {
   expression: string;
   timezone: string;
   endAt?: string | null;
+  modelProvider?: string | null;
+  modelName?: string | null;
   taskContent: string;
   status: string;
   currentExecutionUid?: string | null;
