@@ -373,11 +373,11 @@ const enUS = {
       recurring: "Recurring"
     },
     recurringMode: {
-      minute: "By minute",
-      hour: "By hour",
-      day: "By day",
-      week: "By week",
-      month: "By month"
+      minute: "Minute",
+      hour: "Hourly",
+      day: "Daily",
+      week: "Weekly",
+      month: "Monthly"
     },
     validation: {
       pickDateTime: "Please select execution date and time",
