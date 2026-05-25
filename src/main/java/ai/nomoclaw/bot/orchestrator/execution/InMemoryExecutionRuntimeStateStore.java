@@ -19,6 +19,7 @@ public class InMemoryExecutionRuntimeStateStore implements ExecutionRuntimeState
     private final ConcurrentMap<String, MessageExecutionRuntimeState> executionStates = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, StringBuilder> streamingAnswerBuffers = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, String> messageApprovalModes = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, String> messageConversationMap = new ConcurrentHashMap<>();
 
     @Override
     public boolean start(String messageUid) {
@@ -76,11 +77,32 @@ public class InMemoryExecutionRuntimeStateStore implements ExecutionRuntimeState
     }
 
     @Override
+    public void bindConversation(String messageUid, String conversationUid) {
+        if (messageUid == null || messageUid.isBlank() || conversationUid == null || conversationUid.isBlank()) {
+            return;
+        }
+        messageConversationMap.put(messageUid, conversationUid);
+    }
+
+    @Override
+    public List<String> listActiveMessageUids(String conversationUid) {
+        if (conversationUid == null || conversationUid.isBlank()) {
+            return List.of();
+        }
+        return messageConversationMap.entrySet().stream()
+                .filter(entry -> conversationUid.equals(entry.getValue()))
+                .map(entry -> entry.getKey())
+                .filter(messageUid -> runningMessages.containsKey(messageUid) || executionStates.containsKey(messageUid))
+                .toList();
+    }
+
+    @Override
     public void clear(String messageUid) {
         // 终态统一清理，保证该 message 的运行态无残留。
         runningMessages.remove(messageUid);
         executionStates.remove(messageUid);
         streamingAnswerBuffers.remove(messageUid);
         messageApprovalModes.remove(messageUid);
+        messageConversationMap.remove(messageUid);
     }
 }

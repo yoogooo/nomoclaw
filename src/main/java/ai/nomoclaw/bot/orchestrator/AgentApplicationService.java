@@ -61,6 +61,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * Agent 领域应用层 Facade。
@@ -214,6 +215,10 @@ public class AgentApplicationService {
 
     public AgentMessage getMessage(String messageUid) {
         return conversationService.getMessage(messageUid);
+    }
+
+    public String updateConversationApprovalMode(String conversationUid, String approvalMode, boolean applyToRunning) {
+        return conversationService.updateApprovalMode(conversationUid, approvalMode, applyToRunning);
     }
 
     public int maxLoopRounds() {
@@ -371,8 +376,8 @@ public class AgentApplicationService {
             public RoundExecutionResult executeRound(AgentMessage message,
                                                      MessageExecutionRuntimeState state,
                                                      List<PlanStep> steps,
-                                                     String approvalMode) {
-                return AgentApplicationService.this.executeRound(message, state, steps, approvalMode);
+                                                     Supplier<String> approvalModeSupplier) {
+                return AgentApplicationService.this.executeRound(message, state, steps, approvalModeSupplier);
             }
 
             @Override
@@ -532,7 +537,7 @@ public class AgentApplicationService {
     private RoundExecutionResult executeRound(AgentMessage message,
                                               MessageExecutionRuntimeState state,
                                               List<PlanStep> steps,
-                                              String approvalMode) {
+                                              Supplier<String> approvalModeSupplier) {
         AgentConversation conversation = requireConversation(message.conversationUid());
         ExecutionScope executionScope = executionScopeResolver.resolveForExecution(conversation, message);
         AgentDefinitionEntity executionAgent = executionScope.executionAgent();
@@ -582,7 +587,7 @@ public class AgentApplicationService {
                     conversation,
                     executionAgent,
                     workspaceConfig,
-                    approvalMode
+                    approvalModeSupplier
             );
             StepExecutionService.StepExecutionOutcome outcome = stepExecutionService.executeStepWithRetry(
                     message,
@@ -954,6 +959,7 @@ public class AgentApplicationService {
         if (!APPROVAL_MODE_FULL_ACCESS.equals(approvalMode)) {
             return decision;
         }
+        // Keep hard guard behavior unchanged even under full access mode.
         if (decision.hardGuardHit()) {
             return decision;
         }

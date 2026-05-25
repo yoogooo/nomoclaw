@@ -31,5 +31,9 @@ public interface ExecutionRuntimeStateStore {
 
     String getApprovalMode(String messageUid, String defaultValue);
 
+    void bindConversation(String messageUid, String conversationUid);
+
+    List<String> listActiveMessageUids(String conversationUid);
+
     void clear(String messageUid);
 }

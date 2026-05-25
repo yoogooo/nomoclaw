@@ -33,6 +33,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 import java.time.Instant;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 /**
  * Executes a single step with retry/policy/progress handling and emits step events.
@@ -174,7 +175,7 @@ public class StepExecutionService {
                     message.conversationUid(),
                     message.messageUid()
             );
-            policyDecision = applyApprovalModeOverride(policyDecision, context.approvalMode());
+            policyDecision = applyApprovalModeOverride(policyDecision, context.approvalModeSupplier().get());
             if (policyDecision.denied()) {
                 // Return a tool-level failure result so reviewer + event flow remains unchanged.
                 ObjectNode metrics = JsonNodeFactory.instance.objectNode();
@@ -329,6 +330,7 @@ public class StepExecutionService {
         if (!APPROVAL_MODE_FULL_ACCESS.equals(approvalMode)) {
             return decision;
         }
+        // Keep hard guard behavior unchanged even under full access mode.
         if (decision.hardGuardHit()) {
             return decision;
         }
@@ -407,7 +409,7 @@ public class StepExecutionService {
     public record RuntimeContext(AgentConversation conversation,
                                  AgentDefinitionEntity executionAgent,
                                  AgentWorkspaceConfig workspaceConfig,
-                                 String approvalMode) {
+                                 Supplier<String> approvalModeSupplier) {
     }
 
     public record StepExecutionOutcome(boolean canceled, ToolResult toolResult, String memoryText, ChatMessage injectedMemoryMessage) {

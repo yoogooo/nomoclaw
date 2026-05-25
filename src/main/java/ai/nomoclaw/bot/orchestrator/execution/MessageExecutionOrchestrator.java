@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Supplier;
 
 /**
  * Message 执行主循环编排器。
@@ -31,8 +32,9 @@ public class MessageExecutionOrchestrator {
         this.runtimeStateStore = runtimeStateStore;
     }
 
-    public void enqueue(String messageUid, Locale locale, String approvalMode, ExecutionDriver driver) {
+    public void enqueue(String messageUid, String conversationUid, Locale locale, String approvalMode, ExecutionDriver driver) {
         // approvalMode 在 submit 阶段写入，后续 round 执行时按 messageUid 读取。
+        runtimeStateStore.bindConversation(messageUid, conversationUid);
         runtimeStateStore.setApprovalMode(messageUid, approvalMode);
         runAsync(messageUid, locale, driver);
     }
@@ -61,6 +63,15 @@ public class MessageExecutionOrchestrator {
 
     public String approvalMode(String messageUid, String defaultValue) {
         return runtimeStateStore.getApprovalMode(messageUid, defaultValue);
+    }
+
+    public void updateApprovalModeForConversation(String conversationUid, String approvalMode) {
+        if (conversationUid == null || conversationUid.isBlank()) {
+            return;
+        }
+        for (String messageUid : runtimeStateStore.listActiveMessageUids(conversationUid)) {
+            runtimeStateStore.setApprovalMode(messageUid, approvalMode);
+        }
     }
 
     private void runAsync(String messageUid, Locale locale, ExecutionDriver driver) {
@@ -120,8 +131,8 @@ public class MessageExecutionOrchestrator {
                     roundSteps = planningResult.steps();
                 }
 
-                String approvalMode = runtimeStateStore.getApprovalMode(messageUid, driver.defaultApprovalMode());
-                RoundExecutionResult executionResult = driver.executeRound(message, state, roundSteps, approvalMode);
+                Supplier<String> approvalModeSupplier = () -> runtimeStateStore.getApprovalMode(messageUid, driver.defaultApprovalMode());
+                RoundExecutionResult executionResult = driver.executeRound(message, state, roundSteps, approvalModeSupplier);
                 if (executionResult.waitingApproval()) {
                     // WAITING_APPROVAL 需要释放 running 标记，等待外部 approve/reject 触发 resume。
                     runtimeStateStore.finish(messageUid);
@@ -163,7 +174,7 @@ public class MessageExecutionOrchestrator {
         RoundExecutionResult executeRound(AgentMessage message,
                                           MessageExecutionRuntimeState state,
                                           List<PlanStep> steps,
-                                          String approvalMode);
+                                          Supplier<String> approvalModeSupplier);
 
         boolean isCanceled(String messageUid, MessageStatus status);
 

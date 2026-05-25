@@ -1,6 +1,7 @@
 package ai.nomoclaw.bot.orchestrator;
 
 import ai.nomoclaw.bot.model.AgentEvent;
+import ai.nomoclaw.bot.model.AgentEventType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
@@ -30,8 +31,10 @@ public class AgentEventBus {
 
     public void publish(AgentEvent event) {
         List<SseEmitter> emitters = emittersByConversation.getOrDefault(event.conversationUid(), List.of());
-        log.info("[SSE] publish eventType={} conversationUid={} messageUid={} stepUid={} subscribers={}",
-                event.eventType(), event.conversationUid(), event.messageUid(), event.stepUid(), emitters.size());
+        if (event.eventType() != AgentEventType.MESSAGE_DELTA) {
+            log.info("[SSE] publish eventType={} conversationUid={} messageUid={} stepUid={} subscribers={}",
+                    event.eventType(), event.conversationUid(), event.messageUid(), event.stepUid(), emitters.size());
+        }
         for (SseEmitter emitter : emitters) {
             try {
                 emitter.send(SseEmitter.event()

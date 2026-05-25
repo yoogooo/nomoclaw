@@ -23,6 +23,7 @@ public class PermissionEngine {
             "memorysearchtool",
             "currenttimetool",
             "tokenusagetool",
+            "readfiletool",
             "filesearchtool",
             "greptool",
             "imageloadertool",

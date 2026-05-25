@@ -214,13 +214,23 @@ public class ConversationService {
         if (beforeExecuteHook != null) {
             beforeExecuteHook.accept(messageUid);
         }
-        messageExecutionOrchestrator.enqueue(messageUid, LocaleContextHolder.getLocale(), normalizedApprovalMode, executionDriver);
+        messageExecutionOrchestrator.enqueue(messageUid, conversationUid, LocaleContextHolder.getLocale(), normalizedApprovalMode, executionDriver);
         return messageUid;
     }
 
     public AgentMessage getMessage(String messageUid) {
         return store.findMessage(messageUid)
                 .orElseThrow(() -> new IllegalArgumentException("message not found: " + messageUid));
+    }
+
+    public String updateApprovalMode(String conversationUid, String approvalMode, boolean applyToRunning) {
+        store.findConversation(conversationUid)
+                .orElseThrow(() -> new IllegalArgumentException("conversation not found: " + conversationUid));
+        String normalized = normalizeApprovalMode(approvalMode);
+        if (applyToRunning) {
+            messageExecutionOrchestrator.updateApprovalModeForConversation(conversationUid, normalized);
+        }
+        return normalized;
     }
 
     public int maxLoopRounds() {

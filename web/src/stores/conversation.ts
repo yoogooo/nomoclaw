@@ -231,9 +231,16 @@ export const useConversationStore = defineStore("conversation", () => {
     if (!currentConversationUid.value) {
       return;
     }
+    const conversationUid = currentConversationUid.value;
     const map = loadApprovalModeMap();
-    map[currentConversationUid.value] = mode;
+    map[conversationUid] = mode;
     saveApprovalModeMap(map);
+    void conversationApi.updateApprovalMode(conversationUid, {
+      approvalMode: mode,
+      applyToRunning: true
+    }).catch((err) => {
+      console.warn("[conversation] update approval mode failed", err);
+    });
   }
 
   const filteredConversations = computed(() =>

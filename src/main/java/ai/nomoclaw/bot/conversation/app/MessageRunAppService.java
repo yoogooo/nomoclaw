@@ -42,6 +42,10 @@ public class MessageRunAppService {
         return facade.getMessage(messageUid);
     }
 
+    public String updateApprovalMode(String conversationUid, String approvalMode, boolean applyToRunning) {
+        return facade.updateConversationApprovalMode(conversationUid, approvalMode, applyToRunning);
+    }
+
     public int maxLoopRounds() {
         return facade.maxLoopRounds();
     }

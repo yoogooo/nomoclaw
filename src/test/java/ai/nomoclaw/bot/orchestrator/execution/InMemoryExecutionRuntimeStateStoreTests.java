@@ -20,10 +20,12 @@ class InMemoryExecutionRuntimeStateStoreTests {
         assertTrue(store.isRunning("msg-1"));
 
         store.setApprovalMode("msg-1", "full_access");
+        store.bindConversation("msg-1", "conv-1");
         store.appendDelta("msg-1", "hello");
         store.getOrCreateState("msg-1", List.of(UserMessage.from("hi"))).advanceRound();
 
         assertEquals("full_access", store.getApprovalMode("msg-1", "default"));
+        assertEquals(List.of("msg-1"), store.listActiveMessageUids("conv-1"));
         assertEquals("hello", store.getBufferedAnswer("msg-1"));
         assertEquals(2, store.currentRound("msg-1", 1));
 
@@ -31,6 +33,7 @@ class InMemoryExecutionRuntimeStateStoreTests {
 
         assertFalse(store.isRunning("msg-1"));
         assertEquals("default", store.getApprovalMode("msg-1", "default"));
+        assertTrue(store.listActiveMessageUids("conv-1").isEmpty());
         assertEquals("", store.getBufferedAnswer("msg-1"));
         assertEquals(1, store.currentRound("msg-1", 1));
     }

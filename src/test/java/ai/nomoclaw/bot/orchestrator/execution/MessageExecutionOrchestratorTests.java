@@ -10,10 +10,32 @@ import org.springframework.core.task.SyncTaskExecutor;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class MessageExecutionOrchestratorTests {
+
+    @Test
+    void shouldUpdateApprovalModeForActiveMessagesInConversation() {
+        InMemoryExecutionRuntimeStateStore store = new InMemoryExecutionRuntimeStateStore();
+        MessageExecutionOrchestrator orchestrator = new MessageExecutionOrchestrator(new SyncTaskExecutor(), store);
+        store.bindConversation("msg-1", "conv-1");
+        store.bindConversation("msg-2", "conv-1");
+        store.bindConversation("msg-3", "conv-2");
+        store.setApprovalMode("msg-1", "default");
+        store.setApprovalMode("msg-2", "default");
+        store.setApprovalMode("msg-3", "default");
+        store.start("msg-1");
+        store.getOrCreateState("msg-2", List.of());
+        store.start("msg-3");
+
+        orchestrator.updateApprovalModeForConversation("conv-1", "full_access");
+
+        assertEquals("full_access", store.getApprovalMode("msg-1", "default"));
+        assertEquals("full_access", store.getApprovalMode("msg-2", "default"));
+        assertEquals("default", store.getApprovalMode("msg-3", "default"));
+    }
 
     @Test
     void shouldRunOnlyOnceWhenNestedResumeOnSameMessage() {
@@ -74,7 +96,7 @@ class MessageExecutionOrchestratorTests {
             public RoundExecutionResult executeRound(AgentMessage message,
                                                      MessageExecutionRuntimeState state,
                                                      List<PlanStep> steps,
-                                                     String approvalMode) {
+                                                     Supplier<String> approvalModeSupplier) {
                 return RoundExecutionResult.success();
             }
 
@@ -114,7 +136,7 @@ class MessageExecutionOrchestratorTests {
             }
         };
 
-        orchestrator.enqueue("msg-1", null, "default", driver);
+        orchestrator.enqueue("msg-1", "conv-1", null, "default", driver);
 
         assertEquals(1, executeCount.get());
     }

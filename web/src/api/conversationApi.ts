@@ -261,6 +261,16 @@ export const conversationApi = {
       body: JSON.stringify(payload)
     });
   },
+  updateApprovalMode(conversationUid: string, payload: {
+    approvalMode: "default" | "full_access";
+    applyToRunning?: boolean;
+  }) {
+    return requestJson<SimpleResponse>(`/api/conversations/${conversationUid}/approval-mode`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+  },
   approveStep(conversationUid: string, stepUid: string) {
     return requestJson<SimpleResponse>(`/api/conversations/${conversationUid}/approvals/${stepUid}`, {
       method: "POST",

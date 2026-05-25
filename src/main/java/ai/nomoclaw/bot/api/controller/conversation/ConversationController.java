@@ -4,6 +4,7 @@ import ai.nomoclaw.bot.api.dto.common.response.SimpleResponse;
 import ai.nomoclaw.bot.api.dto.conversation.request.ApprovalDecisionRequest;
 import ai.nomoclaw.bot.api.dto.conversation.request.CreateConversationRequest;
 import ai.nomoclaw.bot.api.dto.conversation.request.MessageRequest;
+import ai.nomoclaw.bot.api.dto.conversation.request.UpdateApprovalModeRequest;
 import ai.nomoclaw.bot.api.dto.conversation.request.UpdateConversationPinnedRequest;
 import ai.nomoclaw.bot.api.dto.conversation.request.UpdateConversationTitleRequest;
 import ai.nomoclaw.bot.api.dto.conversation.response.ApprovalDecisionResponse;
@@ -130,6 +131,18 @@ public class ConversationController {
         log.info("[AgentAPI] submitMessage accepted conversationUid={} messageUid={} round={}/{}",
                 conversationUid, messageUid, 1, maxRounds);
         return new MessageResponse(messageUid, "accepted", 1, maxRounds, null);
+    }
+
+    @PatchMapping("/conversations/{conversationUid}/approval-mode")
+    public SimpleResponse updateApprovalMode(@PathVariable String conversationUid,
+                                             @RequestBody(required = false) UpdateApprovalModeRequest request) {
+        String normalized = messageRunAppService.updateApprovalMode(
+                conversationUid,
+                request == null ? "default" : request.approvalMode(),
+                request == null || request.applyToRunning() == null || request.applyToRunning()
+        );
+        log.info("[AgentAPI] updateApprovalMode conversationUid={} mode={}", conversationUid, normalized);
+        return new SimpleResponse(normalized);
     }
 
     @PostMapping(value = "/conversations/{conversationUid}/uploads", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
