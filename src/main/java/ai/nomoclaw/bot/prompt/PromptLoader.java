@@ -81,6 +81,16 @@ public final class PromptLoader {
         builder.append("# ENVIRONMENT\n");
         builder.append(renderEnvContext(context)).append("\n\n");
 
+        builder.append("# REPORT_OUTPUT_STRUCTURE (MUST)\n");
+        builder.append("""
+                - Do not write report files directly under `report/` root (for example `report/*.md`), unless the user explicitly requires that exact path.
+                - You MUST organize report outputs as: `report/<topic>/<yyyy-mm-dd>/<hhmm>-<short-task>.md`
+                - `<topic>` and `<short-task>` MUST use concise kebab-case.
+                - Multiple files generated in the same task should be placed under the same `<topic>/<yyyy-mm-dd>/` directory.
+                - Always create missing directories before writing report files.
+                - If the user explicitly provides a custom output path, follow the user's instruction.
+                """.trim()).append("\n\n");
+
         builder.append("[内置工具]\n\n");
         if (builtinToolsPrompt != null && !builtinToolsPrompt.isBlank()) {
             builder.append(builtinToolsPrompt.trim()).append("\n\n");
@@ -116,6 +126,7 @@ public final class PromptLoader {
                   4. 截图、下载、中间素材、临时文件统一放 tmp/
                   5. 最终交付给用户的成品统一放 report/
                   6. 需要发送文件时，优先发送 report/ 下的文件
+                  7. report/ 目录禁止平铺，必须按 topic/date 分层
                 ====================
                 """.formatted(
                 CURRENT_OS_CONTEXT,
