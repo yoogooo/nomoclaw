@@ -89,6 +89,13 @@ llm:
   provider: dashscope
   timeout: 180s
   max-retries: 1
+  debug:
+    enabled: true
+    file-path: "logs/llm-debug.jsonl"
+    max-chars-per-field: 200000
+    redact-enabled: true
+    include-response-text: true
+    max-file-size-bytes: 52428800
   codex:
     model-name: gpt-5.5
     instructions: "You are a task planner and execution assistant."

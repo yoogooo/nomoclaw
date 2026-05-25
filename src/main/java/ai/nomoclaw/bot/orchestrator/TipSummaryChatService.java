@@ -1,12 +1,15 @@
 package ai.nomoclaw.bot.orchestrator;
 
+import ai.nomoclaw.bot.llm.debug.LlmDebugLogger;
 import ai.nomoclaw.bot.planner.RuntimeChatModelResolver;
 import ai.nomoclaw.bot.prompt.PromptLoader;
 import ai.nomoclaw.bot.prompt.PromptTemplateService;
 import ai.nomoclaw.bot.util.JsonUtil;
+import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.request.ToolChoice;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +21,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
 @Service
 @Slf4j
@@ -59,16 +63,19 @@ public class TipSummaryChatService {
 
     private final RuntimeChatModelResolver runtimeChatModelResolver;
     private final PromptTemplateService promptTemplateService;
+    private final LlmDebugLogger llmDebugLogger;
 
     protected TipSummaryChatService(RuntimeChatModelResolver runtimeChatModelResolver) {
-        this(runtimeChatModelResolver, null);
+        this(runtimeChatModelResolver, null, new NoopLlmDebugLogger());
     }
 
     @Autowired
     public TipSummaryChatService(RuntimeChatModelResolver runtimeChatModelResolver,
-                                 PromptTemplateService promptTemplateService) {
+                                 PromptTemplateService promptTemplateService,
+                                 LlmDebugLogger llmDebugLogger) {
         this.runtimeChatModelResolver = runtimeChatModelResolver;
         this.promptTemplateService = promptTemplateService;
+        this.llmDebugLogger = llmDebugLogger;
     }
 
     public TipEvaluationResult evaluate(PromptLoader.PromptContext promptContext,
@@ -85,6 +92,19 @@ public class TipSummaryChatService {
                         UserMessage.from(prompt)
                 ))
                 .build();
+        String requestId = UUID.randomUUID().toString();
+        long startNanos = System.nanoTime();
+        llmDebugLogger.logRequest(
+                requestId,
+                "tip_summary",
+                resolvedModel.providerId(),
+                resolvedModel.modelId(),
+                promptContext,
+                systemPrompt,
+                request.messages(),
+                null,
+                List.of()
+        );
         log.info("[TipSummaryChat] start provider={} model={} sessionId={} messageUid={}",
                 resolvedModel.providerId(),
                 resolvedModel.modelId(),
@@ -96,13 +116,39 @@ public class TipSummaryChatService {
                 currentRequestHeader("X-App-Locale"));
         log.info("[TipSummaryChat] systemPrompt:\n{}", systemPrompt);
         log.info("[TipSummaryChat] userPrompt:\n{}", prompt);
-        ChatResponse response = resolvedModel.model().chat(request);
-        String output = response.aiMessage() == null ? "" : response.aiMessage().text();
-        log.info("[TipSummaryChat] finish provider={} model={} outputLength={}",
-                resolvedModel.providerId(),
-                resolvedModel.modelId(),
-                output == null ? 0 : output.length());
-        return parseEvaluationResult(output, recentMessages, steps, finalResult);
+        try {
+            ChatResponse response = resolvedModel.model().chat(request);
+            llmDebugLogger.logResponse(requestId, "tip_summary", resolvedModel.providerId(), resolvedModel.modelId(),
+                    promptContext, response, elapsedMillis(startNanos));
+            String output = response.aiMessage() == null ? "" : response.aiMessage().text();
+            log.info("[TipSummaryChat] finish provider={} model={} outputLength={}",
+                    resolvedModel.providerId(),
+                    resolvedModel.modelId(),
+                    output == null ? 0 : output.length());
+            return parseEvaluationResult(output, recentMessages, steps, finalResult);
+        } catch (Exception ex) {
+            llmDebugLogger.logError(requestId, "tip_summary", resolvedModel.providerId(), resolvedModel.modelId(),
+                    promptContext, ex, elapsedMillis(startNanos));
+            throw ex;
+        }
+    }
+
+    private long elapsedMillis(long startNanos) {
+        return (System.nanoTime() - startNanos) / 1_000_000L;
+    }
+
+    private static final class NoopLlmDebugLogger implements LlmDebugLogger {
+        @Override
+        public void logRequest(String requestId, String scene, String provider, String model, PromptLoader.PromptContext promptContext, String systemPrompt, List<ChatMessage> messages, ToolChoice toolChoice, List<String> toolNames) {
+        }
+
+        @Override
+        public void logResponse(String requestId, String scene, String provider, String model, PromptLoader.PromptContext promptContext, ChatResponse response, long latencyMs) {
+        }
+
+        @Override
+        public void logError(String requestId, String scene, String provider, String model, PromptLoader.PromptContext promptContext, Throwable error, long latencyMs) {
+        }
     }
 
     private String buildEvaluationPrompt(List<RecentMessage> recentMessages,
