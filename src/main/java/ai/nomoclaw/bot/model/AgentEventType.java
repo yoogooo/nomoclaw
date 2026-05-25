@@ -2,6 +2,7 @@ package ai.nomoclaw.bot.model;
 
 public enum AgentEventType {
     MESSAGE_DELTA,
+    MESSAGE_REASONING,
     PLAN_CREATED,
     STEP_STARTED,
     STEP_WAITING_APPROVAL,

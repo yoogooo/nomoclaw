@@ -63,6 +63,8 @@ import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+import static org.apache.commons.lang3.StringUtils.abbreviate;
+
 /**
  * Agent 领域应用层 Facade。
  *
@@ -499,6 +501,10 @@ public class AgentApplicationService {
             return RoundPlanningResult.completed("模型未返回有效内容。");
         }
 
+        if (aiMessage.hasToolExecutionRequests()) {
+            persistReasoningSnapshot(message, roundIndex, streamedResult.accumulatedText(), aiMessage.text());
+        }
+
         if (hasMeaningfulText(aiMessage.text()) || aiMessage.hasToolExecutionRequests()) {
             state.memory().add(aiMessage);
         }
@@ -797,16 +803,22 @@ public class AgentApplicationService {
         payload.put("accumulatedText", accumulatedText == null ? "" : accumulatedText);
         payload.put("roundIndex", roundIndex);
         payload.put("done", done);
-        AgentEvent event = new AgentEvent(
-                UUID.randomUUID().toString(),
-                AgentEventType.MESSAGE_DELTA,
-                message.conversationUid(),
-                message.messageUid(),
-                null,
-                Instant.now(),
-                payload
-        );
-        eventBus.publish(event);
+        publishTransientEvent(AgentEventType.MESSAGE_DELTA, message.conversationUid(), message.messageUid(), null, payload);
+    }
+
+    private void persistReasoningSnapshot(AgentMessage message, int roundIndex, String streamedText, String aiText) {
+        String reasoning = nullToEmpty(streamedText).trim();
+        if (reasoning.isBlank()) {
+            reasoning = nullToEmpty(aiText).trim();
+        }
+        if (reasoning.isBlank()) {
+            return;
+        }
+        ObjectNode payload = basePayload("message reasoning snapshot");
+        payload.put("roundIndex", roundIndex);
+        payload.put("content", abbreviate(reasoning, 32 * 1024));
+        payload.put("chars", reasoning.length());
+        publishEvent(AgentEventType.MESSAGE_REASONING, message.conversationUid(), message.messageUid(), null, payload);
     }
 
     private void publishEvent(AgentEventType type, String conversationUid, String messageUid, String stepUid, ObjectNode payload) {
@@ -820,6 +832,19 @@ public class AgentApplicationService {
                 payload
         );
         store.appendEvent(event);
+        eventBus.publish(event);
+    }
+
+    private void publishTransientEvent(AgentEventType type, String conversationUid, String messageUid, String stepUid, ObjectNode payload) {
+        AgentEvent event = new AgentEvent(
+                UUID.randomUUID().toString(),
+                type,
+                conversationUid,
+                messageUid,
+                stepUid,
+                Instant.now(),
+                payload
+        );
         eventBus.publish(event);
     }
 
