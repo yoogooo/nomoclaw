@@ -792,7 +792,16 @@ public class AgentApplicationService {
         payload.put("accumulatedText", accumulatedText == null ? "" : accumulatedText);
         payload.put("roundIndex", roundIndex);
         payload.put("done", done);
-        publishEvent(AgentEventType.MESSAGE_DELTA, message.conversationUid(), message.messageUid(), null, payload);
+        AgentEvent event = new AgentEvent(
+                UUID.randomUUID().toString(),
+                AgentEventType.MESSAGE_DELTA,
+                message.conversationUid(),
+                message.messageUid(),
+                null,
+                Instant.now(),
+                payload
+        );
+        eventBus.publish(event);
     }
 
     private void publishEvent(AgentEventType type, String conversationUid, String messageUid, String stepUid, ObjectNode payload) {
