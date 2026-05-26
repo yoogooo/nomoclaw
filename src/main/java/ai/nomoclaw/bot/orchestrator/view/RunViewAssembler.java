@@ -58,6 +58,20 @@ public class RunViewAssembler {
         Instant updatedTime = message.createdAt();
         for (AgentEvent event : safeEvents) {
             updatedTime = event.timestamp();
+            if (event.eventType() == AgentEventType.MESSAGE_REASONING) {
+                int roundIndex = event.payload() == null ? 1 : event.payload().path("roundIndex").asInt(1);
+                String virtualStepUid = reasoningStepUid(message.messageUid(), roundIndex);
+                RunStepAccumulator accumulator = stepMap.computeIfAbsent(virtualStepUid, ignored -> RunStepAccumulator.empty(virtualStepUid));
+                accumulator.roundIndex = roundIndex;
+                accumulator.stepIndex = 0;
+                accumulator.status = "completed";
+                accumulator.toolName = "Reasoning";
+                accumulator.displayTitle = "思考过程 / Reasoning";
+                accumulator.displaySummary = "模型思考摘要";
+                accumulator.displayDetails = event.payload() == null ? "" : event.payload().path("content").asText("");
+                accumulator.updatedTime = event.timestamp();
+                continue;
+            }
             if (event.eventType() == AgentEventType.PLAN_CREATED) {
                 JsonNode displaySteps = event.payload() == null ? null : event.payload().path("displaySteps");
                 if (displaySteps != null && displaySteps.isArray()) {
@@ -148,6 +162,10 @@ public class RunViewAssembler {
             return "completed";
         }
         return currentStatus == null || currentStatus.isBlank() ? "planned" : currentStatus;
+    }
+
+    private String reasoningStepUid(String messageUid, int roundIndex) {
+        return "reasoning-" + messageUid + "-" + roundIndex;
     }
 
     private static final class RunStepAccumulator {

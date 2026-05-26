@@ -1134,6 +1134,22 @@ export const useConversationStore = defineStore("conversation", () => {
     });
   }
 
+  function handleReasoningEvent(event: AgentEvent) {
+    if (!event.messageUid) return;
+    const roundIndex = Number(event.payload.roundIndex || 1);
+    const stepUid = `reasoning-${event.messageUid}-${roundIndex}`;
+    conversationRunsStore.updateRunStep(event.messageUid, stepUid, {
+      roundIndex,
+      stepIndex: 0,
+      status: "completed",
+      toolName: "Reasoning",
+      displayTitle: "思考过程 / Reasoning",
+      displaySummary: "模型思考摘要",
+      displayDetails: String(event.payload.content || ""),
+      updatedTime: new Date().toISOString()
+    });
+  }
+
   function showApprovalAlert(event: AgentEvent) {
     const rendered = resolveApprovalFromPayload(event.payload || {});
     approval.value = {
@@ -1181,6 +1197,10 @@ export const useConversationStore = defineStore("conversation", () => {
       runtimeLogStore.append(tr("chat.runtime.modelToolCall", { round: event.payload.roundIndex || 1 }));
       renderPlanSteps(event.payload.steps || []);
       handlePlanCreated(event);
+      return;
+    }
+    if (type === "MESSAGE_REASONING") {
+      handleReasoningEvent(event);
       return;
     }
     if (type === "STEP_WAITING_APPROVAL") {

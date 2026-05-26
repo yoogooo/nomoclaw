@@ -4,7 +4,11 @@ import { tr } from "@/i18n";
 import type { ConversationMessageRun, ConversationRunStep } from "@/types/api";
 
 function normalizeRunSummary(run: ConversationMessageRun) {
-  const steps = run.steps || [];
+  const steps = [...(run.steps || [])].sort(
+    (a, b) => Number(a.roundIndex || 0) - Number(b.roundIndex || 0)
+      || Number(a.stepIndex || 0) - Number(b.stepIndex || 0)
+  );
+  run.steps = steps;
   const completedSteps = steps.filter((step) => step.status === "completed").length;
   let status = run.status || "planned";
 

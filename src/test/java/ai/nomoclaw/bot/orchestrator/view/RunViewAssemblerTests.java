@@ -24,6 +24,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RunViewAssemblerTests {
 
@@ -101,5 +102,83 @@ class RunViewAssemblerTests {
         assertEquals(1, run.totalSteps());
         assertEquals("正在处理，已完成 0/1 步", run.summary());
         assertEquals("running", run.steps().get(0).status());
+    }
+
+    @Test
+    void shouldInjectReasoningVirtualStepBeforeToolStepsInSameRound() {
+        LocaleContextHolder.setLocale(Locale.SIMPLIFIED_CHINESE);
+        PlanStep step = new PlanStep(
+                "step-tool-1",
+                2,
+                1,
+                "执行命令: ls",
+                "CommandTool",
+                JsonNodeFactory.instance.objectNode().put("command", "ls"),
+                RiskLevel.LOW,
+                "",
+                StepStatus.CREATED,
+                0,
+                null,
+                null,
+                ApprovalStatus.NONE
+        );
+        AgentMessage message = new AgentMessage(
+                "msg-2",
+                "conv-2",
+                null,
+                "user",
+                "hello",
+                MessageStatus.RUNNING,
+                "",
+                "",
+                0,
+                0,
+                0,
+                0,
+                Instant.now(),
+                Instant.now()
+        );
+
+        ObjectNode reasoningPayload = JsonNodeFactory.instance.objectNode();
+        reasoningPayload.put("roundIndex", 2);
+        reasoningPayload.put("content", "先思考再执行。");
+        AgentEvent reasoningEvent = new AgentEvent(
+                UUID.randomUUID().toString(),
+                AgentEventType.MESSAGE_REASONING,
+                "conv-2",
+                "msg-2",
+                "",
+                Instant.now(),
+                reasoningPayload
+        );
+
+        ObjectNode startedPayload = JsonNodeFactory.instance.objectNode();
+        startedPayload.put("stepUid", "step-tool-1");
+        startedPayload.put("roundIndex", 2);
+        startedPayload.put("stepIndex", 1);
+        startedPayload.put("status", "running");
+        startedPayload.put("toolName", "CommandTool");
+        startedPayload.set("toolArgs", JsonNodeFactory.instance.objectNode().put("command", "ls"));
+        startedPayload.put("displayTitle", "正在执行命令: ls");
+        startedPayload.put("displaySummary", "正在执行");
+        startedPayload.put("displayDetails", "系统正在执行本地命令“ls”。");
+        AgentEvent startedEvent = new AgentEvent(
+                UUID.randomUUID().toString(),
+                AgentEventType.STEP_STARTED,
+                "conv-2",
+                "msg-2",
+                "step-tool-1",
+                Instant.now(),
+                startedPayload
+        );
+
+        var run = assembler.toMessageRunResponse(message, List.of(step), List.of(reasoningEvent, startedEvent));
+
+        assertNotNull(run);
+        assertEquals(2, run.steps().size());
+        assertEquals(0, run.steps().get(0).stepIndex());
+        assertEquals("Reasoning", run.steps().get(0).toolName());
+        assertTrue(run.steps().get(0).displayDetails().contains("先思考再执行"));
+        assertEquals("step-tool-1", run.steps().get(1).stepUid());
     }
 }

@@ -53,7 +53,9 @@ const messageListRef = ref<HTMLElement | null>(null);
 const shouldScrollToBottomOnNextRender = ref(true);
 const userMessageCollapseLineLimit = 10;
 const runOutputCollapsedLineLimit = 20;
+const showReasoningStorageKey = "chat:show-reasoning-steps";
 const runStepRenderCache = new Map<string, RunStepRenderData>();
+const showReasoningSteps = ref(true);
 const savedTipMessageUidSet = computed(() => {
   const uidSet = new Set<string>();
   for (const tip of jinnangStore.tips) {
@@ -129,6 +131,24 @@ function runTone(status: string) {
   if (status === "waiting_approval") return "warning";
   if (status === "running") return "info";
   return "default";
+}
+
+function isReasoningStep(step: ConversationRunStep) {
+  const stepUid = (step.stepUid || "").toLowerCase();
+  return (step.toolName || "") === "Reasoning" || stepUid.startsWith("reasoning-");
+}
+
+function runStepTone(step: ConversationRunStep) {
+  if (isReasoningStep(step)) return "default";
+  return runTone(step.status);
+}
+
+function visibleRunSteps(messageUid: string) {
+  const steps = conversationRunsStore.runsByMessageUid[messageUid]?.steps || [];
+  if (showReasoningSteps.value) {
+    return steps;
+  }
+  return steps.filter((step) => !isReasoningStep(step));
 }
 
 function runStatusText(status: string) {
@@ -568,8 +588,18 @@ watch(
 );
 
 onMounted(() => {
+  const savedShowReasoningSteps = window.localStorage.getItem(showReasoningStorageKey);
+  if (savedShowReasoningSteps === "0") {
+    showReasoningSteps.value = false;
+  } else if (savedShowReasoningSteps === "1") {
+    showReasoningSteps.value = true;
+  }
   void scrollToConversationBottom();
   shouldScrollToBottomOnNextRender.value = false;
+});
+
+watch(showReasoningSteps, (value) => {
+  window.localStorage.setItem(showReasoningStorageKey, value ? "1" : "0");
 });
 </script>
 
@@ -719,7 +749,16 @@ onMounted(() => {
             <n-collapse>
               <n-collapse-item :name="`run-${message.messageUid}`">
                 <template #header>
-                  <div class="run-title">{{ t("chat.messages.runTitle") }}</div>
+                  <div class="run-header">
+                    <div class="run-title">{{ t("chat.messages.runTitle") }}</div>
+                    <button
+                      class="run-reasoning-toggle"
+                      type="button"
+                      @click.stop="showReasoningSteps = !showReasoningSteps"
+                    >
+                      {{ showReasoningSteps ? "隐藏思考过程" : "显示思考过程" }}
+                    </button>
+                  </div>
                 </template>
                 <template #header-extra>
                   <n-tag size="small" :type="runTone(conversationRunsStore.runsByMessageUid[message.messageUid].status)">
@@ -729,13 +768,13 @@ onMounted(() => {
                 <div class="run-summary">{{ conversationRunsStore.runsByMessageUid[message.messageUid].summary }}</div>
                 <n-collapse class="run-steps-collapse">
                   <n-collapse-item
-                    v-for="(step, stepPosition) in conversationRunsStore.runsByMessageUid[message.messageUid].steps"
+                    v-for="(step, stepPosition) in visibleRunSteps(message.messageUid)"
                     :key="step.stepUid"
                     :title="`${stepPosition + 1}. ${step.displayTitle}`"
                     :name="step.stepUid"
                   >
                     <template #header-extra>
-                      <n-tag size="small" :type="runTone(step.status)">{{ runStatusText(step.status) }}</n-tag>
+                      <n-tag size="small" :type="runStepTone(step)">{{ runStatusText(step.status) }}</n-tag>
                     </template>
                     <template v-if="getRunStepRenderData(step).isCommand">
                       <div class="run-command-blocks">
@@ -1249,13 +1288,35 @@ onMounted(() => {
 }
 
 .run-title {
-  width: 100%;
+  flex: 1;
   text-align: left;
   font-size: var(--text-body-size);
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-muted);
+}
+
+.run-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.run-reasoning-toggle {
+  border: none;
+  background: transparent;
+  color: var(--color-text-brand-strong);
+  font-size: var(--text-caption-size);
+  line-height: 1.2;
+  cursor: pointer;
+  padding: 0;
+}
+
+.run-reasoning-toggle:hover {
+  color: var(--color-text-brand);
 }
 
 .run-summary {
