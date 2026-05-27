@@ -56,6 +56,11 @@ export const conversationApi = {
       body: JSON.stringify({ pinned })
     });
   },
+  markConversationRead(conversationUid: string) {
+    return requestJson<SimpleResponse>(`/api/conversations/${conversationUid}/read`, {
+      method: "PATCH"
+    });
+  },
   listAgentGroups() {
     return requestJson<AgentCatalogGroup[]>("/api/agent-groups");
   },

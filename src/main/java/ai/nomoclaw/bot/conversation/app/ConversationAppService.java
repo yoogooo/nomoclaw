@@ -45,4 +45,8 @@ public class ConversationAppService {
     public void updateConversationPinned(String conversationUid, boolean pinned) {
         facade.updateConversationPinned(conversationUid, pinned);
     }
+
+    public void markConversationRead(String conversationUid) {
+        facade.markConversationRead(conversationUid);
+    }
 }

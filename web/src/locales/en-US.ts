@@ -176,6 +176,7 @@ const enUS = {
       pin: "Pin",
       unpin: "Unpin",
       pinned: "Pinned",
+      unreadHint: "Unread updates",
       rename: "Rename",
       renamePrompt: "Enter a new conversation name",
       delete: "Delete"

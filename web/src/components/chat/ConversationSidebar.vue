@@ -299,6 +299,7 @@ function isCronConversation(conversationUid: string) {
                   <Clock3 :size="12" />
                 </span>
                 <span class="conversation-title-text">{{ item.title || t("chat.sidebar.unnamed") }}</span>
+                <span v-if="item.unread" class="conversation-unread-dot" :title="t('chat.sidebar.unreadHint')" aria-label="unread" />
               </div>
             </button>
             <div class="conversation-meta-slot">
@@ -539,6 +540,14 @@ function isCronConversation(conversationUid: string) {
 
 .conversation-row.active .conversation-title {
   color: var(--color-text-brand);
+}
+
+.conversation-unread-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e5484d;
+  flex: none;
 }
 
 .conversation-cron-icon {

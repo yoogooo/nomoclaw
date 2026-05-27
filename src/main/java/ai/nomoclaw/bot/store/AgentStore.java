@@ -8,6 +8,7 @@ import ai.nomoclaw.bot.model.MessageStatus;
 import ai.nomoclaw.bot.model.PlanStep;
 import ai.nomoclaw.bot.model.StepStatus;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -30,6 +31,8 @@ public interface AgentStore {
     void updateConversationTitle(String conversationUid, String title);
 
     void updateConversationPinned(String conversationUid, boolean pinned);
+
+    void markConversationRead(String conversationUid, Instant readAt);
 
     default AgentMessage createUserMessage(String messageUid,
                                            String conversationUid,

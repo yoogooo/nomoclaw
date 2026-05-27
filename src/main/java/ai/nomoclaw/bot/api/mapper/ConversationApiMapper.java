@@ -34,6 +34,8 @@ public final class ConversationApiMapper {
                 dto.agentUid(),
                 dto.title(),
                 dto.pinned(),
+                dto.unread(),
+                dto.lastTaskTerminalTime(),
                 dto.createdTime(),
                 dto.updatedTime()
         );

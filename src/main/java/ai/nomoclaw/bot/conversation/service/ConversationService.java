@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -89,6 +90,8 @@ public class ConversationService {
                         conversation.agentUid(),
                         conversation.title(),
                         conversation.pinned(),
+                        isUnread(conversation),
+                        conversation.lastTaskTerminalAt(),
                         conversation.createdAt(),
                         conversation.updatedAt()
                 ))
@@ -173,6 +176,12 @@ public class ConversationService {
         store.updateConversationPinned(conversationUid, pinned);
         log.info("[Agent] conversation pin updated conversationUid={} pinned={} agentGroupUid={} agentUid={}",
                 conversationUid, pinned, conversation.agentGroupUid(), conversation.agentUid());
+    }
+
+    public void markConversationRead(String conversationUid) {
+        store.findConversation(conversationUid)
+                .orElseThrow(() -> new IllegalArgumentException("conversation not found: " + conversationUid));
+        store.markConversationRead(conversationUid, Instant.now());
     }
 
     public String submitMessage(String conversationUid,
@@ -267,6 +276,16 @@ public class ConversationService {
 
     private String emptyToNull(String value) {
         return value == null || value.isBlank() ? null : value;
+    }
+
+    private boolean isUnread(AgentConversation conversation) {
+        if (conversation.lastTaskTerminalAt() == null) {
+            return false;
+        }
+        if (conversation.lastReadAt() == null) {
+            return true;
+        }
+        return conversation.lastTaskTerminalAt().isAfter(conversation.lastReadAt());
     }
 
     private String buildConversationTitle(String message) {

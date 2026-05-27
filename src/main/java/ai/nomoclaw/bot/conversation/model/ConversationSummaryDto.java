@@ -8,6 +8,8 @@ public record ConversationSummaryDto(
         String agentUid,
         String title,
         boolean pinned,
+        boolean unread,
+        Instant lastTaskTerminalTime,
         Instant createdTime,
         Instant updatedTime
 ) {

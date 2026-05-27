@@ -176,6 +176,7 @@ const zhCN = {
       pin: "置顶",
       unpin: "取消置顶",
       pinned: "已置顶",
+      unreadHint: "有未读更新",
       rename: "修改名称",
       renamePrompt: "请输入新的对话名称",
       delete: "删除"

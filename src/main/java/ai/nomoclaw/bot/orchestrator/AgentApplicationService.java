@@ -174,6 +174,10 @@ public class AgentApplicationService {
         conversationService.updateConversationPinned(conversationUid, pinned);
     }
 
+    public void markConversationRead(String conversationUid) {
+        conversationService.markConversationRead(conversationUid);
+    }
+
     public String submitMessage(String conversationUid, String message) {
         return submitMessage(conversationUid, message, "web");
     }

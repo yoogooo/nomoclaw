@@ -13,6 +13,8 @@ public record AgentConversation(
         int cachedInputTokens,
         int outputTokens,
         int totalTokens,
+        Instant lastTaskTerminalAt,
+        Instant lastReadAt,
         Instant createdAt,
         Instant updatedAt
 ) {

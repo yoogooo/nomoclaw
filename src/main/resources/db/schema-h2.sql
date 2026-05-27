@@ -241,6 +241,8 @@ CREATE TABLE IF NOT EXISTS agent_conversation (
     cached_input_tokens INT NOT NULL DEFAULT 0,
     output_tokens INT NOT NULL DEFAULT 0,
     total_tokens INT NOT NULL DEFAULT 0,
+    last_task_terminal_time TIMESTAMP(3) NULL,
+    last_read_at TIMESTAMP(3) NULL,
     created_time TIMESTAMP(3) NOT NULL,
     updated_time TIMESTAMP(3) NOT NULL,
     PRIMARY KEY (id),

@@ -831,6 +831,15 @@ export const useConversationStore = defineStore("conversation", () => {
     draftAttachments.value = [];
     resetRuntimePanels();
     await loadMessages(conversationUid);
+    void conversationApi.markConversationRead(conversationUid).then(() => {
+      conversations.value = conversations.value.map((item) =>
+        item.conversationUid === conversationUid
+          ? { ...item, unread: false }
+          : item
+      );
+    }).catch(() => {
+      // best effort: next refresh will reconcile unread state
+    });
     syncRuntimeModelSelection();
     subscribeEvents();
   }

@@ -104,6 +104,13 @@ public class ConversationController {
         return new SimpleResponse("updated");
     }
 
+    @PatchMapping("/conversations/{conversationUid}/read")
+    public SimpleResponse markConversationRead(@PathVariable String conversationUid) {
+        log.info("[AgentAPI] markConversationRead conversationUid={}", conversationUid);
+        conversationAppService.markConversationRead(conversationUid);
+        return new SimpleResponse("updated");
+    }
+
     @GetMapping("/conversations/{conversationUid}/messages")
     public List<ConversationMessageResponse> listMessages(@PathVariable String conversationUid) {
         log.info("[AgentAPI] listMessages conversationUid={}", conversationUid);

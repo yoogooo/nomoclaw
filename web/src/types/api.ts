@@ -428,6 +428,8 @@ export interface ConversationSummary {
   agentUid: string;
   title: string;
   pinned: boolean;
+  unread: boolean;
+  lastTaskTerminalTime?: string | null;
   createdTime: string;
   updatedTime: string;
 }

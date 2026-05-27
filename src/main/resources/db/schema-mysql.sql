@@ -274,6 +274,8 @@ CREATE TABLE IF NOT EXISTS agent_conversation (
     cached_input_tokens INT NOT NULL DEFAULT 0 COMMENT '对话累计缓存命中输入 token 数',
     output_tokens INT NOT NULL DEFAULT 0 COMMENT '对话累计输出 token 数',
     total_tokens INT NOT NULL DEFAULT 0 COMMENT '对话累计总 token 数',
+    last_task_terminal_time DATETIME(3) NULL COMMENT '最近一次任务终态时间（completed/failed/canceled）',
+    last_read_at DATETIME(3) NULL COMMENT '最后已读时间',
     created_time DATETIME(3) NOT NULL COMMENT '创建时间',
     updated_time DATETIME(3) NOT NULL COMMENT '更新时间',
     PRIMARY KEY (id),
