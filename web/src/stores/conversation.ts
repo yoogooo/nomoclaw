@@ -1036,6 +1036,10 @@ export const useConversationStore = defineStore("conversation", () => {
   async function decideStep(action: "allow" | "deny", scope: "once" | "session" | "agent" | "user") {
     if (!currentConversationUid.value || !approval.value.stepUid || approval.value.submitting) return;
     const stepUid = approval.value.stepUid;
+    const activeConversationUid = String(currentConversationUid.value || "").trim();
+    const previousUnread = activeConversationUid
+      ? conversations.value.find((item) => item.conversationUid === activeConversationUid)?.unread
+      : undefined;
     const submittingAction = action === "deny"
       ? "deny_once"
       : (scope === "session" ? "allow_session"
@@ -1049,13 +1053,17 @@ export const useConversationStore = defineStore("conversation", () => {
     try {
       await conversationApi.decideStep(currentConversationUid.value, stepUid, { action, scope });
       clearApproval();
-      const activeConversationUid = String(currentConversationUid.value || "").trim();
       if (activeConversationUid) {
         conversations.value = conversations.value.map((item) =>
           item.conversationUid === activeConversationUid
-            ? { ...item, waitingApproval: false }
+            ? { ...item, waitingApproval: false, unread: previousUnread ?? item.unread }
             : item
         );
+        if (previousUnread === false) {
+          void conversationApi.markConversationRead(activeConversationUid).catch(() => {
+            // best effort: next refresh will reconcile read state
+          });
+        }
       }
       if (action === "allow") {
         message.success(tr("toast.approveSuccess"));

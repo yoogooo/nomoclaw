@@ -85,18 +85,24 @@ public class ConversationService {
 
     public List<ConversationSummaryDto> listConversations() {
         return store.listConversations().stream()
-                .map(conversation -> new ConversationSummaryDto(
-                        conversation.conversationUid(),
-                        conversation.agentGroupUid(),
-                        conversation.agentUid(),
-                        conversation.title(),
-                        conversation.pinned(),
-                        isWaitingApproval(conversation.conversationUid()),
-                        isUnread(conversation),
-                        conversation.lastTaskTerminalAt(),
-                        conversation.createdAt(),
-                        conversation.updatedAt()
-                ))
+                .map(conversation -> {
+                    AgentMessage latestUserMessage = store.findLatestUserMessageByConversation(conversation.conversationUid()).orElse(null);
+                    boolean waitingApproval = latestUserMessage != null && latestUserMessage.status() == MessageStatus.WAITING_APPROVAL;
+                    boolean unread = isUnread(conversation)
+                            || isWaitingApprovalUnread(conversation, latestUserMessage, waitingApproval);
+                    return new ConversationSummaryDto(
+                            conversation.conversationUid(),
+                            conversation.agentGroupUid(),
+                            conversation.agentUid(),
+                            conversation.title(),
+                            conversation.pinned(),
+                            waitingApproval,
+                            unread,
+                            conversation.lastTaskTerminalAt(),
+                            conversation.createdAt(),
+                            conversation.updatedAt()
+                    );
+                })
                 .toList();
     }
 
@@ -290,10 +296,16 @@ public class ConversationService {
         return conversation.lastTaskTerminalAt().isAfter(conversation.lastReadAt());
     }
 
-    private boolean isWaitingApproval(String conversationUid) {
-        return store.findLatestUserMessageByConversation(conversationUid)
-                .map(message -> message.status() == MessageStatus.WAITING_APPROVAL)
-                .orElse(false);
+    private boolean isWaitingApprovalUnread(AgentConversation conversation,
+                                            AgentMessage latestUserMessage,
+                                            boolean waitingApproval) {
+        if (!waitingApproval || latestUserMessage == null) {
+            return false;
+        }
+        if (conversation.lastReadAt() == null) {
+            return true;
+        }
+        return latestUserMessage.updatedAt().isAfter(conversation.lastReadAt());
     }
 
     private String buildConversationTitle(String message) {
