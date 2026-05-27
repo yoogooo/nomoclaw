@@ -8,21 +8,9 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.*;
 
 class SystemErrorLogServiceTests {
-
-    @Test
-    void listLatestCapsLimitAtTwoHundred() {
-        FakeSystemErrorLogRepository repository = new FakeSystemErrorLogRepository();
-        SystemErrorLogService service = new SystemErrorLogService(repository);
-
-        service.listLatest(500);
-
-        assertEquals(200, repository.lastListLimit);
-    }
 
     @Test
     void summaryReturnsRecentCountAndLatestTime() {
@@ -76,12 +64,6 @@ class SystemErrorLogServiceTests {
         private long countSinceResult;
         private boolean throwOnSave;
         private SystemErrorLogEntity latest;
-
-        @Override
-        public List<SystemErrorLogEntity> listLatest(int limit) {
-            lastListLimit = limit;
-            return List.of();
-        }
 
         @Override
         public SystemErrorLogEntity latest() {
