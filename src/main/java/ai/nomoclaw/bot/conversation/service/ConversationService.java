@@ -11,6 +11,7 @@ import ai.nomoclaw.bot.domain.AgentConversation;
 import ai.nomoclaw.bot.domain.AgentMessage;
 import ai.nomoclaw.bot.model.AgentEvent;
 import ai.nomoclaw.bot.model.AgentEventType;
+import ai.nomoclaw.bot.model.MessageStatus;
 import ai.nomoclaw.bot.orchestrator.MessageCancellationRegistry;
 import ai.nomoclaw.bot.orchestrator.execution.ExecutionScopeResolver;
 import ai.nomoclaw.bot.orchestrator.execution.MessageExecutionOrchestrator;
@@ -90,6 +91,7 @@ public class ConversationService {
                         conversation.agentUid(),
                         conversation.title(),
                         conversation.pinned(),
+                        isWaitingApproval(conversation.conversationUid()),
                         isUnread(conversation),
                         conversation.lastTaskTerminalAt(),
                         conversation.createdAt(),
@@ -286,6 +288,12 @@ public class ConversationService {
             return true;
         }
         return conversation.lastTaskTerminalAt().isAfter(conversation.lastReadAt());
+    }
+
+    private boolean isWaitingApproval(String conversationUid) {
+        return store.findLatestUserMessageByConversation(conversationUid)
+                .map(message -> message.status() == MessageStatus.WAITING_APPROVAL)
+                .orElse(false);
     }
 
     private String buildConversationTitle(String message) {

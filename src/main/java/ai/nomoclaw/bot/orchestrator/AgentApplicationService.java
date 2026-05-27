@@ -623,26 +623,32 @@ public class AgentApplicationService {
 
     private List<PlanStep> toPlanSteps(String messageUid, int roundIndex, List<ToolExecutionRequest> toolCalls) {
         List<PlanStep> steps = new ArrayList<>();
-        int stepIndex = 1;
-        for (ToolExecutionRequest toolCall : toolCalls) {
-            JsonNode toolArgs = parseToolArgs(toolCall);
-            RiskLevel riskLevel = riskPolicy.evaluateRisk(toolCall.name(), toolArgs);
-            steps.add(new PlanStep(
-                    UUID.randomUUID().toString(),
-                    roundIndex,
-                    stepIndex++,
-                    feedbackBuilder.buildStepTitle(toolCall.name(), toolArgs),
-                    toolCall.name(),
-                    toolArgs,
-                    riskLevel,
-                    "",
-                    StepStatus.CREATED,
-                    0,
-                    null,
-                    null,
-                    ApprovalStatus.NONE
-            ));
+        if (toolCalls == null || toolCalls.isEmpty()) {
+            return steps;
         }
+        if (toolCalls.size() > 1) {
+            log.info("[Reasoning] multi tool calls trimmed to single step messageUid={} round={} originalCount={}",
+                    messageUid, roundIndex, toolCalls.size());
+        }
+        int stepIndex = 1;
+        ToolExecutionRequest toolCall = toolCalls.get(0);
+        JsonNode toolArgs = parseToolArgs(toolCall);
+        RiskLevel riskLevel = riskPolicy.evaluateRisk(toolCall.name(), toolArgs);
+        steps.add(new PlanStep(
+                UUID.randomUUID().toString(),
+                roundIndex,
+                stepIndex,
+                feedbackBuilder.buildStepTitle(toolCall.name(), toolArgs),
+                toolCall.name(),
+                toolArgs,
+                riskLevel,
+                "",
+                StepStatus.CREATED,
+                0,
+                null,
+                null,
+                ApprovalStatus.NONE
+        ));
         log.info("[Reasoning] tool calls planned messageUid={} round={} count={}", messageUid, roundIndex, steps.size());
         return steps;
     }

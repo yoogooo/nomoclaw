@@ -428,6 +428,7 @@ export interface ConversationSummary {
   agentUid: string;
   title: string;
   pinned: boolean;
+  waitingApproval: boolean;
   unread: boolean;
   lastTaskTerminalTime?: string | null;
   createdTime: string;

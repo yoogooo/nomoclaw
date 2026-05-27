@@ -176,6 +176,7 @@ const zhCN = {
       pin: "置顶",
       unpin: "取消置顶",
       pinned: "已置顶",
+      waitingApproval: "待确认",
       unreadHint: "有未读更新",
       rename: "修改名称",
       renamePrompt: "请输入新的对话名称",
@@ -218,7 +219,7 @@ const zhCN = {
         failed: "执行失败",
         rejected: "已拒绝",
         canceled: "已取消",
-        waitingApproval: "等待确认",
+        waitingApproval: "待确认",
         running: "执行中",
         planned: "已规划",
         preparing: "准备中"
@@ -339,7 +340,7 @@ const zhCN = {
       failed: "执行失败，已完成 {completedSteps}/{totalSteps} 步",
       rejected: "执行已拒绝，已完成 {completedSteps}/{totalSteps} 步",
       canceled: "已取消，已完成 {completedSteps}/{totalSteps} 步",
-      waitingApproval: "等待确认，已完成 {completedSteps}/{totalSteps} 步",
+      waitingApproval: "待确认，已完成 {completedSteps}/{totalSteps} 步",
       running: "正在处理，已完成 {completedSteps}/{totalSteps} 步",
       planned: "已规划 {totalSteps} 步，等待开始",
       preparing: "正在准备执行步骤"
@@ -514,7 +515,7 @@ const zhCN = {
       completedSectionTitle: "已完成",
       runningTag: "运行中",
       statusRunning: "运行中",
-      statusWaitingApproval: "待人工审核",
+      statusWaitingApproval: "待确认",
       statusTimedOutApproval: "审批超时",
       statusFailed: "失败",
       statusCanceled: "已取消",
@@ -551,7 +552,7 @@ const zhCN = {
       statusCanceled: "已取消",
       statusRunning: "运行中",
       statusInProgress: "执行中",
-      statusWaitingApproval: "待人工审核"
+      statusWaitingApproval: "待确认"
     },
     empty: {
       title: "还没有定时任务",

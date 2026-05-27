@@ -292,6 +292,7 @@ function isCronConversation(conversationUid: string) {
           >
             <button class="conversation-main" @click="conversationStore.selectConversation(item.conversationUid)">
               <div class="conversation-title">
+                <span v-if="item.unread" class="conversation-unread-dot" :title="t('chat.sidebar.unreadHint')" aria-label="unread" />
                 <span v-if="item.pinned" class="conversation-pinned-icon" :title="t('chat.sidebar.pinned')">
                   <Pin :size="12" />
                 </span>
@@ -299,11 +300,13 @@ function isCronConversation(conversationUid: string) {
                   <Clock3 :size="12" />
                 </span>
                 <span class="conversation-title-text">{{ item.title || t("chat.sidebar.unnamed") }}</span>
-                <span v-if="item.unread" class="conversation-unread-dot" :title="t('chat.sidebar.unreadHint')" aria-label="unread" />
               </div>
             </button>
             <div class="conversation-meta-slot">
-              <div class="conversation-time-inline" :title="formatDateTime(item.updatedTime)">
+              <div v-if="item.waitingApproval" class="conversation-status-pill waiting-approval-pill">
+                {{ t("chat.sidebar.waitingApproval") }}
+              </div>
+              <div v-else class="conversation-time-inline" :title="formatDateTime(item.updatedTime)">
                 {{ formatConversationListTime(item.updatedTime, locale) }}
               </div>
               <div class="conversation-menu-wrap">
@@ -463,9 +466,9 @@ function isCronConversation(conversationUid: string) {
 }
 
 .conversation-row {
-  --conversation-meta-width: 3.5rem;
+  --conversation-meta-min-width: 3.5rem;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--conversation-meta-width);
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   column-gap: var(--space-1_5);
   padding-top: var(--space-2_5);
@@ -567,9 +570,30 @@ function isCronConversation(conversationUid: string) {
   transition: opacity 0.18s ease, visibility 0.18s ease;
 }
 
+.conversation-status-pill {
+  min-width: 0;
+  max-width: 100%;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 9px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-right: 2px;
+}
+
+.waiting-approval-pill {
+  color: #8a4b00;
+  background: #ffe5bf;
+  border: 1px solid #ffcc80;
+  margin-right: -8px;
+}
+
 .conversation-meta-slot {
   position: relative;
-  width: var(--conversation-meta-width);
+  min-width: var(--conversation-meta-min-width);
+  width: max-content;
   height: var(--size-24);
   display: flex;
   align-items: center;
@@ -582,18 +606,19 @@ function isCronConversation(conversationUid: string) {
   inset: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
   width: 100%;
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
   transition: opacity 0.18s ease, visibility 0.18s ease;
+  padding-right: 6px;
 }
 
 .conversation-menu-wrap :deep(.n-dropdown-trigger) {
   display: flex;
-  width: 100%;
-  height: 100%;
+  width: var(--size-24);
+  height: var(--size-24);
   align-items: center;
   justify-content: center;
 }
@@ -601,8 +626,8 @@ function isCronConversation(conversationUid: string) {
 .history-menu-button {
   display: grid;
   place-items: center;
-  width: 100%;
-  height: 100%;
+  width: var(--size-24);
+  height: var(--size-24);
   padding: 0;
   line-height: 0;
   border: 0;
@@ -632,6 +657,11 @@ function isCronConversation(conversationUid: string) {
 }
 
 .conversation-row:hover .conversation-time-inline {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.conversation-row:hover .conversation-status-pill {
   opacity: 0;
   visibility: hidden;
 }

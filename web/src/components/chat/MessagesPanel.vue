@@ -53,9 +53,7 @@ const messageListRef = ref<HTMLElement | null>(null);
 const shouldScrollToBottomOnNextRender = ref(true);
 const userMessageCollapseLineLimit = 10;
 const runOutputCollapsedLineLimit = 20;
-const showReasoningStorageKey = "chat:show-reasoning-steps";
 const runStepRenderCache = new Map<string, RunStepRenderData>();
-const showReasoningSteps = ref(true);
 const savedTipMessageUidSet = computed(() => {
   const uidSet = new Set<string>();
   for (const tip of jinnangStore.tips) {
@@ -143,12 +141,18 @@ function runStepTone(step: ConversationRunStep) {
   return runTone(step.status);
 }
 
-function visibleRunSteps(messageUid: string) {
-  const steps = conversationRunsStore.runsByMessageUid[messageUid]?.steps || [];
-  if (showReasoningSteps.value) {
-    return steps;
+function runDisplayStatus(messageUid: string) {
+  const run = conversationRunsStore.runsByMessageUid[messageUid];
+  if (!run) return "planned";
+  if (run.status !== "planned") {
+    return run.status;
   }
-  return steps.filter((step) => !isReasoningStep(step));
+  const hasWaitingApproval = Boolean(run?.steps?.some((item) => item.status === "waiting_approval"));
+  return hasWaitingApproval ? "waiting_approval" : run.status;
+}
+
+function visibleRunSteps(messageUid: string) {
+  return conversationRunsStore.runsByMessageUid[messageUid]?.steps || [];
 }
 
 function runStatusText(status: string) {
@@ -588,18 +592,8 @@ watch(
 );
 
 onMounted(() => {
-  const savedShowReasoningSteps = window.localStorage.getItem(showReasoningStorageKey);
-  if (savedShowReasoningSteps === "0") {
-    showReasoningSteps.value = false;
-  } else if (savedShowReasoningSteps === "1") {
-    showReasoningSteps.value = true;
-  }
   void scrollToConversationBottom();
   shouldScrollToBottomOnNextRender.value = false;
-});
-
-watch(showReasoningSteps, (value) => {
-  window.localStorage.setItem(showReasoningStorageKey, value ? "1" : "0");
 });
 </script>
 
@@ -751,18 +745,11 @@ watch(showReasoningSteps, (value) => {
                 <template #header>
                   <div class="run-header">
                     <div class="run-title">{{ t("chat.messages.runTitle") }}</div>
-                    <button
-                      class="run-reasoning-toggle"
-                      type="button"
-                      @click.stop="showReasoningSteps = !showReasoningSteps"
-                    >
-                      {{ showReasoningSteps ? "隐藏思考过程" : "显示思考过程" }}
-                    </button>
                   </div>
                 </template>
                 <template #header-extra>
-                  <n-tag size="small" :type="runTone(conversationRunsStore.runsByMessageUid[message.messageUid].status)">
-                    {{ runStatusText(conversationRunsStore.runsByMessageUid[message.messageUid].status) }}
+                  <n-tag size="small" :type="runTone(runDisplayStatus(message.messageUid || ''))">
+                    {{ runStatusText(runDisplayStatus(message.messageUid || '')) }}
                   </n-tag>
                 </template>
                 <div class="run-summary">{{ conversationRunsStore.runsByMessageUid[message.messageUid].summary }}</div>
@@ -1303,20 +1290,6 @@ watch(showReasoningSteps, (value) => {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-}
-
-.run-reasoning-toggle {
-  border: none;
-  background: transparent;
-  color: var(--color-text-brand-strong);
-  font-size: var(--text-caption-size);
-  line-height: 1.2;
-  cursor: pointer;
-  padding: 0;
-}
-
-.run-reasoning-toggle:hover {
-  color: var(--color-text-brand);
 }
 
 .run-summary {

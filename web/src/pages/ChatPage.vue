@@ -70,6 +70,7 @@ onMounted(() => {
     if (!conversationStore.conversations.length) {
       void conversationStore.init();
     } else {
+      void conversationStore.refreshConversations();
       void conversationStore.loadModelConfig();
     }
   }

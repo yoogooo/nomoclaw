@@ -8,6 +8,7 @@ public record ConversationSummaryResponse(
         String agentUid,
         String title,
         boolean pinned,
+        boolean waitingApproval,
         boolean unread,
         Instant lastTaskTerminalTime,
         Instant createdTime,
