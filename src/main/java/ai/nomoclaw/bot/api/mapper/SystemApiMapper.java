@@ -9,6 +9,8 @@ import ai.nomoclaw.bot.api.dto.system.response.ModelConfigResponse;
 import ai.nomoclaw.bot.api.dto.system.response.SystemConfigResponse;
 import ai.nomoclaw.bot.api.dto.system.response.SystemErrorLogResponse;
 import ai.nomoclaw.bot.api.dto.system.response.SystemErrorLogSummaryResponse;
+import ai.nomoclaw.bot.common.page.PageResult;
+import ai.nomoclaw.bot.api.dto.common.response.PageResponse;
 import ai.nomoclaw.bot.system.model.ChannelConfigDto;
 import ai.nomoclaw.bot.modelconfig.model.ModelConfigDto;
 import ai.nomoclaw.bot.system.model.SystemConfigDto;
@@ -33,6 +35,16 @@ public final class SystemApiMapper {
 
     public static List<SystemErrorLogResponse> toSystemErrorLogs(List<SystemErrorLogDto> dtos) {
         return dtos.stream().map(SystemApiMapper::toSystemErrorLog).toList();
+    }
+
+    public static PageResponse<SystemErrorLogResponse> toSystemErrorLogPage(PageResult<SystemErrorLogDto> pageResult) {
+        return new PageResponse<>(
+                toSystemErrorLogs(pageResult.items()),
+                pageResult.total(),
+                pageResult.page(),
+                pageResult.pageSize(),
+                pageResult.totalPages()
+        );
     }
 
     public static SystemErrorLogResponse toSystemErrorLog(SystemErrorLogDto dto) {

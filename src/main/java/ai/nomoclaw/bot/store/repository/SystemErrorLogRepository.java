@@ -3,6 +3,8 @@ package ai.nomoclaw.bot.store.repository;
 import ai.nomoclaw.bot.store.entity.SystemErrorLogEntity;
 import ai.nomoclaw.bot.store.mapper.SystemErrorLogMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.repository.CrudRepository;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.StringUtils;
@@ -30,6 +32,23 @@ public class SystemErrorLogRepository extends CrudRepository<SystemErrorLogMappe
                 .orderByDesc(SystemErrorLogEntity::getOccurredTime, SystemErrorLogEntity::getId)
                 .last("LIMIT " + normalizedLimit)
                 .list();
+    }
+
+    public IPage<SystemErrorLogEntity> pageLatest(int page, int pageSize, String keyword) {
+        String normalizedKeyword = StringUtils.hasText(keyword) ? keyword.trim() : null;
+        return lambdaQuery()
+                .and(StringUtils.hasText(normalizedKeyword), wrapper -> wrapper
+                        .like(SystemErrorLogEntity::getTitle, normalizedKeyword)
+                        .or()
+                        .like(SystemErrorLogEntity::getMessage, normalizedKeyword)
+                        .or()
+                        .like(SystemErrorLogEntity::getDetail, normalizedKeyword)
+                        .or()
+                        .like(SystemErrorLogEntity::getSource, normalizedKeyword)
+                        .or()
+                        .like(SystemErrorLogEntity::getCode, normalizedKeyword))
+                .orderByDesc(SystemErrorLogEntity::getOccurredTime, SystemErrorLogEntity::getId)
+                .page(new Page<>(Math.max(page, 1), Math.max(pageSize, 1)));
     }
 
     public SystemErrorLogEntity latest() {

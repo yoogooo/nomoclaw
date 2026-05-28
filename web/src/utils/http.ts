@@ -136,7 +136,7 @@ function normalizeErrorMessage(text: string): string {
 }
 
 function buildUserFriendlyMessage(status: number, reason: string): string {
-  const normalizedReason = reason?.trim() || "";
+  const normalizedReason = translateBackendReason(reason?.trim() || "");
   const withReason = (base: string) => (normalizedReason ? tr("http.withReason", { base, reason: normalizedReason }) : base);
   if (status === 400) {
     return normalizedReason || tr("http.400");
@@ -169,4 +169,21 @@ function buildUserFriendlyMessage(status: number, reason: string): string {
     return withReason(tr("http.500"));
   }
   return withReason(tr("http.default", { status }));
+}
+
+function translateBackendReason(reason: string): string {
+  const normalized = reason.trim();
+  if (!normalized) {
+    return "";
+  }
+  if (normalized === "pageSize must be one of 10, 20, 50" || normalized === "pageSize must be 20") {
+    return tr("http.invalidPageSize");
+  }
+  if (normalized.startsWith("invalid status:")) {
+    return tr("http.invalidStatus");
+  }
+  if (normalized === "startDate cannot be later than endDate") {
+    return tr("http.invalidDateRange");
+  }
+  return normalized;
 }

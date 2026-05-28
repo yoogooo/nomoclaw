@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, h, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { NButton, NDataTable, NDatePicker, NEmpty, NPagination, NSelect, NTag, type DataTableColumns } from "naive-ui";
+import { NButton, NDataTable, NDatePicker, NEmpty, NIcon, NPagination, NSelect, NTag, type DataTableColumns } from "naive-ui";
 import { useRouter } from "vue-router";
-import { ChevronLeft } from "lucide-vue-next";
+import { ChevronLeft, Search } from "lucide-vue-next";
 import DirectoryRail from "@/components/chat/DirectoryRail.vue";
 import AppPageHeader from "@/components/layout/AppPageHeader.vue";
 import { cronApi } from "@/api/cronApi";
@@ -29,11 +29,11 @@ const dateQuickOptions = computed(() => [
   { label: t("cron.history.quick30d"), value: "30d" },
   { label: t("cron.history.quickCustom"), value: "custom" }
 ]);
-const pageSizeOptions = [
-  { label: "10 条/页", value: 10 },
-  { label: "20 条/页", value: 20 },
-  { label: "50 条/页", value: 50 }
-];
+const pageSizeOptions = computed(() => [
+  { label: "10", value: 10 },
+  { label: "20", value: 20 },
+  { label: "50", value: 50 }
+]);
 
 const statusOptions = computed(() => [
   { label: t("cron.history.statusAll"), value: "" },
@@ -274,6 +274,9 @@ watch([agentUid, status, dateQuick, dateRange], () => {
                 class="history-filter-item history-filter-date"
               />
               <n-button type="primary" size="small" :loading="loading" class="history-filter-item history-filter-action" @click="applyFilters">
+                <template #icon>
+                  <n-icon :component="Search" :size="14" />
+                </template>
                 {{ t("cron.history.query") }}
               </n-button>
             </div>
@@ -299,13 +302,16 @@ watch([agentUid, status, dateQuick, dateRange], () => {
                   :page-slot="7"
                   @update:page="loadHistory"
                 />
-                <n-select
-                  :value="pageSize"
-                  size="small"
-                  class="history-page-size-select"
-                  :options="pageSizeOptions"
-                  @update:value="handlePageSizeChange"
-                />
+                <div class="history-page-size-control">
+                  <span class="history-page-size-label">{{ t("settings.paginationShowPerPage") }}</span>
+                  <n-select
+                    :value="pageSize"
+                    size="small"
+                    class="history-page-size-select"
+                    :options="pageSizeOptions"
+                    @update:value="handlePageSizeChange"
+                  />
+                </div>
               </div>
             </div>
           </section>
@@ -401,11 +407,22 @@ watch([agentUid, status, dateQuick, dateRange], () => {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: var(--space-2);
+  gap: var(--space-4);
 }
 
 .history-page-size-select {
-  width: 96px;
+  width: 72px;
+}
+
+.history-page-size-control {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.history-page-size-label {
+  color: var(--color-text-secondary);
+  font-size: var(--text-body-size);
 }
 
 .history-empty-state {

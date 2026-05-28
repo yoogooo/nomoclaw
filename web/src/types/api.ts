@@ -551,6 +551,14 @@ export interface CronJobExecutionHistoryPage {
   totalPages: number;
 }
 
+export interface SystemErrorLogPage {
+  items: SystemErrorLog[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
 export interface CronExecutionDetail {
   executionUid: string;
   jobUid: string;

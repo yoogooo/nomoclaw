@@ -44,6 +44,7 @@ import java.util.*;
 public class CronJobApplicationService {
     private static final int RESULT_REPORT_PREVIEW_LIMIT = 16_000;
     private static final List<String> FINISHED_EXECUTION_STATUSES = List.of("COMPLETED", "FAILED", "CANCELED", "TIMED_OUT_APPROVAL");
+    private static final List<Integer> HISTORY_ALLOWED_PAGE_SIZES = List.of(10, 20, 50);
 
     private final AgentCronJobRepository agentCronJobRepository;
     private final AgentCronJobExecutionRepository agentCronJobExecutionRepository;
@@ -376,10 +377,10 @@ public class CronJobApplicationService {
                                                                       String endDate,
                                                                       int page,
                                                                       int pageSize) {
-        PageRequest normalizedRequest = new PageRequest(page, pageSize).normalize(20, 20);
-        if (pageSize > 0 && normalizedRequest.pageSize() != pageSize) {
-            throw new IllegalArgumentException("pageSize must be 20");
+        if (pageSize > 0 && !HISTORY_ALLOWED_PAGE_SIZES.contains(pageSize)) {
+            throw new IllegalArgumentException("pageSize must be one of 10, 20, 50");
         }
+        PageRequest normalizedRequest = new PageRequest(page, pageSize).normalize(20, 50);
         String normalizedAgentUid = agentUid == null ? "" : agentUid.trim();
         String normalizedStatus = status == null ? "" : status.trim().toUpperCase();
         if (!normalizedStatus.isBlank() && !FINISHED_EXECUTION_STATUSES.contains(normalizedStatus)) {

@@ -71,7 +71,9 @@ const enUS = {
     diagnosticsCopyLog: "Copy Log",
     diagnosticsCopyLogSuccess: "Log copied",
     diagnosticsSearch: "Search",
-    diagnosticsSearchPlaceholder: "Search logs by keyword"
+    diagnosticsSearchPlaceholder: "Search logs by keyword",
+    paginationPageSize: "{count} items/page",
+    paginationShowPerPage: "Show per Page:"
   },
   modelGate: {
     title: "Set up a model first",
@@ -530,7 +532,7 @@ const enUS = {
     history: {
       title: "Execution History",
       subtitle: "View all historical execution records and filter by Agent, status, and date range.",
-      query: "Query",
+      query: "Search",
       quick7d: "Last 7 days",
       quick30d: "Last 30 days",
       quickCustom: "Custom",
@@ -597,6 +599,9 @@ const enUS = {
     networkError: "Cannot reach backend service (it may not be started). Start the service and try again.",
     withReason: "{base} Reason: {reason}",
     400: "The request could not be processed. Please try again.",
+    invalidPageSize: "Invalid page size. Please choose 10, 20, or 50.",
+    invalidStatus: "Invalid status filter value.",
+    invalidDateRange: "Start date cannot be later than end date.",
     401: "Session expired. Please sign in again.",
     403: "You do not have permission for this action.",
     404: "Requested resource does not exist or has been removed.",

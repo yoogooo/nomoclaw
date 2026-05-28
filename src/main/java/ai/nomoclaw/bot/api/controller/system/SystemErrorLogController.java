@@ -1,5 +1,6 @@
 package ai.nomoclaw.bot.api.controller.system;
 
+import ai.nomoclaw.bot.api.dto.common.response.PageResponse;
 import ai.nomoclaw.bot.api.dto.system.response.SystemErrorLogResponse;
 import ai.nomoclaw.bot.api.dto.system.response.SystemErrorLogSummaryResponse;
 import ai.nomoclaw.bot.api.mapper.SystemApiMapper;
@@ -9,8 +10,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 /**
  * System error log query endpoints.
@@ -27,10 +26,12 @@ public class SystemErrorLogController {
     }
 
     @GetMapping
-    public List<SystemErrorLogResponse> listErrorLogs(@RequestParam(name = "limit", required = false) Integer limit,
-                                                       @RequestParam(name = "keyword", required = false) String keyword) {
-        log.info("[AgentAPI] listSystemErrorLogs limit={} keyword={}", limit, keyword);
-        return SystemApiMapper.toSystemErrorLogs(systemErrorLogService.listLatest(limit, keyword));
+    public PageResponse<SystemErrorLogResponse> listErrorLogs(
+            @RequestParam(name = "keyword", required = false) String keyword,
+            @RequestParam(name = "page", required = false, defaultValue = "1") int page,
+            @RequestParam(name = "pageSize", required = false, defaultValue = "20") int pageSize) {
+        log.info("[AgentAPI] listSystemErrorLogs keyword={} page={} pageSize={}", keyword, page, pageSize);
+        return SystemApiMapper.toSystemErrorLogPage(systemErrorLogService.pageLatest(page, pageSize, keyword));
     }
 
     @GetMapping("/summary")

@@ -1,14 +1,15 @@
-import type { SystemErrorLog, SystemErrorLogSummary } from "@/types/api";
+import type { SystemErrorLogPage, SystemErrorLogSummary } from "@/types/api";
 import { requestJson } from "@/utils/http";
 
 export const systemDiagnosticsApi = {
-  listErrorLogs(limit = 100, keyword = "") {
+  listErrorLogs(page = 1, pageSize = 20, keyword = "") {
     const params = new URLSearchParams();
-    params.set("limit", String(limit));
+    params.set("page", String(page));
+    params.set("pageSize", String(pageSize));
     if (keyword.trim()) {
       params.set("keyword", keyword.trim());
     }
-    return requestJson<SystemErrorLog[]>(`/api/system/error-logs?${params.toString()}`);
+    return requestJson<SystemErrorLogPage>(`/api/system/error-logs?${params.toString()}`);
   },
   getErrorLogSummary() {
     return requestJson<SystemErrorLogSummary>("/api/system/error-logs/summary");

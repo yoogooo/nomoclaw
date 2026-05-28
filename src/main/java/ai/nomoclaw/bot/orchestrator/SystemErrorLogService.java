@@ -1,5 +1,8 @@
 package ai.nomoclaw.bot.orchestrator;
 
+import ai.nomoclaw.bot.common.page.PageRequest;
+import ai.nomoclaw.bot.common.page.PageResult;
+import ai.nomoclaw.bot.common.page.PageResultMapper;
 import ai.nomoclaw.bot.system.model.SystemErrorLogDto;
 import ai.nomoclaw.bot.system.model.SystemErrorLogSummaryDto;
 import ai.nomoclaw.bot.store.entity.SystemErrorLogEntity;
@@ -37,6 +40,16 @@ public class SystemErrorLogService {
         int limit = normalizeLimit(requestedLimit);
         String normalizedKeyword = normalizeKeyword(keyword);
         return repository.listLatest(limit, normalizedKeyword).stream().map(this::toDto).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public PageResult<SystemErrorLogDto> pageLatest(int page, int pageSize, String keyword) {
+        PageRequest request = new PageRequest(page, pageSize).normalize(20, 100);
+        String normalizedKeyword = normalizeKeyword(keyword);
+        return PageResultMapper.fromMpPage(
+                repository.pageLatest(request.page(), request.pageSize(), normalizedKeyword),
+                this::toDto
+        );
     }
 
     @Transactional(readOnly = true)

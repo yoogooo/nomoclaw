@@ -71,7 +71,9 @@ const zhCN = {
     diagnosticsCopyLog: "复制日志",
     diagnosticsCopyLogSuccess: "日志已复制",
     diagnosticsSearch: "检索",
-    diagnosticsSearchPlaceholder: "输入关键字检索日志"
+    diagnosticsSearchPlaceholder: "输入关键字检索日志",
+    paginationPageSize: "{count} 条/页",
+    paginationShowPerPage: "每页显示："
   },
   modelGate: {
     title: "先配置一个可用模型",
@@ -597,6 +599,9 @@ const zhCN = {
     networkError: "无法连接后端服务（可能未启动）。请先启动服务后重试。",
     withReason: "{base} 原因：{reason}",
     400: "请求未能处理，请稍后重试。",
+    invalidPageSize: "分页大小无效，请选择 10、20 或 50。",
+    invalidStatus: "状态筛选值无效。",
+    invalidDateRange: "开始日期不能晚于结束日期。",
     401: "登录状态已失效，请重新登录后重试。",
     403: "当前没有该操作权限。",
     404: "请求的资源不存在或已被删除。",

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ChevronLeft, Copy, RefreshCw } from "lucide-vue-next";
-import { NButton, NDataTable, NIcon, NInput, NModal } from "naive-ui";
+import { NButton, NDataTable, NIcon, NInput, NModal, NPagination, NSelect } from "naive-ui";
 import type { DataTableColumns } from "naive-ui";
 import { computed, h, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -14,8 +14,16 @@ const { t } = useI18n();
 const router = useRouter();
 const errorLogs = ref<SystemErrorLog[]>([]);
 const logsLoading = ref(false);
+const page = ref(1);
+const pageSize = ref(20);
+const total = ref(0);
 const selectedEvent = ref<SystemErrorLog | null>(null);
 const searchKeyword = ref("");
+const pageSizeOptions = computed(() => [
+  { label: "10", value: 10 },
+  { label: "20", value: 20 },
+  { label: "50", value: 50 }
+]);
 const detailModalVisible = computed({
   get: () => selectedEvent.value !== null,
   set: (value: boolean) => {
@@ -88,15 +96,30 @@ function rowProps(row: SystemErrorLog) {
 async function loadErrorLogs() {
   logsLoading.value = true;
   try {
-    errorLogs.value = await systemDiagnosticsApi.listErrorLogs(100, searchKeyword.value);
+    const response = await systemDiagnosticsApi.listErrorLogs(page.value, pageSize.value, searchKeyword.value);
+    errorLogs.value = response.items;
+    total.value = response.total;
   } catch {
     errorLogs.value = [];
+    total.value = 0;
   } finally {
     logsLoading.value = false;
   }
 }
 
 function searchLogs() {
+  page.value = 1;
+  void loadErrorLogs();
+}
+
+function handlePageChange(nextPage: number) {
+  page.value = nextPage;
+  void loadErrorLogs();
+}
+
+function handlePageSizeChange(nextPageSize: number) {
+  pageSize.value = nextPageSize;
+  page.value = 1;
   void loadErrorLogs();
 }
 
@@ -123,7 +146,7 @@ function backToSettings() {
               <div>
                 <div class="surface-card-title">{{ t("settings.diagnosticsDrawerSubtitle") }}</div>
                 <div class="settings-error-logs-meta">
-                  {{ t("settings.diagnosticsDrawerMeta", { count: errorLogs.length }) }}
+                  {{ t("settings.diagnosticsDrawerMeta", { count: total }) }}
                 </div>
               </div>
               <div class="settings-error-logs-actions">
@@ -155,6 +178,25 @@ function backToSettings() {
                 {{ t("settings.diagnosticsEmpty") }}
               </template>
             </n-data-table>
+            <div class="settings-error-logs-pagination">
+              <n-pagination
+                :page="page"
+                :page-size="pageSize"
+                :item-count="total"
+                :page-slot="7"
+                @update:page="handlePageChange"
+              />
+              <div class="settings-error-logs-page-size-control">
+                <span class="settings-error-logs-page-size-label">{{ t("settings.paginationShowPerPage") }}</span>
+                <n-select
+                  :value="pageSize"
+                  size="small"
+                  class="settings-error-logs-page-size-select"
+                  :options="pageSizeOptions"
+                  @update:value="handlePageSizeChange"
+                />
+              </div>
+            </div>
           </section>
         </div>
       </main>
@@ -246,6 +288,29 @@ function backToSettings() {
 
 .settings-error-logs-search {
   width: min(360px, 48vw);
+}
+
+.settings-error-logs-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.settings-error-logs-page-size-select {
+  width: 72px;
+}
+
+.settings-error-logs-page-size-control {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.settings-error-logs-page-size-label {
+  color: var(--color-text-secondary);
+  font-size: var(--text-body-size);
 }
 
 .settings-error-log-time {
