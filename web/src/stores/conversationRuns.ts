@@ -149,9 +149,34 @@ export const useConversationRunsStore = defineStore("conversationRuns", () => {
   function markRunCanceled(messageUid: string) {
     const existing = runsByMessageUid.value[messageUid];
     if (!existing) return;
+    const steps = [...(existing.steps || [])];
+    const pendingStatuses = new Set(["running", "planned", "waiting_approval"]);
+    const pendingIndexes = steps
+      .map((step, index) => ({ step, index }))
+      .filter(({ step }) => pendingStatuses.has(String(step.status || "").toLowerCase()))
+      .sort((left, right) => {
+        const leftRound = Number(left.step.roundIndex || 0);
+        const rightRound = Number(right.step.roundIndex || 0);
+        if (leftRound !== rightRound) {
+          return rightRound - leftRound;
+        }
+        const leftStep = Number(left.step.stepIndex || 0);
+        const rightStep = Number(right.step.stepIndex || 0);
+        return rightStep - leftStep;
+      });
+    if (pendingIndexes.length) {
+      const target = pendingIndexes[0];
+      steps[target.index] = {
+        ...target.step,
+        status: "canceled",
+        updatedTime: new Date().toISOString()
+      };
+    }
     upsertRun({
       ...existing,
-      status: "canceled"
+      status: "canceled",
+      steps,
+      updatedTime: new Date().toISOString()
     });
   }
 

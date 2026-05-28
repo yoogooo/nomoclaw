@@ -5,6 +5,7 @@ import ai.nomoclaw.bot.conversation.model.ConversationRunStepDto;
 import ai.nomoclaw.bot.domain.AgentMessage;
 import ai.nomoclaw.bot.model.AgentEvent;
 import ai.nomoclaw.bot.model.AgentEventType;
+import ai.nomoclaw.bot.model.MessageStatus;
 import ai.nomoclaw.bot.model.PlanStep;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
@@ -131,6 +132,10 @@ public class RunViewAssembler {
         if (stepResponses.isEmpty()) {
             return null;
         }
+        if (message.status() == MessageStatus.CANCELED) {
+            runStatus = "canceled";
+            stepResponses = patchCanceledRunSteps(stepResponses);
+        }
         int completedSteps = (int) stepResponses.stream().filter(step -> "completed".equals(step.status())).count();
         String normalizedStatus = normalizeRunStatus(runStatus, stepResponses);
         return new ConversationMessageRunDto(
@@ -166,6 +171,38 @@ public class RunViewAssembler {
 
     private String reasoningStepUid(String messageUid, int roundIndex) {
         return "reasoning-" + messageUid + "-" + roundIndex;
+    }
+
+    private List<ConversationRunStepDto> patchCanceledRunSteps(List<ConversationRunStepDto> steps) {
+        List<ConversationRunStepDto> patched = steps.stream()
+                .map(step -> step)
+                .collect(Collectors.toList());
+        int indexToCancel = -1;
+        for (int i = patched.size() - 1; i >= 0; i--) {
+            String status = patched.get(i).status();
+            if (!"completed".equals(status) && !"failed".equals(status) && !"rejected".equals(status) && !"canceled".equals(status)) {
+                indexToCancel = i;
+                break;
+            }
+        }
+        if (indexToCancel < 0) {
+            return patched;
+        }
+        ConversationRunStepDto step = patched.get(indexToCancel);
+        patched.set(indexToCancel, new ConversationRunStepDto(
+                step.stepUid(),
+                step.roundIndex(),
+                step.stepIndex(),
+                "canceled",
+                step.toolName(),
+                step.toolArgs(),
+                step.displayTitle(),
+                step.displaySummary(),
+                step.displayDetails(),
+                step.policyReasonCode(),
+                step.updatedTime()
+        ));
+        return patched;
     }
 
     private static final class RunStepAccumulator {

@@ -181,4 +181,109 @@ class RunViewAssemblerTests {
         assertTrue(run.steps().get(0).displayDetails().contains("先思考再执行"));
         assertEquals("step-tool-1", run.steps().get(1).stepUid());
     }
+
+    @Test
+    void shouldForceCanceledRunStatusFromMessageAndMarkLatestPendingStepCanceled() {
+        LocaleContextHolder.setLocale(Locale.SIMPLIFIED_CHINESE);
+        PlanStep step1 = new PlanStep(
+                "step-1",
+                1,
+                1,
+                "执行工具: MemorySearchTool",
+                "MemorySearchTool",
+                JsonNodeFactory.instance.objectNode().put("query", "abc"),
+                RiskLevel.LOW,
+                "",
+                StepStatus.SUCCEEDED,
+                0,
+                null,
+                null,
+                ApprovalStatus.NONE
+        );
+        PlanStep step2 = new PlanStep(
+                "step-2",
+                1,
+                2,
+                "打开网页",
+                "BrowserTool",
+                JsonNodeFactory.instance.objectNode().put("action", "navigate"),
+                RiskLevel.LOW,
+                "",
+                StepStatus.SUCCEEDED,
+                0,
+                null,
+                null,
+                ApprovalStatus.NONE
+        );
+        PlanStep step3 = new PlanStep(
+                "step-3",
+                1,
+                3,
+                "提取网页信息",
+                "BrowserTool",
+                JsonNodeFactory.instance.objectNode().put("action", "extract_text"),
+                RiskLevel.LOW,
+                "",
+                StepStatus.SUCCEEDED,
+                0,
+                null,
+                null,
+                ApprovalStatus.NONE
+        );
+        PlanStep step4 = new PlanStep(
+                "step-4",
+                1,
+                4,
+                "打开网页",
+                "BrowserTool",
+                JsonNodeFactory.instance.objectNode().put("action", "navigate"),
+                RiskLevel.LOW,
+                "",
+                StepStatus.CREATED,
+                0,
+                null,
+                null,
+                ApprovalStatus.NONE
+        );
+        AgentMessage message = new AgentMessage(
+                "msg-3",
+                "conv-3",
+                null,
+                "user",
+                "hello",
+                MessageStatus.CANCELED,
+                "",
+                "",
+                0,
+                0,
+                0,
+                0,
+                Instant.now(),
+                Instant.now()
+        );
+        ObjectNode finished1 = JsonNodeFactory.instance.objectNode();
+        finished1.put("stepUid", "step-1");
+        finished1.put("roundIndex", 1);
+        finished1.put("stepIndex", 1);
+        finished1.put("status", "completed");
+        AgentEvent event1 = new AgentEvent(UUID.randomUUID().toString(), AgentEventType.STEP_FINISHED, "conv-3", "msg-3", "step-1", Instant.now(), finished1);
+        ObjectNode finished2 = JsonNodeFactory.instance.objectNode();
+        finished2.put("stepUid", "step-2");
+        finished2.put("roundIndex", 1);
+        finished2.put("stepIndex", 2);
+        finished2.put("status", "completed");
+        AgentEvent event2 = new AgentEvent(UUID.randomUUID().toString(), AgentEventType.STEP_FINISHED, "conv-3", "msg-3", "step-2", Instant.now(), finished2);
+        ObjectNode finished3 = JsonNodeFactory.instance.objectNode();
+        finished3.put("stepUid", "step-3");
+        finished3.put("roundIndex", 1);
+        finished3.put("stepIndex", 3);
+        finished3.put("status", "completed");
+        AgentEvent event3 = new AgentEvent(UUID.randomUUID().toString(), AgentEventType.STEP_FINISHED, "conv-3", "msg-3", "step-3", Instant.now(), finished3);
+
+        var run = assembler.toMessageRunResponse(message, List.of(step1, step2, step3, step4), List.of(event1, event2, event3));
+
+        assertNotNull(run);
+        assertEquals("canceled", run.status());
+        assertEquals("canceled", run.steps().get(3).status());
+    }
 }

@@ -207,13 +207,17 @@ public class MybatisPlusAgentStore implements AgentStore {
     @Override
     public void updateMessageStatus(String messageUid, MessageStatus status) {
         LocalDateTime now = LocalDateTime.now();
-        messageRepository.update(new LambdaUpdateWrapper<AgentMessageEntity>()
+        boolean updated = messageRepository.update(new LambdaUpdateWrapper<AgentMessageEntity>()
                 .eq(AgentMessageEntity::getMessageUid, messageUid)
+                .notIn(AgentMessageEntity::getStatus,
+                        MessageStatus.COMPLETED.name(),
+                        MessageStatus.FAILED.name(),
+                        MessageStatus.CANCELED.name())
                 .set(AgentMessageEntity::getStatus, status.name())
                 .set(AgentMessageEntity::getUpdatedTime, now));
         if (status == MessageStatus.COMPLETED || status == MessageStatus.FAILED || status == MessageStatus.CANCELED) {
             AgentMessageEntity messageEntity = messageRepository.findByMessageId(messageUid);
-            if (messageEntity != null && messageEntity.getConversationUid() != null && !messageEntity.getConversationUid().isBlank()) {
+            if (updated && messageEntity != null && messageEntity.getConversationUid() != null && !messageEntity.getConversationUid().isBlank()) {
                 conversationRepository.update(new LambdaUpdateWrapper<AgentConversationEntity>()
                         .eq(AgentConversationEntity::getConversationUid, messageEntity.getConversationUid())
                         .set(AgentConversationEntity::getLastTaskTerminalTime, now)
