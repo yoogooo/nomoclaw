@@ -761,7 +761,7 @@ onMounted(() => {
                     :name="step.stepUid"
                   >
                     <template #header-extra>
-                      <n-tag size="small" :type="runStepTone(step)">{{ runStatusText(step.status) }}</n-tag>
+                      <n-tag v-if="!isReasoningStep(step)" size="small" :type="runStepTone(step)">{{ runStatusText(step.status) }}</n-tag>
                     </template>
                     <template v-if="getRunStepRenderData(step).isCommand">
                       <div class="run-command-blocks">

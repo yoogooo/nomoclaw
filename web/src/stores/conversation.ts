@@ -1189,8 +1189,8 @@ export const useConversationStore = defineStore("conversation", () => {
       stepIndex: 0,
       status: "completed",
       toolName: "Reasoning",
-      displayTitle: "思考过程 / Reasoning",
-      displaySummary: "模型思考摘要",
+      displayTitle: tr("chat.runtime.stepTitle.reasoning"),
+      displaySummary: tr("chat.runtime.reasoningSummary"),
       displayDetails: String(event.payload.content || ""),
       updatedTime: new Date().toISOString()
     });

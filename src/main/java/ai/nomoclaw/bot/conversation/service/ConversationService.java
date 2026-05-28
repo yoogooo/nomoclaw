@@ -21,12 +21,15 @@ import ai.nomoclaw.bot.store.AgentStore;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -231,7 +234,7 @@ public class ConversationService {
         if (beforeExecuteHook != null) {
             beforeExecuteHook.accept(messageUid);
         }
-        messageExecutionOrchestrator.enqueue(messageUid, conversationUid, LocaleContextHolder.getLocale(), normalizedApprovalMode, executionDriver);
+        messageExecutionOrchestrator.enqueue(messageUid, conversationUid, resolveRequestLocale(), normalizedApprovalMode, executionDriver);
         return messageUid;
     }
 
@@ -333,5 +336,50 @@ public class ConversationService {
         }
         int limit = 2000;
         return text.length() <= limit ? text : text.substring(0, limit) + "...";
+    }
+
+    private Locale resolveRequestLocale() {
+        ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        if (attributes == null || attributes.getRequest() == null) {
+            return LocaleContextHolder.getLocale();
+        }
+        String explicitLocale = attributes.getRequest().getHeader("X-App-Locale");
+        Locale parsedExplicit = parseLocaleHeader(explicitLocale);
+        if (parsedExplicit != null) {
+            return parsedExplicit;
+        }
+        String acceptLanguage = attributes.getRequest().getHeader("Accept-Language");
+        Locale parsedAcceptLanguage = parseAcceptLanguageHeader(acceptLanguage);
+        if (parsedAcceptLanguage != null) {
+            return parsedAcceptLanguage;
+        }
+        return LocaleContextHolder.getLocale();
+    }
+
+    private Locale parseLocaleHeader(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String normalized = raw.trim().replace('_', '-');
+        Locale locale = Locale.forLanguageTag(normalized);
+        if (locale.getLanguage() == null || locale.getLanguage().isBlank()) {
+            return null;
+        }
+        return locale;
+    }
+
+    private Locale parseAcceptLanguageHeader(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String firstLanguageRange = raw.split(",")[0].trim();
+        if (firstLanguageRange.isBlank()) {
+            return null;
+        }
+        String tag = firstLanguageRange.split(";")[0].trim();
+        if (tag.isBlank()) {
+            return null;
+        }
+        return parseLocaleHeader(tag);
     }
 }

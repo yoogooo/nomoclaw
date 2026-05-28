@@ -3,7 +3,52 @@ import { defineStore } from "pinia";
 import { tr } from "@/i18n";
 import type { ConversationMessageRun, ConversationRunStep } from "@/types/api";
 
+function localizeStepDisplayTitle(step: ConversationRunStep) {
+  const toolName = String(step.toolName || "");
+  const args = step.toolArgs || {};
+  if (toolName === "BrowserTool") {
+    const action = String((args as Record<string, unknown>).action || "");
+    if (action === "open" || action === "navigate") return tr("chat.runtime.stepTitle.browserOpen");
+    if (action === "extract_text") return tr("chat.runtime.stepTitle.browserExtractText");
+    if (action === "click") return tr("chat.runtime.stepTitle.browserClick");
+    if (action === "type") return tr("chat.runtime.stepTitle.browserType");
+    if (action === "wait_for") return tr("chat.runtime.stepTitle.browserWaitFor");
+    if (action === "screenshot") return tr("chat.runtime.stepTitle.browserScreenshot");
+    if (action === "download") return tr("chat.runtime.stepTitle.browserDownload");
+    if (action === "press_key") return tr("chat.runtime.stepTitle.browserPressKey");
+    if (action === "snapshot") return tr("chat.runtime.stepTitle.browserSnapshot");
+    return tr("chat.runtime.stepTitle.browserDefault");
+  }
+  if (toolName === "CommandTool") {
+    const command = String((args as Record<string, unknown>).command || "").trim();
+    if (command) return tr("chat.runtime.stepTitle.commandRunWithCommand", { command });
+    return tr("chat.runtime.stepTitle.commandRun");
+  }
+  if (toolName === "Reasoning") return tr("chat.runtime.stepTitle.reasoning");
+  if (toolName === "WebSearchTool") return tr("chat.runtime.stepTitle.webSearch");
+  if (toolName === "WebFetchTool") return tr("chat.runtime.stepTitle.webFetch");
+  if (toolName === "ReadFileTool") return tr("chat.runtime.stepTitle.fileRead");
+  if (toolName === "ListFileTool") return tr("chat.runtime.stepTitle.fileList");
+  if (toolName === "CreateFileTool") return tr("chat.runtime.stepTitle.fileCreate");
+  if (toolName === "EditFileTool") return tr("chat.runtime.stepTitle.fileEdit");
+  if (toolName === "FileSearchTool") return tr("chat.runtime.stepTitle.fileSearch");
+  if (toolName === "ImageLoaderTool") return tr("chat.runtime.stepTitle.imageAnalyze");
+  if (toolName === "DesktopScreenshotTool") return tr("chat.runtime.stepTitle.desktopScreenshot");
+  if (toolName === "CronCreateTool") return tr("chat.runtime.stepTitle.cronCreate");
+  if (toolName === "CronDeleteTool") return tr("chat.runtime.stepTitle.cronDelete");
+  if (toolName === "CronListTool") return tr("chat.runtime.stepTitle.cronList");
+  return step.displayTitle || tr("chat.runtime.processingStep");
+}
+
+function localizeRunSteps(run: ConversationMessageRun) {
+  run.steps = (run.steps || []).map((step) => ({
+    ...step,
+    displayTitle: localizeStepDisplayTitle(step)
+  }));
+}
+
 function normalizeRunSummary(run: ConversationMessageRun) {
+  localizeRunSteps(run);
   const steps = [...(run.steps || [])].sort(
     (a, b) => Number(a.roundIndex || 0) - Number(b.roundIndex || 0)
       || Number(a.stepIndex || 0) - Number(b.stepIndex || 0)
