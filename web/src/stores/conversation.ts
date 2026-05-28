@@ -1029,8 +1029,29 @@ export const useConversationStore = defineStore("conversation", () => {
 
   async function cancelRunningMessage() {
     if (!currentConversationUid.value) return;
-    await conversationApi.cancelConversation(currentConversationUid.value);
+    const activeConversationUid = currentConversationUid.value;
+    markConversationReadLocally(activeConversationUid);
+    await conversationApi.cancelConversation(activeConversationUid);
+    await keepCurrentConversationRead(activeConversationUid);
     runningConversationUid.value = null;
+  }
+
+  function markConversationReadLocally(conversationUid: string) {
+    conversations.value = conversations.value.map((item) =>
+      item.conversationUid === conversationUid
+        ? { ...item, unread: false }
+        : item
+    );
+  }
+
+  async function keepCurrentConversationRead(conversationUid: string) {
+    markConversationReadLocally(conversationUid);
+    try {
+      await conversationApi.markConversationRead(conversationUid);
+      markConversationReadLocally(conversationUid);
+    } catch {
+      // best effort: next refresh will reconcile unread state
+    }
   }
 
   async function decideStep(action: "allow" | "deny", scope: "once" | "session" | "agent" | "user") {
@@ -1297,10 +1318,12 @@ export const useConversationStore = defineStore("conversation", () => {
       }
       runningConversationUid.value = null;
       if (currentConversationUid.value) {
-        await loadMessages(currentConversationUid.value);
+        const activeConversationUid = currentConversationUid.value;
+        await loadMessages(activeConversationUid);
         if (!skipConversationListRefresh.value) {
-          await refreshConversations(currentConversationUid.value, false);
+          await refreshConversations(activeConversationUid, false);
         }
+        await keepCurrentConversationRead(activeConversationUid);
       }
       return;
     }
@@ -1324,10 +1347,12 @@ export const useConversationStore = defineStore("conversation", () => {
       }
       runningConversationUid.value = null;
       if (currentConversationUid.value) {
-        await loadMessages(currentConversationUid.value);
+        const activeConversationUid = currentConversationUid.value;
+        await loadMessages(activeConversationUid);
         if (!skipConversationListRefresh.value) {
-          await refreshConversations(currentConversationUid.value, false);
+          await refreshConversations(activeConversationUid, false);
         }
+        await keepCurrentConversationRead(activeConversationUid);
       }
     }
   }
