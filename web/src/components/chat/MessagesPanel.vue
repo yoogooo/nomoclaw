@@ -151,6 +151,15 @@ function runDisplayStatus(messageUid: string) {
   return hasWaitingApproval ? "waiting_approval" : run.status;
 }
 
+function runProgressText(messageUid: string) {
+  const run = conversationRunsStore.runsByMessageUid[messageUid];
+  if (!run) return "";
+  return t("chat.messages.runProgressOnly", {
+    completedSteps: run.completedSteps ?? 0,
+    totalSteps: run.totalSteps ?? 0
+  });
+}
+
 function visibleRunSteps(messageUid: string) {
   return conversationRunsStore.runsByMessageUid[messageUid]?.steps || [];
 }
@@ -747,12 +756,7 @@ onMounted(() => {
                     <div class="run-title">{{ t("chat.messages.runTitle") }}</div>
                   </div>
                 </template>
-                <template #header-extra>
-                  <n-tag size="small" :type="runTone(runDisplayStatus(message.messageUid || ''))">
-                    {{ runStatusText(runDisplayStatus(message.messageUid || '')) }}
-                  </n-tag>
-                </template>
-                <div class="run-summary">{{ conversationRunsStore.runsByMessageUid[message.messageUid].summary }}</div>
+                <div class="run-summary">{{ runProgressText(message.messageUid || "") }}</div>
                 <n-collapse class="run-steps-collapse">
                   <n-collapse-item
                     v-for="(step, stepPosition) in visibleRunSteps(message.messageUid)"

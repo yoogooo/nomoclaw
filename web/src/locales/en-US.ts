@@ -216,6 +216,7 @@ const enUS = {
       collapseMessage: "Collapse",
       processing: "Processing...",
       runTitle: "Execution",
+      runProgressOnly: "Completed {completedSteps}/{totalSteps} steps",
       runStatus: {
         completed: "Completed",
         failed: "Failed",

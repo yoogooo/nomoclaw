@@ -216,6 +216,7 @@ const zhCN = {
       collapseMessage: "收起",
       processing: "处理进行中…",
       runTitle: "执行过程",
+      runProgressOnly: "已完成 {completedSteps}/{totalSteps} 步",
       runStatus: {
         completed: "执行完成",
         failed: "执行失败",
