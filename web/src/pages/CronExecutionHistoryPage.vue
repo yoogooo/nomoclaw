@@ -206,6 +206,11 @@ async function handlePageSizeChange(nextPageSize: number) {
   await loadHistory();
 }
 
+async function handlePageChange(nextPage: number) {
+  page.value = nextPage;
+  await loadHistory();
+}
+
 function goBack() {
   if (window.history.length > 1) {
     router.back();
@@ -297,7 +302,7 @@ watch([agentUid, status, dateQuick, dateRange], () => {
                   :page-size="pageSize"
                   :total="total"
                   :page-size-options="pageSizeOptions"
-                  @update:page="loadHistory"
+                  @update:page="handlePageChange"
                   @update:page-size="handlePageSizeChange"
                 />
               </div>
