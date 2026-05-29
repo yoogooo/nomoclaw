@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ChevronLeft, Copy, RefreshCw } from "lucide-vue-next";
-import { NButton, NDataTable, NIcon, NInput, NModal, NPagination, NSelect } from "naive-ui";
+import { NButton, NDataTable, NIcon, NInput, NModal } from "naive-ui";
 import type { DataTableColumns } from "naive-ui";
 import { computed, h, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import DirectoryRail from "@/components/chat/DirectoryRail.vue";
+import AppPaginationBar from "@/components/layout/AppPaginationBar.vue";
 import { systemDiagnosticsApi } from "@/api/systemDiagnosticsApi";
 import { message as discreteMessage } from "@/discrete";
 import type { SystemErrorLog } from "@/types/api";
@@ -19,11 +20,7 @@ const pageSize = ref(20);
 const total = ref(0);
 const selectedEvent = ref<SystemErrorLog | null>(null);
 const searchKeyword = ref("");
-const pageSizeOptions = computed(() => [
-  { label: "10", value: 10 },
-  { label: "20", value: 20 },
-  { label: "50", value: 50 }
-]);
+const pageSizeOptions = [10, 20, 50];
 const detailModalVisible = computed({
   get: () => selectedEvent.value !== null,
   set: (value: boolean) => {
@@ -179,23 +176,14 @@ function backToSettings() {
               </template>
             </n-data-table>
             <div class="settings-error-logs-pagination">
-              <n-pagination
+              <AppPaginationBar
                 :page="page"
                 :page-size="pageSize"
-                :item-count="total"
-                :page-slot="7"
+                :total="total"
+                :page-size-options="pageSizeOptions"
                 @update:page="handlePageChange"
+                @update:page-size="handlePageSizeChange"
               />
-              <div class="settings-error-logs-page-size-control">
-                <span class="settings-error-logs-page-size-label">{{ t("settings.paginationShowPerPage") }}</span>
-                <n-select
-                  :value="pageSize"
-                  size="small"
-                  class="settings-error-logs-page-size-select"
-                  :options="pageSizeOptions"
-                  @update:value="handlePageSizeChange"
-                />
-              </div>
             </div>
           </section>
         </div>
@@ -291,26 +279,7 @@ function backToSettings() {
 }
 
 .settings-error-logs-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-}
-
-.settings-error-logs-page-size-select {
-  width: 72px;
-}
-
-.settings-error-logs-page-size-control {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.settings-error-logs-page-size-label {
-  color: var(--color-text-secondary);
-  font-size: var(--text-body-size);
+  display: contents;
 }
 
 .settings-error-log-time {
