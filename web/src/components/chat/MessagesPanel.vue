@@ -176,6 +176,24 @@ function runStatusText(status: string) {
   return status;
 }
 
+function isMessageCanceled(message: ConversationMessage) {
+  const status = (message.status || "").trim().toLowerCase();
+  return status === "canceled";
+}
+
+function shouldShowCanceledSystemBubble(message: ConversationMessage) {
+  if (message.role !== "user" || !message.messageUid) return false;
+  const run = conversationRunsStore.runsByMessageUid[message.messageUid];
+  const runCanceled = (run?.status || "").trim().toLowerCase() === "canceled";
+  return runCanceled || isMessageCanceled(message);
+}
+
+function canceledSystemBubbleTime(message: ConversationMessage) {
+  if (!message.messageUid) return "";
+  const run = conversationRunsStore.runsByMessageUid[message.messageUid];
+  return run?.updatedTime || message.createdTime;
+}
+
 function runStepStateKey(messageUid: string | undefined, stepUid: string) {
   return `${messageUid || "unknown"}:${stepUid}`;
 }
@@ -756,6 +774,15 @@ onMounted(() => {
                     <div class="run-title">{{ t("chat.messages.runTitle") }}</div>
                   </div>
                 </template>
+                <template #header-extra>
+                  <n-tag
+                    v-if="runDisplayStatus(message.messageUid || '') !== 'planned'"
+                    size="small"
+                    :type="runTone(runDisplayStatus(message.messageUid || ''))"
+                  >
+                    {{ runStatusText(runDisplayStatus(message.messageUid || '')) }}
+                  </n-tag>
+                </template>
                 <div class="run-summary">{{ runProgressText(message.messageUid || "") }}</div>
                 <n-collapse class="run-steps-collapse">
                   <n-collapse-item
@@ -834,6 +861,12 @@ onMounted(() => {
             :force-visible="runHasWaitingApprovalStep(message)"
             class="run-approval-banner"
           />
+          <div v-if="shouldShowCanceledSystemBubble(message)" class="message-wrap canceled-assistant-message">
+            <div class="message-bubble">
+              <span class="message-system-event-text">{{ t("chat.messages.userCanceledTask") }}</span>
+            </div>
+            <div class="message-time message-system-event-time">{{ formatMessageTime(canceledSystemBubbleTime(message)) }}</div>
+          </div>
         </div>
 
         <div v-if="conversationStore.currentConversationUid && shouldShowTypingIndicator" class="message-wrap">
@@ -1299,6 +1332,27 @@ onMounted(() => {
 .run-summary {
   margin-top: var(--space-1_5);
   line-height: 1.7;
+}
+
+.canceled-assistant-message {
+  align-self: flex-start;
+  margin-top: var(--space-4);
+  width: min(var(--size-percent-message-max), var(--container-xl));
+}
+
+.canceled-assistant-message .message-time {
+  margin-top: var(--space-1_5);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(calc(var(--size-1) * -1));
+  transition: opacity 0.14s ease, transform 0.14s ease, visibility 0.14s ease;
+}
+
+.canceled-assistant-message:hover .message-time,
+.canceled-assistant-message:focus-within .message-time {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
 }
 
 .run-details {

@@ -217,6 +217,7 @@ const enUS = {
       processing: "Processing...",
       runTitle: "Execution",
       runProgressOnly: "Completed {completedSteps}/{totalSteps} steps",
+      userCanceledTask: "You canceled this task",
       runStatus: {
         completed: "Completed",
         failed: "Failed",

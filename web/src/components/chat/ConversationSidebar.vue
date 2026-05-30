@@ -246,6 +246,7 @@ function handleAgentChange(agentUid: string | number | null) {
 function isCronConversation(conversationUid: string) {
   return Boolean(cronTaskByConversationUid.value[String(conversationUid || "").trim()]);
 }
+
 </script>
 
 <template>
