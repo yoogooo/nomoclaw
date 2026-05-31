@@ -144,6 +144,11 @@ function buildDarkThemeOverrides(): GlobalThemeOverrides {
     Notification: {
       ...notificationOverrides("dark")
     },
+    Tooltip: {
+      color: "rgba(62, 66, 76, 0.98)",
+      textColor: "#F7F8FA",
+      boxShadow: "0 12px 28px rgba(0, 0, 0, 0.42), inset 0 0 0 1px rgba(255, 255, 255, 0.14)"
+    },
     Tag: {
       borderRadius: themeTokens.radius.base
     }
