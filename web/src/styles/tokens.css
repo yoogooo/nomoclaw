@@ -184,6 +184,8 @@
   --color-composer-stop-bg: #000000;
   --color-composer-stop-bg-hover: #141414;
   --color-composer-stop-fg: #FFFFFF;
+  --composer-model-select-border: 0;
+  --composer-model-select-border-hover: var(--color-border-active);
   --color-button-neutral-bg-light: #EEF1F5;
   --color-button-neutral-bg-hover-light: #E2E7EE;
   --color-button-neutral-bg-pressed-light: #D6DEE8;
@@ -329,6 +331,7 @@
   --size-180: 180px;
   --size-190: 190px;
   --size-220: 220px;
+  --size-240: 240px;
   --size-260: 260px;
   --size-280: 280px;
   --size-300: 300px;
@@ -352,9 +355,9 @@
   --control-height-sm: 2rem;
   --control-height-md: 2.5rem;
   --control-height-lg: 2.75rem;
-  --control-radius-sm: 0.5rem;
-  --control-radius-md: 0.625rem;
-  --control-radius-lg: 0.75rem;
+  --control-radius-sm: 0.3rem; /* 4.8px */
+  --control-radius-md: 0.4rem; /* 6.4px */
+  --control-radius-lg: 0.5rem; /* 8px */
   --control-padding-x-sm: var(--space-2_5);
   --control-padding-x-md: var(--space-3);
   --control-padding-x-lg: var(--space-4);
@@ -363,11 +366,11 @@
   --control-padding-y-lg: var(--space-2_5);
 
   /* Radius */
-  --radius-sm: 0.375rem; /* 6px */
-  --radius-md: 0.75rem; /* 12px */
-  --radius-lg: 1.125rem; /* 18px */
-  --radius-xl: 1.5rem; /* 24px */
-  --radius-2xl: 1.75rem; /* 28px */
+  --radius-sm: 0.2rem; /* 3.2px */
+  --radius-md: 0.4rem; /* 6.4px */
+  --radius-lg: 0.6rem; /* 9.6px */
+  --radius-xl: 0.8rem; /* 12.8px */
+  --radius-2xl: 0.9rem; /* 14.4px */
   --radius-pill: 999px;
 
   /* Runtime-overridable component variables with sensible defaults */
@@ -492,6 +495,8 @@
   --color-composer-stop-bg: #F2F3F5;
   --color-composer-stop-bg-hover: #FFFFFF;
   --color-composer-stop-fg: #000000;
+  --composer-model-select-border: var(--size-1) solid var(--color-border-strong);
+  --composer-model-select-border-hover: var(--color-border-active);
   --color-button-neutral-bg-light: #EEF1F5;
   --color-button-neutral-bg-hover-light: #E2E7EE;
   --color-button-neutral-bg-pressed-light: #D6DEE8;

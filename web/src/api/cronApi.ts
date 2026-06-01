@@ -2,18 +2,23 @@ import type {
   AgentCatalogGroup,
   BatchDeleteCronJobsResponse,
   CronJob,
+  CronJobExecutionHistoryPage,
   CronJobExecutionResult,
   CronJobReport,
   CronSubscription,
+  CronExecutionDetail,
   SimpleResponse
 } from "@/types/api";
 import { requestJson } from "@/utils/http";
 
 export interface UpdateCronJobPayload {
+  agentUid?: string;
   title?: string;
   expression?: string;
   timezone?: string;
   endAt?: string;
+  modelProvider?: string;
+  modelName?: string;
   taskContent?: string;
   status?: string;
 }
@@ -24,6 +29,8 @@ export interface CreateCronJobPayload {
   expression: string;
   timezone?: string;
   endAt?: string;
+  modelProvider?: string;
+  modelName?: string;
   taskContent: string;
   status?: string;
 }
@@ -56,6 +63,43 @@ export const cronApi = {
   },
   listCronJobResults(jobUid: string) {
     return requestJson<CronJobExecutionResult[]>(`/api/cron-jobs/${jobUid}/results`);
+  },
+  listGlobalRecentResults(limit = 20) {
+    return requestJson<CronJobExecutionResult[]>(`/api/cron-jobs/results/recent?limit=${limit}`);
+  },
+  listGlobalRunningResults(limit = 50) {
+    return requestJson<CronJobExecutionResult[]>(`/api/cron-jobs/results/running?limit=${limit}`);
+  },
+  listGlobalExecutionHistory(params?: {
+    agentUid?: string;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
+    const query = new URLSearchParams();
+    if (params?.agentUid) query.set("agentUid", params.agentUid);
+    if (params?.status) query.set("status", params.status);
+    if (params?.startDate) query.set("startDate", params.startDate);
+    if (params?.endDate) query.set("endDate", params.endDate);
+    query.set("page", String(params?.page && params.page > 0 ? params.page : 1));
+    query.set("pageSize", String(params?.pageSize && params.pageSize > 0 ? params.pageSize : 20));
+    return requestJson<CronJobExecutionHistoryPage>(`/api/cron-jobs/results/history?${query.toString()}`);
+  },
+  getExecutionDetail(executionUid: string, options?: { suppressErrorToast?: boolean }) {
+    return requestJson<CronExecutionDetail>(
+      `/api/cron-jobs/executions/${executionUid}`,
+      undefined,
+      options
+    );
+  },
+  markExecutionRead(executionUid: string) {
+    return requestJson<SimpleResponse>(`/api/cron-jobs/executions/${executionUid}/read`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({})
+    });
   },
   listCronSubscriptions(jobUid: string) {
     return requestJson<CronSubscription[]>(`/api/cron-jobs/${jobUid}/subscriptions`);

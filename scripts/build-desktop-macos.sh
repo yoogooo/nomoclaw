@@ -50,6 +50,8 @@ DESKTOP_PRODUCT_NAME=""
 TAURI_CONFIG_OVERRIDE_PATH=""
 BUILD_NO=""
 FULL_VERSION=""
+MACOS_BUNDLE_VERSION=""
+GIT_SHORT_SHA=""
 
 log() {
   printf '[build-desktop] %s\n' "$*" >&2
@@ -62,6 +64,12 @@ fail() {
 
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || fail "Missing command: $1"
+}
+
+resolve_git_short_sha() {
+  command -v git >/dev/null 2>&1 || fail "Missing command: git"
+  GIT_SHORT_SHA="$(git rev-parse --short=7 HEAD 2>/dev/null || true)"
+  [[ -n "$GIT_SHORT_SHA" ]] || fail "Failed to resolve git short SHA"
 }
 
 run_arch() {
@@ -127,7 +135,10 @@ setup_version_metadata() {
   seconds_of_day=$((10#$hour * 3600 + 10#$minute * 60 + 10#$second))
 
   BUILD_NO="${build_date}.${seconds_of_day}"
-  FULL_VERSION="${DESKTOP_VERSION}+${BUILD_NO}"
+  resolve_git_short_sha
+  FULL_VERSION="${DESKTOP_VERSION} (g${GIT_SHORT_SHA})"
+  # Keep the macOS bundle build id aligned with the visible build tag.
+  MACOS_BUNDLE_VERSION="g${GIT_SHORT_SHA}"
 }
 
 write_version_file() {
@@ -317,7 +328,7 @@ build_tauri_config_override() {
 
   node -e '
 const fs = require("fs");
-const [basePath, outPath, productName, version, updaterPubkey, targetArch] = process.argv.slice(1);
+const [basePath, outPath, productName, version, bundleVersion, updaterPubkey, targetArch] = process.argv.slice(1);
 const cfg = JSON.parse(fs.readFileSync(basePath, "utf8"));
 cfg.productName = productName;
 cfg.version = version;
@@ -331,12 +342,13 @@ cfg.bundle = cfg.bundle || {};
 cfg.bundle.macOS = cfg.bundle.macOS || {};
 // Intel builds target 10.15+, Apple Silicon builds target 11.0+.
 cfg.bundle.macOS.minimumSystemVersion = targetArch === "x64" ? "10.15" : "11.0";
+cfg.bundle.macOS.bundleVersion = bundleVersion;
 cfg.bundle.createUpdaterArtifacts = Boolean(updaterPubkey);
 if (updaterPubkey && cfg.plugins && cfg.plugins.updater) {
   cfg.plugins.updater.pubkey = updaterPubkey;
 }
 fs.writeFileSync(outPath, JSON.stringify(cfg, null, 2) + "\n");
-' "$base_config_path" "$TAURI_CONFIG_OVERRIDE_PATH" "$DESKTOP_PRODUCT_NAME" "$DESKTOP_VERSION" "$TAURI_UPDATER_PUBKEY" "$TARGET_ARCH"
+' "$base_config_path" "$TAURI_CONFIG_OVERRIDE_PATH" "$DESKTOP_PRODUCT_NAME" "$DESKTOP_VERSION" "$MACOS_BUNDLE_VERSION" "$TAURI_UPDATER_PUBKEY" "$TARGET_ARCH"
 }
 
 build_tauri_bundle() {

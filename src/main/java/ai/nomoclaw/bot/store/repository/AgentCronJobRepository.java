@@ -13,13 +13,13 @@ public class AgentCronJobRepository extends CrudRepository<AgentCronJobMapper, A
     public List<AgentCronJobEntity> listActive() {
         return lambdaQuery()
                 .eq(AgentCronJobEntity::getStatus, "ACTIVE")
-                .orderByAsc(AgentCronJobEntity::getCreatedTime, AgentCronJobEntity::getId)
+                .orderByAsc(AgentCronJobEntity::getId)
                 .list();
     }
 
     public List<AgentCronJobEntity> listAllJobs() {
         return lambdaQuery()
-                .orderByDesc(AgentCronJobEntity::getUpdatedTime, AgentCronJobEntity::getCreatedTime, AgentCronJobEntity::getId)
+                .orderByDesc(AgentCronJobEntity::getUpdatedTime, AgentCronJobEntity::getId)
                 .list();
     }
 

@@ -1,23 +1,18 @@
 package ai.nomoclaw.bot.orchestrator;
 
-import ai.nomoclaw.bot.application.dto.ModelConfigDto;
+import ai.nomoclaw.bot.conversation.support.ConversationAttachmentService;
+
+import ai.nomoclaw.bot.modelconfig.model.ModelConfigDto;
 import ai.nomoclaw.bot.domain.AgentMessage;
 import ai.nomoclaw.bot.model.PlanStep;
 import ai.nomoclaw.bot.model.ToolResult;
-import dev.langchain4j.data.message.ChatMessage;
-import dev.langchain4j.data.message.Content;
-import dev.langchain4j.data.message.ImageContent;
-import dev.langchain4j.data.message.TextContent;
-import dev.langchain4j.data.message.UserMessage;
+import ai.nomoclaw.bot.modelconfig.ModelConfigAppService;
+import dev.langchain4j.data.message.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
+import java.util.*;
 
 @Service
 @Slf4j
@@ -25,10 +20,10 @@ public class ImageLoaderContextService {
 
     private static final String MODEL_NOT_MULTIMODAL_CODE = "MODEL_NOT_MULTIMODAL";
 
-    private final ConversationAttachmentAppService conversationAttachmentAppService;
+    private final ConversationAttachmentService conversationAttachmentAppService;
     private final ModelConfigAppService modelConfigAppService;
 
-    public ImageLoaderContextService(ConversationAttachmentAppService conversationAttachmentAppService,
+    public ImageLoaderContextService(ConversationAttachmentService conversationAttachmentAppService,
                                      ModelConfigAppService modelConfigAppService) {
         this.conversationAttachmentAppService = conversationAttachmentAppService;
         this.modelConfigAppService = modelConfigAppService;
@@ -38,7 +33,7 @@ public class ImageLoaderContextService {
         if (message == null || step == null || result == null) {
             return IntegrationResult.noop();
         }
-        if (!"image_loader_tool".equals(step.toolName()) || !result.success()) {
+        if (!"ImageLoaderTool".equals(step.toolName()) || !result.success()) {
             return IntegrationResult.noop();
         }
         ResolvedImages resolvedImages = resolveImages(result.artifacts());
@@ -111,8 +106,8 @@ public class ImageLoaderContextService {
         Set<String> localPaths = new LinkedHashSet<>();
         Set<String> externalUrls = new LinkedHashSet<>();
         for (JsonNode image : images) {
-            String path = image.path("path").asText("");
-            String url = image.path("url").asText("");
+            String path = image.path("path").asString("");
+            String url = image.path("url").asString("");
             boolean external = image.path("isExternal").asBoolean(false);
             String normalizedPath = path == null ? "" : path.trim();
             String normalizedUrl = url == null ? "" : url.trim();

@@ -45,11 +45,11 @@ public class FeishuBotTargetResolverService {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             JsonNode root = readFeishuResponse(response, "bot/v3/info");
             JsonNode botNode = root.path("bot").isObject() ? root.path("bot") : root.path("data").path("bot");
-            String openId = trim(botNode.path("open_id").asText(""));
+            String openId = trim(botNode.path("open_id").asString(""));
             if (openId.isBlank()) {
                 return ResolveResult.unresolved("open_id missing in bot info response");
             }
-            String name = trim(botNode.path("name").asText(""));
+            String name = trim(botNode.path("name").asString(""));
             if (name.isBlank()) {
                 name = "Feishu Bot";
             }
@@ -73,7 +73,7 @@ public class FeishuBotTargetResolverService {
                 .build();
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         JsonNode root = readFeishuResponse(response, "auth/v3/tenant_access_token/internal");
-        String token = trim(root.path("tenant_access_token").asText(""));
+        String token = trim(root.path("tenant_access_token").asString(""));
         if (token.isBlank()) {
             throw new IllegalStateException("tenant_access_token is empty");
         }
@@ -87,7 +87,7 @@ public class FeishuBotTargetResolverService {
         JsonNode root = MAPPER.readTree(response.body());
         int code = root.path("code").asInt(-1);
         if (code != 0) {
-            throw new IllegalStateException("code=" + code + " msg=" + trim(root.path("msg").asText("")));
+            throw new IllegalStateException("code=" + code + " msg=" + trim(root.path("msg").asString("")));
         }
         return root;
     }

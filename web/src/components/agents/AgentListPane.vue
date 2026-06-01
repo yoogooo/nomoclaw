@@ -71,13 +71,16 @@ function avatarFallbackText(agent: ManagedAgent) {
 
 <style scoped>
 .agent-list-column {
+  min-width: 0;
   min-height: 0;
   overflow: hidden;
 }
 
 .agent-list-pane {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   height: 100%;
-  max-height: calc(100vh - 250px);
   min-height: 0;
   overflow: auto;
 }
@@ -154,13 +157,28 @@ function avatarFallbackText(agent: ManagedAgent) {
   box-shadow: var(--color-shadow-brand-inner);
 }
 
-@media (max-width: var(--size-breakpoint-lg)) {
+@media (max-width: 1120px) {
   .agent-list-column {
     overflow: visible;
   }
 
   .agent-list-pane {
+    height: auto;
+    min-height: unset;
     max-height: none;
+    overflow: visible;
+  }
+}
+
+@media (max-width: 700px) {
+  .agent-list-column {
+    min-height: unset;
+  }
+
+  .agent-list-pane {
+    height: auto;
+    min-height: unset;
+    overflow: visible;
   }
 }
 </style>

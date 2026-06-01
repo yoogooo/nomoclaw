@@ -7,6 +7,7 @@ import type {
   GlobalSkillBindings,
   AgentTip,
   AgentTool,
+  AgentMcpTool,
   CreateSkillPayload,
   ConversationMessage,
   ConversationMessageRun,
@@ -23,6 +24,7 @@ import type {
   UploadFilesResponse
 } from "@/types/api";
 import { requestJson } from "@/utils/http";
+import type { RequestJsonOptions } from "@/utils/http";
 
 export const conversationApi = {
   createConversation(agentGroupUid?: string, agentUid?: string) {
@@ -52,6 +54,11 @@ export const conversationApi = {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pinned })
+    });
+  },
+  markConversationRead(conversationUid: string) {
+    return requestJson<SimpleResponse>(`/api/conversations/${conversationUid}/read`, {
+      method: "PATCH"
     });
   },
   listAgentGroups() {
@@ -132,6 +139,9 @@ export const conversationApi = {
   listAgentTools(agentUid: string) {
     return requestJson<AgentTool[]>(`/api/agents/${agentUid}/tools`);
   },
+  listAgentMcpTools(agentUid: string) {
+    return requestJson<AgentMcpTool[]>(`/api/agents/${agentUid}/mcp-tools`);
+  },
   listAgentDocs(agentUid: string) {
     return requestJson<AgentDocFile[]>(`/api/agents/${agentUid}/docs`);
   },
@@ -153,12 +163,12 @@ export const conversationApi = {
     sourceMessageUid?: string;
     sourceTime?: string;
     generateBestPractice?: boolean;
-  }) {
+  }, options?: RequestJsonOptions) {
     return requestJson<AgentTip>(`/api/agents/${agentUid}/tips`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
-    });
+    }, options);
   },
   deleteAgentTip(agentUid: string, tipUid: string) {
     return requestJson<SimpleResponse>(`/api/agents/${agentUid}/tips/${tipUid}`, {
@@ -213,6 +223,13 @@ export const conversationApi = {
       body: JSON.stringify({ enabled })
     });
   },
+  updateAgentMcpToolStatus(agentUid: string, toolKey: string, enabled: boolean) {
+    return requestJson<AgentMcpTool>(`/api/agents/${agentUid}/mcp-tools/${toolKey}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled })
+    });
+  },
   getSystemConfig() {
     return requestJson<SystemConfig>("/api/system/config");
   },
@@ -241,9 +258,20 @@ export const conversationApi = {
     fileUrls: string[];
     modelProvider: string;
     modelName: string;
+    approvalMode: "default" | "full_access";
   }) {
     return requestJson<MessageResponse>(`/api/conversations/${conversationUid}/messages`, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+  },
+  updateApprovalMode(conversationUid: string, payload: {
+    approvalMode: "default" | "full_access";
+    applyToRunning?: boolean;
+  }) {
+    return requestJson<SimpleResponse>(`/api/conversations/${conversationUid}/approval-mode`, {
+      method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });

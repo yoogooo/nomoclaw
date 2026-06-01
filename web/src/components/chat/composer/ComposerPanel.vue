@@ -262,6 +262,7 @@ onBeforeUnmount(() => {
         <ComposerToolbar
           :selected-model-key="conversationStore.selectedModelKey"
           :model-options="conversationStore.availableModelOptions"
+          :approval-mode="conversationStore.approvalMode"
           :show-jinnang-picker="showJinnangPicker"
           :upload-disabled="Boolean(conversationStore.uploadDisabledReason)"
           :uploading-files="conversationStore.uploadingFiles"
@@ -271,6 +272,7 @@ onBeforeUnmount(() => {
           :render-label="renderModelLabel"
           :render-option="renderModelOption"
           @change-model="onModelChange"
+          @change-approval-mode="conversationStore.setApprovalMode($event)"
           @trigger-upload="triggerFilePicker"
           @toggle-jinnang="toggleJinnangPicker"
           @submit="conversationStore.sendMessage()"
@@ -402,7 +404,7 @@ onBeforeUnmount(() => {
   display: none;
 }
 
-@media (max-width: var(--size-breakpoint-md)) {
+@media (max-width: 600px) {
   .composer-spacer {
     display: block;
     height: calc(var(--size-190) + var(--size-20) + env(safe-area-inset-bottom));
@@ -425,6 +427,10 @@ onBeforeUnmount(() => {
   .composer-input-shell {
     padding: var(--space-3);
     border-radius: var(--radius-lg);
+  }
+
+  .composer-upload-status {
+    align-items: flex-start;
   }
 }
 </style>

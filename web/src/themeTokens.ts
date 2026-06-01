@@ -108,10 +108,46 @@ export const themeTokens = {
         borderError: "1px solid #FF6B6B",
         borderFocusError: "1px solid #FF6B6B"
       }
+    },
+    notification: {
+      light: {
+        color: "rgba(255, 255, 255, 0.96)",
+        titleColor: "#142338",
+        descriptionColor: "#475569",
+        iconColor: "#64748B",
+        closeColor: "#64748B",
+        closeColorHover: "#142338",
+        shadow: "inset 0 0 0 1px rgba(216, 227, 238, 0.9)"
+      },
+      dark: {
+        color: "rgba(36, 37, 40, 0.96)",
+        titleColor: "#F2F3F5",
+        descriptionColor: "#C2C5CA",
+        iconColor: "#979CA5",
+        closeColor: "#979CA5",
+        closeColorHover: "#F2F3F5",
+        shadow: "inset 0 0 0 1px rgba(255, 255, 255, 0.09)"
+      },
+      success: {
+        lightColor: "#0F766E",
+        lightBg: "rgba(15, 118, 110, 0.1)",
+        lightBorder: "rgba(15, 118, 110, 0.16)",
+        darkColor: "#6CE3C1",
+        darkBg: "rgba(54, 203, 181, 0.14)",
+        darkBorder: "rgba(54, 203, 181, 0.18)"
+      },
+      warning: {
+        lightColor: "#B9732F",
+        lightBg: "rgba(192, 106, 43, 0.1)",
+        lightBorder: "rgba(192, 106, 43, 0.16)",
+        darkColor: "#F1BA72",
+        darkBg: "rgba(240, 179, 90, 0.14)",
+        darkBorder: "rgba(240, 179, 90, 0.18)"
+      }
     }
   },
   radius: {
-    base: "18px"
+    base: "10px"
   },
   font: {
     sans: "\"IBM Plex Sans\", \"PingFang SC\", sans-serif",

@@ -19,19 +19,19 @@
   - `BUILD_TARGET_DMG=true|false`（默认 `true`）
   - `TAURI_BUILD_CI=true|false`（默认 `true`）
   - `TAURI_UPDATER_PUBKEY=<pubkey>`（可选；用于 updater 验签）
-  - `DESKTOP_VERSION=yyyy.M.d`（默认当天日期）
+  - `DESKTOP_VERSION=major.minor.patch`（推荐如 `1.0.0`；默认当天日期）
   - `DESKTOP_NAME_PREFIX=<name>`（默认 `NomoClaw`）
 - 示例:
-  - `TARGET_ARCH=arm64 DESKTOP_VERSION=2026.4.14 ./scripts/build-desktop-macos.sh`
+  - `TARGET_ARCH=arm64 DESKTOP_VERSION=1.0.0 ./scripts/build-desktop-macos.sh`
 
 常用平台命令:
 
 ```bash
 # Apple Silicon (arm64)
-TARGET_ARCH=arm64 ./scripts/build-desktop-macos.sh
+TARGET_ARCH=arm64 DESKTOP_VERSION=1.0.0 ./scripts/build-desktop-macos.sh
 
 # Intel (x64)
-TARGET_ARCH=x64 ./scripts/build-desktop-macos.sh
+TARGET_ARCH=x64 DESKTOP_VERSION=1.0.0 ./scripts/build-desktop-macos.sh
 ```
 
 ### `build-desktop-windows-x64.sh`
@@ -59,71 +59,11 @@ TARGET_ARCH=x64 ./scripts/build-desktop-macos.sh
   - `TAURI_BUNDLES=msi,nsis DESKTOP_VERSION=1.0.0 ./scripts/build-desktop-windows-x64.sh`
   - `TARGET_ARCH=arm64 TAURI_BUNDLES=msi,nsis DESKTOP_VERSION=1.0.0 ./scripts/build-desktop-windows-x64.sh`
 
-## 历史脚本（Legacy）
-
-以下脚本仍可用，但建议优先迁移到上面的统一脚本。
-
-### `legacy/build-dmg-apple-silicon.sh`
-
-- 作用:
-  - 仅用于 Apple Silicon（arm64）macOS 的 DMG 构建
-- 用法:
-  - `./scripts/legacy/build-dmg-apple-silicon.sh`
-- 可选参数:
-  - `APP_NAME=<name>`（默认 `NomoClaw`）
-  - `APP_VERSION=<version>`（默认自动生成并归一化）
-  - `ICON_FILE=<path>`（可选）
-  - `JAVA_OPTIONS='<opts>'`（默认含 `h2` profile 与 `18080` 端口）
-  - `LOG_FILE_PATH=<path>`（默认 `/tmp/NomoClaw.log`）
-  - `SKIP_TESTS=true|false`（默认 `true`）
-  - `MAVEN_PROFILE=prod-lite`（默认 `prod-lite`）
-  - `SKIP_WEB_BUILD=true|false`（默认 `false`）
-  - `MAC_UI_ELEMENT=true|false`（默认 `false`）
-
-### `legacy/build-dmg-macos-intel.sh`
-
-- 作用:
-  - macOS Intel（x64）DMG 构建
-  - 支持 Apple Silicon 上通过 Rosetta + x64 JDK 21 构建
-- 用法:
-  - `./scripts/legacy/build-dmg-macos-intel.sh`
-- 可选参数:
-  - `APP_NAME=<name>`（默认 `NomoClaw`）
-  - `APP_VERSION=<version>`（默认自动生成并归一化）
-  - `ICON_FILE=<path>`（可选）
-  - `JAVA_OPTIONS='<opts>'`（默认含 `h2` profile 与 `18080` 端口）
-  - `LOG_FILE_PATH=<path>`（默认 `/tmp/NomoClaw.log`）
-  - `SKIP_TESTS=true|false`（默认 `true`）
-  - `MAVEN_PROFILE=prod-lite`（默认 `prod-lite`）
-  - `SKIP_WEB_BUILD=true|false`（默认 `false`）
-  - `MAC_UI_ELEMENT=true|false`（默认 `false`）
-
-### `legacy/build-msi-windows-x64.sh`
-
-- 作用:
-  - Windows x64 MSI 构建（非 Tauri 统一脚本，历史版本）
-- 运行环境:
-  - 需在 Windows（Git Bash / MSYS / Cygwin）执行
-- 用法:
-  - `./scripts/legacy/build-msi-windows-x64.sh`
-- 可选参数:
-  - `APP_NAME=<name>`（默认 `NomoClaw`）
-  - `APP_VERSION=<version>`（默认自动生成并归一化）
-  - `ICON_FILE=<path>`（可选）
-  - `JAVA_OPTIONS='<opts>'`（默认含 `h2` profile 与 `18080` 端口）
-  - `LOG_FILE_PATH=<path>`（默认 `NomoClaw.log`）
-  - `SKIP_TESTS=true|false`（默认 `true`）
-  - `MAVEN_PROFILE=prod-lite`（默认 `prod-lite`）
-  - `SKIP_WEB_BUILD=true|false`（默认 `false`）
-  - `WIN_MENU_GROUP=<name>`（默认 `NomoClaw`）
-  - `WIN_PER_USER_INSTALL=true|false`（默认 `true`）
-
 ## 快速建议
 
 - 新项目或日常构建:
   - macOS 用 `build-desktop-macos.sh`
   - Windows 用 `build-desktop-windows-x64.sh`
-- Legacy 脚本适合兼容旧流程，不建议继续扩展新能力。
 
 ## 更新元数据校验
 

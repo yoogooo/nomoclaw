@@ -149,13 +149,16 @@
       width: 100%;
       height: 100%;
       filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.28));
+      --orbit-line: rgba(203, 213, 225, 0.08);
     }
 
     .sun {
       position: absolute;
-      inset: 50%;
+      left: 50%;
+      top: 50%;
       width: 18px;
       height: 18px;
+      z-index: 10;
       margin-left: -9px;
       margin-top: -9px;
       border-radius: 999px;
@@ -169,34 +172,34 @@
       position: absolute;
       top: 50%;
       left: 50%;
-      width: var(--orbit-size);
-      height: var(--orbit-size);
-      transform: translate(-50%, -50%);
+      width: calc(var(--semi-major) * 2px);
+      height: calc(var(--projected-minor) * 2px);
+      transform: translate(-50%, -50%) rotate(var(--tilt));
       border-radius: 50%;
-      border: 1px solid rgba(203, 213, 225, 0.05);
-      animation: orbit var(--period) linear infinite;
+      border: 1px solid var(--orbit-line);
     }
 
     .orbit .planet {
       position: absolute;
-      top: 50%;
-      left: 100%;
+      top: 0;
+      left: 0;
       width: var(--planet-size);
       height: var(--planet-size);
       transform: translate(-50%, -50%);
       border-radius: 50%;
       background: var(--planet-color);
       box-shadow: 0 0 6px var(--planet-glow);
+      will-change: left, top, transform;
     }
 
-    .orbit.mercury { --orbit-size: 59px; --planet-size: 3px; --period: 1.92s; --planet-color: #b7b7b5; --planet-glow: rgba(183, 183, 181, 0.65); }
-    .orbit.venus { --orbit-size: 82px; --planet-size: 4px; --period: 3.08s; --planet-color: #d6b484; --planet-glow: rgba(214, 180, 132, 0.58); }
-    .orbit.earth { --orbit-size: 105px; --planet-size: 4px; --period: 4.08s; --planet-color: #4fa3ff; --planet-glow: rgba(79, 163, 255, 0.62); }
-    .orbit.mars { --orbit-size: 127px; --planet-size: 3px; --period: 5.08s; --planet-color: #d37758; --planet-glow: rgba(211, 119, 88, 0.62); }
-    .orbit.jupiter { --orbit-size: 158px; --planet-size: 9px; --period: 6.5s; --planet-color: #d7b48a; --planet-glow: rgba(215, 180, 138, 0.56); }
-    .orbit.saturn { --orbit-size: 192px; --planet-size: 7px; --period: 8.08s; --planet-color: #d8c28f; --planet-glow: rgba(216, 194, 143, 0.54); }
-    .orbit.uranus { --orbit-size: 232px; --planet-size: 6px; --period: 9.92s; --planet-color: #87d6d6; --planet-glow: rgba(135, 214, 214, 0.52); }
-    .orbit.neptune { --orbit-size: 274px; --planet-size: 6px; --period: 12.08s; --planet-color: #5578d8; --planet-glow: rgba(85, 120, 216, 0.58); }
+    .orbit.mercury { --semi-major: 29.5; --projected-minor: 13; --tilt: -12deg; --planet-size: 3px; --planet-color: #b7b7b5; --planet-glow: rgba(183, 183, 181, 0.65); }
+    .orbit.venus { --semi-major: 41; --projected-minor: 18; --tilt: -12deg; --planet-size: 4px; --planet-color: #d6b484; --planet-glow: rgba(214, 180, 132, 0.58); }
+    .orbit.earth { --semi-major: 52.5; --projected-minor: 23; --tilt: -12deg; --planet-size: 4px; --planet-color: #4fa3ff; --planet-glow: rgba(79, 163, 255, 0.62); }
+    .orbit.mars { --semi-major: 63.5; --projected-minor: 28; --tilt: -12deg; --planet-size: 3px; --planet-color: #d37758; --planet-glow: rgba(211, 119, 88, 0.62); }
+    .orbit.jupiter { --semi-major: 79; --projected-minor: 35; --tilt: -12deg; --planet-size: 9px; --planet-color: #d7b48a; --planet-glow: rgba(215, 180, 138, 0.56); }
+    .orbit.saturn { --semi-major: 96; --projected-minor: 42; --tilt: -12deg; --planet-size: 7px; --planet-color: #d8c28f; --planet-glow: rgba(216, 194, 143, 0.54); }
+    .orbit.uranus { --semi-major: 116; --projected-minor: 51; --tilt: -12deg; --planet-size: 6px; --planet-color: #87d6d6; --planet-glow: rgba(135, 214, 214, 0.52); }
+    .orbit.neptune { --semi-major: 137; --projected-minor: 60; --tilt: -12deg; --planet-size: 6px; --planet-color: #5578d8; --planet-glow: rgba(85, 120, 216, 0.58); }
 
     .orbit.saturn .planet::after {
       content: "";
@@ -211,7 +214,7 @@
     }
 
     :root[data-theme="light"] .orbit {
-      border-color: rgba(71, 85, 105, 0.08);
+      --orbit-line: rgba(71, 85, 105, 0.12);
     }
 
     :root[data-theme="light"] .solar-system {
@@ -272,11 +275,6 @@
       100% { transform: translateX(140%); }
     }
 
-    @keyframes orbit {
-      from { transform: translate(-50%, -50%) rotate(0deg); }
-      to { transform: translate(-50%, -50%) rotate(360deg); }
-    }
-
   </style>
 </head>
 
@@ -302,21 +300,70 @@
 <div class="tips" id="loaderTip">Tip：页面没更新？右键点一下刷新试试</div>
 <script>
   (function () {
-    function randomizeOrbitPhases() {
-      const orbits = document.querySelectorAll(".orbit");
-      orbits.forEach((orbit) => {
-        const periodRaw = getComputedStyle(orbit).getPropertyValue("--period").trim();
-        const period = Number.parseFloat(periodRaw);
-        if (!Number.isFinite(period) || period <= 0) return;
-        const randomOffset = Math.random() * period;
-        orbit.style.animationDelay = `-${randomOffset}s`;
+    const TAU = Math.PI * 2;
+    const EARTH_RADIUS_PX = 52.5;
+    const EARTH_PERIOD_MS = 4200;
+
+    function cssNumber(style, name) {
+      return Number.parseFloat(style.getPropertyValue(name));
+    }
+
+    function solveEccentricAnomaly(meanAnomaly, eccentricity) {
+      let eccentricAnomaly = meanAnomaly;
+      for (let i = 0; i < 5; i += 1) {
+        eccentricAnomaly -= (eccentricAnomaly - eccentricity * Math.sin(eccentricAnomaly) - meanAnomaly) /
+          (1 - eccentricity * Math.cos(eccentricAnomaly));
+      }
+      return eccentricAnomaly;
+    }
+
+    function readOrbits() {
+      return Array.from(document.querySelectorAll(".orbit")).map((orbit) => {
+        const style = getComputedStyle(orbit);
+        const semiMajor = cssNumber(style, "--semi-major");
+        const projectedMinor = cssNumber(style, "--projected-minor");
+        const eccentricity = 0.18;
+        const period = EARTH_PERIOD_MS * Math.pow(semiMajor / EARTH_RADIUS_PX, 1.5);
+        return {
+          planet: orbit.querySelector(".planet"),
+          semiMajor,
+          projectedMinor,
+          eccentricity,
+          period,
+          phase: Math.random() * TAU
+        };
       });
     }
 
+    function startKeplerMotion() {
+      const bodies = readOrbits();
+      const startedAt = performance.now();
+
+      function frame(now) {
+        bodies.forEach((body) => {
+          const meanAnomaly = (((now - startedAt) / body.period) * TAU + body.phase) % TAU;
+          const eccentricAnomaly = solveEccentricAnomaly(meanAnomaly, body.eccentricity);
+          const x = body.semiMajor * (Math.cos(eccentricAnomaly) - body.eccentricity);
+          const y = body.projectedMinor * Math.sin(eccentricAnomaly);
+          const depth = (y / body.projectedMinor + 1) / 2;
+          const scale = 0.72 + depth * 0.36;
+
+          body.planet.style.left = `${body.semiMajor + x}px`;
+          body.planet.style.top = `${body.projectedMinor + y}px`;
+          body.planet.style.transform = `translate(-50%, -50%) scale(${scale})`;
+          body.planet.style.zIndex = String(Math.round(depth * 8));
+        });
+
+        requestAnimationFrame(frame);
+      }
+
+      requestAnimationFrame(frame);
+    }
+
     if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", randomizeOrbitPhases, { once: true });
+      document.addEventListener("DOMContentLoaded", startKeplerMotion, { once: true });
     } else {
-      randomizeOrbitPhases();
+      startKeplerMotion();
     }
   })();
 </script>

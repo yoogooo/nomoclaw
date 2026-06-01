@@ -1,5 +1,6 @@
 package ai.nomoclaw.bot.policy.tool.permission;
 
+import ai.nomoclaw.bot.config.AgentProperties;
 import ai.nomoclaw.bot.policy.tool.ToolPolicyContext;
 import ai.nomoclaw.bot.policy.tool.ToolPolicyReasonCode;
 import org.springframework.stereotype.Component;
@@ -19,26 +20,33 @@ import java.util.regex.Pattern;
 @Component
 public class PermissionEngine {
     private static final Set<String> BUILTIN_READONLY_TOOLS = Set.of(
-            "memory_search_tool",
-            "current_time_tool",
-            "token_usage_tool",
-            "file_search_tool",
-            "image_loader_tool"
+            "memorysearchtool",
+            "currenttimetool",
+            "tokenusagetool",
+            "readfiletool",
+            "filesearchtool",
+            "greptool",
+            "imageloadertool",
+            "websearchtool",
+            "webfetchtool"
     );
 
     private final PermissionSettingsStore settingsStore;
     private final SessionPermissionStore sessionPermissionStore;
     private final CommandRuleResolver commandRuleResolver;
     private final HardGuardService hardGuardService;
+    private final AgentProperties agentProperties;
 
     public PermissionEngine(PermissionSettingsStore settingsStore,
                             SessionPermissionStore sessionPermissionStore,
                             CommandRuleResolver commandRuleResolver,
-                            HardGuardService hardGuardService) {
+                            HardGuardService hardGuardService,
+                            AgentProperties agentProperties) {
         this.settingsStore = settingsStore;
         this.sessionPermissionStore = sessionPermissionStore;
         this.commandRuleResolver = commandRuleResolver;
         this.hardGuardService = hardGuardService;
+        this.agentProperties = agentProperties;
     }
 
     public PermissionDecision evaluate(ToolPolicyContext context) {
@@ -66,6 +74,10 @@ public class PermissionEngine {
         decision = matchByBehavior(context, details, PermissionEffect.ASK, rulesBySource);
         if (decision != null) {
             return decision;
+        }
+        PermissionDecision browserLocalBridgeGate = evaluateBrowserLocalBridgeConsent(context, details, rulesBySource);
+        if (browserLocalBridgeGate != null) {
+            return browserLocalBridgeGate;
         }
         decision = matchByBehavior(context, details, PermissionEffect.ALLOW, rulesBySource);
         if (decision != null) {
@@ -108,6 +120,18 @@ public class PermissionEngine {
             );
         }
 
+        if (isMcpBaselineAllowed(context)) {
+            return new PermissionDecision(
+                    PermissionEffect.ALLOW,
+                    ToolPolicyReasonCode.RULE_ALLOW_MATCHED,
+                    "MCP 工具默认放行。",
+                    PermissionSource.COMMAND,
+                    "mcp-default-allow",
+                    firstPath(details),
+                    false
+            );
+        }
+
         if (isBuiltinReadonlyTool(context.toolName())) {
             return new PermissionDecision(
                     PermissionEffect.ALLOW,
@@ -115,6 +139,17 @@ public class PermissionEngine {
                     "内置只读工具默认放行。",
                     PermissionSource.COMMAND,
                     "builtin-readonly-allow",
+                    firstPath(details),
+                    false
+            );
+        }
+        if (isCreateFileNewTargetAllowed(context, details)) {
+            return new PermissionDecision(
+                    PermissionEffect.ALLOW,
+                    ToolPolicyReasonCode.RULE_ALLOW_MATCHED,
+                    "新建文件写入默认放行。",
+                    PermissionSource.COMMAND,
+                    "builtin-file-create-new-allow",
                     firstPath(details),
                     false
             );
@@ -254,8 +289,10 @@ public class PermissionEngine {
             return toolName.startsWith(prefix);
         }
         if ("file_*".equals(ruleTool)) {
-            return "file_tool".equals(toolName)
-                    || "file_io_tool".equals(toolName);
+            return "readfiletool".equals(toolName)
+                    || "listfiletool".equals(toolName)
+                    || "createfiletool".equals(toolName)
+                    || "editfiletool".equals(toolName);
         }
         return ruleTool.equals(toolName);
     }
@@ -382,25 +419,96 @@ public class PermissionEngine {
     }
 
     private boolean isBuiltinReadonlyTool(String toolName) {
-        String normalized = normalize(toolName);
-        return BUILTIN_READONLY_TOOLS.contains(normalized);
+        return BUILTIN_READONLY_TOOLS.contains(normalize(toolName));
     }
 
     private boolean isCommandReadonlyBaselineAllowed(ToolPolicyContext context, PermissionContextDetails details) {
         String tool = normalize(context.toolName());
-        if (!"command_tool".equals(tool)) {
+        if (!"commandtool".equals(tool)) {
             return false;
         }
-        return commandRuleResolver.isReadonlyCommand(context, details) == CommandRuleResolver.ReadonlyCommandVerdict.READ_ONLY;
+        return commandRuleResolver.isReadonlyParam(context, details) == CommandRuleResolver.ReadonlyCommandVerdict.READ_ONLY;
     }
 
     private boolean isBrowserBaselineAllowed(ToolPolicyContext context) {
         String tool = normalize(context.toolName());
-        return "browser_tool".equals(tool) || "browser_control_tool".equals(tool);
+        return "browsertool".equals(tool);
     }
 
     private boolean isCronBaselineAllowed(ToolPolicyContext context) {
         String tool = normalize(context.toolName());
-        return "cron_tool".equals(tool);
+        return "croncreatetool".equals(tool)
+                || "crondeletetool".equals(tool)
+                || "cronlisttool".equals(tool);
+    }
+
+    private boolean isMcpBaselineAllowed(ToolPolicyContext context) {
+        return normalize(context.toolName()).startsWith("mcp_");
+    }
+
+    private boolean isCreateFileNewTargetAllowed(ToolPolicyContext context, PermissionContextDetails details) {
+        if (!"createfiletool".equals(normalize(context.toolName()))) {
+            return false;
+        }
+        String mode = context.toolArgs() == null ? "" : context.toolArgs().path("mode").asString("create_or_truncate");
+        if (!"create_or_truncate".equalsIgnoreCase(mode)) {
+            return false;
+        }
+        if (details == null || details.resolvedPaths() == null || details.resolvedPaths().isEmpty()) {
+            return false;
+        }
+        Path target = details.resolvedPaths().get(0);
+        if (target == null) {
+            return false;
+        }
+        return !Files.exists(target.toAbsolutePath().normalize());
+    }
+
+    private PermissionDecision evaluateBrowserLocalBridgeConsent(ToolPolicyContext context,
+                                                                 PermissionContextDetails details,
+                                                                 Map<PermissionSource, List<PermissionRule>> rulesBySource) {
+        if (!requiresLocalBridgeConsent(context)) {
+            return null;
+        }
+        PermissionDecision allowDecision = matchByBehavior(context, details, PermissionEffect.ALLOW, rulesBySource);
+        if (allowDecision != null) {
+            return allowDecision;
+        }
+        return new PermissionDecision(
+                PermissionEffect.ASK,
+                ToolPolicyReasonCode.POLICY_REQUIRE_APPROVAL_HIGH_RISK,
+                "local bridge 复用本地登录态访问高风险域名，需要用户确认。",
+                null,
+                "",
+                firstPath(details),
+                false
+        );
+    }
+
+    private boolean requiresLocalBridgeConsent(ToolPolicyContext context) {
+        if (!agentProperties.getBrowser().getLocalBridge().isConsentRequired()) {
+            return false;
+        }
+        if (!"browsertool".equals(normalize(context.toolName()))) {
+            return false;
+        }
+        String action = context.toolArgs().path("action").asString("").trim().toLowerCase(Locale.ROOT);
+        if (!"open".equals(action) && !"navigate".equals(action)) {
+            return false;
+        }
+        String mode = agentProperties.getBrowser().getMode() == null
+                ? "auto"
+                : agentProperties.getBrowser().getMode().trim().toLowerCase(Locale.ROOT);
+        if ("managed".equals(mode)) {
+            return false;
+        }
+        if ("local_bridge".equals(mode)) {
+            return true;
+        }
+        if (!"auto".equals(mode)) {
+            return false;
+        }
+        String host = BrowserPermissionSupport.extractHost(context.toolArgs().path("url").asString(""));
+        return BrowserPermissionSupport.matchesDomain(host, agentProperties.getBrowser().getLocalBridge().getLocalBridgeDomains());
     }
 }

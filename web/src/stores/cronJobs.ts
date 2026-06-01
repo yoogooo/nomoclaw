@@ -13,15 +13,33 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
   const selectedTab = ref<"config" | "result">("config");
   const currentSubscriptions = ref<CronSubscription[]>([]);
   const currentResults = ref<CronJobExecutionResult[]>([]);
-  const bulkMode = ref(false);
-  const selectedBulkJobUids = ref<string[]>([]);
   const loading = ref(false);
+  const recentGlobalResults = ref<CronJobExecutionResult[]>([]);
+  const runningGlobalResults = ref<CronJobExecutionResult[]>([]);
 
   const currentJob = computed(() => jobs.value.find((job) => job.jobUid === selectedJobUid.value) || null);
+  const ACTIVE_EXECUTION_STATUSES = new Set(["RUNNING", "WAITING_APPROVAL"]);
 
-  function clearBulkMode() {
-    bulkMode.value = false;
-    selectedBulkJobUids.value = [];
+  function isJobExecutionActive(job: CronJob | undefined) {
+    if (!job) return false;
+    const jobUid = String(job.jobUid || "").trim();
+    if (!jobUid) return false;
+    return runningGlobalResults.value.some((item) => String(item.jobUid || "").trim() === jobUid);
+  }
+
+  function markJobRunningLocally(jobUid: string) {
+    const nowIso = new Date().toISOString();
+    jobs.value = jobs.value.map((job) => (
+      job.jobUid === jobUid
+        ? {
+            ...job,
+            triggerState: "BLOCKED",
+            currentExecutionStatus: "RUNNING",
+            currentExecutionStartedTime: job.currentExecutionStartedTime || nowIso,
+            updatedTime: nowIso
+          }
+        : job
+    ));
   }
 
   async function selectJob(jobUid: string) {
@@ -40,29 +58,59 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
   async function refresh(preferredJobUid: string | null = selectedJobUid.value) {
     loading.value = true;
     try {
-      const [nextJobs, nextGroups] = await Promise.all([
+      const [nextJobs, nextGroups, recentResults, runningResults] = await Promise.all([
         cronApi.listCronJobs(),
-        cronApi.listAgentGroups()
+        cronApi.listAgentGroups(),
+        cronApi.listGlobalRecentResults(20),
+        cronApi.listGlobalRunningResults(100)
       ]);
-      jobs.value = nextJobs;
+      const statusByExecutionUid = new Map<string, string>();
+      await Promise.all(runningResults.map(async (item) => {
+        const executionUid = String(item.executionUid || "").trim();
+        if (!executionUid) return;
+        try {
+          const detail = await cronApi.getExecutionDetail(executionUid, { suppressErrorToast: true });
+          const normalizedStatus = String(detail?.status || "").trim();
+          if (normalizedStatus) {
+            statusByExecutionUid.set(executionUid, normalizedStatus);
+          }
+        } catch {
+          // Best-effort sync.
+        }
+      }));
+
+      jobs.value = nextJobs.map((job) => {
+        const executionUid = String(job.currentExecutionUid || "").trim();
+        const syncedStatus = executionUid ? statusByExecutionUid.get(executionUid) : undefined;
+        return syncedStatus ? { ...job, currentExecutionStatus: syncedStatus } : job;
+      });
       agentGroups.value = nextGroups;
-      selectedBulkJobUids.value = selectedBulkJobUids.value.filter((jobUid) =>
-        jobs.value.some((job) => job.jobUid === jobUid)
-      );
+      recentGlobalResults.value = recentResults;
+      runningGlobalResults.value = runningResults.map((item) => {
+        const executionUid = String(item.executionUid || "").trim();
+        const syncedStatus = executionUid ? statusByExecutionUid.get(executionUid) : undefined;
+        return syncedStatus ? { ...item, status: syncedStatus } : item;
+      });
 
       if (!jobs.value.length) {
         selectedJobUid.value = null;
         currentSubscriptions.value = [];
         currentResults.value = [];
-        clearBulkMode();
+        recentGlobalResults.value = [];
+        runningGlobalResults.value = [];
+        return;
+      }
+
+      if (preferredJobUid === null) {
+        selectedJobUid.value = null;
+        currentSubscriptions.value = [];
+        currentResults.value = [];
         return;
       }
 
       const nextSelection = preferredJobUid && jobs.value.some((job) => job.jobUid === preferredJobUid)
         ? preferredJobUid
-        : selectedJobUid.value && jobs.value.some((job) => job.jobUid === selectedJobUid.value)
-          ? selectedJobUid.value
-          : jobs.value[0].jobUid;
+        : jobs.value[0].jobUid;
 
       if (nextSelection) {
         await selectJob(nextSelection);
@@ -72,27 +120,62 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
     }
   }
 
-  function toggleBulkMode() {
-    bulkMode.value = !bulkMode.value;
-    if (!bulkMode.value) {
-      selectedBulkJobUids.value = [];
+  async function refreshExecutionState() {
+    const [nextJobs, recentResults, runningResults] = await Promise.all([
+      cronApi.listCronJobs(),
+      cronApi.listGlobalRecentResults(20),
+      cronApi.listGlobalRunningResults(100)
+    ]);
+    const statusByExecutionUid = new Map<string, string>();
+    await Promise.all(runningResults.map(async (item) => {
+      const executionUid = String(item.executionUid || "").trim();
+      if (!executionUid) return;
+      try {
+        const detail = await cronApi.getExecutionDetail(executionUid, { suppressErrorToast: true });
+        const normalizedStatus = String(detail?.status || "").trim();
+        if (normalizedStatus) {
+          statusByExecutionUid.set(executionUid, normalizedStatus);
+        }
+      } catch {
+        // Best-effort sync: keep existing job status when detail is temporarily unavailable.
+      }
+    }));
+    jobs.value = nextJobs.map((job) => {
+      const executionUid = String(job.currentExecutionUid || "").trim();
+      const syncedStatus = executionUid ? statusByExecutionUid.get(executionUid) : undefined;
+      return syncedStatus ? { ...job, currentExecutionStatus: syncedStatus } : job;
+    });
+    recentGlobalResults.value = recentResults;
+    runningGlobalResults.value = runningResults.map((item) => {
+      const executionUid = String(item.executionUid || "").trim();
+      const syncedStatus = executionUid ? statusByExecutionUid.get(executionUid) : undefined;
+      return syncedStatus ? { ...item, status: syncedStatus } : item;
+    });
+    if (selectedJobUid.value && !jobs.value.some((job) => job.jobUid === selectedJobUid.value)) {
+      selectedJobUid.value = null;
+      currentSubscriptions.value = [];
+      currentResults.value = [];
     }
-  }
-
-  function toggleBulkSelection(jobUid: string, checked: boolean) {
-    const next = new Set(selectedBulkJobUids.value);
-    if (checked) {
-      next.add(jobUid);
-    } else {
-      next.delete(jobUid);
-    }
-    selectedBulkJobUids.value = Array.from(next);
   }
 
   async function runJob(jobUid: string) {
-    await cronApi.runCronJob(jobUid);
-    await refresh(jobUid);
-    message.success(tr("toast.taskTriggered"));
+    const targetJob = jobs.value.find((job) => job.jobUid === jobUid);
+    if (isJobExecutionActive(targetJob)) {
+      message.warning("该任务正在执行中，请勿重复触发。");
+      return;
+    }
+    const preferredSelection = selectedJobUid.value;
+    const previousJobs = jobs.value.slice();
+    markJobRunningLocally(jobUid);
+    try {
+      const latestJob = await cronApi.runCronJob(jobUid);
+      jobs.value = jobs.value.map((job) => (job.jobUid === jobUid ? { ...job, ...latestJob } : job));
+      await refresh(preferredSelection);
+      message.success(tr("toast.taskTriggered"));
+    } catch (error) {
+      jobs.value = previousJobs;
+      throw error;
+    }
   }
 
   async function createJob(payload: CreateCronJobPayload) {
@@ -115,10 +198,13 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
   }
 
   async function updateJob(jobUid: string, payload: {
+    agentUid?: string;
     title: string;
     expression: string;
     timezone: string;
     endAt?: string;
+    modelProvider?: string;
+    modelName?: string;
     taskContent: string;
     status: string;
   }) {
@@ -147,41 +233,27 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
     });
   }
 
-  async function batchDeleteSelected() {
-    const selectedJobs = jobs.value.filter((job) => selectedBulkJobUids.value.includes(job.jobUid));
-    if (!selectedJobs.length) {
-      return;
-    }
-
-    const preview = selectedJobs.slice(0, 3).map((job) => `- ${job.title || job.taskContent || tr("format.fallbackNoName")}`).join("\n");
-    const suffix = selectedJobs.length > 3 ? tr("cron.batchDeleteSuffix", { count: selectedJobs.length - 3 }) : "";
-
-    dialog.warning({
-      title: tr("dialogs.deleteCronBatchTitle"),
-      content: tr("dialogs.deleteCronBatchContent", { count: selectedJobs.length, preview, suffix }),
-      ...warningDialogPreset(),
-      positiveText: tr("dialogs.confirmDelete"),
-      negativeText: tr("common.cancel"),
-      onPositiveClick: async () => {
-        const result = await cronApi.batchDeleteCronJobs(selectedJobs.map((job) => job.jobUid));
-        const nextJobUid = jobs.value.find((job) => !selectedBulkJobUids.value.includes(job.jobUid))?.jobUid || null;
-        clearBulkMode();
-        await refresh(nextJobUid);
-        if (!result.failedItems.length) {
-          message.success(tr("cron.batchDeleteSuccess", { count: result.deletedJobUids.length }));
-          return;
-        }
-        message.warning(tr("cron.batchDeletePartial", {
-          success: result.deletedJobUids.length,
-          failed: result.failedItems.length
-        }));
-      }
-    });
-  }
-
   async function openReportFile(path: string) {
     await fileApi.openFile(path);
   }
+
+  async function markExecutionRead(executionUid: string) {
+    if (!executionUid) {
+      return;
+    }
+    await cronApi.markExecutionRead(executionUid);
+    recentGlobalResults.value = recentGlobalResults.value.map((item) => (
+      item.executionUid === executionUid
+        ? { ...item, unread: false }
+        : item
+    ));
+    currentResults.value = currentResults.value.map((item) => (
+      item.executionUid === executionUid
+        ? { ...item, unread: false }
+        : item
+    ));
+  }
+
 
   async function updateSubscriptions(jobUid: string, payload: Array<{ channel: string; target: string; botId?: string; enabled: boolean }>) {
     const updated = await cronApi.updateCronSubscriptions(jobUid, { subscriptions: payload });
@@ -196,24 +268,22 @@ export const useCronJobsStore = defineStore("cronJobs", () => {
     selectedTab,
     currentSubscriptions,
     currentResults,
-    bulkMode,
-    selectedBulkJobUids,
+    recentGlobalResults,
+    runningGlobalResults,
     currentJob,
     loading,
     refresh,
+    refreshExecutionState,
     createJob,
     selectJob,
-    toggleBulkMode,
-    clearBulkMode,
-    toggleBulkSelection,
     runJob,
     pauseJob,
     resumeJob,
     updateJob,
     deleteJob,
     confirmDeleteJob,
-    batchDeleteSelected,
     openReportFile,
+    markExecutionRead,
     updateSubscriptions
   };
 });

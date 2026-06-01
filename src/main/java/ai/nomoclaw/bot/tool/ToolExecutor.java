@@ -4,6 +4,7 @@ import ai.nomoclaw.bot.model.PlanStep;
 import ai.nomoclaw.bot.model.ToolProgress;
 import ai.nomoclaw.bot.model.ToolRequest;
 import ai.nomoclaw.bot.model.ToolResult;
+import ai.nomoclaw.bot.mcp.McpApplicationService;
 import ai.nomoclaw.bot.orchestrator.MessageCancellationRegistry;
 import ai.nomoclaw.bot.orchestrator.ToolSpecificationRegistry;
 import ai.nomoclaw.bot.workspace.NomoClawPaths;
@@ -21,13 +22,16 @@ public class ToolExecutor {
     private final ToolRegistry toolRegistry;
     private final MessageCancellationRegistry cancellationRegistry;
     private final ToolSpecificationRegistry toolSpecificationRegistry;
+    private final McpApplicationService mcpApplicationService;
 
     public ToolExecutor(ToolRegistry toolRegistry,
                         MessageCancellationRegistry cancellationRegistry,
-                        ToolSpecificationRegistry toolSpecificationRegistry) {
+                        ToolSpecificationRegistry toolSpecificationRegistry,
+                        McpApplicationService mcpApplicationService) {
         this.toolRegistry = toolRegistry;
         this.cancellationRegistry = cancellationRegistry;
         this.toolSpecificationRegistry = toolSpecificationRegistry;
+        this.mcpApplicationService = mcpApplicationService;
     }
 
     public ToolResult execute(String conversationUid,
@@ -46,9 +50,8 @@ public class ToolExecutor {
         if (!toolSpecificationRegistry.isToolAllowed(agentName, step.toolName())) {
             return ToolResult.failure("UNAUTHORIZED_TOOL", "tool is not enabled for current agent", JsonNodeFactory.instance.objectNode());
         }
-        Tool tool = toolRegistry.getRequired(step.toolName());
         log.info("[ToolExecutor] dispatch tool={} conversationUid={} messageUid={} stepUid={} timeoutMs={}",
-                tool.name(), conversationUid, messageUid, step.stepUid(), timeoutMs);
+                step.toolName(), conversationUid, messageUid, step.stepUid(), timeoutMs);
         Path workspace = NomoClawPaths.ensureAgentWorkspace(agentWorkspacePath == null
                 ? NomoClawPaths.agentWorkspace(agentName)
                 : agentWorkspacePath);
@@ -67,6 +70,10 @@ public class ToolExecutor {
                 timeoutMs,
                 progressReporter
         );
+        if (toolSpecificationRegistry.isMcpTool(step.toolName())) {
+            return mcpApplicationService.execute(step.toolName(), request);
+        }
+        Tool tool = toolRegistry.getRequired(step.toolName());
         return tool.execute(request);
     }
 

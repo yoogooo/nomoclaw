@@ -2,13 +2,24 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { NButton, NCard, NDrawer, NDrawerContent, NForm, NFormItem, NInput, NSwitch, NTag } from "naive-ui";
+import { CircleHelp } from "lucide-vue-next";
 import DirectoryRail from "@/components/chat/DirectoryRail.vue";
 import AppPageHeader from "@/components/layout/AppPageHeader.vue";
+import UiInstantTooltip from "@/components/UiInstantTooltip.vue";
 import { channelApi } from "@/api/channelApi";
 import { message } from "@/discrete";
-import type { ChannelConfig, ChannelDingTalkBotConfig, ChannelFeishuBotConfig } from "@/types/api";
+import type {
+  ChannelConfig,
+  ChannelDingTalkBotConfig,
+  ChannelDiscordBotConfig,
+  ChannelFeishuBotConfig,
+  ChannelQqBotConfig,
+  ChannelTelegramBotConfig,
+  ChannelWeComBotConfig,
+  ChannelWeixinBotConfig
+} from "@/types/api";
 
-type ChannelKey = "feishu" | "dingtalk";
+type ChannelKey = "feishu" | "dingtalk" | "discord" | "telegram" | "qq" | "wecom" | "weixin";
 const { t } = useI18n();
 
 const loading = ref(false);
@@ -35,15 +46,58 @@ const channelCards = computed(() => [
     enabled: config.channels.dingtalk.enabled,
     botCount: config.channels.dingtalk.bots.length,
     defaultBot: config.channels.dingtalk.bots.find((item) => item.isDefault)?.displayName || "-"
+  },
+  {
+    key: "discord" as ChannelKey,
+    title: t("channels.cards.discord.title"),
+    subtitle: t("channels.cards.discord.subtitle"),
+    enabled: config.channels.discord.enabled,
+    botCount: config.channels.discord.bots.length,
+    defaultBot: config.channels.discord.bots.find((item) => item.isDefault)?.displayName || "-"
+  },
+  {
+    key: "telegram" as ChannelKey,
+    title: t("channels.cards.telegram.title"),
+    subtitle: t("channels.cards.telegram.subtitle"),
+    enabled: config.channels.telegram.enabled,
+    botCount: config.channels.telegram.bots.length,
+    defaultBot: config.channels.telegram.bots.find((item) => item.isDefault)?.displayName || "-"
+  },
+  {
+    key: "qq" as ChannelKey,
+    title: t("channels.cards.qq.title"),
+    subtitle: t("channels.cards.qq.subtitle"),
+    enabled: config.channels.qq.enabled,
+    botCount: config.channels.qq.bots.length,
+    defaultBot: config.channels.qq.bots.find((item) => item.isDefault)?.displayName || "-"
+  },
+  {
+    key: "wecom" as ChannelKey,
+    title: t("channels.cards.wecom.title"),
+    subtitle: t("channels.cards.wecom.subtitle"),
+    enabled: config.channels.wecom.enabled,
+    botCount: config.channels.wecom.bots.length,
+    defaultBot: config.channels.wecom.bots.find((item) => item.isDefault)?.displayName || "-"
+  },
+  {
+    key: "weixin" as ChannelKey,
+    title: t("channels.cards.weixin.title"),
+    subtitle: t("channels.cards.weixin.subtitle"),
+    enabled: config.channels.weixin.enabled,
+    botCount: config.channels.weixin.bots.length,
+    defaultBot: config.channels.weixin.bots.find((item) => item.isDefault)?.displayName || "-"
   }
 ]);
 
-const editorTitle = computed(() =>
-  editingKey.value === "feishu" ? t("channels.editor.feishuTitle") : t("channels.editor.dingtalkTitle")
-);
+const editorTitle = computed(() => t(`channels.editor.${editingKey.value}Title`));
 
 const editingFeishuBots = computed(() => draft.channels.feishu.bots);
 const editingDingTalkBots = computed(() => draft.channels.dingtalk.bots);
+const editingDiscordBots = computed(() => draft.channels.discord.bots);
+const editingTelegramBots = computed(() => draft.channels.telegram.bots);
+const editingQqBots = computed(() => draft.channels.qq.bots);
+const editingWeComBots = computed(() => draft.channels.wecom.bots);
+const editingWeixinBots = computed(() => draft.channels.weixin.bots);
 
 function createDefaultFeishuBot(): ChannelFeishuBotConfig {
   return {
@@ -77,11 +131,86 @@ function createDefaultDingTalkBot(): ChannelDingTalkBotConfig {
   };
 }
 
+function createDefaultDiscordBot(): ChannelDiscordBotConfig {
+  return {
+    botId: `discord_${Date.now()}`,
+    displayName: "Discord Bot",
+    enabled: true,
+    isDefault: false,
+    requireMention: true,
+    allowList: [],
+    token: "",
+    botUserId: "",
+    acceptBotMessages: false
+  };
+}
+
+function createDefaultTelegramBot(): ChannelTelegramBotConfig {
+  return {
+    botId: `telegram_${Date.now()}`,
+    displayName: "Telegram Bot",
+    enabled: true,
+    isDefault: false,
+    requireMention: true,
+    allowList: [],
+    token: "",
+    botUsername: ""
+  };
+}
+
+function createDefaultQqBot(): ChannelQqBotConfig {
+  return {
+    botId: `qq_${Date.now()}`,
+    displayName: "QQ Bot",
+    enabled: true,
+    isDefault: false,
+    requireMention: true,
+    allowList: [],
+    appId: "",
+    clientSecret: "",
+    botUserId: "",
+    sandbox: false,
+    markdownEnabled: false
+  };
+}
+
+function createDefaultWeComBot(): ChannelWeComBotConfig {
+  return {
+    botId: `wecom_${Date.now()}`,
+    displayName: "WeCom Bot",
+    enabled: true,
+    isDefault: false,
+    requireMention: true,
+    allowList: [],
+    wecomBotId: "",
+    secret: ""
+  };
+}
+
+function createDefaultWeixinBot(): ChannelWeixinBotConfig {
+  return {
+    botId: `weixin_${Date.now()}`,
+    displayName: "Weixin Bot",
+    enabled: true,
+    isDefault: false,
+    requireMention: true,
+    allowList: [],
+    botToken: "",
+    botTokenFile: "",
+    baseUrl: "https://ilinkai.weixin.qq.com"
+  };
+}
+
 function createEmptyConfig(): ChannelConfig {
   return {
     channels: {
       feishu: { enabled: false, bots: [createDefaultFeishuBot()] },
-      dingtalk: { enabled: false, bots: [createDefaultDingTalkBot()] }
+      dingtalk: { enabled: false, bots: [createDefaultDingTalkBot()] },
+      discord: { enabled: false, bots: [createDefaultDiscordBot()] },
+      telegram: { enabled: false, bots: [createDefaultTelegramBot()] },
+      qq: { enabled: false, bots: [createDefaultQqBot()] },
+      wecom: { enabled: false, bots: [createDefaultWeComBot()] },
+      weixin: { enabled: false, bots: [createDefaultWeixinBot()] }
     }
   };
 }
@@ -96,6 +225,21 @@ function syncAllowListText() {
   }
   for (const bot of config.channels.dingtalk.bots) {
     allowListText[`dingtalk:${bot.botId}`] = (bot.allowList || []).join(", ");
+  }
+  for (const bot of config.channels.discord.bots) {
+    allowListText[`discord:${bot.botId}`] = (bot.allowList || []).join(", ");
+  }
+  for (const bot of config.channels.telegram.bots) {
+    allowListText[`telegram:${bot.botId}`] = (bot.allowList || []).join(", ");
+  }
+  for (const bot of config.channels.qq.bots) {
+    allowListText[`qq:${bot.botId}`] = (bot.allowList || []).join(", ");
+  }
+  for (const bot of config.channels.wecom.bots) {
+    allowListText[`wecom:${bot.botId}`] = (bot.allowList || []).join(", ");
+  }
+  for (const bot of config.channels.weixin.bots) {
+    allowListText[`weixin:${bot.botId}`] = (bot.allowList || []).join(", ");
   }
 }
 
@@ -119,8 +263,12 @@ function extractOpenId(target: string): string {
   return index >= 0 ? raw.slice(index + 1) : raw;
 }
 
+function botsFor(channel: ChannelKey) {
+  return draft.channels[channel].bots;
+}
+
 function ensureSingleDefault(channel: ChannelKey) {
-  const bots = channel === "feishu" ? draft.channels.feishu.bots : draft.channels.dingtalk.bots;
+  const bots = botsFor(channel);
   if (!bots.length) {
     return;
   }
@@ -137,11 +285,31 @@ async function loadConfig() {
     const data = await channelApi.getChannelConfig();
     config.channels.feishu = { enabled: data.channels.feishu.enabled, bots: data.channels.feishu.bots || [] };
     config.channels.dingtalk = { enabled: data.channels.dingtalk.enabled, bots: data.channels.dingtalk.bots || [] };
+    config.channels.discord = { enabled: data.channels.discord.enabled, bots: data.channels.discord.bots || [] };
+    config.channels.telegram = { enabled: data.channels.telegram.enabled, bots: data.channels.telegram.bots || [] };
+    config.channels.qq = { enabled: data.channels.qq?.enabled ?? false, bots: data.channels.qq?.bots || [] };
+    config.channels.wecom = { enabled: data.channels.wecom?.enabled ?? false, bots: data.channels.wecom?.bots || [] };
+    config.channels.weixin = { enabled: data.channels.weixin?.enabled ?? false, bots: data.channels.weixin?.bots || [] };
     if (!config.channels.feishu.bots.length) {
       config.channels.feishu.bots = [createDefaultFeishuBot()];
     }
     if (!config.channels.dingtalk.bots.length) {
       config.channels.dingtalk.bots = [createDefaultDingTalkBot()];
+    }
+    if (!config.channels.discord.bots.length) {
+      config.channels.discord.bots = [createDefaultDiscordBot()];
+    }
+    if (!config.channels.telegram.bots.length) {
+      config.channels.telegram.bots = [createDefaultTelegramBot()];
+    }
+    if (!config.channels.qq.bots.length) {
+      config.channels.qq.bots = [createDefaultQqBot()];
+    }
+    if (!config.channels.wecom.bots.length) {
+      config.channels.wecom.bots = [createDefaultWeComBot()];
+    }
+    if (!config.channels.weixin.bots.length) {
+      config.channels.weixin.bots = [createDefaultWeixinBot()];
     }
     syncAllowListText();
   } finally {
@@ -164,13 +332,38 @@ function openEditor(key: ChannelKey) {
   const copied = cloneConfig(config);
   draft.channels.feishu = copied.channels.feishu;
   draft.channels.dingtalk = copied.channels.dingtalk;
+  draft.channels.discord = copied.channels.discord;
+  draft.channels.telegram = copied.channels.telegram;
+  draft.channels.qq = copied.channels.qq;
+  draft.channels.wecom = copied.channels.wecom;
+  draft.channels.weixin = copied.channels.weixin;
   ensureSingleDefault("feishu");
   ensureSingleDefault("dingtalk");
+  ensureSingleDefault("discord");
+  ensureSingleDefault("telegram");
+  ensureSingleDefault("qq");
+  ensureSingleDefault("wecom");
+  ensureSingleDefault("weixin");
   for (const bot of draft.channels.feishu.bots) {
     allowListText[`feishu:${bot.botId}`] = (bot.allowList || []).join(", ");
   }
   for (const bot of draft.channels.dingtalk.bots) {
     allowListText[`dingtalk:${bot.botId}`] = (bot.allowList || []).join(", ");
+  }
+  for (const bot of draft.channels.discord.bots) {
+    allowListText[`discord:${bot.botId}`] = (bot.allowList || []).join(", ");
+  }
+  for (const bot of draft.channels.telegram.bots) {
+    allowListText[`telegram:${bot.botId}`] = (bot.allowList || []).join(", ");
+  }
+  for (const bot of draft.channels.qq.bots) {
+    allowListText[`qq:${bot.botId}`] = (bot.allowList || []).join(", ");
+  }
+  for (const bot of draft.channels.wecom.bots) {
+    allowListText[`wecom:${bot.botId}`] = (bot.allowList || []).join(", ");
+  }
+  for (const bot of draft.channels.weixin.bots) {
+    allowListText[`weixin:${bot.botId}`] = (bot.allowList || []).join(", ");
   }
   showEditor.value = true;
 }
@@ -178,14 +371,24 @@ function openEditor(key: ChannelKey) {
 function addBot(channel: ChannelKey) {
   if (channel === "feishu") {
     draft.channels.feishu.bots.push(createDefaultFeishuBot());
-  } else {
+  } else if (channel === "dingtalk") {
     draft.channels.dingtalk.bots.push(createDefaultDingTalkBot());
+  } else if (channel === "discord") {
+    draft.channels.discord.bots.push(createDefaultDiscordBot());
+  } else if (channel === "telegram") {
+    draft.channels.telegram.bots.push(createDefaultTelegramBot());
+  } else if (channel === "qq") {
+    draft.channels.qq.bots.push(createDefaultQqBot());
+  } else if (channel === "wecom") {
+    draft.channels.wecom.bots.push(createDefaultWeComBot());
+  } else {
+    draft.channels.weixin.bots.push(createDefaultWeixinBot());
   }
   ensureSingleDefault(channel);
 }
 
 function removeBot(channel: ChannelKey, index: number) {
-  const bots = channel === "feishu" ? draft.channels.feishu.bots : draft.channels.dingtalk.bots;
+  const bots = botsFor(channel);
   if (bots.length <= 1) {
     return;
   }
@@ -194,7 +397,7 @@ function removeBot(channel: ChannelKey, index: number) {
 }
 
 function setDefaultBot(channel: ChannelKey, index: number) {
-  const bots = channel === "feishu" ? draft.channels.feishu.bots : draft.channels.dingtalk.bots;
+  const bots = botsFor(channel);
   bots.forEach((item, idx) => {
     item.isDefault = idx === index;
   });
@@ -213,13 +416,73 @@ function validateChannelDraft() {
     });
     return;
   }
-  const section = draft.channels.dingtalk;
+  if (editingKey.value === "dingtalk") {
+    const section = draft.channels.dingtalk;
+    if (section.enabled && !section.bots.some((item) => item.enabled)) {
+      throw new Error(t("channels.errors.dingtalkRequired"));
+    }
+    section.bots.forEach((bot) => {
+      if (section.enabled && bot.enabled && (!bot.clientId.trim() || !bot.clientSecret.trim() || !bot.robotCode.trim())) {
+        throw new Error(t("channels.errors.dingtalkRequired"));
+      }
+    });
+    return;
+  }
+  if (editingKey.value === "discord") {
+    const section = draft.channels.discord;
+    if (section.enabled && !section.bots.some((item) => item.enabled)) {
+      throw new Error(t("channels.errors.discordRequired"));
+    }
+    section.bots.forEach((bot) => {
+      if (section.enabled && bot.enabled && !bot.token.trim()) {
+        throw new Error(t("channels.errors.discordRequired"));
+      }
+    });
+    return;
+  }
+  if (editingKey.value === "telegram") {
+    const section = draft.channels.telegram;
+    if (section.enabled && !section.bots.some((item) => item.enabled)) {
+      throw new Error(t("channels.errors.telegramRequired"));
+    }
+    section.bots.forEach((bot) => {
+      if (section.enabled && bot.enabled && !bot.token.trim()) {
+        throw new Error(t("channels.errors.telegramRequired"));
+      }
+    });
+    return;
+  }
+  if (editingKey.value === "qq") {
+    const section = draft.channels.qq;
+    if (section.enabled && !section.bots.some((item) => item.enabled)) {
+      throw new Error(t("channels.errors.qqRequired"));
+    }
+    section.bots.forEach((bot) => {
+      if (section.enabled && bot.enabled && (!bot.appId.trim() || !bot.clientSecret.trim())) {
+        throw new Error(t("channels.errors.qqRequired"));
+      }
+    });
+    return;
+  }
+  if (editingKey.value === "wecom") {
+    const section = draft.channels.wecom;
+    if (section.enabled && !section.bots.some((item) => item.enabled)) {
+      throw new Error(t("channels.errors.wecomRequired"));
+    }
+    section.bots.forEach((bot) => {
+      if (section.enabled && bot.enabled && (!bot.wecomBotId.trim() || !bot.secret.trim())) {
+        throw new Error(t("channels.errors.wecomRequired"));
+      }
+    });
+    return;
+  }
+  const section = draft.channels.weixin;
   if (section.enabled && !section.bots.some((item) => item.enabled)) {
-    throw new Error(t("channels.errors.dingtalkRequired"));
+    throw new Error(t("channels.errors.weixinRequired"));
   }
   section.bots.forEach((bot) => {
-    if (section.enabled && bot.enabled && (!bot.clientId.trim() || !bot.clientSecret.trim() || !bot.robotCode.trim())) {
-      throw new Error(t("channels.errors.dingtalkRequired"));
+    if (section.enabled && bot.enabled && (!bot.botToken.trim() && !bot.botTokenFile.trim())) {
+      throw new Error(t("channels.errors.weixinRequired"));
     }
   });
 }
@@ -233,8 +496,30 @@ function normalizeDraftBeforeSave() {
   draft.channels.dingtalk.bots.forEach((bot) => {
     bot.allowList = normalizeAllowList(allowListText[`dingtalk:${bot.botId}`] || "");
   });
+  draft.channels.discord.bots.forEach((bot) => {
+    bot.allowList = normalizeAllowList(allowListText[`discord:${bot.botId}`] || "");
+  });
+  draft.channels.telegram.bots.forEach((bot) => {
+    bot.allowList = normalizeAllowList(allowListText[`telegram:${bot.botId}`] || "");
+    bot.botUsername = bot.botUsername.replace(/^@/, "").trim();
+  });
+  draft.channels.qq.bots.forEach((bot) => {
+    bot.allowList = normalizeAllowList(allowListText[`qq:${bot.botId}`] || "");
+  });
+  draft.channels.wecom.bots.forEach((bot) => {
+    bot.allowList = normalizeAllowList(allowListText[`wecom:${bot.botId}`] || "");
+  });
+  draft.channels.weixin.bots.forEach((bot) => {
+    bot.allowList = normalizeAllowList(allowListText[`weixin:${bot.botId}`] || "");
+    bot.baseUrl = bot.baseUrl.trim() || "https://ilinkai.weixin.qq.com";
+  });
   ensureSingleDefault("feishu");
   ensureSingleDefault("dingtalk");
+  ensureSingleDefault("discord");
+  ensureSingleDefault("telegram");
+  ensureSingleDefault("qq");
+  ensureSingleDefault("wecom");
+  ensureSingleDefault("weixin");
 }
 
 async function saveEditor() {
@@ -245,6 +530,11 @@ async function saveEditor() {
     const saved = await channelApi.updateChannelConfig(cloneConfig(draft));
     config.channels.feishu = { ...saved.channels.feishu };
     config.channels.dingtalk = { ...saved.channels.dingtalk };
+    config.channels.discord = { ...saved.channels.discord };
+    config.channels.telegram = { ...saved.channels.telegram };
+    config.channels.qq = { ...saved.channels.qq };
+    config.channels.wecom = { ...saved.channels.wecom };
+    config.channels.weixin = { ...saved.channels.weixin };
     syncAllowListText();
     showEditor.value = false;
     message.success(t("channels.toast.saved"));
@@ -344,7 +634,15 @@ onMounted(() => {
               <n-input v-model:value="bot.appSecret" type="password" show-password-on="click" />
             </n-form-item>
           </div>
-          <n-form-item class="bot-full-row" :label="t('channels.editor.allowList')">
+          <n-form-item class="bot-full-row">
+            <template #label>
+              <span class="field-label-with-tip">
+                <span>{{ t("channels.editor.allowList") }}</span>
+                <UiInstantTooltip :content="t('channels.editor.allowListTip')" placement="top">
+                  <CircleHelp class="field-tip-icon" :size="15" />
+                </UiInstantTooltip>
+              </span>
+            </template>
             <n-input v-model:value="allowListText[`feishu:${bot.botId}`]" />
           </n-form-item>
           <div class="bot-target-status">
@@ -359,7 +657,7 @@ onMounted(() => {
         </div>
       </n-form>
 
-      <n-form v-else label-placement="top" class="channel-edit-form">
+      <n-form v-else-if="editingKey === 'dingtalk'" label-placement="top" class="channel-edit-form">
         <div class="editor-toolbar">
           <div class="channel-switch-row">
             <span class="meta-label">{{ t("channels.editor.enableDingtalk") }}</span>
@@ -400,8 +698,298 @@ onMounted(() => {
           <n-form-item :label="t('channels.editor.dingtalkRobotCode')">
             <n-input v-model:value="bot.robotCode" />
           </n-form-item>
-          <n-form-item class="bot-full-row" :label="t('channels.editor.allowList')">
+          <n-form-item class="bot-full-row">
+            <template #label>
+              <span class="field-label-with-tip">
+                <span>{{ t("channels.editor.allowList") }}</span>
+                <UiInstantTooltip :content="t('channels.editor.allowListTip')" placement="top">
+                  <CircleHelp class="field-tip-icon" :size="15" />
+                </UiInstantTooltip>
+              </span>
+            </template>
             <n-input v-model:value="allowListText[`dingtalk:${bot.botId}`]" />
+          </n-form-item>
+        </div>
+      </n-form>
+
+      <n-form v-else-if="editingKey === 'discord'" label-placement="top" class="channel-edit-form">
+        <div class="editor-toolbar">
+          <div class="channel-switch-row">
+            <span class="meta-label">{{ t("channels.editor.enableDiscord") }}</span>
+            <n-switch v-model:value="draft.channels.discord.enabled" />
+          </div>
+          <n-button tertiary type="primary" @click="addBot('discord')">{{ t("channels.editor.addBot") }}</n-button>
+        </div>
+        <div v-for="(bot, idx) in editingDiscordBots" :key="`discord-${bot.botId}-${idx}`" class="bot-card">
+          <div class="bot-head">
+            <div class="bot-title">
+              <div class="bot-name">{{ bot.displayName || bot.botId }}</div>
+              <div class="bot-id-sub">{{ bot.botId }}</div>
+            </div>
+            <div class="bot-head-actions">
+              <n-button size="small" tertiary :type="bot.isDefault ? 'success' : 'default'" @click="setDefaultBot('discord', idx)">
+                {{ bot.isDefault ? t("channels.editor.defaultBot") : t("channels.editor.setDefault") }}
+              </n-button>
+              <n-button size="small" tertiary type="error" :disabled="editingDiscordBots.length <= 1" @click="removeBot('discord', idx)">
+                {{ t("common.delete") }}
+              </n-button>
+            </div>
+          </div>
+          <div class="bot-switch-row">
+            <span class="meta-label">{{ t("common.enabled") }}</span>
+            <n-switch v-model:value="bot.enabled" />
+          </div>
+          <div class="bot-field-grid">
+            <n-form-item :label="t('channels.editor.botName')">
+              <n-input v-model:value="bot.displayName" />
+            </n-form-item>
+            <n-form-item>
+              <template #label>
+                <span class="field-label-with-tip">
+                  <span>{{ t("channels.editor.discordBotUserId") }}</span>
+                  <UiInstantTooltip :content="t('channels.editor.discordBotUserIdTip')" placement="top">
+                    <CircleHelp class="field-tip-icon" :size="15" />
+                  </UiInstantTooltip>
+                </span>
+              </template>
+              <n-input v-model:value="bot.botUserId" />
+            </n-form-item>
+            <n-form-item :label="t('channels.editor.discordToken')">
+              <n-input v-model:value="bot.token" type="password" show-password-on="click" />
+            </n-form-item>
+          </div>
+          <n-form-item class="bot-full-row">
+            <template #label>
+              <span class="field-label-with-tip">
+                <span>{{ t("channels.editor.allowList") }}</span>
+                <UiInstantTooltip :content="t('channels.editor.allowListTip')" placement="top">
+                  <CircleHelp class="field-tip-icon" :size="15" />
+                </UiInstantTooltip>
+              </span>
+            </template>
+            <n-input v-model:value="allowListText[`discord:${bot.botId}`]" />
+          </n-form-item>
+          <div class="bot-switch-row">
+            <span class="meta-label">{{ t("channels.editor.acceptBotMessages") }}</span>
+            <n-switch v-model:value="bot.acceptBotMessages" />
+          </div>
+        </div>
+      </n-form>
+
+      <n-form v-else-if="editingKey === 'telegram'" label-placement="top" class="channel-edit-form">
+        <div class="editor-toolbar">
+          <div class="channel-switch-row">
+            <span class="meta-label">{{ t("channels.editor.enableTelegram") }}</span>
+            <n-switch v-model:value="draft.channels.telegram.enabled" />
+          </div>
+          <n-button tertiary type="primary" @click="addBot('telegram')">{{ t("channels.editor.addBot") }}</n-button>
+        </div>
+        <div v-for="(bot, idx) in editingTelegramBots" :key="`telegram-${bot.botId}-${idx}`" class="bot-card">
+          <div class="bot-head">
+            <div class="bot-title">
+              <div class="bot-name">{{ bot.displayName || bot.botId }}</div>
+              <div class="bot-id-sub">{{ bot.botId }}</div>
+            </div>
+            <div class="bot-head-actions">
+              <n-button size="small" tertiary :type="bot.isDefault ? 'success' : 'default'" @click="setDefaultBot('telegram', idx)">
+                {{ bot.isDefault ? t("channels.editor.defaultBot") : t("channels.editor.setDefault") }}
+              </n-button>
+              <n-button size="small" tertiary type="error" :disabled="editingTelegramBots.length <= 1" @click="removeBot('telegram', idx)">
+                {{ t("common.delete") }}
+              </n-button>
+            </div>
+          </div>
+          <div class="bot-switch-row">
+            <span class="meta-label">{{ t("common.enabled") }}</span>
+            <n-switch v-model:value="bot.enabled" />
+          </div>
+          <div class="bot-field-grid">
+            <n-form-item :label="t('channels.editor.botName')">
+              <n-input v-model:value="bot.displayName" />
+            </n-form-item>
+            <n-form-item :label="t('channels.editor.telegramUsername')">
+              <n-input v-model:value="bot.botUsername" />
+            </n-form-item>
+            <n-form-item :label="t('channels.editor.telegramToken')">
+              <n-input v-model:value="bot.token" type="password" show-password-on="click" />
+            </n-form-item>
+          </div>
+          <n-form-item class="bot-full-row">
+            <template #label>
+              <span class="field-label-with-tip">
+                <span>{{ t("channels.editor.allowList") }}</span>
+                <UiInstantTooltip :content="t('channels.editor.allowListTip')" placement="top">
+                  <CircleHelp class="field-tip-icon" :size="15" />
+                </UiInstantTooltip>
+              </span>
+            </template>
+            <n-input v-model:value="allowListText[`telegram:${bot.botId}`]" />
+          </n-form-item>
+        </div>
+      </n-form>
+
+      <n-form v-else-if="editingKey === 'qq'" label-placement="top" class="channel-edit-form">
+        <div class="editor-toolbar">
+          <div class="channel-switch-row">
+            <span class="meta-label">{{ t("channels.editor.enableQq") }}</span>
+            <n-switch v-model:value="draft.channels.qq.enabled" />
+          </div>
+          <n-button tertiary type="primary" @click="addBot('qq')">{{ t("channels.editor.addBot") }}</n-button>
+        </div>
+        <div v-for="(bot, idx) in editingQqBots" :key="`qq-${bot.botId}-${idx}`" class="bot-card">
+          <div class="bot-head">
+            <div class="bot-title">
+              <div class="bot-name">{{ bot.displayName || bot.botId }}</div>
+              <div class="bot-id-sub">{{ bot.botId }}</div>
+            </div>
+            <div class="bot-head-actions">
+              <n-button size="small" tertiary :type="bot.isDefault ? 'success' : 'default'" @click="setDefaultBot('qq', idx)">
+                {{ bot.isDefault ? t("channels.editor.defaultBot") : t("channels.editor.setDefault") }}
+              </n-button>
+              <n-button size="small" tertiary type="error" :disabled="editingQqBots.length <= 1" @click="removeBot('qq', idx)">
+                {{ t("common.delete") }}
+              </n-button>
+            </div>
+          </div>
+          <div class="bot-switch-row">
+            <span class="meta-label">{{ t("common.enabled") }}</span>
+            <n-switch v-model:value="bot.enabled" />
+          </div>
+          <div class="bot-field-grid">
+            <n-form-item :label="t('channels.editor.botName')">
+              <n-input v-model:value="bot.displayName" />
+            </n-form-item>
+            <n-form-item :label="t('channels.editor.qqAppId')">
+              <n-input v-model:value="bot.appId" />
+            </n-form-item>
+            <n-form-item :label="t('channels.editor.qqClientSecret')">
+              <n-input v-model:value="bot.clientSecret" type="password" show-password-on="click" />
+            </n-form-item>
+            <n-form-item :label="t('channels.editor.qqBotUserId')">
+              <n-input v-model:value="bot.botUserId" />
+            </n-form-item>
+          </div>
+          <n-form-item class="bot-full-row">
+            <template #label>
+              <span class="field-label-with-tip">
+                <span>{{ t("channels.editor.allowList") }}</span>
+                <UiInstantTooltip :content="t('channels.editor.allowListTip')" placement="top">
+                  <CircleHelp class="field-tip-icon" :size="15" />
+                </UiInstantTooltip>
+              </span>
+            </template>
+            <n-input v-model:value="allowListText[`qq:${bot.botId}`]" />
+          </n-form-item>
+          <div class="bot-switch-row">
+            <span class="meta-label">{{ t("channels.editor.qqSandbox") }}</span>
+            <n-switch v-model:value="bot.sandbox" />
+          </div>
+        </div>
+      </n-form>
+
+      <n-form v-else-if="editingKey === 'wecom'" label-placement="top" class="channel-edit-form">
+        <div class="editor-toolbar">
+          <div class="channel-switch-row">
+            <span class="meta-label">{{ t("channels.editor.enableWecom") }}</span>
+            <n-switch v-model:value="draft.channels.wecom.enabled" />
+          </div>
+          <n-button tertiary type="primary" @click="addBot('wecom')">{{ t("channels.editor.addBot") }}</n-button>
+        </div>
+        <div v-for="(bot, idx) in editingWeComBots" :key="`wecom-${bot.botId}-${idx}`" class="bot-card">
+          <div class="bot-head">
+            <div class="bot-title">
+              <div class="bot-name">{{ bot.displayName || bot.botId }}</div>
+              <div class="bot-id-sub">{{ bot.botId }}</div>
+            </div>
+            <div class="bot-head-actions">
+              <n-button size="small" tertiary :type="bot.isDefault ? 'success' : 'default'" @click="setDefaultBot('wecom', idx)">
+                {{ bot.isDefault ? t("channels.editor.defaultBot") : t("channels.editor.setDefault") }}
+              </n-button>
+              <n-button size="small" tertiary type="error" :disabled="editingWeComBots.length <= 1" @click="removeBot('wecom', idx)">
+                {{ t("common.delete") }}
+              </n-button>
+            </div>
+          </div>
+          <div class="bot-switch-row">
+            <span class="meta-label">{{ t("common.enabled") }}</span>
+            <n-switch v-model:value="bot.enabled" />
+          </div>
+          <div class="bot-field-grid">
+            <n-form-item :label="t('channels.editor.botName')">
+              <n-input v-model:value="bot.displayName" />
+            </n-form-item>
+            <n-form-item :label="t('channels.editor.wecomBotId')">
+              <n-input v-model:value="bot.wecomBotId" />
+            </n-form-item>
+            <n-form-item :label="t('channels.editor.wecomSecret')">
+              <n-input v-model:value="bot.secret" type="password" show-password-on="click" />
+            </n-form-item>
+          </div>
+          <n-form-item class="bot-full-row">
+            <template #label>
+              <span class="field-label-with-tip">
+                <span>{{ t("channels.editor.allowList") }}</span>
+                <UiInstantTooltip :content="t('channels.editor.allowListTip')" placement="top">
+                  <CircleHelp class="field-tip-icon" :size="15" />
+                </UiInstantTooltip>
+              </span>
+            </template>
+            <n-input v-model:value="allowListText[`wecom:${bot.botId}`]" />
+          </n-form-item>
+        </div>
+      </n-form>
+
+      <n-form v-else label-placement="top" class="channel-edit-form">
+        <div class="editor-toolbar">
+          <div class="channel-switch-row">
+            <span class="meta-label">{{ t("channels.editor.enableWeixin") }}</span>
+            <n-switch v-model:value="draft.channels.weixin.enabled" />
+          </div>
+          <n-button tertiary type="primary" @click="addBot('weixin')">{{ t("channels.editor.addBot") }}</n-button>
+        </div>
+        <div v-for="(bot, idx) in editingWeixinBots" :key="`weixin-${bot.botId}-${idx}`" class="bot-card">
+          <div class="bot-head">
+            <div class="bot-title">
+              <div class="bot-name">{{ bot.displayName || bot.botId }}</div>
+              <div class="bot-id-sub">{{ bot.botId }}</div>
+            </div>
+            <div class="bot-head-actions">
+              <n-button size="small" tertiary :type="bot.isDefault ? 'success' : 'default'" @click="setDefaultBot('weixin', idx)">
+                {{ bot.isDefault ? t("channels.editor.defaultBot") : t("channels.editor.setDefault") }}
+              </n-button>
+              <n-button size="small" tertiary type="error" :disabled="editingWeixinBots.length <= 1" @click="removeBot('weixin', idx)">
+                {{ t("common.delete") }}
+              </n-button>
+            </div>
+          </div>
+          <div class="bot-switch-row">
+            <span class="meta-label">{{ t("common.enabled") }}</span>
+            <n-switch v-model:value="bot.enabled" />
+          </div>
+          <div class="bot-field-grid">
+            <n-form-item :label="t('channels.editor.botName')">
+              <n-input v-model:value="bot.displayName" />
+            </n-form-item>
+            <n-form-item :label="t('channels.editor.weixinBotToken')">
+              <n-input v-model:value="bot.botToken" type="password" show-password-on="click" />
+            </n-form-item>
+            <n-form-item :label="t('channels.editor.weixinBotTokenFile')">
+              <n-input v-model:value="bot.botTokenFile" />
+            </n-form-item>
+            <n-form-item :label="t('channels.editor.weixinBaseUrl')">
+              <n-input v-model:value="bot.baseUrl" />
+            </n-form-item>
+          </div>
+          <n-form-item class="bot-full-row">
+            <template #label>
+              <span class="field-label-with-tip">
+                <span>{{ t("channels.editor.allowList") }}</span>
+                <UiInstantTooltip :content="t('channels.editor.allowListTip')" placement="top">
+                  <CircleHelp class="field-tip-icon" :size="15" />
+                </UiInstantTooltip>
+              </span>
+            </template>
+            <n-input v-model:value="allowListText[`weixin:${bot.botId}`]" />
           </n-form-item>
         </div>
       </n-form>
@@ -540,6 +1128,21 @@ onMounted(() => {
   align-items: center;
   gap: var(--space-2);
   margin-top: var(--space-2);
+}
+
+.field-label-with-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1_5);
+}
+
+.field-tip-icon {
+  color: var(--color-text-tertiary);
+  cursor: help;
+}
+
+.field-tip-icon:hover {
+  color: var(--color-text-secondary);
 }
 
 .channel-edit-form :deep(.n-form-item) {

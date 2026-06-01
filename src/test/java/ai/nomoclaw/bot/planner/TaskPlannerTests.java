@@ -1,6 +1,7 @@
 package ai.nomoclaw.bot.planner;
 
 import ai.nomoclaw.bot.llm.config.LlmProperties;
+import ai.nomoclaw.bot.llm.debug.LlmDebugLogger;
 import ai.nomoclaw.bot.prompt.PromptLoader;
 import ai.nomoclaw.bot.prompt.SkillPromptLoader;
 import dev.langchain4j.data.message.AiMessage;
@@ -33,6 +34,7 @@ class TaskPlannerTests {
 
         RuntimeChatModelResolver runtimeChatModelResolver = mock(RuntimeChatModelResolver.class);
         SkillPromptLoader skillPromptLoader = mock(SkillPromptLoader.class);
+        LlmDebugLogger llmDebugLogger = mock(LlmDebugLogger.class);
         when(skillPromptLoader.buildAgentSkillPrompt(any())).thenReturn("");
 
         ChatModel chatModel = mock(ChatModel.class);
@@ -50,7 +52,7 @@ class TaskPlannerTests {
         );
         when(runtimeChatModelResolver.resolve(any())).thenReturn(resolvedModel);
 
-        TaskPlanner taskPlanner = new TaskPlanner(llmProperties, runtimeChatModelResolver, skillPromptLoader);
+        TaskPlanner taskPlanner = new TaskPlanner(llmProperties, runtimeChatModelResolver, skillPromptLoader, llmDebugLogger);
         List<ChatMessage> memory = List.of(UserMessage.from("请总结"));
         PromptLoader.PromptContext promptContext = PromptLoader.PromptContext.forAgent(
                 "session-1",

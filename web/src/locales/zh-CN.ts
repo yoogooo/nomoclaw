@@ -19,6 +19,7 @@ const zhCN = {
     skills: "技能管理",
     channels: "Channel 管理",
     models: "模型管理",
+    mcp: "MCP 管理",
     settings: "个人配置"
   },
   settings: {
@@ -45,7 +46,34 @@ const zhCN = {
     updateDownloading: "更新下载中 {progress}",
     updateVersion: "新版本 {version}",
     updateFailed: "更新失败",
-    updateFailedWithReason: "更新失败：{reason}"
+    updateFailedWithReason: "更新失败：{reason}",
+    diagnostics: "系统诊断",
+    diagnosticsSubtitle: "收集启动、迁移和运行时关键错误。",
+    diagnosticsHealth: "健康状态",
+    diagnosticsHealthy: "正常",
+    diagnosticsNeedsAttention: "需要关注",
+    diagnosticsActive: "未处理错误",
+    diagnosticsLast24Hours: "最近 24 小时",
+    diagnosticsRefresh: "刷新",
+    diagnosticsViewLogs: "查看日志",
+    diagnosticsDrawerTitle: "错误日志",
+    diagnosticsDrawerSubtitle: "最近错误日志",
+    diagnosticsDrawerMeta: "当前显示 {count} 条",
+    diagnosticsLogsSubtitle: "查看最近的系统关键错误事件。",
+    diagnosticsBackToSettings: "返回设置",
+    diagnosticsAcknowledged: "已处理",
+    diagnosticsEmpty: "没有符合条件的错误日志",
+    diagnosticsOccurredAt: "时间",
+    diagnosticsLogContent: "日志内容",
+    diagnosticsImpact: "影响",
+    diagnosticsSuggestion: "建议",
+    diagnosticsTechnicalDetail: "技术详情",
+    diagnosticsCopyLog: "复制日志",
+    diagnosticsCopyLogSuccess: "日志已复制",
+    diagnosticsSearch: "检索",
+    diagnosticsSearchPlaceholder: "输入关键字检索日志",
+    paginationPageSize: "{count} 条/页",
+    paginationShowPerPage: "每页显示："
   },
   modelGate: {
     title: "先配置一个可用模型",
@@ -57,6 +85,79 @@ const zhCN = {
     actions: {
       goConfig: "前往模型配置",
       dismissForever: "不再提示"
+    }
+  },
+  mcp: {
+    title: "MCP 管理",
+    subtitle: "管理外部 MCP Server，并将发现出的工具接入 Agent。",
+    serverListTitle: "MCP Servers",
+    confirmDelete: "确认删除 {name}？",
+    columns: {
+      name: "名称",
+      transport: "Transport",
+      status: "状态",
+      tools: "工具数量",
+      actions: "操作"
+    },
+    actions: {
+      addServer: "新增 MCP Server",
+      test: "测试",
+      refreshTools: "刷新工具",
+      viewTools: "查看工具",
+      viewParams: "查看参数"
+    },
+    toolColumns: {
+      key: "Tool Key",
+      name: "名称",
+      description: "描述",
+      params: "参数",
+      status: "状态"
+    },
+    toolsModal: {
+      title: "{name} 工具",
+      paramsTitle: "{name} 参数定义"
+    },
+    params: {
+      empty: "该工具未提供参数定义。",
+      invalid: "参数定义格式异常，无法解析。",
+      required: "必填",
+      optional: "可选",
+      noDescription: "无描述",
+      unknownType: "未知类型"
+    },
+    editor: {
+      createTitle: "新增 MCP Server",
+      editTitle: "编辑 MCP Server",
+      name: "名称",
+      namePlaceholder: "MCP Server 名称",
+      tabHttp: "Streamable HTTP",
+      tabStdio: "STDIO",
+      url: "URL",
+      bearerTokenEnvVar: "Bearer token 环境变量",
+      headers: "请求头",
+      headerKey: "Key",
+      headerValue: "Value",
+      addHeader: "添加请求头",
+      commandToLaunch: "启动命令",
+      arguments: "参数",
+      addArgument: "添加参数",
+      env: "环境变量",
+      envKey: "Key",
+      envValue: "Value",
+      addEnv: "添加环境变量",
+      cwd: "工作目录"
+    },
+    toast: {
+      created: "MCP Server 已创建",
+      updated: "MCP Server 已更新",
+      deleted: "MCP Server 已删除",
+      enabled: "MCP Server 已启用",
+      disabled: "MCP Server 已停用",
+      saveFailed: "保存失败",
+      nameRequired: "MCP Server 名称不能为空",
+      nameDuplicated: "MCP Server 名称不能重复",
+      testSuccess: "连接测试成功",
+      toolsRefreshed: "工具已刷新"
     }
   },
   chat: {
@@ -71,11 +172,14 @@ const zhCN = {
       refreshHistory: "刷新历史对话",
       refreshHistoryTooltip: "刷新历史对话（右键页面任意位置：刷新整个页面）",
       noConversations: "暂无历史对话",
+      cronTaskTag: "定时任务：{title}",
       unnamed: "未命名对话",
-      updatedAt: "更新于 {time}",
+      updatedAt: "{time}",
       pin: "置顶",
       unpin: "取消置顶",
       pinned: "已置顶",
+      waitingApproval: "待确认",
+      unreadHint: "有未读更新",
       rename: "修改名称",
       renamePrompt: "请输入新的对话名称",
       delete: "删除"
@@ -83,6 +187,7 @@ const zhCN = {
     messages: {
       panelTitle: "对话区",
       noMessages: "当前对话暂无消息。",
+      routeLoadingMessage: "正在加载消息...",
       newConversationTitle: "开始一个新会话",
       newConversationHint: "这是一个新的会话，可以从下方模版快速开始。",
       starterTemplate1Title: "每日 AI 热点整理",
@@ -95,7 +200,12 @@ const zhCN = {
       starterTemplate3Summary: "适合从 0 到 1 搭建品牌官网首页。输出信息架构、模块布局和关键文案方向，便于直接进入设计或开发阶段。",
       starterTemplate3Prompt: "帮我做一个面向北美市场的 3C 配件独立站首页：先给出信息架构（导航/模块层级），再输出首页线框布局，包含 Hero 卖点、爆款商品区、用户评价、运费与退换政策、FAQ 和主 CTA 文案；然后根据该信息架构和页面布局直接生成可运行页面，并自动打开预览给我查看。",
       copyFailed: "复制失败，请重试",
+      saveTipSuccessTitle: "锦囊已保存",
+      saveTipFailureTitle: "未保存为锦囊",
       saveTipNoAgent: "当前未选择可归属的 Agent，无法保存锦囊。",
+      saveTipFailed: "保存锦囊失败，请稍后重试。",
+      saveTipRejectedNoReusableFlow: "这条内容更像一次结果展示，还没有沉淀出可复用的方法、流程或排错经验，暂时不建议保存为锦囊。",
+      saveTipRejectedUnavailable: "当前这条消息暂时无法提炼为锦囊，请稍后重试或换一条完整回复再保存。",
       copy: "复制",
       saveTip: "保存为锦囊",
       tipSaved: "锦囊已保存",
@@ -106,6 +216,18 @@ const zhCN = {
       collapseMessage: "收起",
       processing: "处理进行中…",
       runTitle: "执行过程",
+      runProgressOnly: "已完成 {completedSteps}/{totalSteps} 步",
+      userCanceledTask: "你已取消本次任务",
+      runStatus: {
+        completed: "执行完成",
+        failed: "执行失败",
+        rejected: "已拒绝",
+        canceled: "已取消",
+        waitingApproval: "待确认",
+        running: "执行中",
+        planned: "已规划",
+        preparing: "准备中"
+      },
       noExtraDetails: "无附加详情",
       commandBlockLabel: "执行命令",
       outputBlockLabel: "输出结果",
@@ -140,7 +262,12 @@ const zhCN = {
       closePreview: "关闭预览",
       attachmentPreview: "附件预览",
       previewImageAttachment: "预览图片 {name}",
-      removeAttachment: "移除附件 {name}"
+      removeAttachment: "移除附件 {name}",
+      permissionMode: {
+        label: "权限模式",
+        default: "默认权限",
+        fullAccess: "完全访问权限"
+      }
     },
     runtime: {
       title: "运行时日志",
@@ -177,7 +304,35 @@ const zhCN = {
       stepFinished: "步骤完成: {title}\n输出: {output}",
       stepFailed: "步骤失败: {title}\n错误: {errorMessage}",
       stepRejected: "步骤已被拒绝: {title}",
-      roundTokenUsage: "Round {round} Token 使用: input={input}, output={output}, total={total}, model={modelName}",
+      stepTitle: {
+        browserOpen: "打开网页",
+        browserExtractText: "提取网页信息",
+        browserClick: "操作网页元素",
+        browserType: "填写网页内容",
+        browserWaitFor: "等待页面内容出现",
+        browserScreenshot: "保存网页截图",
+        browserDownload: "下载网页文件",
+        browserPressKey: "向页面发送按键",
+        browserSnapshot: "整理当前页面内容",
+        browserDefault: "处理网页内容",
+        commandRun: "执行本地命令",
+        commandRunWithCommand: "执行命令: {command}",
+        webSearch: "搜索网页信息",
+        webFetch: "抓取网页内容",
+        fileRead: "读取文件内容",
+        fileList: "查看文件列表",
+        fileCreate: "写入文件",
+        fileEdit: "修改文件",
+        fileSearch: "搜索文件内容",
+        imageAnalyze: "分析图片",
+        desktopScreenshot: "截取桌面画面",
+        cronCreate: "创建定时任务",
+        cronDelete: "删除定时任务",
+        cronList: "查询定时任务",
+        reasoning: "思考过程"
+      },
+      reasoningSummary: "模型思考摘要",
+      roundTokenUsage: "Round {round} Token 使用: input={input}, cachedInput={cachedInput}, output={output}, total={total}, model={modelName}",
       messageCompleted: "消息处理结束: {status} / {message}",
       stopReason: "停止原因: {reason} ({roundsUsed}/{maxRounds})",
       loopLimitReached: "达到最大循环次数({maxRounds})，任务终止。失败步骤: {failedStepId}",
@@ -188,6 +343,11 @@ const zhCN = {
       riskPrompt: "检测到命令执行风险，请确认后继续",
       riskPromptGeneric: "检测到工具操作风险，请确认后继续",
       riskPromptScreenshot: "即将截取桌面画面，请确认后继续",
+      riskPromptPrivacyDevice: "即将访问摄像头/麦克风等隐私设备，请确认后继续",
+      riskPromptScreenCapture: "即将进行屏幕捕获或录制，请确认后继续",
+      riskPromptRemoteControl: "即将开启远程控制/隧道能力，请确认后继续",
+      riskPromptPrivilegeEscalation: "即将执行提权操作，请确认后继续",
+      riskPromptDataExfiltration: "检测到疑似数据外传操作，请确认后继续",
       commandLabel: "待执行命令",
       payloadLabel: "待执行参数",
       screenshotPathLabel: "截图保存路径",
@@ -212,7 +372,7 @@ const zhCN = {
       failed: "执行失败，已完成 {completedSteps}/{totalSteps} 步",
       rejected: "执行已拒绝，已完成 {completedSteps}/{totalSteps} 步",
       canceled: "已取消，已完成 {completedSteps}/{totalSteps} 步",
-      waitingApproval: "等待确认，已完成 {completedSteps}/{totalSteps} 步",
+      waitingApproval: "待确认，已完成 {completedSteps}/{totalSteps} 步",
       running: "正在处理，已完成 {completedSteps}/{totalSteps} 步",
       planned: "已规划 {totalSteps} 步，等待开始",
       preparing: "正在准备执行步骤"
@@ -263,13 +423,17 @@ const zhCN = {
       endAtAfterFirstRun: "截止日期必须晚于首次触发时间"
     },
     list: {
-      title: "任务列表",
-      subtitle: "按 Agent 分组查看调度中的任务，支持批量管理。",
+      title: "任务计划",
+      subtitle: "按列表查看和管理调度中的任务，支持批量管理。",
       createTask: "创建任务",
       createFirstTask: "创建第一个任务",
       selectedCount: "已选 {count} 项",
       deleteSelected: "删除选中",
       bulkManage: "批量管理",
+      taskName: "任务名称",
+      agentName: "Agent",
+      status: "状态",
+      schedule: "调度计划",
       jobCount: "{count} 个任务",
       nextRunAt: "下次执行 {time}",
       emptyTitle: "当前还没有定时任务",
@@ -281,6 +445,10 @@ const zhCN = {
       executeAgentPlaceholder: "选择负责执行这个任务的 Agent",
       taskTitle: "任务标题",
       taskTitlePlaceholder: "例如：工作日报、每日市场简报、服务器巡检",
+      modelProvider: "模型 Provider",
+      modelProviderPlaceholder: "选择模型提供方",
+      modelName: "模型",
+      modelNamePlaceholder: "选择执行模型",
       taskContent: "任务内容",
       taskContentPlaceholder: "直接写你希望它定时帮你做什么。越具体，执行结果越稳定。",
       plan: "执行计划",
@@ -305,6 +473,9 @@ const zhCN = {
     edit: {
       title: "修改任务"
     },
+    create: {
+      title: "创建任务"
+    },
     detail: {
       title: "任务详情",
       selectOneHint: "请选择左侧的一个定时任务。",
@@ -320,6 +491,7 @@ const zhCN = {
       deleteTask: "删除任务",
       tabConfig: "配置",
       tabResult: "执行记录",
+      globalRecentResults: "全局最近执行结果",
       frequency: "执行频率",
       nextRun: "下次执行",
       currentStatus: "当前状态",
@@ -362,8 +534,57 @@ const zhCN = {
       longRunning: "长期执行",
       channel: {
         feishu: "飞书",
-        dingtalk: "钉钉"
+        dingtalk: "钉钉",
+        discord: "Discord",
+        telegram: "Telegram",
+        qq: "QQ",
+        wecom: "企业微信",
+        weixin: "微信"
       }
+    },
+    execution: {
+      runningSectionTitle: "执行中",
+      completedSectionTitle: "已完成",
+      runningTag: "运行中",
+      statusRunning: "运行中",
+      statusWaitingApproval: "待确认",
+      statusTimedOutApproval: "审批超时",
+      statusFailed: "失败",
+      statusCanceled: "已取消",
+      viewExecutionDetail: "查看运行详情",
+      viewLog: "查看日志",
+      viewAllCompleted: "查看全部",
+      noRunningTasks: "当前没有执行中的任务。",
+      noCompletedTasks: "当前没有已完成的执行记录。",
+      showMoreCompleted: "更多",
+      showLessCompleted: "收起"
+    },
+    history: {
+      title: "历史执行",
+      subtitle: "查看全部历史执行记录，并按 Agent、状态和日期范围筛选。",
+      query: "查询",
+      quick7d: "最近7天",
+      quick30d: "最近30天",
+      quickCustom: "自定义时间",
+      agentPlaceholder: "筛选 Agent",
+      statusPlaceholder: "筛选执行状态",
+      startDate: "开始日期",
+      endDate: "结束日期",
+      empty: "暂无符合条件的历史记录",
+      colTask: "任务名称",
+      colAgent: "Agent",
+      colStatus: "状态",
+      colTime: "执行时间",
+      colAction: "操作",
+      agentAll: "全部 Agent",
+      statusAll: "全部状态",
+      statusCompleted: "成功",
+      statusFailed: "失败",
+      statusTimedOutApproval: "审批超时",
+      statusCanceled: "已取消",
+      statusRunning: "运行中",
+      statusInProgress: "执行中",
+      statusWaitingApproval: "待确认"
     },
     empty: {
       title: "还没有定时任务",
@@ -408,6 +629,9 @@ const zhCN = {
     networkError: "无法连接后端服务（可能未启动）。请先启动服务后重试。",
     withReason: "{base} 原因：{reason}",
     400: "请求未能处理，请稍后重试。",
+    invalidPageSize: "分页大小无效，请选择 10、20 或 50。",
+    invalidStatus: "状态筛选值无效。",
+    invalidDateRange: "开始日期不能晚于结束日期。",
     401: "登录状态已失效，请重新登录后重试。",
     403: "当前没有该操作权限。",
     404: "请求的资源不存在或已被删除。",
@@ -551,6 +775,7 @@ const zhCN = {
       archiveHint: "请上传压缩包，系统会自动解析 Skill 目录结构。",
       pickArchive: "选择压缩包",
       archiveSupportFormat: "支持 .zip / .tar.gz / .tgz",
+      archiveInvalidFormat: "仅支持 .zip、.tar.gz 或 .tgz 压缩包。",
       archiveChooseButton: "点击选择文件",
       archiveSelectedLabel: "当前文件",
       archiveNotSelected: "未选择",
@@ -579,26 +804,46 @@ const zhCN = {
     },
     time: {
       justNow: "刚刚",
-      minutesAgo: "{count}分钟前",
-      hoursAgo: "{count}小时前",
-      daysAgo: "{count}天前",
-      monthsAgo: "{count}个月前",
-      yearsAgo: "{count}年前"
+      minutesAgo: "{count} 分钟前",
+      hoursAgo: "{count} 小时前",
+      daysAgo: "{count} 天前",
+      monthsAgo: "{count} 个月前",
+      yearsAgo: "{count} 年前"
     }
   },
   channels: {
     cards: {
       feishu: {
-        title: "飞书 Channel",
+        title: "飞书",
         subtitle: "长连接接收消息，支持 Reaction ACK",
         summaryConfigured: "App ID: {appId}",
         summaryEmpty: "未配置 App ID"
       },
       dingtalk: {
-        title: "钉钉 Channel",
+        title: "钉钉",
         subtitle: "Stream SDK 接收消息，支持会话 webhook 回复",
         summaryConfigured: "Robot Code: {robotCode}",
         summaryEmpty: "未配置 Robot Code"
+      },
+      discord: {
+        title: "Discord",
+        subtitle: "Gateway 接收消息，Bot API 回复到频道"
+      },
+      telegram: {
+        title: "Telegram",
+        subtitle: "Bot API 轮询接收消息，并回复到 chat"
+      },
+      qq: {
+        title: "QQ",
+        subtitle: "QQBot 网关接收消息，官方 API 回复"
+      },
+      wecom: {
+        title: "企业微信",
+        subtitle: "企业微信 AI Bot WebSocket 配置"
+      },
+      weixin: {
+        title: "微信",
+        subtitle: "iLink Bot long polling 接收消息"
       },
       mentionPolicy: "@响应策略",
       mentionOnly: "仅 @ 触发",
@@ -608,13 +853,24 @@ const zhCN = {
     editor: {
       feishuTitle: "编辑飞书通道",
       dingtalkTitle: "编辑钉钉通道",
+      discordTitle: "编辑 Discord 通道",
+      telegramTitle: "编辑 Telegram 通道",
+      qqTitle: "编辑 QQ 通道",
+      wecomTitle: "编辑企业微信通道",
+      weixinTitle: "编辑微信通道",
       enable: "启用",
       enableDingtalk: "启用钉钉通道",
+      enableDiscord: "启用 Discord 通道",
+      enableTelegram: "启用 Telegram 通道",
+      enableQq: "启用 QQ 通道",
+      enableWecom: "启用企业微信通道",
+      enableWeixin: "启用微信通道",
       mentionOnly: "仅响应 @ 机器人",
       feishuAppId: "App ID（启用时必填）",
       feishuAppSecret: "App Secret（启用时必填）",
       feishuAppIdPlaceholder: "cli_xxx",
       allowList: "Allow List（可选，逗号分隔）",
+      allowListTip: "限制哪些用户可以触发机器人；留空表示不限制。请填写平台用户 ID，多个 ID 用逗号分隔。",
       allowListFeishuPlaceholder: "ou_xxx, ou_yyy",
       addBot: "新增机器人",
       setDefault: "设为默认",
@@ -628,11 +884,31 @@ const zhCN = {
       dingtalkClientSecret: "Client Secret（启用时必填）",
       dingtalkRobotCode: "Robot Code（启用时必填）",
       dingtalkRobotCodePlaceholder: "dingxxxx",
-      allowListDingtalkPlaceholder: "manager001, manager002"
+      allowListDingtalkPlaceholder: "manager001, manager002",
+      discordToken: "Bot Token（启用时必填）",
+      discordBotUserId: "Bot User ID（群聊 @ 判断）",
+      discordBotUserIdTip: "用于识别 Discord 群聊/频道消息是否 @ 了机器人，并在转交给 Agent 前移除 @ 文本。私聊不依赖此字段。",
+      acceptBotMessages: "接收其他机器人消息",
+      telegramToken: "Bot Token（启用时必填）",
+      telegramUsername: "Bot Username（群聊 @ 判断）",
+      qqAppId: "App ID（启用时必填）",
+      qqClientSecret: "Client Secret（启用时必填）",
+      qqBotUserId: "Bot User ID（群聊 @ 判断）",
+      qqSandbox: "使用 QQ 沙箱环境",
+      wecomBotId: "Bot ID（启用时必填）",
+      wecomSecret: "Secret（启用时必填）",
+      weixinBotToken: "Bot Token（启用时必填）",
+      weixinBotTokenFile: "Bot Token File（可选）",
+      weixinBaseUrl: "Base URL"
     },
     errors: {
       feishuRequired: "飞书启用时必须填写 appId 和 appSecret",
-      dingtalkRequired: "钉钉启用时必须填写 clientId、clientSecret、robotCode"
+      dingtalkRequired: "钉钉启用时必须填写 clientId、clientSecret、robotCode",
+      discordRequired: "Discord 启用时必须填写 Bot Token",
+      telegramRequired: "Telegram 启用时必须填写 Bot Token",
+      qqRequired: "QQ 启用时必须填写 App ID 和 Client Secret",
+      wecomRequired: "企业微信启用时必须填写 Bot ID 和 Secret",
+      weixinRequired: "微信启用时必须填写 Bot Token 或 Bot Token File"
     },
     toast: {
       saved: "Channel 配置已保存"
@@ -642,13 +918,15 @@ const zhCN = {
     status: {
       configured: "已配置",
       pendingLocalUrl: "待填写本地地址",
-      pendingApiKey: "待填写密钥"
+      pendingApiKey: "待填写密钥",
+      pendingCodexLogin: "待登录 Codex"
     },
     actions: {
       editConfig: "编辑配置",
       loadLocalModels: "加载本地模型",
       addModel: "新增模型",
-      testConnection: "测试连接"
+      testConnection: "测试连接",
+      codexLogin: "登录 Codex"
     },
     labels: {
       defaultModel: "默认模型",
@@ -696,7 +974,9 @@ const zhCN = {
       localModelsLoaded: "已加载本地 Ollama 模型",
       localModelsLoadFailed: "加载本地模型失败",
       connectionTestSuccess: "连接测试成功",
-      connectionTestFailed: "连接测试失败"
+      connectionTestFailed: "连接测试失败",
+      codexLoginStarted: "已打开 Codex 登录页面",
+      codexLoginFailed: "无法打开 Codex 登录页面"
     }
   },
   pages: {
@@ -713,6 +993,7 @@ const zhCN = {
       tabBasic: "基本信息",
       tabSkills: "技能",
       tabTools: "工具",
+      tabMcp: "MCP",
       tabTips: "锦囊",
       tabDocs: "配置文件"
     },

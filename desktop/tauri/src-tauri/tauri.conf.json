@@ -13,8 +13,11 @@
         "title": "NomoClaw",
         "width": 1440,
         "height": 920,
+        "minWidth": 1024,
+        "minHeight": 700,
         "visible": false,
-        "resizable": true
+        "resizable": true,
+        "dragDropEnabled": false
       }
     ]
   },

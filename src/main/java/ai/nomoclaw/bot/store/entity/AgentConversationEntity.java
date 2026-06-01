@@ -18,8 +18,11 @@ public class AgentConversationEntity {
     private String title;
     private Boolean pinned;
     private Integer inputTokens;
+    private Integer cachedInputTokens;
     private Integer outputTokens;
     private Integer totalTokens;
+    private LocalDateTime lastTaskTerminalTime;
+    private LocalDateTime lastReadAt;
     private LocalDateTime createdTime;
     private LocalDateTime updatedTime;
 
@@ -95,12 +98,36 @@ public class AgentConversationEntity {
         this.outputTokens = outputTokens;
     }
 
+    public Integer getCachedInputTokens() {
+        return cachedInputTokens;
+    }
+
+    public void setCachedInputTokens(Integer cachedInputTokens) {
+        this.cachedInputTokens = cachedInputTokens;
+    }
+
     public Integer getTotalTokens() {
         return totalTokens;
     }
 
     public void setTotalTokens(Integer totalTokens) {
         this.totalTokens = totalTokens;
+    }
+
+    public LocalDateTime getLastTaskTerminalTime() {
+        return lastTaskTerminalTime;
+    }
+
+    public void setLastTaskTerminalTime(LocalDateTime lastTaskTerminalTime) {
+        this.lastTaskTerminalTime = lastTaskTerminalTime;
+    }
+
+    public LocalDateTime getLastReadAt() {
+        return lastReadAt;
+    }
+
+    public void setLastReadAt(LocalDateTime lastReadAt) {
+        this.lastReadAt = lastReadAt;
     }
 
     public LocalDateTime getCreatedTime() {

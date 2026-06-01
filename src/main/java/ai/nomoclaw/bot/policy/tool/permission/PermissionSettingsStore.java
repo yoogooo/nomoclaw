@@ -1,6 +1,7 @@
 package ai.nomoclaw.bot.policy.tool.permission;
 
-import ai.nomoclaw.bot.tool.PathResolver;
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import ai.nomoclaw.bot.util.JsonUtil;
 import ai.nomoclaw.bot.workspace.NomoClawPaths;
 import lombok.extern.slf4j.Slf4j;
@@ -15,12 +16,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 @Component
 @Slf4j
@@ -97,7 +93,7 @@ public class PermissionSettingsStore {
         List<PermissionRule> rules = new ArrayList<>();
         for (String path : stringList(policies.path("allowWritePaths"))) {
             rules.add(new PermissionRule(
-                    "legacy-allow-" + UUID.randomUUID(),
+                    "legacy-allow-" + UuidUtil.newUuid(),
                     source,
                     PermissionEffect.ALLOW,
                     "file_*",
@@ -111,7 +107,7 @@ public class PermissionSettingsStore {
         }
         for (String path : stringList(policies.path("denyWritePaths"))) {
             rules.add(new PermissionRule(
-                    "legacy-deny-" + UUID.randomUUID(),
+                    "legacy-deny-" + UuidUtil.newUuid(),
                     source,
                     PermissionEffect.DENY,
                     "file_*",
@@ -125,10 +121,10 @@ public class PermissionSettingsStore {
         }
         for (String pattern : stringList(policies.path("highRiskCommandPatterns"))) {
             rules.add(new PermissionRule(
-                    "legacy-cmd-" + UUID.randomUUID(),
+                    "legacy-cmd-" + UuidUtil.newUuid(),
                     source,
                     PermissionEffect.ASK,
-                    "command_tool",
+                    "CommandTool",
                     "*",
                     PermissionResourceType.COMMAND,
                     "",
@@ -139,7 +135,7 @@ public class PermissionSettingsStore {
         }
         for (String action : stringList(policies.path("highRiskFileActions"))) {
             rules.add(new PermissionRule(
-                    "legacy-file-action-" + UUID.randomUUID(),
+                    "legacy-file-action-" + UuidUtil.newUuid(),
                     source,
                     PermissionEffect.ASK,
                     "file_*",
@@ -163,7 +159,7 @@ public class PermissionSettingsStore {
         }
         Set<String> values = new LinkedHashSet<>();
         for (JsonNode item : node) {
-            String text = item == null ? "" : item.asText("").trim();
+            String text = item == null ? "" : item.asString("").trim();
             if (!text.isBlank()) {
                 values.add(text);
             }
@@ -180,16 +176,16 @@ public class PermissionSettingsStore {
             if (!item.isObject()) {
                 continue;
             }
-            PermissionEffect effect = parseEffect(item.path("effect").asText(""));
+            PermissionEffect effect = parseEffect(item.path("effect").asString(""));
             if (effect == null) {
                 continue;
             }
-            String ruleId = item.path("ruleId").asText("").trim();
+            String ruleId = item.path("ruleId").asString("").trim();
             if (ruleId.isBlank()) {
-                ruleId = source.name().toLowerCase(Locale.ROOT) + "-" + UUID.randomUUID();
+                ruleId = source.name().toLowerCase(Locale.ROOT) + "-" + UuidUtil.newUuid();
             }
             Instant expiresAt = null;
-            String expiresAtRaw = item.path("expiresAt").asText("").trim();
+            String expiresAtRaw = item.path("expiresAt").asString("").trim();
             if (!expiresAtRaw.isBlank()) {
                 try {
                     expiresAt = Instant.parse(expiresAtRaw);
@@ -201,11 +197,11 @@ public class PermissionSettingsStore {
                     ruleId,
                     source,
                     effect,
-                    normalizeTool(item.path("tool").asText("*")),
-                    normalizeStar(item.path("action").asText("*")),
-                    PermissionResourceType.from(item.path("resourceType").asText("*")),
-                    normalizeOptional(item.path("pathPattern").asText("")),
-                    normalizeOptional(item.path("commandPattern").asText("")),
+                    normalizeTool(item.path("tool").asString("*")),
+                    normalizeStar(item.path("action").asString("*")),
+                    PermissionResourceType.from(item.path("resourceType").asString("*")),
+                    normalizeOptional(item.path("pathPattern").asString("")),
+                    normalizeOptional(item.path("commandPattern").asString("")),
                     expiresAt,
                     item.path("enabled").asBoolean(true)
             ));
@@ -217,6 +213,9 @@ public class PermissionSettingsStore {
         String value = normalizeStar(tool);
         if ("file_*".equals(value)) {
             return "file_*";
+        }
+        if ("*".equals(value)) {
+            return value;
         }
         return value;
     }
@@ -283,7 +282,7 @@ public class PermissionSettingsStore {
                 return MAPPER.createObjectNode();
             }
             String content = Files.readString(path, StandardCharsets.UTF_8);
-            if (content == null || content.isBlank()) {
+            if (content.isBlank()) {
                 return MAPPER.createObjectNode();
             }
             JsonNode root = MAPPER.readTree(content);

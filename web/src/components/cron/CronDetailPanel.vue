@@ -21,12 +21,18 @@ const { t } = useI18n();
 const showEditModal = ref(false);
 const savingSubscriptions = ref(false);
 const switchingJobStatus = ref(false);
-const selectedChannel = ref<"feishu" | "dingtalk" | null>(null);
+type ChannelKey = "feishu" | "dingtalk" | "discord" | "telegram" | "qq" | "wecom" | "weixin";
+const selectedChannel = ref<ChannelKey | null>(null);
 const selectedBotId = ref("");
-const enabledChannelOptions = ref<Array<{ label: string; value: "feishu" | "dingtalk" }>>([]);
-const channelBotOptions = ref<Record<"feishu" | "dingtalk", Array<{ label: string; value: string }>>>({
+const enabledChannelOptions = ref<Array<{ label: string; value: ChannelKey }>>([]);
+const channelBotOptions = ref<Record<ChannelKey, Array<{ label: string; value: string }>>>({
   feishu: [],
-  dingtalk: []
+  dingtalk: [],
+  discord: [],
+  telegram: [],
+  qq: [],
+  wecom: [],
+  weixin: []
 });
 
 const scheduleSummary = computed(() => cronJobsStore.currentJob ? humanizeCronExpression(cronJobsStore.currentJob.expression) : "-");
@@ -55,8 +61,8 @@ watch(
       return;
     }
     const first = (cronJobsStore.currentSubscriptions || [])[0];
-    selectedChannel.value = first
-      ? (first.channel === "dingtalk" ? "dingtalk" : "feishu")
+    selectedChannel.value = first && ["feishu", "dingtalk", "discord", "telegram", "qq", "wecom", "weixin"].includes(first.channel)
+      ? (first.channel as ChannelKey)
       : null;
     selectedBotId.value = first?.botId || "";
   },
@@ -68,7 +74,7 @@ void loadEnabledChannels();
 async function loadEnabledChannels() {
   try {
     const config = await channelApi.getChannelConfig();
-    const options: Array<{ label: string; value: "feishu" | "dingtalk" }> = [];
+    const options: Array<{ label: string; value: ChannelKey }> = [];
     channelBotOptions.value.feishu = (config.channels.feishu.bots || []).filter((item) => item.enabled).map((item) => ({
       label: item.displayName || item.botId,
       value: item.botId
@@ -77,11 +83,46 @@ async function loadEnabledChannels() {
       label: item.displayName || item.botId,
       value: item.botId
     }));
+    channelBotOptions.value.discord = (config.channels.discord.bots || []).filter((item) => item.enabled).map((item) => ({
+      label: item.displayName || item.botId,
+      value: item.botId
+    }));
+    channelBotOptions.value.telegram = (config.channels.telegram.bots || []).filter((item) => item.enabled).map((item) => ({
+      label: item.displayName || item.botId,
+      value: item.botId
+    }));
+    channelBotOptions.value.qq = (config.channels.qq.bots || []).filter((item) => item.enabled).map((item) => ({
+      label: item.displayName || item.botId,
+      value: item.botId
+    }));
+    channelBotOptions.value.wecom = (config.channels.wecom.bots || []).filter((item) => item.enabled).map((item) => ({
+      label: item.displayName || item.botId,
+      value: item.botId
+    }));
+    channelBotOptions.value.weixin = (config.channels.weixin.bots || []).filter((item) => item.enabled).map((item) => ({
+      label: item.displayName || item.botId,
+      value: item.botId
+    }));
     if (config.channels.feishu.enabled) {
       options.push({ label: t("cron.detail.channel.feishu"), value: "feishu" });
     }
     if (config.channels.dingtalk.enabled) {
       options.push({ label: t("cron.detail.channel.dingtalk"), value: "dingtalk" });
+    }
+    if (config.channels.discord.enabled) {
+      options.push({ label: t("cron.detail.channel.discord"), value: "discord" });
+    }
+    if (config.channels.telegram.enabled) {
+      options.push({ label: t("cron.detail.channel.telegram"), value: "telegram" });
+    }
+    if (config.channels.qq.enabled) {
+      options.push({ label: t("cron.detail.channel.qq"), value: "qq" });
+    }
+    if (config.channels.wecom.enabled) {
+      options.push({ label: t("cron.detail.channel.wecom"), value: "wecom" });
+    }
+    if (config.channels.weixin.enabled) {
+      options.push({ label: t("cron.detail.channel.weixin"), value: "weixin" });
     }
     enabledChannelOptions.value = options;
     if (selectedChannel.value && !options.some((item) => item.value === selectedChannel.value)) {
@@ -161,6 +202,7 @@ function executionStatusText(status: string | null | undefined) {
   const normalized = (status || "").toUpperCase();
   if (normalized === "COMPLETED") return t("common.success");
   if (normalized === "FAILED") return t("common.failed");
+  if (normalized === "TIMED_OUT_APPROVAL") return t("cron.history.statusTimedOutApproval");
   return normalized || t("common.unknown");
 }
 
@@ -331,7 +373,7 @@ function openResultPreview(executedTime: string, content: string) {
                 >
                   <div class="recent-result-head">
                     <div class="recent-result-time">{{ formatDateTime(item.executedTime) }}</div>
-                    <n-tag size="small" :type="item.status === 'FAILED' ? 'error' : 'success'">
+                    <n-tag size="small" :type="item.status === 'FAILED' || item.status === 'TIMED_OUT_APPROVAL' ? 'error' : 'success'">
                       {{ executionStatusText(item.status) }}
                     </n-tag>
                   </div>

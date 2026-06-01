@@ -31,14 +31,14 @@ class PermissionAppServiceTests {
         args.put("path", "tmp/dingtalk_now.png");
 
         PermissionRule rule = service.ruleFromApproval(
-                "desktop_screenshot_tool",
+                "DesktopScreenshotTool",
                 args,
                 PermissionEffect.ALLOW,
                 PermissionSource.SESSION,
                 Path.of(".").toAbsolutePath().normalize()
         );
 
-        assertEquals("desktop_screenshot_tool", rule.tool());
+        assertEquals("DesktopScreenshotTool", rule.tool());
         assertEquals("*", rule.action());
         assertTrue(rule.pathPattern().isBlank());
     }
@@ -57,14 +57,14 @@ class PermissionAppServiceTests {
         args.put("path", "tmp/page.png");
 
         PermissionRule rule = service.ruleFromApproval(
-                "browser_tool",
+                "BrowserTool",
                 args,
                 PermissionEffect.ALLOW,
                 PermissionSource.SESSION,
                 Path.of(".").toAbsolutePath().normalize()
         );
 
-        assertEquals("browser_tool", rule.tool());
+        assertEquals("BrowserTool", rule.tool());
         assertEquals("screenshot", rule.action());
         assertTrue(rule.pathPattern().isBlank());
     }

@@ -1,11 +1,14 @@
 import { createRouter, createWebHashHistory } from "vue-router";
 import ChatPage from "@/pages/ChatPage.vue";
 import CronPage from "@/pages/CronPage.vue";
+import CronExecutionHistoryPage from "@/pages/CronExecutionHistoryPage.vue";
 import AgentsPage from "@/pages/AgentsPage.vue";
 import SkillsPage from "@/pages/SkillsPage.vue";
 import SettingsPage from "@/pages/SettingsPage.vue";
+import SettingsErrorLogsPage from "@/pages/SettingsErrorLogsPage.vue";
 import ChannelsPage from "@/pages/ChannelsPage.vue";
 import ModelsPage from "@/pages/ModelsPage.vue";
+import McpPage from "@/pages/McpPage.vue";
 import ForbiddenPage from "@/pages/ForbiddenPage.vue";
 import DesignSystemPage from "@/pages/design-system/DesignSystemPage.vue";
 
@@ -27,6 +30,35 @@ export const router = createRouter({
       component: CronPage
     },
     {
+      path: "/cron/executions/history",
+      name: "cron-execution-history",
+      component: CronExecutionHistoryPage
+    },
+    {
+      path: "/cron/executions/:executionUid",
+      name: "cron-execution-detail",
+      redirect: (to) => ({
+        path: "/",
+        query: {
+          source: "cron",
+          executionUid: String(to.params.executionUid || ""),
+          ...to.query
+        }
+      })
+    },
+    {
+      path: "/cron/executions/:executionUid/chat",
+      name: "cron-execution-chat",
+      redirect: (to) => ({
+        path: "/",
+        query: {
+          source: "cron",
+          executionUid: String(to.params.executionUid || ""),
+          ...to.query
+        }
+      })
+    },
+    {
       path: "/agents",
       name: "agents",
       component: AgentsPage
@@ -42,6 +74,11 @@ export const router = createRouter({
       component: SettingsPage
     },
     {
+      path: "/settings/error-logs",
+      name: "settings-error-logs",
+      component: SettingsErrorLogsPage
+    },
+    {
       path: "/channels",
       name: "channels",
       component: ChannelsPage
@@ -50,6 +87,11 @@ export const router = createRouter({
       path: "/models",
       name: "models",
       component: ModelsPage
+    },
+    {
+      path: "/mcp",
+      name: "mcp",
+      component: McpPage
     },
     {
       path: "/design-system",

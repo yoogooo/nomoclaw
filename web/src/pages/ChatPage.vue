@@ -2,18 +2,24 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { ChevronLeft } from "lucide-vue-next";
+import { NSpin } from "naive-ui";
+import { useRoute, useRouter } from "vue-router";
 import DirectoryRail from "@/components/chat/DirectoryRail.vue";
 import ConversationSidebar from "@/components/chat/ConversationSidebar.vue";
 import MessagesPanel from "@/components/chat/MessagesPanel.vue";
 import RuntimeLogPanel from "@/components/chat/RuntimeLogPanel.vue";
 import { useAgentCatalogStore } from "@/stores/agentCatalog";
 import { useConversationStore } from "@/stores/conversation";
+import { useCronJobsStore } from "@/stores/cronJobs";
 import { useJinnangStore } from "@/stores/jinnang";
 import { useUiPreferencesStore } from "@/stores/uiPreferences";
 import { themeTokens } from "@/themeTokens";
 
+const route = useRoute();
+const router = useRouter();
 const conversationStore = useConversationStore();
 const agentCatalogStore = useAgentCatalogStore();
+const cronJobsStore = useCronJobsStore();
 const jinnangStore = useJinnangStore();
 const uiPreferencesStore = useUiPreferencesStore();
 uiPreferencesStore.init();
@@ -23,6 +29,29 @@ const { t } = useI18n();
 const browserRuntimeOverlay = computed(() => conversationStore.browserRuntimeOverlay);
 const showRuntimeLogPanel = computed(() => uiPreferencesStore.chatRuntimeLogVisible);
 const runtimeAreaCollapsed = computed(() => !showRuntimeLogPanel.value || runtimeCollapsed.value);
+const routeConversationUid = computed(() => String(route.query.conversationUid || "").trim());
+const routeMessageUid = computed(() => String(route.query.messageUid || "").trim());
+const routeAgentUid = computed(() => String(route.query.agentUid || "").trim());
+const routeJobUid = computed(() => String(route.query.jobUid || "").trim());
+const routeSource = computed(() => String(route.query.source || "").trim().toLowerCase());
+const applyingRouteContext = ref(false);
+const cronRouteBootstrapDone = ref(false);
+let applyRouteToken = 0;
+
+const shouldGateCronRouteView = computed(() =>
+  routeSource.value === "cron" && !!routeConversationUid.value
+);
+const pageLoading = computed(() =>
+  conversationStore.loading || applyingRouteContext.value
+);
+const cronRouteReady = computed(() =>
+  !shouldGateCronRouteView.value
+  || cronRouteBootstrapDone.value
+  || (
+    !applyingRouteContext.value
+    && conversationStore.currentConversationUid === routeConversationUid.value
+  )
+);
 
 if (typeof window !== "undefined") {
   runtimeCollapsed.value = window.localStorage.getItem(runtimeCollapsedStorageKey) === "1";
@@ -37,15 +66,71 @@ onMounted(() => {
   if (window.matchMedia(`(max-width: ${themeTokens.layout.breakpointLg})`).matches) {
     runtimeCollapsed.value = true;
   }
-  if (!conversationStore.conversations.length) {
-    void conversationStore.init();
-  } else {
-    void conversationStore.loadModelConfig();
+  if (!routeConversationUid.value) {
+    if (!conversationStore.conversations.length) {
+      void conversationStore.init();
+    } else {
+      void conversationStore.refreshConversations();
+      void conversationStore.loadModelConfig();
+    }
   }
   if (agentCatalogStore.selectedAgentUid) {
     void jinnangStore.restoreTips(agentCatalogStore.selectedAgentUid);
   }
 });
+
+async function applyConversationRouteContext() {
+  const token = ++applyRouteToken;
+  const targetConversationUid = routeConversationUid.value;
+  if (!targetConversationUid) {
+    applyingRouteContext.value = false;
+    cronRouteBootstrapDone.value = true;
+    return;
+  }
+  applyingRouteContext.value = true;
+  try {
+    if (!conversationStore.conversations.length) {
+      await conversationStore.init();
+    } else {
+      await conversationStore.loadModelConfig();
+    }
+    if (token !== applyRouteToken) return;
+    if (!agentCatalogStore.allAgents.length) {
+      await agentCatalogStore.loadCatalog();
+    }
+    if (token !== applyRouteToken) return;
+
+    const conversationSummary = conversationStore.conversations.find(
+      (item) => item.conversationUid === targetConversationUid
+    );
+    const targetAgentUid = routeAgentUid.value || String(conversationSummary?.agentUid || "").trim();
+    if (targetAgentUid) {
+      const targetAgent = agentCatalogStore.allAgents.find((item) => item.agentUid === targetAgentUid);
+      if (targetAgent && targetAgent.agentUid !== agentCatalogStore.selectedAgentUid) {
+        agentCatalogStore.selectAgent(targetAgent.agentGroupUid, targetAgent.agentUid);
+        await conversationStore.refreshConversations(targetConversationUid);
+        if (token !== applyRouteToken) return;
+      }
+    }
+
+    if (routeJobUid.value) {
+      void cronJobsStore.selectJob(routeJobUid.value);
+    }
+
+    if (conversationStore.currentConversationUid !== targetConversationUid) {
+      await conversationStore.selectConversation(targetConversationUid);
+    }
+    if (token !== applyRouteToken) return;
+    await conversationStore.refreshConversations(targetConversationUid);
+  } finally {
+    if (token === applyRouteToken) {
+      if (conversationStore.currentConversationUid === targetConversationUid) {
+        cronRouteBootstrapDone.value = true;
+      }
+      applyingRouteContext.value = false;
+    }
+  }
+}
 
 watch(
   () => agentCatalogStore.selectedAgentUid,
@@ -55,16 +140,75 @@ watch(
   },
   { immediate: true }
 );
+
+watch(
+  () => [routeConversationUid.value, routeAgentUid.value, routeJobUid.value],
+  () => {
+    const currentConversationUid = String(conversationStore.currentConversationUid || "").trim();
+    if (
+      routeSource.value !== "cron"
+      && routeConversationUid.value
+      && routeConversationUid.value === currentConversationUid
+    ) {
+      applyingRouteContext.value = false;
+      cronRouteBootstrapDone.value = true;
+      return;
+    }
+    if (!routeConversationUid.value) {
+      applyingRouteContext.value = false;
+      cronRouteBootstrapDone.value = true;
+    } else {
+      // Each new deep-link target should gate once during bootstrap.
+      cronRouteBootstrapDone.value = false;
+    }
+    void applyConversationRouteContext();
+  },
+  { immediate: true }
+);
+
+watch(
+  () => conversationStore.currentConversationUid,
+  (currentConversationUid) => {
+    const current = String(currentConversationUid || "").trim();
+    if (!current) return;
+    if (!routeConversationUid.value) return;
+    if (current === routeConversationUid.value) return;
+    if (routeSource.value === "cron" && !cronRouteBootstrapDone.value) return;
+
+    const nextQuery = { ...route.query } as Record<string, any>;
+    // User switched away from deep-linked target: keep URL in sync with current conversation
+    // so refresh won't jump back to stale conversationUid.
+    if (routeSource.value === "cron") {
+      delete nextQuery.source;
+      delete nextQuery.executionUid;
+      delete nextQuery.jobUid;
+      delete nextQuery.messageUid;
+    }
+    nextQuery.conversationUid = current;
+    void router.replace({ path: route.path, query: nextQuery });
+  }
+);
 </script>
 
 <template>
   <div class="page-frame chat-page">
-    <div class="grid-chat" :class="{ 'runtime-collapsed': runtimeAreaCollapsed }">
-      <DirectoryRail />
-      <ConversationSidebar />
-      <MessagesPanel />
-      <RuntimeLogPanel v-if="showRuntimeLogPanel && !runtimeCollapsed" :collapsed="runtimeCollapsed" @toggle="runtimeCollapsed = !runtimeCollapsed" />
-    </div>
+    <n-spin :show="pageLoading">
+      <template #description>
+        <span>{{ t("chat.messages.routeLoadingMessage") }}</span>
+      </template>
+      <div class="grid-chat" :class="{ 'runtime-collapsed': runtimeAreaCollapsed }">
+        <DirectoryRail />
+        <ConversationSidebar v-if="cronRouteReady" />
+        <div v-else class="panel chat-route-loading">
+          <div class="panel-body">{{ t("chat.messages.routeLoadingMessage") }}</div>
+        </div>
+        <MessagesPanel v-if="cronRouteReady" :focus-message-uid="routeMessageUid" />
+        <div v-else class="panel chat-route-loading">
+          <div class="panel-body">{{ t("chat.messages.routeLoadingMessage") }}</div>
+        </div>
+        <RuntimeLogPanel v-if="showRuntimeLogPanel && !runtimeCollapsed" :collapsed="runtimeCollapsed" @toggle="runtimeCollapsed = !runtimeCollapsed" />
+      </div>
+    </n-spin>
     <button v-if="showRuntimeLogPanel && runtimeCollapsed" class="runtime-expand-toggle" :title="t('chat.runtime.expand')" @click="runtimeCollapsed = false">
       <ChevronLeft :size="16" />
     </button>
@@ -96,6 +240,12 @@ watch(
 <style scoped>
 .chat-page {
   position: relative;
+}
+
+.chat-route-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .browser-runtime-overlay {

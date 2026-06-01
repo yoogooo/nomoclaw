@@ -6,21 +6,6 @@
 
 A local-first multi-agent assistant platform that combines chat, tool execution, approvals, and scheduled jobs in one workflow.
 
-## Desktop Install (Recommended)
-
-- The installer and build commands below are for macOS only.
-- Download the desktop installer (`.dmg`) for your platform and install it to `Applications`.
-- One-click install and launch, with no extra environment setup required.
-- To build installers locally:
-
-```bash
-# Apple Silicon
-TARGET_ARCH=arm64 ./scripts/build-desktop-macos.sh
-
-# Intel x64
-TARGET_ARCH=x64 ./scripts/build-desktop-macos.sh
-```
-
 ## Functional Capabilities
 
 - Traceable execution loop: planning, step execution, approvals, and final summary with replayable run states instead of a black-box chat flow.
@@ -29,64 +14,34 @@ TARGET_ARCH=x64 ./scripts/build-desktop-macos.sh
 - Automation that can be operated: built-in cron scheduling, execution reports, and channel delivery (Feishu / DingTalk).
 - Decoupled model layer: unified multi-provider model management with local model discovery for cost/quality switching.
 
-## Upcoming Feature Roadmap
+## Install and Run
 
-- Knowledge base integration into the Agent assistant (moving from separate "tips/docs/skills" to a unified retrieval entry), improving response consistency and traceability.
-- Workflow integration into the Agent assistant (evolving from chat execution to orchestrated flows), turning high-frequency tasks into reusable processes.
-- Multi-Agent collaboration, supporting task decomposition, role-based execution, and coordinated delivery.
-- Plugin capabilities, enabling on-demand integration with external systems and business-specific extensions.
-- Control center (multi-Agent node status, output summaries, and token usage monitoring), enabling operational observability and cost management.
+Use the desktop app first when possible. Use Docker for a quick local run. Use source startup for development and debugging.
 
-## Typical Use Cases
+### Option 1: Desktop App (Recommended)
 
-- Complex task execution: plan steps first, execute step-by-step, and require human approval for risky actions
-- Knowledge reuse: save high-quality outputs as “tips” to speed up future tasks
-- Routine automation: collect information on schedule, generate reports, and push notifications to channels
+- Download and install the desktop package for your platform.
+- Use `.dmg` on macOS and `.msi` on Windows.
+- The desktop app launches directly without manually setting up JDK, Node.js, or MySQL.
 
-## Runtime & Dev Requirements
-
-- Desktop app (recommended): macOS, install from `.dmg` and run directly (no manual JDK/Node/MySQL setup).
-- Source deployment (backend): JDK 21+, MySQL 8+ (H2 file mode is available for dev/test).
-- Source deployment (frontend): Node.js 20+, pnpm 10+.
-
-## Quick Start
-
-1. Configure environment variables
+Build locally:
 
 ```bash
-cp .env.example .env
-cp web/.env.example web/.env
+# macOS Apple Silicon
+TARGET_ARCH=arm64 ./scripts/build-desktop-macos.sh
+
+# macOS Intel x64
+TARGET_ARCH=x64 ./scripts/build-desktop-macos.sh
+
+# Windows x64
+TARGET_ARCH=x64 ./scripts/build-desktop-windows-x64.sh
 ```
 
-2. Initialize database: run `src/main/resources/db/schema-mysql.sql`
-
-3. Start backend
-
-```bash
-./mvnw spring-boot:run
-```
-
-Notes:
-- Local MySQL development uses Maven `prod-full` by default (activeByDefault), which includes `mysql-connector-j` and `flyway-mysql`.
-- Desktop release scripts use `prod-lite` (H2) by default to keep the packaged jar smaller.
-
-Default: `http://127.0.0.1:8080`
-
-4. Start frontend
-
-```bash
-cd web
-pnpm install
-pnpm dev
-```
-
-Default: `http://127.0.0.1:5173`
-
-## One-Command Docker Startup (Frontend + Backend)
+### Option 2: Docker Local Run
 
 For users who want a quick local run with minimal setup. This setup uses H2 file mode by default, so MySQL is not required.
 
-1. (Optional) Create a `.env` file at repo root and set variables you need (for example `DASHSCOPE_API_KEY`, `LLM_MODEL_CONFIG_ENCRYPTION_KEY`).
+1. Optional: create a `.env` file at the repo root and set variables you need, for example `DASHSCOPE_API_KEY` and `LLM_MODEL_CONFIG_ENCRYPTION_KEY`.
 2. Start both services:
 
 ```bash
@@ -108,7 +63,44 @@ Notes:
 - Frontend uses Nginx and proxies `/api` to the backend container
 - To reset data: `docker compose down -v`
 
-### Run with H2 (file mode, dev/test)
+### Option 3: Source Development
+
+Requirements:
+- Backend: JDK 21+, MySQL 8+ (H2 file mode is available for dev/test)
+- Frontend: Node.js 20+, pnpm 10+
+
+1. Configure environment variables:
+
+```bash
+cp .env.example .env
+cp web/.env.example web/.env
+```
+
+2. Initialize database: run `src/main/resources/db/schema-mysql.sql`
+
+3. Start backend:
+
+```bash
+./mvnw spring-boot:run
+```
+
+Default: `http://127.0.0.1:8080`
+
+4. Start frontend:
+
+```bash
+cd web
+pnpm install
+pnpm dev
+```
+
+Default: `http://127.0.0.1:5173`
+
+Notes:
+- Local MySQL development uses Maven `prod-full` by default (activeByDefault), which includes `mysql-connector-j` and `flyway-mysql`.
+- Desktop release scripts use `prod-lite` (H2) by default to keep the packaged jar smaller.
+
+Run with H2 file mode:
 
 ```bash
 SPRING_PROFILES_ACTIVE=h2 ./mvnw spring-boot:run
@@ -118,6 +110,8 @@ SPRING_PROFILES_ACTIVE=h2 ./mvnw spring-boot:run
 - This mode is intended for development/testing compatibility, not as the recommended production primary database
 
 ## 1-Minute Demo
+
+After starting the desktop app or frontend/backend services:
 
 1. Open `http://127.0.0.1:5173`, go to `/`, and send a chat message.
 2. Go to `/agents`, save one output as a tip, and preview it.
@@ -140,13 +134,12 @@ pnpm dev
 pnpm build
 ```
 
-Desktop (macOS, Tauri):
+Desktop:
 
 ```bash
 ./scripts/build-desktop-macos.sh
+./scripts/build-desktop-windows-x64.sh
 ```
-
-- Legacy scripts `scripts/build-dmg-apple-silicon.sh` and `scripts/build-dmg-macos-intel.sh` are kept temporarily as rollback paths.
 
 ## Documentation Map
 
@@ -164,15 +157,23 @@ For operations and configuration:
 - Core config: `src/main/resources/application.yml`
 - Common env vars: `MYSQL_URL`, `MYSQL_USER`, `MYSQL_PASSWORD`, `NOMOCLAW_ROOT_DIR`, `DASHSCOPE_API_KEY`, `LLM_MODEL_CONFIG_ENCRYPTION_KEY`, `FEISHU_APP_ID`, `FEISHU_APP_SECRET`, `DINGTALK_CLIENT_ID`, `DINGTALK_CLIENT_SECRET`, `DINGTALK_ROBOT_CODE`
 
+## Upcoming Feature Roadmap
+
+- Knowledge base integration into the Agent assistant (moving from separate "tips/docs/skills" to a unified retrieval entry), improving response consistency and traceability.
+- Workflow integration into the Agent assistant (evolving from chat execution to orchestrated flows), turning high-frequency tasks into reusable processes.
+- Multi-Agent collaboration, supporting task decomposition, role-based execution, and coordinated delivery.
+- Plugin capabilities, enabling on-demand integration with external systems and business-specific extensions.
+- Control center (multi-Agent node status, output summaries, and token usage monitoring), enabling operational observability and cost management.
+
 ## Security Notes
 
 - `/api` is local-only by default (`agent.api.local-only-enabled: true`).
 - In production, set `LLM_MODEL_CONFIG_ENCRYPTION_KEY` to avoid plaintext model API key storage.
 
-## License
-
-[MIT License](./LICENSE)
-
 ## Contributing
 
 Please read [CONTRIBUTING.md](./CONTRIBUTING.md) first.
+
+## License
+
+[MIT License](./LICENSE)

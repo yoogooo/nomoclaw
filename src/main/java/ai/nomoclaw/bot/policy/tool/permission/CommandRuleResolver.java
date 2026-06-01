@@ -1,17 +1,14 @@
 package ai.nomoclaw.bot.policy.tool.permission;
 
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import ai.nomoclaw.bot.policy.tool.ToolPolicyContext;
 import ai.nomoclaw.bot.tool.PathResolver;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.regex.Pattern;
 
 @Component
@@ -60,13 +57,14 @@ public class CommandRuleResolver {
     }
 
     public PermissionContextDetails resolve(ToolPolicyContext context) {
-        String tool = normalize(context.toolName());
-        if ("command_tool".equals(tool)) {
-            String command = context.toolArgs().path("command").asText("");
+        String tool = normalizeTool(context.toolName());
+        if ("commandtool".equals(tool)) {
+            String command = context.toolArgs().path("command").asString("");
             Path cwd = resolveCommandCwd(context);
             List<Path> targets = extractCommandWriteTargets(command, cwd);
             boolean writeIntent = hasWriteIntent(command);
             return new PermissionContextDetails(
+                    context.toolName(),
                     PermissionResourceType.COMMAND,
                     "execute",
                     !writeIntent,
@@ -77,14 +75,15 @@ public class CommandRuleResolver {
             );
         }
 
-        if ("file_tool".equals(tool) || "file_io_tool".equals(tool)) {
-            String action = context.toolArgs().path("action").asText("").trim().toLowerCase(Locale.ROOT);
-            String pathRaw = context.toolArgs().path("path").asText("");
+        if ("filetool".equals(tool)) {
+            String action = context.toolArgs().path("action").asString("").trim().toLowerCase(Locale.ROOT);
+            String pathRaw = context.toolArgs().path("path").asString("");
             Path base = context.agentWorkspacePath() == null ? Path.of(".").toAbsolutePath().normalize() : context.agentWorkspacePath();
             Path path = PathResolver.resolve(pathRaw, base);
             boolean write = Set.of("write", "append", "edit").contains(action);
             boolean read = Set.of("read", "list").contains(action);
             return new PermissionContextDetails(
+                    context.toolName(),
                     PermissionResourceType.FILE,
                     action.isBlank() ? "*" : action,
                     read,
@@ -96,8 +95,9 @@ public class CommandRuleResolver {
         }
 
         return new PermissionContextDetails(
+                context.toolName(),
                 PermissionResourceType.fromTool(tool),
-                context.toolArgs().path("action").asText("*"),
+                context.toolArgs().path("action").asString("*"),
                 false,
                 false,
                 "",
@@ -110,13 +110,23 @@ public class CommandRuleResolver {
         if (context == null || context.toolArgs() == null) {
             return List.of();
         }
+        String tool = normalizeTool(context.toolName());
+        if ("browsertool".equals(tool)) {
+            String action = context.toolArgs().path("action").asString("").trim().toLowerCase(Locale.ROOT);
+            if ("open".equals(action) || "navigate".equals(action)) {
+                String host = BrowserPermissionSupport.extractHost(context.toolArgs().path("url").asString(""));
+                if (!host.isBlank()) {
+                    return List.of(BrowserPermissionSupport.browserDomainPath(host));
+                }
+            }
+        }
         Path base = context.agentWorkspacePath() == null ? Path.of(".").toAbsolutePath().normalize() : context.agentWorkspacePath();
         LinkedHashSet<Path> out = new LinkedHashSet<>();
-        String pathArg = context.toolArgs().path("path").asText("");
+        String pathArg = context.toolArgs().path("path").asString("");
         if (pathArg != null && !pathArg.isBlank()) {
             out.add(PathResolver.resolve(pathArg, base));
         }
-        String outputArg = context.toolArgs().path("output").asText("");
+        String outputArg = context.toolArgs().path("output").asString("");
         if (outputArg != null && !outputArg.isBlank()) {
             out.add(PathResolver.resolve(outputArg, base));
         }
@@ -124,20 +134,35 @@ public class CommandRuleResolver {
     }
 
     public List<PermissionRule> buildCommandRules(ToolPolicyContext context, PermissionContextDetails details) {
-        if (!"command_tool".equals(normalize(context.toolName()))) {
+        if (!"commandtool".equals(normalizeTool(context.toolName()))) {
             return List.of();
         }
         String command = details.commandText() == null ? "" : details.commandText().trim();
         if (command.isBlank()) {
             return List.of();
         }
+        String normalized = normalize(command);
+        if (containsThirdPartyBrowserCliFallback(normalized)) {
+            return List.of(new PermissionRule(
+                    "command-deny-third-party-browser-cli-" + UuidUtil.newUuid(),
+                    PermissionSource.COMMAND,
+                    PermissionEffect.DENY,
+                    "CommandTool",
+                    "execute",
+                    PermissionResourceType.COMMAND,
+                    "",
+                    "",
+                    null,
+                    true
+            ));
+        }
 
         if (matchesHighRiskPattern(command)) {
             return List.of(new PermissionRule(
-                    "command-risk-" + UUID.randomUUID(),
+                    "command-risk-" + UuidUtil.newUuid(),
                     PermissionSource.COMMAND,
                     PermissionEffect.ASK,
-                    "command_tool",
+                    "CommandTool",
                     "execute",
                     PermissionResourceType.COMMAND,
                     "",
@@ -149,8 +174,18 @@ public class CommandRuleResolver {
         return List.of();
     }
 
-    public ReadonlyCommandVerdict isReadonlyCommand(ToolPolicyContext context, PermissionContextDetails details) {
-        if (!"command_tool".equals(normalize(context.toolName()))) {
+    private boolean containsThirdPartyBrowserCliFallback(String normalizedCommand) {
+        if (normalizedCommand == null || normalizedCommand.isBlank()) {
+            return false;
+        }
+        String value = " " + normalizedCommand + " ";
+        return value.contains(" agent-browser ")
+                || value.contains(" npm install -g agent-browser")
+                || value.contains(" npx agent-browser ");
+    }
+
+    public ReadonlyCommandVerdict isReadonlyParam(ToolPolicyContext context, PermissionContextDetails details) {
+        if (!"commandtool".equals(normalizeTool(context.toolName()))) {
             return ReadonlyCommandVerdict.UNKNOWN;
         }
         String command = details == null ? "" : details.commandText();
@@ -163,12 +198,12 @@ public class CommandRuleResolver {
     private boolean matchesHighRiskPattern(String command) {
         String value = " " + normalize(command) + " ";
         return value.contains(" sudo ") || value.contains(" rm -rf") || value.contains(" mkfs ") || value.contains(" dd ")
-                || value.contains(" mount ") || value.contains(" umount ") || value.contains(" launchctl ") || value.contains(" systemctl ")
-                || value.contains(" crontab ") || value.contains(" chmod -r");
+               || value.contains(" mount ") || value.contains(" umount ") || value.contains(" launchctl ") || value.contains(" systemctl ")
+               || value.contains(" crontab ") || value.contains(" chmod -r");
     }
 
     private Path resolveCommandCwd(ToolPolicyContext context) {
-        String raw = context.toolArgs().path("cwd").asText("");
+        String raw = context.toolArgs().path("cwd").asString("");
         Path workspace = context.agentWorkspacePath() == null ? Path.of(".").toAbsolutePath().normalize() : context.agentWorkspacePath().toAbsolutePath().normalize();
         if (raw == null || raw.isBlank()) {
             return workspace;
@@ -221,7 +256,7 @@ public class CommandRuleResolver {
             return ReadonlyCommandVerdict.NOT_READ_ONLY;
         }
 
-        ShellCommand unwrapped = unwrapShellCommand(command, shell);
+        ShellParam unwrapped = unwrapShellParam(command, shell);
         String effective = unwrapped.command();
         ShellKind effectiveShell = unwrapped.shellKind();
         List<String> segments = splitSegments(effective);
@@ -249,19 +284,19 @@ public class CommandRuleResolver {
         return allReadonly ? ReadonlyCommandVerdict.READ_ONLY : ReadonlyCommandVerdict.UNKNOWN;
     }
 
-    private boolean containsHighRiskExecutionSignal(String normalizedCommand) {
-        String value = " " + normalizedCommand + " ";
+    private boolean containsHighRiskExecutionSignal(String normalizedParam) {
+        String value = " " + normalizedParam + " ";
         return value.contains(" sudo ")
-                || value.contains(" invoke-expression ")
-                || value.contains(" iex ")
-                || value.contains(" start-process ") && value.contains(" -verb runas");
+               || value.contains(" invoke-expression ")
+               || value.contains(" iex ")
+               || value.contains(" start-process ") && value.contains(" -verb runas");
     }
 
-    private boolean hasWriteRedirection(String normalizedCommand) {
-        if (!normalizedCommand.contains(">")) {
+    private boolean hasWriteRedirection(String normalizedParam) {
+        if (!normalizedParam.contains(">")) {
             return false;
         }
-        java.util.regex.Matcher matcher = Pattern.compile("(^|\\s)\\d*>>?\\s*([^\\s|;&]+)").matcher(normalizedCommand);
+        java.util.regex.Matcher matcher = Pattern.compile("(^|\\s)\\d*>>?\\s*([^\\s|;&]+)").matcher(normalizedParam);
         boolean found = false;
         while (matcher.find()) {
             found = true;
@@ -295,20 +330,20 @@ public class CommandRuleResolver {
         return os.contains("win") ? ShellKind.CMD : ShellKind.LINUX;
     }
 
-    private ShellCommand unwrapShellCommand(String command, ShellKind shell) {
+    private ShellParam unwrapShellParam(String command, ShellKind shell) {
         List<String> tokens = tokenize(command);
         if (tokens.isEmpty()) {
-            return new ShellCommand(command, shell);
+            return new ShellParam(command, shell);
         }
         String first = normalize(stripQuotes(tokens.get(0)));
         if (!SHELL_WRAPPERS.contains(first)) {
-            return new ShellCommand(command, shell);
+            return new ShellParam(command, shell);
         }
         if (("powershell".equals(first) || "pwsh".equals(first)) && tokens.size() >= 3) {
             for (int i = 1; i < tokens.size() - 1; i++) {
                 String option = normalize(stripQuotes(tokens.get(i)));
                 if ("-command".equals(option) || "-c".equals(option)) {
-                    return new ShellCommand(stripQuotes(tokens.get(i + 1)), ShellKind.POWERSHELL);
+                    return new ShellParam(stripQuotes(tokens.get(i + 1)), ShellKind.POWERSHELL);
                 }
             }
         }
@@ -316,7 +351,7 @@ public class CommandRuleResolver {
             for (int i = 1; i < tokens.size() - 1; i++) {
                 String option = normalize(stripQuotes(tokens.get(i)));
                 if ("/c".equals(option) || "/k".equals(option)) {
-                    return new ShellCommand(stripQuotes(tokens.get(i + 1)), ShellKind.CMD);
+                    return new ShellParam(stripQuotes(tokens.get(i + 1)), ShellKind.CMD);
                 }
             }
         }
@@ -324,11 +359,11 @@ public class CommandRuleResolver {
             for (int i = 1; i < tokens.size() - 1; i++) {
                 String option = normalize(stripQuotes(tokens.get(i)));
                 if ("-c".equals(option)) {
-                    return new ShellCommand(stripQuotes(tokens.get(i + 1)), ShellKind.LINUX);
+                    return new ShellParam(stripQuotes(tokens.get(i + 1)), ShellKind.LINUX);
                 }
             }
         }
-        return new ShellCommand(command, shell);
+        return new ShellParam(command, shell);
     }
 
     private List<String> splitSegments(String command) {
@@ -387,7 +422,7 @@ public class CommandRuleResolver {
         return READONLY_LINUX_COMMANDS.contains(first);
     }
 
-    private record ShellCommand(String command, ShellKind shellKind) {
+    private record ShellParam(String command, ShellKind shellKind) {
     }
 
     private List<String> tokenize(String command) {
@@ -426,13 +461,17 @@ public class CommandRuleResolver {
             return "";
         }
         if (out.length() >= 2
-                && ((out.startsWith("\"") && out.endsWith("\"")) || (out.startsWith("'") && out.endsWith("'")))) {
+            && ((out.startsWith("\"") && out.endsWith("\"")) || (out.startsWith("'") && out.endsWith("'")))) {
             out = out.substring(1, out.length() - 1);
         }
         return out.trim();
     }
 
     private String normalize(String text) {
+        return text == null ? "" : text.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizeTool(String text) {
         return text == null ? "" : text.trim().toLowerCase(Locale.ROOT);
     }
 }

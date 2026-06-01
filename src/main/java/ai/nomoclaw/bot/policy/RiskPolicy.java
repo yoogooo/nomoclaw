@@ -1,9 +1,9 @@
 package ai.nomoclaw.bot.policy;
 
 import ai.nomoclaw.bot.config.AgentProperties;
-import ai.nomoclaw.bot.workspace.NomoClawPaths;
 import ai.nomoclaw.bot.model.PlanStep;
 import ai.nomoclaw.bot.model.RiskLevel;
+import ai.nomoclaw.bot.workspace.NomoClawPaths;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
@@ -27,18 +27,23 @@ public class RiskPolicy {
 
     public RiskLevel evaluateRisk(String toolName, JsonNode toolArgs) {
         String tool = toolName == null ? "" : toolName.toLowerCase();
+        if (tool.startsWith("mcp_")) {
+            return RiskLevel.LOW;
+        }
         if (tool.contains("command")) {
-            String cmd = toolArgs == null ? "" : toolArgs.path("command").asText("").toLowerCase();
+            String cmd = toolArgs == null ? "" : toolArgs.path("command").asString("").toLowerCase();
             return cmd.contains("rm ") || cmd.contains("sudo ") || cmd.contains("chmod -r") || cmd.contains("mv ")
                     ? RiskLevel.HIGH
                     : RiskLevel.LOW;
         }
-        if (tool.contains("file")) {
-            String action = toolArgs == null ? "" : toolArgs.path("action").asText("").toLowerCase();
-            if ("write".equals(action) || "append".equals(action) || "edit".equals(action)) {
-                String pathRaw = toolArgs == null ? "" : toolArgs.path("path").asText("");
-                return isAgentWorkspacePath(pathRaw) ? RiskLevel.LOW : RiskLevel.HIGH;
-            }
+        if ("createfiletool".equals(tool) || "editfiletool".equals(tool)) {
+            String pathRaw = toolArgs == null ? "" : toolArgs.path("path").asString("");
+            return isAgentWorkspacePath(pathRaw) ? RiskLevel.LOW : RiskLevel.HIGH;
+        }
+        if ("readfiletool".equals(tool) || "listfiletool".equals(tool)) {
+            return RiskLevel.LOW;
+        }
+        if ("websearchtool".equals(tool) || "webfetchtool".equals(tool)) {
             return RiskLevel.LOW;
         }
         if (tool.contains("browser")) {

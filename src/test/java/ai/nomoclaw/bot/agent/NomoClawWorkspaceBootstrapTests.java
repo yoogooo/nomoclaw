@@ -4,6 +4,7 @@ import ai.nomoclaw.bot.workspace.NomoClawWorkspaceBootstrap;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
@@ -34,6 +35,9 @@ class NomoClawWorkspaceBootstrapTests {
         assertTrue(Files.isRegularFile(defaultAgent.resolve("USER.md")));
         assertTrue(Files.isRegularFile(defaultAgent.resolve("TOOLS.md")));
         assertTrue(Files.isRegularFile(defaultAgent.resolve("MEMORY.md")));
+        String soulFromWorkspace = Files.readString(defaultAgent.resolve("SOUL.md"), StandardCharsets.UTF_8);
+        String soulFromResource = readResource("prompts/agents/default/zh/SOUL.md");
+        assertEquals(soulFromResource, soulFromWorkspace);
         assertTrue(Files.isDirectory(defaultAgent.resolve("tmp")));
         assertTrue(Files.isDirectory(defaultAgent.resolve("report")));
         assertTrue(Files.isRegularFile(skillsRoot.resolve("pdf").resolve("SKILL.md")));
@@ -79,5 +83,15 @@ class NomoClawWorkspaceBootstrapTests {
                 description: test skill
                 ---
                 """.formatted(skillName), StandardCharsets.UTF_8);
+    }
+
+    private static String readResource(String path) throws Exception {
+        ClassLoader classLoader = NomoClawWorkspaceBootstrapTests.class.getClassLoader();
+        try (InputStream input = classLoader.getResourceAsStream(path)) {
+            if (input == null) {
+                throw new IllegalStateException("resource not found: " + path);
+            }
+            return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 }

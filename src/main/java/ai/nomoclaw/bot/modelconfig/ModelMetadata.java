@@ -1,0 +1,22 @@
+package ai.nomoclaw.bot.modelconfig;
+
+import ai.nomoclaw.bot.modelconfig.model.ModelConfigDto;
+
+import java.util.List;
+
+public record ModelMetadata(
+        String providerId,
+        String modelId,
+        String displayName,
+        List<String> inputModalities,
+        List<String> outputModalities,
+        boolean reasoning,
+        Integer contextWindowTokens,
+        Integer maxInputTokens,
+        Integer maxOutputTokens,
+        ModelConfigDto.UploadPolicy uploadPolicy,
+        boolean matched,
+        String source,
+        String confidence
+) {
+}

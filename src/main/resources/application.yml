@@ -48,9 +48,19 @@ agent:
     timeout-seconds: 60
   browser:
     step-timeout-seconds: 10
-    headless: false
+    click-timeout-seconds: 10
+    mode: auto
+    headless: true
+    force-click-fallback-enabled: false
     shared-profile-enabled: true
     shared-profile-name: shared
+    local-bridge:
+      cdp-endpoint: "http://localhost:9222"
+      local-bridge-domains:
+        - "xiaohongshu.com"
+      connect-timeout-ms: 10000
+      fallback-to-managed: true
+      consent-required: false
   retry:
     max-attempts: 2
   loop:
@@ -62,16 +72,32 @@ agent:
     chat-upload:
       max-file-size: 10MB
       max-request-size: 100MB
+  web-search:
+    endpoints:
+      - "https://www.bing.com/search?q={query}&setlang=zh-Hans"
 
 nomoclaw:
   root-dir: "${NOMOCLAW_ROOT_DIR:${user.home}/.nomoclaw}"
+  cron:
+    approval-timeout-seconds: 1800
+    resume-interval-seconds: 3
+    resume-batch-size: 100
+  flyway:
+    fail-on-migrate-error: false
 
 llm:
   provider: dashscope
   timeout: 180s
   max-retries: 1
+  debug:
+    enabled: true
+    file-path: "logs/llm-debug.jsonl"
+    max-chars-per-field: 200000
+    redact-enabled: true
+    include-response-text: true
+    max-file-size-bytes: 52428800
   codex:
-    model-name: gpt-5.4
+    model-name: gpt-5.5
     instructions: "You are a task planner and execution assistant."
   ollama:
     base-url: "http://localhost:11434"

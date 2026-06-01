@@ -16,11 +16,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
@@ -45,7 +41,7 @@ public class CronChannelTargetDirectoryService {
     public SearchResult search(String channel, String keyword, String botId, int limit) {
         String normalizedKeyword = trim(keyword);
         String normalizedBotId = trim(botId);
-        int safeLimit = Math.max(1, Math.min(limit, MAX_LIMIT));
+        int safeLimit = Math.clamp(limit, 1, MAX_LIMIT);
         ChannelType channelType = ChannelType.from(channel);
         if (channelType != ChannelType.FEISHU && channelType != ChannelType.DINGTALK) {
             return new SearchResult(List.of(), "unsupported channel");
@@ -53,7 +49,7 @@ public class CronChannelTargetDirectoryService {
 
         List<TargetItem> platform = List.of();
         String error = null;
-        boolean robotKeywordMatched = false;
+        boolean robotKeywordMatched;
         if (channelType == ChannelType.FEISHU) {
             try {
                 robotKeywordMatched = isFeishuRobotKeyword(normalizedKeyword, normalizedBotId);
@@ -65,9 +61,6 @@ public class CronChannelTargetDirectoryService {
             }
         }
 
-        if (!platform.isEmpty()) {
-            error = null;
-        }
         return new SearchResult(platform.stream().limit(safeLimit).toList(), error);
     }
 
@@ -97,11 +90,11 @@ public class CronChannelTargetDirectoryService {
         JsonNode root = readFeishuResponse(response, "im/v1/chats");
         ArrayList<TargetItem> items = new ArrayList<>();
         for (JsonNode item : root.path("data").path("items")) {
-            String chatId = trim(item.path("chat_id").asText(""));
+            String chatId = trim(item.path("chat_id").asString(""));
             if (chatId.isBlank()) {
                 continue;
             }
-            String name = trim(item.path("name").asText(""));
+            String name = trim(item.path("name").asString(""));
             String label = name.isBlank() ? chatId : name;
             String target = "feishu:chat_id:" + chatId;
             if (!matchKeyword(keyword, label, target, chatId)) {
@@ -129,13 +122,13 @@ public class CronChannelTargetDirectoryService {
         JsonNode root = readFeishuResponse(response, "contact/v3/users/find_by_name");
         ArrayList<TargetItem> items = new ArrayList<>();
         for (JsonNode item : root.path("data").path("items")) {
-            String openId = trim(item.path("open_id").asText(""));
-            String userId = trim(item.path("user_id").asText(""));
+            String openId = trim(item.path("open_id").asString(""));
+            String userId = trim(item.path("user_id").asString(""));
             String id = !openId.isBlank() ? openId : userId;
             if (id.isBlank()) {
                 continue;
             }
-            String name = trim(item.path("name").asText(""));
+            String name = trim(item.path("name").asString(""));
             String label = name.isBlank() ? id : name;
             String target = !openId.isBlank() ? "feishu:open_id:" + openId : "feishu:user_id:" + userId;
             if (!matchKeyword(keyword, label, target, id)) {
@@ -149,14 +142,14 @@ public class CronChannelTargetDirectoryService {
         return items;
     }
 
-    private JsonNode readFeishuResponse(HttpResponse<String> response, String api) throws Exception {
+    private JsonNode readFeishuResponse(HttpResponse<String> response, String api) {
         if (response.statusCode() >= 400) {
             throw new IllegalStateException("http " + response.statusCode() + " from " + api);
         }
         JsonNode root = MAPPER.readTree(response.body());
         int code = root.path("code").asInt(-1);
         if (code != 0) {
-            throw new IllegalStateException("code=" + code + " msg=" + trim(root.path("msg").asText("")));
+            throw new IllegalStateException("code=" + code + " msg=" + trim(root.path("msg").asString("")));
         }
         return root;
     }
@@ -192,7 +185,7 @@ public class CronChannelTargetDirectoryService {
                 .build();
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         JsonNode root = readFeishuResponse(response, "auth/v3/tenant_access_token/internal");
-        String token = trim(root.path("tenant_access_token").asText(""));
+        String token = trim(root.path("tenant_access_token").asString(""));
         if (token.isBlank()) {
             throw new IllegalStateException("empty tenant access token");
         }
@@ -240,9 +233,9 @@ public class CronChannelTargetDirectoryService {
                 .build();
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         JsonNode root = readFeishuResponse(response, "bot/v3/info");
-        String name = trim(root.path("bot").path("name").asText(""));
+        String name = trim(root.path("bot").path("name").asString(""));
         if (name.isBlank()) {
-            name = trim(root.path("data").path("bot").path("name").asText(""));
+            name = trim(root.path("data").path("bot").path("name").asString(""));
         }
         feishuBotNameCache.put(normalizedBotId, new NameState(name, now.plusSeconds(600)));
         return name;

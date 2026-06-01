@@ -82,8 +82,12 @@ public class HttpApiLoggingFilter extends OncePerRequestFilter {
                 String requestBody = requestToUse instanceof ContentCachingRequestWrapper cachingRequest
                         ? summarizeRequestBody(cachingRequest)
                         : "";
-                if (status >= 400) {
+                if (status >= 500) {
                     log.error("[HTTP][OUT] method={} uri={} status={} costMs={} query={} params={} body={} remote={}",
+                            request.getMethod(), uri, status, costMs, request.getQueryString(),
+                            formatParameters(requestToUse), requestBody, request.getRemoteAddr());
+                } else if (status >= 400) {
+                    log.warn("[HTTP][OUT] method={} uri={} status={} costMs={} query={} params={} body={} remote={}",
                             request.getMethod(), uri, status, costMs, request.getQueryString(),
                             formatParameters(requestToUse), requestBody, request.getRemoteAddr());
                 } else {

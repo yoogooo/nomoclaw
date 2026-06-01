@@ -117,7 +117,7 @@ watch(
   color: var(--color-text-faint);
 }
 
-@media (max-width: var(--size-breakpoint-md)) {
+@media (max-width: 860px) {
   .composer-textarea {
     min-height: 3.2em;
     padding: 0;

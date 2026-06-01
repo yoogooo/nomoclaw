@@ -19,6 +19,7 @@ const enUS = {
     skills: "Skill Management",
     channels: "Channel Management",
     models: "Model Management",
+    mcp: "MCP Management",
     settings: "Settings"
   },
   settings: {
@@ -45,7 +46,34 @@ const enUS = {
     updateDownloading: "Downloading update {progress}",
     updateVersion: "New version {version}",
     updateFailed: "Update failed",
-    updateFailedWithReason: "Update failed: {reason}"
+    updateFailedWithReason: "Update failed: {reason}",
+    diagnostics: "System Diagnostics",
+    diagnosticsSubtitle: "Collects startup, migration, and critical runtime errors.",
+    diagnosticsHealth: "Health",
+    diagnosticsHealthy: "Healthy",
+    diagnosticsNeedsAttention: "Needs Attention",
+    diagnosticsActive: "Open Errors",
+    diagnosticsLast24Hours: "Last 24 Hours",
+    diagnosticsRefresh: "Refresh",
+    diagnosticsViewLogs: "View Logs",
+    diagnosticsDrawerTitle: "Error Logs",
+    diagnosticsDrawerSubtitle: "Recent Error Logs",
+    diagnosticsDrawerMeta: "Showing {count} events",
+    diagnosticsLogsSubtitle: "Review recent critical system error events.",
+    diagnosticsBackToSettings: "Back to Settings",
+    diagnosticsAcknowledged: "Acknowledged",
+    diagnosticsEmpty: "No matching error logs",
+    diagnosticsOccurredAt: "Time",
+    diagnosticsLogContent: "Log Content",
+    diagnosticsImpact: "Impact",
+    diagnosticsSuggestion: "Suggestion",
+    diagnosticsTechnicalDetail: "Technical Details",
+    diagnosticsCopyLog: "Copy Log",
+    diagnosticsCopyLogSuccess: "Log copied",
+    diagnosticsSearch: "Search",
+    diagnosticsSearchPlaceholder: "Search logs by keyword",
+    paginationPageSize: "{count} items/page",
+    paginationShowPerPage: "Show per Page:"
   },
   modelGate: {
     title: "Set up a model first",
@@ -57,6 +85,79 @@ const enUS = {
     actions: {
       goConfig: "Go to Model Config",
       dismissForever: "Don't show again"
+    }
+  },
+  mcp: {
+    title: "MCP Management",
+    subtitle: "Manage external MCP servers and connect discovered tools to Agents.",
+    serverListTitle: "MCP Servers",
+    confirmDelete: "Delete {name}?",
+    columns: {
+      name: "Name",
+      transport: "Transport",
+      status: "Status",
+      tools: "Tools",
+      actions: "Actions"
+    },
+    actions: {
+      addServer: "Add MCP Server",
+      test: "Test",
+      refreshTools: "Refresh Tools",
+      viewTools: "View Tools",
+      viewParams: "View Params"
+    },
+    toolColumns: {
+      key: "Tool Key",
+      name: "Name",
+      description: "Description",
+      params: "Params",
+      status: "Status"
+    },
+    toolsModal: {
+      title: "{name} Tools",
+      paramsTitle: "{name} Parameters"
+    },
+    params: {
+      empty: "No parameter schema provided by this tool.",
+      invalid: "Invalid parameter schema format.",
+      required: "required",
+      optional: "optional",
+      noDescription: "No description",
+      unknownType: "unknown"
+    },
+    editor: {
+      createTitle: "Add MCP Server",
+      editTitle: "Edit MCP Server",
+      name: "Name",
+      namePlaceholder: "MCP server name",
+      tabHttp: "Streamable HTTP",
+      tabStdio: "STDIO",
+      url: "URL",
+      bearerTokenEnvVar: "Bearer token env var",
+      headers: "Headers",
+      headerKey: "Key",
+      headerValue: "Value",
+      addHeader: "Add header",
+      commandToLaunch: "Command to launch",
+      arguments: "Arguments",
+      addArgument: "Add argument",
+      env: "Environment variables",
+      envKey: "Key",
+      envValue: "Value",
+      addEnv: "Add environment variable",
+      cwd: "CWD"
+    },
+    toast: {
+      created: "MCP Server created",
+      updated: "MCP Server updated",
+      deleted: "MCP Server deleted",
+      enabled: "MCP Server enabled",
+      disabled: "MCP Server disabled",
+      saveFailed: "Save failed",
+      nameRequired: "MCP Server name is required",
+      nameDuplicated: "MCP Server name must be unique",
+      testSuccess: "Connection test succeeded",
+      toolsRefreshed: "Tools refreshed"
     }
   },
   chat: {
@@ -71,11 +172,14 @@ const enUS = {
       refreshHistory: "Refresh Conversation History",
       refreshHistoryTooltip: "Refresh history (right-click anywhere on page: reload whole page)",
       noConversations: "No conversation history",
+      cronTaskTag: "Scheduled Task: {title}",
       unnamed: "Untitled Conversation",
-      updatedAt: "Updated at {time}",
+      updatedAt: "{time}",
       pin: "Pin",
       unpin: "Unpin",
       pinned: "Pinned",
+      waitingApproval: "Pending",
+      unreadHint: "Unread updates",
       rename: "Rename",
       renamePrompt: "Enter a new conversation name",
       delete: "Delete"
@@ -83,6 +187,7 @@ const enUS = {
     messages: {
       panelTitle: "Conversation",
       noMessages: "No messages in this conversation yet.",
+      routeLoadingMessage: "Loading messages...",
       newConversationTitle: "Start a new conversation",
       newConversationHint: "This is a new conversation. Use a starter prompt to begin.",
       starterTemplate1Title: "Daily AI News Digest",
@@ -95,7 +200,12 @@ const enUS = {
       starterTemplate3Summary: "Ideal for building a brand site homepage from scratch. It outputs IA, section layout, and copy direction so you can move directly into design or implementation.",
       starterTemplate3Prompt: "Create a homepage for a North America-focused 3C accessories DTC store: provide IA first (nav + section hierarchy), then a homepage wireframe including Hero value props, bestseller block, social proof, shipping/returns policy, FAQ, and primary CTA copy; then generate the actual runnable page based on that IA and layout, and automatically open a preview for me.",
       copyFailed: "Copy failed, please try again.",
+      saveTipSuccessTitle: "Tip saved",
+      saveTipFailureTitle: "Tip not saved",
       saveTipNoAgent: "No target Agent selected, unable to save as tip.",
+      saveTipFailed: "Failed to save the tip. Please try again.",
+      saveTipRejectedNoReusableFlow: "This reply is closer to a one-off result display and does not yet contain a reusable method, workflow, or troubleshooting experience, so it is not a good tip candidate.",
+      saveTipRejectedUnavailable: "This message cannot be turned into a tip right now. Try again later or save a more complete assistant reply.",
       copy: "Copy",
       saveTip: "Save as Tip",
       tipSaved: "Tip saved",
@@ -106,6 +216,18 @@ const enUS = {
       collapseMessage: "Collapse",
       processing: "Processing...",
       runTitle: "Execution",
+      runProgressOnly: "Completed {completedSteps}/{totalSteps} steps",
+      userCanceledTask: "You canceled this task",
+      runStatus: {
+        completed: "Completed",
+        failed: "Failed",
+        rejected: "Rejected",
+        canceled: "Canceled",
+        waitingApproval: "Waiting approval",
+        running: "Running",
+        planned: "Planned",
+        preparing: "Preparing"
+      },
       noExtraDetails: "No extra details",
       commandBlockLabel: "Command",
       outputBlockLabel: "Output",
@@ -140,7 +262,12 @@ const enUS = {
       closePreview: "Close preview",
       attachmentPreview: "Attachment preview",
       previewImageAttachment: "Preview image {name}",
-      removeAttachment: "Remove attachment {name}"
+      removeAttachment: "Remove attachment {name}",
+      permissionMode: {
+        label: "Permission mode",
+        default: "Default permissions",
+        fullAccess: "Full access permissions"
+      }
     },
     runtime: {
       title: "Runtime Log",
@@ -177,7 +304,35 @@ const enUS = {
       stepFinished: "Step finished: {title}\nOutput: {output}",
       stepFailed: "Step failed: {title}\nError: {errorMessage}",
       stepRejected: "Step rejected: {title}",
-      roundTokenUsage: "Round {round} token usage: input={input}, output={output}, total={total}, model={modelName}",
+      stepTitle: {
+        browserOpen: "Open webpage",
+        browserExtractText: "Extract webpage information",
+        browserClick: "Interact with webpage element",
+        browserType: "Type webpage content",
+        browserWaitFor: "Wait for webpage content",
+        browserScreenshot: "Save webpage screenshot",
+        browserDownload: "Download webpage file",
+        browserPressKey: "Send key to webpage",
+        browserSnapshot: "Collect current webpage content",
+        browserDefault: "Process webpage content",
+        commandRun: "Run local command",
+        commandRunWithCommand: "Run command: {command}",
+        webSearch: "Search web information",
+        webFetch: "Fetch webpage content",
+        fileRead: "Read file content",
+        fileList: "List files",
+        fileCreate: "Write file",
+        fileEdit: "Edit file",
+        fileSearch: "Search file content",
+        imageAnalyze: "Analyze image",
+        desktopScreenshot: "Capture desktop screenshot",
+        cronCreate: "Create scheduled task",
+        cronDelete: "Delete scheduled task",
+        cronList: "Query scheduled tasks",
+        reasoning: "Reasoning"
+      },
+      reasoningSummary: "Model reasoning summary",
+      roundTokenUsage: "Round {round} token usage: input={input}, cachedInput={cachedInput}, output={output}, total={total}, model={modelName}",
       messageCompleted: "Message completed: {status} / {message}",
       stopReason: "Stop reason: {reason} ({roundsUsed}/{maxRounds})",
       loopLimitReached: "Loop limit reached ({maxRounds}). Task terminated. Failed step: {failedStepId}",
@@ -188,6 +343,11 @@ const enUS = {
       riskPrompt: "Command execution risk detected. Please confirm before continuing.",
       riskPromptGeneric: "Tool operation risk detected. Please confirm before continuing.",
       riskPromptScreenshot: "Desktop screenshot will be captured. Please confirm before continuing.",
+      riskPromptPrivacyDevice: "Privacy device access (camera/microphone) detected. Please confirm before continuing.",
+      riskPromptScreenCapture: "Screen capture or recording detected. Please confirm before continuing.",
+      riskPromptRemoteControl: "Remote control/tunnel capability detected. Please confirm before continuing.",
+      riskPromptPrivilegeEscalation: "Privilege escalation operation detected. Please confirm before continuing.",
+      riskPromptDataExfiltration: "Potential data exfiltration operation detected. Please confirm before continuing.",
       commandLabel: "Command to Execute",
       payloadLabel: "Parameters to Execute",
       screenshotPathLabel: "Screenshot Output Path",
@@ -247,11 +407,11 @@ const enUS = {
       recurring: "Recurring"
     },
     recurringMode: {
-      minute: "By minute",
-      hour: "By hour",
-      day: "By day",
-      week: "By week",
-      month: "By month"
+      minute: "Minute",
+      hour: "Hourly",
+      day: "Daily",
+      week: "Weekly",
+      month: "Monthly"
     },
     validation: {
       pickDateTime: "Please select execution date and time",
@@ -263,13 +423,17 @@ const enUS = {
       endAtAfterFirstRun: "End date must be later than the first run"
     },
     list: {
-      title: "Task List",
-      subtitle: "View scheduled tasks grouped by Agent and manage them in bulk.",
+      title: "Task Plan",
+      subtitle: "View and manage scheduled tasks in a unified list.",
       createTask: "Create Task",
       createFirstTask: "Create First Task",
       selectedCount: "{count} selected",
       deleteSelected: "Delete Selected",
       bulkManage: "Bulk Manage",
+      taskName: "Task",
+      agentName: "Agent",
+      status: "Status",
+      schedule: "Schedule",
       jobCount: "{count} tasks",
       nextRunAt: "Next run {time}",
       emptyTitle: "No scheduled tasks yet",
@@ -281,6 +445,10 @@ const enUS = {
       executeAgentPlaceholder: "Select an Agent to execute this task",
       taskTitle: "Task Title",
       taskTitlePlaceholder: "e.g. Daily report, market brief, server inspection",
+      modelProvider: "Model Provider",
+      modelProviderPlaceholder: "Select a model provider",
+      modelName: "Model",
+      modelNamePlaceholder: "Select runtime model",
       taskContent: "Task Content",
       taskContentPlaceholder: "Describe exactly what you want it to do. More specific prompts produce more stable results.",
       plan: "Execution Plan",
@@ -305,6 +473,9 @@ const enUS = {
     edit: {
       title: "Edit Task"
     },
+    create: {
+      title: "Create Task"
+    },
     detail: {
       title: "Task Details",
       selectOneHint: "Select one scheduled task from the left.",
@@ -320,6 +491,7 @@ const enUS = {
       deleteTask: "Delete Task",
       tabConfig: "Config",
       tabResult: "Execution Logs",
+      globalRecentResults: "Global recent execution results",
       frequency: "Frequency",
       nextRun: "Next Run",
       currentStatus: "Current Status",
@@ -362,8 +534,57 @@ const enUS = {
       longRunning: "Long-term",
       channel: {
         feishu: "Feishu",
-        dingtalk: "DingTalk"
+        dingtalk: "DingTalk",
+        discord: "Discord",
+        telegram: "Telegram",
+        qq: "QQ",
+        wecom: "WeCom",
+        weixin: "Weixin"
       }
+    },
+    execution: {
+      runningSectionTitle: "Running",
+      completedSectionTitle: "Completed",
+      runningTag: "Running",
+      statusRunning: "Running",
+      statusWaitingApproval: "Waiting approval",
+      statusTimedOutApproval: "Timeout",
+      statusFailed: "Failed",
+      statusCanceled: "Canceled",
+      viewExecutionDetail: "View Execution Details",
+      viewLog: "View Log",
+      viewAllCompleted: "View all",
+      noRunningTasks: "No running tasks at the moment.",
+      noCompletedTasks: "No completed execution records yet.",
+      showMoreCompleted: "Show more",
+      showLessCompleted: "Show less"
+    },
+    history: {
+      title: "Execution History",
+      subtitle: "View all historical execution records and filter by Agent, status, and date range.",
+      query: "Search",
+      quick7d: "Last 7 days",
+      quick30d: "Last 30 days",
+      quickCustom: "Custom",
+      agentPlaceholder: "Filter by agent",
+      statusPlaceholder: "Filter by status",
+      startDate: "Start date",
+      endDate: "End date",
+      empty: "No records match current filters.",
+      colTask: "Task",
+      colAgent: "Agent",
+      colStatus: "Status",
+      colTime: "Executed At",
+      colAction: "Action",
+      agentAll: "All agents",
+      statusAll: "All statuses",
+      statusCompleted: "Completed",
+      statusFailed: "Failed",
+      statusTimedOutApproval: "Timeout",
+      statusCanceled: "Canceled",
+      statusRunning: "Running",
+      statusInProgress: "In progress",
+      statusWaitingApproval: "Waiting approval"
     },
     empty: {
       title: "No scheduled tasks yet",
@@ -408,6 +629,9 @@ const enUS = {
     networkError: "Cannot reach backend service (it may not be started). Start the service and try again.",
     withReason: "{base} Reason: {reason}",
     400: "The request could not be processed. Please try again.",
+    invalidPageSize: "Invalid page size. Please choose 10, 20, or 50.",
+    invalidStatus: "Invalid status filter value.",
+    invalidDateRange: "Start date cannot be later than end date.",
     401: "Session expired. Please sign in again.",
     403: "You do not have permission for this action.",
     404: "Requested resource does not exist or has been removed.",
@@ -551,6 +775,7 @@ const enUS = {
       archiveHint: "Upload an archive. The system will parse the Skill directory automatically.",
       pickArchive: "Select archive",
       archiveSupportFormat: "Supports .zip / .tar.gz / .tgz",
+      archiveInvalidFormat: "Only .zip, .tar.gz, or .tgz archives are supported.",
       archiveChooseButton: "Choose file",
       archiveSelectedLabel: "Selected file",
       archiveNotSelected: "No file selected",
@@ -589,16 +814,36 @@ const enUS = {
   channels: {
     cards: {
       feishu: {
-        title: "Feishu Channel",
+        title: "Feishu",
         subtitle: "Receives messages via long connection and supports reaction ACK",
         summaryConfigured: "App ID: {appId}",
         summaryEmpty: "App ID not configured"
       },
       dingtalk: {
-        title: "DingTalk Channel",
+        title: "DingTalk",
         subtitle: "Receives messages via Stream SDK and supports webhook replies",
         summaryConfigured: "Robot Code: {robotCode}",
         summaryEmpty: "Robot Code not configured"
+      },
+      discord: {
+        title: "Discord",
+        subtitle: "Receives messages via Gateway and replies with the Bot API"
+      },
+      telegram: {
+        title: "Telegram",
+        subtitle: "Receives messages through Bot API polling and replies to chats"
+      },
+      qq: {
+        title: "QQ",
+        subtitle: "Receives via QQBot Gateway and replies with the official API"
+      },
+      wecom: {
+        title: "WeCom",
+        subtitle: "Enterprise WeChat AI Bot WebSocket configuration"
+      },
+      weixin: {
+        title: "Weixin",
+        subtitle: "Receives messages through iLink Bot long polling"
       },
       mentionPolicy: "@ mention policy",
       mentionOnly: "Only when @ mentioned",
@@ -608,13 +853,24 @@ const enUS = {
     editor: {
       feishuTitle: "Edit Feishu Channel",
       dingtalkTitle: "Edit DingTalk Channel",
+      discordTitle: "Edit Discord Channel",
+      telegramTitle: "Edit Telegram Channel",
+      qqTitle: "Edit QQ Channel",
+      wecomTitle: "Edit WeCom Channel",
+      weixinTitle: "Edit Weixin Channel",
       enable: "Enable",
       enableDingtalk: "Enable DingTalk channel",
+      enableDiscord: "Enable Discord channel",
+      enableTelegram: "Enable Telegram channel",
+      enableQq: "Enable QQ channel",
+      enableWecom: "Enable WeCom channel",
+      enableWeixin: "Enable Weixin channel",
       mentionOnly: "Respond only when @ bot",
       feishuAppId: "App ID (required when enabled)",
       feishuAppSecret: "App Secret (required when enabled)",
       feishuAppIdPlaceholder: "cli_xxx",
       allowList: "Allow List (optional, comma-separated)",
+      allowListTip: "Restricts who can trigger this bot. Leave empty to allow anyone. Enter platform user IDs separated by commas.",
       allowListFeishuPlaceholder: "ou_xxx, ou_yyy",
       addBot: "Add Bot",
       setDefault: "Set Default",
@@ -628,11 +884,31 @@ const enUS = {
       dingtalkClientSecret: "Client Secret (required when enabled)",
       dingtalkRobotCode: "Robot Code (required when enabled)",
       dingtalkRobotCodePlaceholder: "dingxxxx",
-      allowListDingtalkPlaceholder: "manager001, manager002"
+      allowListDingtalkPlaceholder: "manager001, manager002",
+      discordToken: "Bot Token (required when enabled)",
+      discordBotUserId: "Bot User ID (for group mentions)",
+      discordBotUserIdTip: "Used to detect whether a Discord server/channel message mentioned this bot, and to remove the mention before sending text to the agent. DMs do not depend on it.",
+      acceptBotMessages: "Accept other bot messages",
+      telegramToken: "Bot Token (required when enabled)",
+      telegramUsername: "Bot Username (for group mentions)",
+      qqAppId: "App ID (required when enabled)",
+      qqClientSecret: "Client Secret (required when enabled)",
+      qqBotUserId: "Bot User ID (for group mentions)",
+      qqSandbox: "Use QQ sandbox environment",
+      wecomBotId: "Bot ID (required when enabled)",
+      wecomSecret: "Secret (required when enabled)",
+      weixinBotToken: "Bot Token (required when enabled)",
+      weixinBotTokenFile: "Bot Token File (optional)",
+      weixinBaseUrl: "Base URL"
     },
     errors: {
       feishuRequired: "When Feishu is enabled, appId and appSecret are required",
-      dingtalkRequired: "When DingTalk is enabled, clientId, clientSecret, and robotCode are required"
+      dingtalkRequired: "When DingTalk is enabled, clientId, clientSecret, and robotCode are required",
+      discordRequired: "When Discord is enabled, Bot Token is required",
+      telegramRequired: "When Telegram is enabled, Bot Token is required",
+      qqRequired: "When QQ is enabled, App ID and Client Secret are required",
+      wecomRequired: "When WeCom is enabled, Bot ID and Secret are required",
+      weixinRequired: "When Weixin is enabled, Bot Token or Bot Token File is required"
     },
     toast: {
       saved: "Channel configuration saved"
@@ -642,13 +918,15 @@ const enUS = {
     status: {
       configured: "Configured",
       pendingLocalUrl: "Local URL required",
-      pendingApiKey: "API key required"
+      pendingApiKey: "API key required",
+      pendingCodexLogin: "Codex login required"
     },
     actions: {
       editConfig: "Edit Config",
       loadLocalModels: "Load Local Models",
       addModel: "Add Model",
-      testConnection: "Test Connection"
+      testConnection: "Test Connection",
+      codexLogin: "Log in to Codex"
     },
     labels: {
       defaultModel: "Default Model",
@@ -696,7 +974,9 @@ const enUS = {
       localModelsLoaded: "Local Ollama models loaded",
       localModelsLoadFailed: "Failed to load local models",
       connectionTestSuccess: "Connection test succeeded",
-      connectionTestFailed: "Connection test failed"
+      connectionTestFailed: "Connection test failed",
+      codexLoginStarted: "Codex login page opened",
+      codexLoginFailed: "Failed to open Codex login page"
     }
   },
   pages: {
@@ -713,6 +993,7 @@ const enUS = {
       tabBasic: "Basic",
       tabSkills: "Skills",
       tabTools: "Tools",
+      tabMcp: "MCP",
       tabTips: "Tips",
       tabDocs: "Config Files"
     },

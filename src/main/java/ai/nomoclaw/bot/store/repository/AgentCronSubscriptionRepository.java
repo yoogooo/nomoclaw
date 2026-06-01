@@ -13,7 +13,7 @@ public class AgentCronSubscriptionRepository extends CrudRepository<AgentCronSub
     public List<AgentCronSubscriptionEntity> listByJobUid(String jobUid) {
         return lambdaQuery()
                 .eq(AgentCronSubscriptionEntity::getJobUid, jobUid)
-                .orderByAsc(AgentCronSubscriptionEntity::getCreatedTime, AgentCronSubscriptionEntity::getId)
+                .orderByAsc(AgentCronSubscriptionEntity::getId)
                 .list();
     }
 
@@ -21,7 +21,7 @@ public class AgentCronSubscriptionRepository extends CrudRepository<AgentCronSub
         return lambdaQuery()
                 .eq(AgentCronSubscriptionEntity::getJobUid, jobUid)
                 .eq(AgentCronSubscriptionEntity::getEnabled, 1)
-                .orderByAsc(AgentCronSubscriptionEntity::getCreatedTime, AgentCronSubscriptionEntity::getId)
+                .orderByAsc(AgentCronSubscriptionEntity::getId)
                 .list();
     }
 

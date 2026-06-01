@@ -1,6 +1,7 @@
 package ai.nomoclaw.bot.agent;
 
 import ai.nomoclaw.bot.orchestrator.ToolSpecificationRegistry;
+import ai.nomoclaw.bot.mcp.McpApplicationService;
 import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
 import ai.nomoclaw.bot.store.entity.AgentToolRelationEntity;
 import ai.nomoclaw.bot.store.entity.ToolDefinitionEntity;
@@ -24,6 +25,8 @@ class ToolSpecificationRegistryTests {
         AgentDefinitionRepository agentDefinitionRepository = mock(AgentDefinitionRepository.class);
         ToolDefinitionRepository toolDefinitionRepository = mock(ToolDefinitionRepository.class);
         AgentToolRelationRepository agentToolRelationRepository = mock(AgentToolRelationRepository.class);
+        McpApplicationService mcpApplicationService = mock(McpApplicationService.class);
+        when(mcpApplicationService.listActiveToolSnapshots()).thenReturn(List.of());
 
         AgentDefinitionEntity agent = new AgentDefinitionEntity();
         agent.setAgentUid("agent_demo");
@@ -31,23 +34,24 @@ class ToolSpecificationRegistryTests {
         when(agentDefinitionRepository.findActiveByName("demo")).thenReturn(agent);
 
         AgentToolRelationEntity relation = new AgentToolRelationEntity();
-        relation.setToolKey("command_tool");
+        relation.setToolKey("CommandTool");
         when(agentToolRelationRepository.listActiveByAgentUid("agent_demo")).thenReturn(List.of(relation));
 
         ToolDefinitionEntity tool = new ToolDefinitionEntity();
-        tool.setToolKey("command_tool");
-        when(toolDefinitionRepository.listActiveByKeys(List.of("command_tool"))).thenReturn(List.of(tool));
+        tool.setToolKey("CommandTool");
+        when(toolDefinitionRepository.listActiveByKeys(List.of("CommandTool"))).thenReturn(List.of(tool));
 
         ToolSpecificationRegistry registry = new ToolSpecificationRegistry(
                 agentDefinitionRepository,
                 toolDefinitionRepository,
-                agentToolRelationRepository
+                agentToolRelationRepository,
+                mcpApplicationService
         );
 
         List<String> toolNames = registry.listForAgent("demo").stream().map(spec -> spec.name()).toList();
-        assertEquals(List.of("command_tool"), toolNames);
-        assertTrue(registry.isToolAllowed("demo", "command_tool"));
-        assertFalse(registry.isToolAllowed("demo", "cron_tool"));
+        assertEquals(List.of("CommandTool"), toolNames);
+        assertTrue(registry.isToolAllowed("demo", "CommandTool"));
+        assertFalse(registry.isToolAllowed("demo", "CronCreateTool"));
     }
 
     @Test
@@ -55,15 +59,32 @@ class ToolSpecificationRegistryTests {
         AgentDefinitionRepository agentDefinitionRepository = mock(AgentDefinitionRepository.class);
         ToolDefinitionRepository toolDefinitionRepository = mock(ToolDefinitionRepository.class);
         AgentToolRelationRepository agentToolRelationRepository = mock(AgentToolRelationRepository.class);
+        McpApplicationService mcpApplicationService = mock(McpApplicationService.class);
+        when(mcpApplicationService.listActiveToolSnapshots()).thenReturn(List.of());
 
         ToolSpecificationRegistry registry = new ToolSpecificationRegistry(
                 agentDefinitionRepository,
                 toolDefinitionRepository,
-                agentToolRelationRepository
+                agentToolRelationRepository,
+                mcpApplicationService
         );
 
         assertTrue(registry.listForAgent("unknown").size() > 3);
-        assertTrue(registry.isToolAllowed("unknown", "cron_tool"));
-        assertTrue(registry.isToolAllowed("unknown", "image_loader_tool"));
+        List<String> toolNames = registry.listForAgent("unknown").stream().map(spec -> spec.name()).toList();
+        assertTrue(toolNames.contains("CronCreateTool"));
+        assertTrue(toolNames.contains("CronDeleteTool"));
+        assertTrue(toolNames.contains("CronListTool"));
+        assertTrue(toolNames.contains("ReadFileTool"));
+        assertTrue(toolNames.contains("ListFileTool"));
+        assertTrue(toolNames.contains("CreateFileTool"));
+        assertTrue(toolNames.contains("EditFileTool"));
+        assertTrue(toolNames.contains("WebSearchTool"));
+        assertTrue(toolNames.contains("WebFetchTool"));
+        assertFalse(toolNames.contains("FileTool"));
+        assertTrue(registry.isToolAllowed("unknown", "CronCreateTool"));
+        assertTrue(registry.isToolAllowed("unknown", "CronDeleteTool"));
+        assertTrue(registry.isToolAllowed("unknown", "CronListTool"));
+        assertTrue(registry.isToolAllowed("unknown", "ImageLoaderTool"));
+        assertFalse(registry.isToolAllowed("unknown", "FileTool"));
     }
 }

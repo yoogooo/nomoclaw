@@ -22,7 +22,7 @@ public class AgentChannelSessionRepository extends CrudRepository<AgentChannelSe
     public AgentChannelSessionEntity findLatestByChannel(String channel) {
         return lambdaQuery()
                 .eq(AgentChannelSessionEntity::getChannel, channel)
-                .orderByDesc(AgentChannelSessionEntity::getUpdatedTime, AgentChannelSessionEntity::getCreatedTime, AgentChannelSessionEntity::getId)
+                .orderByDesc(AgentChannelSessionEntity::getUpdatedTime, AgentChannelSessionEntity::getId)
                 .last("LIMIT 1")
                 .one();
     }
@@ -31,7 +31,7 @@ public class AgentChannelSessionRepository extends CrudRepository<AgentChannelSe
         return lambdaQuery()
                 .eq(AgentChannelSessionEntity::getChannel, channel)
                 .eq(AgentChannelSessionEntity::getConversationUid, conversationUid)
-                .orderByDesc(AgentChannelSessionEntity::getUpdatedTime, AgentChannelSessionEntity::getCreatedTime, AgentChannelSessionEntity::getId)
+                .orderByDesc(AgentChannelSessionEntity::getUpdatedTime, AgentChannelSessionEntity::getId)
                 .last("LIMIT 1")
                 .one();
     }
@@ -39,7 +39,7 @@ public class AgentChannelSessionRepository extends CrudRepository<AgentChannelSe
     public AgentChannelSessionEntity findLatestByConversationUid(String conversationUid) {
         return lambdaQuery()
                 .eq(AgentChannelSessionEntity::getConversationUid, conversationUid)
-                .orderByDesc(AgentChannelSessionEntity::getUpdatedTime, AgentChannelSessionEntity::getCreatedTime, AgentChannelSessionEntity::getId)
+                .orderByDesc(AgentChannelSessionEntity::getUpdatedTime, AgentChannelSessionEntity::getId)
                 .last("LIMIT 1")
                 .one();
     }
@@ -48,7 +48,7 @@ public class AgentChannelSessionRepository extends CrudRepository<AgentChannelSe
         int safeLimit = Math.max(1, Math.min(limit, 100));
         return lambdaQuery()
                 .eq(AgentChannelSessionEntity::getChannel, channel)
-                .orderByDesc(AgentChannelSessionEntity::getUpdatedTime, AgentChannelSessionEntity::getCreatedTime, AgentChannelSessionEntity::getId)
+                .orderByDesc(AgentChannelSessionEntity::getUpdatedTime, AgentChannelSessionEntity::getId)
                 .last("LIMIT " + safeLimit)
                 .list();
     }

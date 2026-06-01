@@ -1,5 +1,8 @@
 package ai.nomoclaw.bot.api;
 
+import ai.nomoclaw.bot.api.dto.common.response.SimpleResponse;
+import ai.nomoclaw.bot.orchestrator.SystemErrorLogService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -23,15 +26,18 @@ public class AgentExceptionHandler {
     private String maxRequestSize;
 
     private final LocalizedMessages localizedMessages;
+    private final SystemErrorLogService systemErrorLogService;
 
-    public AgentExceptionHandler(LocalizedMessages localizedMessages) {
+    public AgentExceptionHandler(LocalizedMessages localizedMessages,
+                                 SystemErrorLogService systemErrorLogService) {
         this.localizedMessages = localizedMessages;
+        this.systemErrorLogService = systemErrorLogService;
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public SimpleResponse handleIllegalArgument(IllegalArgumentException ex) {
-        log.warn("[AgentAPI][400] illegal argument: {}", ex.getMessage(), ex);
+        log.warn("[AgentAPI][400] illegal argument: {}", ex.getMessage());
         return new SimpleResponse(ex.getMessage());
     }
 
@@ -64,8 +70,20 @@ public class AgentExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public SimpleResponse handleInternal(Exception ex) {
+    public SimpleResponse handleInternal(Exception ex, HttpServletRequest request) {
         log.error("[AgentAPI][500] unhandled exception", ex);
+        systemErrorLogService.recordException(
+                "ERROR",
+                "HTTP",
+                "HTTP_INTERNAL_ERROR",
+                "HTTP 500 未处理异常",
+                "%s %s failed: %s".formatted(
+                        request == null ? "" : request.getMethod(),
+                        request == null ? "" : request.getRequestURI(),
+                        ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage()
+                ).trim(),
+                ex
+        );
         return new SimpleResponse(ex.getMessage() == null ? "internal error" : ex.getMessage());
     }
 }

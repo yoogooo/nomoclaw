@@ -1,5 +1,7 @@
 package ai.nomoclaw.bot.channel.repository;
 
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import ai.nomoclaw.bot.channel.model.ChannelSessionKey;
 import ai.nomoclaw.bot.channel.model.ChannelType;
 import ai.nomoclaw.bot.channel.spi.ChannelSessionRepository;
@@ -12,7 +14,6 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 
 @Component
 public class MybatisChannelSessionRepository implements ChannelSessionRepository {
@@ -47,7 +48,7 @@ public class MybatisChannelSessionRepository implements ChannelSessionRepository
         );
         if (entity == null) {
             entity = new AgentChannelSessionEntity();
-            entity.setSessionUid(UUID.randomUUID().toString());
+            entity.setSessionUid(UuidUtil.newUuid());
             entity.setChannel(key.channel().value());
             entity.setTenantId(key.tenantId());
             entity.setSessionKey(key.sessionKey());

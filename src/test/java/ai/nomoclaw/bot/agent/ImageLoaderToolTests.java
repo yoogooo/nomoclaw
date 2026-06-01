@@ -48,7 +48,7 @@ class ImageLoaderToolTests {
         assertTrue(result.success());
         assertTrue(result.artifacts().path("matched").asBoolean(false));
         assertEquals(1, result.artifacts().path("resolvedCount").asInt());
-        assertEquals(latest.toString(), result.artifacts().path("images").path(0).path("path").asText(""));
+        assertEquals(latest.toString(), result.artifacts().path("images").path(0).path("path").asString(""));
     }
 
     @Test
@@ -71,7 +71,7 @@ class ImageLoaderToolTests {
         assertTrue(result.success());
         assertTrue(result.artifacts().path("matched").asBoolean(false));
         assertEquals(1, result.artifacts().path("resolvedCount").asInt());
-        assertEquals(round3.toString(), result.artifacts().path("images").path(0).path("path").asText(""));
+        assertEquals(round3.toString(), result.artifacts().path("images").path(0).path("path").asString(""));
         assertEquals(3, result.artifacts().path("images").path(0).path("conversationRoundIndex").asInt());
     }
 
@@ -94,8 +94,8 @@ class ImageLoaderToolTests {
         assertTrue(result.success());
         assertTrue(result.artifacts().path("matched").asBoolean(false));
         assertEquals(1, result.artifacts().path("resolvedCount").asInt());
-        assertEquals(attachmentPath.toString(), result.artifacts().path("images").path(0).path("path").asText(""));
-        assertEquals("m-attach", result.artifacts().path("images").path(0).path("sourceMessageUid").asText(""));
+        assertEquals(attachmentPath.toString(), result.artifacts().path("images").path(0).path("path").asString(""));
+        assertEquals("m-attach", result.artifacts().path("images").path(0).path("sourceMessageUid").asString(""));
     }
 
     @Test
@@ -104,7 +104,7 @@ class ImageLoaderToolTests {
         AgentEventRepository eventRepository = mock(AgentEventRepository.class);
         AgentMessageAttachmentRepository attachmentRepository = mock(AgentMessageAttachmentRepository.class);
         when(eventRepository.listByConversationUid("c5")).thenReturn(List.of(
-                stepFinishedEvent("c5", "m1", "s1", 1, "browser_tool", "extract_text", browserImage, LocalDateTime.now().minusMinutes(1))
+                stepFinishedEvent("c5", "m1", "s1", 1, "BrowserTool", "extract_text", browserImage, LocalDateTime.now().minusMinutes(1))
         ));
         when(attachmentRepository.listActiveByConversationAndMimeGroup("c5", "image")).thenReturn(List.of());
 
@@ -114,7 +114,7 @@ class ImageLoaderToolTests {
         assertTrue(result.success());
         assertTrue(result.artifacts().path("matched").asBoolean(false));
         assertEquals(1, result.artifacts().path("resolvedCount").asInt());
-        assertEquals(browserImage.toString(), result.artifacts().path("images").path(0).path("path").asText(""));
+        assertEquals(browserImage.toString(), result.artifacts().path("images").path(0).path("path").asString(""));
         assertFalse(result.artifacts().path("images").path(0).path("isExternal").asBoolean(true));
     }
 
@@ -131,10 +131,10 @@ class ImageLoaderToolTests {
 
         assertTrue(result.success());
         assertTrue(result.artifacts().path("matched").asBoolean(false));
-        assertEquals("url", result.artifacts().path("referenceType").asText(""));
+        assertEquals("url", result.artifacts().path("referenceType").asString(""));
         assertEquals(1, result.artifacts().path("resolvedCount").asInt());
-        assertEquals(url, result.artifacts().path("images").path(0).path("path").asText(""));
-        assertEquals(url, result.artifacts().path("images").path(0).path("url").asText(""));
+        assertEquals(url, result.artifacts().path("images").path(0).path("path").asString(""));
+        assertEquals(url, result.artifacts().path("images").path(0).path("url").asString(""));
         assertTrue(result.artifacts().path("images").path(0).path("isExternal").asBoolean(false));
     }
 
@@ -184,7 +184,7 @@ class ImageLoaderToolTests {
                                              LocalDateTime createdTime) {
         ObjectNode payload = JsonNodeFactory.instance.objectNode();
         payload.put("success", true);
-        payload.put("toolName", "desktop_screenshot_tool");
+        payload.put("toolName", "DesktopScreenshotTool");
         payload.put("roundIndex", roundIndex);
         payload.put("round", roundIndex);
         payload.putObject("toolArgs");
@@ -233,7 +233,7 @@ class ImageLoaderToolTests {
                                                             LocalDateTime createdTime) {
         ObjectNode payload = JsonNodeFactory.instance.objectNode();
         payload.put("success", true);
-        payload.put("toolName", "command_tool");
+        payload.put("toolName", "CommandTool");
         payload.put("roundIndex", roundIndex);
         payload.put("round", roundIndex);
         payload.putObject("toolArgs");

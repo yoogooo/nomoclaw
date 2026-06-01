@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, h, nextTick, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { ArrowDown, ArrowUp, Check, ChevronsDown, ChevronsUp, Copy, Sparkles } from "lucide-vue-next";
-import { NButton, NCard, NCollapse, NCollapseItem, NFlex, NPopconfirm, NTag } from "naive-ui";
+import { NButton, NCard, NCollapse, NCollapseItem, NFlex, NTag } from "naive-ui";
 import ApprovalBanner from "./ApprovalBanner.vue";
 import ComposerPanel from "./composer/ComposerPanel.vue";
 import UiInstantTooltip from "@/components/UiInstantTooltip.vue";
 import { message as discreteMessage } from "@/discrete";
+import { notification as discreteNotification } from "@/discrete";
 import { useConversationStore } from "@/stores/conversation";
 import { useConversationRunsStore } from "@/stores/conversationRuns";
 import { useAgentCatalogStore } from "@/stores/agentCatalog";
@@ -22,6 +23,20 @@ type RunStepRenderData = {
   output: string;
   details: string;
 };
+
+const props = withDefaults(defineProps<{
+  hideComposer?: boolean;
+  focusMessageUid?: string;
+  forceTypingIndicator?: boolean;
+  hideTypingRoleLabel?: boolean;
+  disableAutoTypingIndicator?: boolean;
+}>(), {
+  hideComposer: false,
+  focusMessageUid: "",
+  forceTypingIndicator: false,
+  hideTypingRoleLabel: false,
+  disableAutoTypingIndicator: false
+});
 
 const conversationStore = useConversationStore();
 const conversationRunsStore = useConversationRunsStore();
@@ -52,10 +67,41 @@ const latestMessageUid = computed(() => {
   const items = conversationStore.messages;
   return (items.length ? items[items.length - 1].messageUid : "") || "";
 });
+const displayedMessages = computed(() => {
+  const allMessages = conversationStore.messages;
+  const focusMessageUid = (props.focusMessageUid || "").trim();
+  if (!focusMessageUid) {
+    return allMessages;
+  }
+  const focusIndex = allMessages.findIndex((item) => item.messageUid === focusMessageUid);
+  if (focusIndex < 0) {
+    return allMessages;
+  }
+  const focusMessage = allMessages[focusIndex];
+  let start = focusIndex;
+  if (focusMessage.role !== "user") {
+    const nearestUserIndex = allMessages.slice(0, focusIndex + 1).map((item) => item.role).lastIndexOf("user");
+    if (nearestUserIndex >= 0) {
+      start = nearestUserIndex;
+    }
+  }
+  return allMessages.slice(start);
+});
 const isRunningCurrentConversation = computed(() =>
   Boolean(conversationStore.currentConversationUid)
   && conversationStore.runningConversationUid === conversationStore.currentConversationUid
 );
+const hasWaitingApprovalInCurrentConversation = computed(() => {
+  if (conversationStore.approval.stepUid) return true;
+  return Object.values(conversationRunsStore.runsByMessageUid).some((run) =>
+    (run.steps || []).some((step) => step.status === "waiting_approval")
+  );
+});
+const shouldShowTypingIndicator = computed(() => {
+  if (props.forceTypingIndicator) return true;
+  if (props.disableAutoTypingIndicator) return false;
+  return isRunningCurrentConversation.value && !hasWaitingApprovalInCurrentConversation.value;
+});
 const starterTemplates = computed(() => [
   {
     id: "project-plan",
@@ -83,6 +129,69 @@ function runTone(status: string) {
   if (status === "waiting_approval") return "warning";
   if (status === "running") return "info";
   return "default";
+}
+
+function isReasoningStep(step: ConversationRunStep) {
+  const stepUid = (step.stepUid || "").toLowerCase();
+  return (step.toolName || "") === "Reasoning" || stepUid.startsWith("reasoning-");
+}
+
+function runStepTone(step: ConversationRunStep) {
+  if (isReasoningStep(step)) return "default";
+  return runTone(step.status);
+}
+
+function runDisplayStatus(messageUid: string) {
+  const run = conversationRunsStore.runsByMessageUid[messageUid];
+  if (!run) return "planned";
+  if (run.status !== "planned") {
+    return run.status;
+  }
+  const hasWaitingApproval = Boolean(run?.steps?.some((item) => item.status === "waiting_approval"));
+  return hasWaitingApproval ? "waiting_approval" : run.status;
+}
+
+function runProgressText(messageUid: string) {
+  const run = conversationRunsStore.runsByMessageUid[messageUid];
+  if (!run) return "";
+  return t("chat.messages.runProgressOnly", {
+    completedSteps: run.completedSteps ?? 0,
+    totalSteps: run.totalSteps ?? 0
+  });
+}
+
+function visibleRunSteps(messageUid: string) {
+  return conversationRunsStore.runsByMessageUid[messageUid]?.steps || [];
+}
+
+function runStatusText(status: string) {
+  if (status === "completed") return t("chat.messages.runStatus.completed");
+  if (status === "failed") return t("chat.messages.runStatus.failed");
+  if (status === "rejected") return t("chat.messages.runStatus.rejected");
+  if (status === "canceled") return t("chat.messages.runStatus.canceled");
+  if (status === "waiting_approval") return t("chat.messages.runStatus.waitingApproval");
+  if (status === "running") return t("chat.messages.runStatus.running");
+  if (status === "planned") return t("chat.messages.runStatus.planned");
+  if (status === "preparing") return t("chat.messages.runStatus.preparing");
+  return status;
+}
+
+function isMessageCanceled(message: ConversationMessage) {
+  const status = (message.status || "").trim().toLowerCase();
+  return status === "canceled";
+}
+
+function shouldShowCanceledSystemBubble(message: ConversationMessage) {
+  if (message.role !== "user" || !message.messageUid) return false;
+  const run = conversationRunsStore.runsByMessageUid[message.messageUid];
+  const runCanceled = (run?.status || "").trim().toLowerCase() === "canceled";
+  return runCanceled || isMessageCanceled(message);
+}
+
+function canceledSystemBubbleTime(message: ConversationMessage) {
+  if (!message.messageUid) return "";
+  const run = conversationRunsStore.runsByMessageUid[message.messageUid];
+  return run?.updatedTime || message.createdTime;
 }
 
 function runStepStateKey(messageUid: string | undefined, stepUid: string) {
@@ -254,6 +363,46 @@ function messageActionKey(messageItem: ConversationMessage) {
   return messageItem.messageUid || `${messageItem.createdTime}-${messageItem.content}`;
 }
 
+function humanizeTipSaveError(message: string) {
+  const normalized = (message || "").trim();
+  if (!normalized) {
+    return t("chat.messages.saveTipFailed");
+  }
+  if (/单次资讯报告|单次.*结果展示|缺失具体执行步骤|缺少可复用|无法复用|信息不足/.test(normalized)) {
+    return t("chat.messages.saveTipRejectedNoReusableFlow");
+  }
+  if (/source message must be assistant role|source message not found|conversation not found/.test(normalized)) {
+    return t("chat.messages.saveTipRejectedUnavailable");
+  }
+  return normalized;
+}
+
+function tipSaveNotificationAvatar(type: "success" | "warning") {
+  return () => h(
+    "span",
+    {
+      class: ["tip-save-notification-avatar", `tip-save-notification-avatar--${type}`]
+    },
+    [
+      h(type === "success" ? Check : Sparkles, {
+        size: 14,
+        strokeWidth: 2.1
+      })
+    ]
+  );
+}
+
+function showTipSaveNotification(type: "success" | "warning", title: string, content: string) {
+  discreteNotification[type]({
+    title,
+    description: content,
+    avatar: tipSaveNotificationAvatar(type),
+    duration: 0,
+    keepAliveOnHover: true,
+    closable: true
+  });
+}
+
 function runHasWaitingApprovalStep(messageItem: ConversationMessage) {
   if (!messageItem.messageUid) return false;
   const run = conversationRunsStore.runsByMessageUid[messageItem.messageUid];
@@ -300,7 +449,7 @@ async function saveJinnang(messageItem: ConversationMessage) {
   const conversationAgentUid = conversationStore.conversations.find((item) => item.conversationUid === conversationStore.currentConversationUid)?.agentUid || "";
   const targetAgentUid = (conversationAgentUid || agentCatalogStore.selectedAgentUid || "").trim();
   if (!targetAgentUid) {
-    discreteMessage.warning(t("chat.messages.saveTipNoAgent"));
+    showTipSaveNotification("warning", t("chat.messages.saveTipFailureTitle"), t("chat.messages.saveTipNoAgent"));
     return;
   }
   savingTipMap.value = {
@@ -315,11 +464,14 @@ async function saveJinnang(messageItem: ConversationMessage) {
       content: messageItem.content,
       sourceTime: messageItem.createdTime,
       conversationUid: conversationStore.currentConversationUid || "",
-      generateBestPractice: true
+      generateBestPractice: true,
+      suppressErrorToast: true
     });
     saved = true;
-  } catch {
+  } catch (error) {
     saved = false;
+    const message = error instanceof Error ? humanizeTipSaveError(error.message) : t("chat.messages.saveTipFailed");
+    showTipSaveNotification("warning", t("chat.messages.saveTipFailureTitle"), message);
   } finally {
     savingTipMap.value = {
       ...savingTipMap.value,
@@ -333,6 +485,7 @@ async function saveJinnang(messageItem: ConversationMessage) {
     ...savedTipMap.value,
     [key]: true
   };
+  showTipSaveNotification("success", t("chat.messages.saveTipSuccessTitle"), t("toast.tipSavedToDb"));
 }
 
 function formatAttachmentSize(sizeBytes = 0) {
@@ -355,20 +508,23 @@ function openAttachment(fileUrl: string) {
 
 function resolveMessageTokenUsage(messageItem: ConversationMessage) {
   const input = Number(messageItem.inputTokens || 0);
+  const cachedInput = Number(messageItem.cachedInputTokens || 0);
   const output = Number(messageItem.outputTokens || 0);
   const total = Number(messageItem.totalTokens || 0);
-  if (input > 0 || output > 0 || total > 0) {
-    return { input, output, total };
+  if (input > 0 || cachedInput > 0 || output > 0 || total > 0) {
+    return { input, cachedInput, output, total };
   }
   if (messageItem.role === "assistant" && messageItem.parentMessageUid) {
     const parent = conversationStore.messages.find((item) => item.messageUid === messageItem.parentMessageUid);
     if (!parent) return null;
     const parentInput = Number(parent.inputTokens || 0);
+    const parentCachedInput = Number(parent.cachedInputTokens || 0);
     const parentOutput = Number(parent.outputTokens || 0);
     const parentTotal = Number(parent.totalTokens || 0);
-    if (parentInput > 0 || parentOutput > 0 || parentTotal > 0) {
+    if (parentInput > 0 || parentCachedInput > 0 || parentOutput > 0 || parentTotal > 0) {
       return {
         input: parentInput,
+        cachedInput: parentCachedInput,
         output: parentOutput,
         total: parentTotal
       };
@@ -472,7 +628,7 @@ onMounted(() => {
   <section class="panel message-panel">
     <div ref="messageListRef" class="panel-body message-list scroll-area">
       <div
-        v-if="!conversationStore.messages.length && !isRunningCurrentConversation"
+        v-if="!displayedMessages.length && !isRunningCurrentConversation"
         class="conversation-empty-state"
       >
         <div class="conversation-empty-hero">
@@ -494,7 +650,7 @@ onMounted(() => {
       </div>
       <template v-else>
         <div
-          v-for="message in conversationStore.messages"
+          v-for="message in displayedMessages"
           :key="`${message.createdTime}-${message.messageUid || message.content}`"
           class="message-wrap"
           :class="{ user: message.role === 'user' }"
@@ -557,6 +713,13 @@ onMounted(() => {
                 <ArrowDown :size="12" />
                 <span>{{ resolveMessageTokenUsage(message)?.input ?? 0 }}</span>
               </span>
+              <span
+                v-if="(resolveMessageTokenUsage(message)?.cachedInput ?? 0) > 0"
+                class="message-token-item"
+              >
+                <span>cache</span>
+                <span>{{ resolveMessageTokenUsage(message)?.cachedInput ?? 0 }}</span>
+              </span>
               <span class="message-token-item">
                 <ArrowUp :size="12" />
                 <span>{{ resolveMessageTokenUsage(message)?.output ?? 0 }}</span>
@@ -577,33 +740,22 @@ onMounted(() => {
                 </button>
               </UiInstantTooltip>
               <div class="save-tip-wrap">
-                <n-popconfirm
-                  :show-icon="false"
-                  :disabled="savingTipMap[messageActionKey(message)] || isTipSaved(message)"
-                  :positive-text="t('common.confirm')"
-                  :negative-text="t('common.cancel')"
-                  @positive-click="saveJinnang(message)"
-                >
-                  <template #trigger>
-                    <UiInstantTooltip :content="isTipSaved(message) ? t('chat.messages.tipSaved') : t('chat.messages.saveTip')">
-                      <button
-                        class="message-action-btn icon-only"
-                        :class="{
-                          loading: savingTipMap[messageActionKey(message)],
-                          saved: isTipSaved(message)
-                        }"
-                        :disabled="savingTipMap[messageActionKey(message)] || isTipSaved(message)"
-                        type="button"
-                        :aria-label="isTipSaved(message) ? t('chat.messages.tipSaved') : t('chat.messages.saveTip')"
-                      >
-                        <Check v-if="isTipSaved(message) && !savingTipMap[messageActionKey(message)]" :size="14" />
-                        <Sparkles v-else-if="!savingTipMap[messageActionKey(message)]" :size="14" />
-                      </button>
-                    </UiInstantTooltip>
-                  </template>
-                  {{ t("chat.messages.saveTipConfirm") }}
-                </n-popconfirm>
-                <span v-if="isTipSaved(message)" class="message-action-hint">{{ t("chat.messages.savedAsTip") }}</span>
+                <UiInstantTooltip :content="isTipSaved(message) ? t('chat.messages.tipSaved') : t('chat.messages.saveTip')">
+                  <button
+                    class="message-action-btn icon-only"
+                    :class="{
+                      loading: savingTipMap[messageActionKey(message)],
+                      saved: isTipSaved(message)
+                    }"
+                    :disabled="savingTipMap[messageActionKey(message)] || isTipSaved(message)"
+                    type="button"
+                    :aria-label="isTipSaved(message) ? t('chat.messages.tipSaved') : t('chat.messages.saveTip')"
+                    @click="saveJinnang(message)"
+                  >
+                    <Check v-if="isTipSaved(message) && !savingTipMap[messageActionKey(message)]" :size="14" />
+                    <Sparkles v-else-if="!savingTipMap[messageActionKey(message)]" :size="14" />
+                  </button>
+                </UiInstantTooltip>
               </div>
             </div>
           </div>
@@ -618,23 +770,29 @@ onMounted(() => {
             <n-collapse>
               <n-collapse-item :name="`run-${message.messageUid}`">
                 <template #header>
-                  <div class="run-title">{{ t("chat.messages.runTitle") }}</div>
+                  <div class="run-header">
+                    <div class="run-title">{{ t("chat.messages.runTitle") }}</div>
+                  </div>
                 </template>
                 <template #header-extra>
-                  <n-tag size="small" :type="runTone(conversationRunsStore.runsByMessageUid[message.messageUid].status)">
-                    {{ conversationRunsStore.runsByMessageUid[message.messageUid].status }}
+                  <n-tag
+                    v-if="runDisplayStatus(message.messageUid || '') !== 'planned'"
+                    size="small"
+                    :type="runTone(runDisplayStatus(message.messageUid || ''))"
+                  >
+                    {{ runStatusText(runDisplayStatus(message.messageUid || '')) }}
                   </n-tag>
                 </template>
-                <div class="run-summary">{{ conversationRunsStore.runsByMessageUid[message.messageUid].summary }}</div>
+                <div class="run-summary">{{ runProgressText(message.messageUid || "") }}</div>
                 <n-collapse class="run-steps-collapse">
                   <n-collapse-item
-                    v-for="(step, stepPosition) in conversationRunsStore.runsByMessageUid[message.messageUid].steps"
+                    v-for="(step, stepPosition) in visibleRunSteps(message.messageUid)"
                     :key="step.stepUid"
                     :title="`${stepPosition + 1}. ${step.displayTitle}`"
                     :name="step.stepUid"
                   >
                     <template #header-extra>
-                      <n-tag size="small" :type="runTone(step.status)">{{ step.status }}</n-tag>
+                      <n-tag v-if="!isReasoningStep(step)" size="small" :type="runStepTone(step)">{{ runStatusText(step.status) }}</n-tag>
                     </template>
                     <template v-if="getRunStepRenderData(step).isCommand">
                       <div class="run-command-blocks">
@@ -703,22 +861,22 @@ onMounted(() => {
             :force-visible="runHasWaitingApprovalStep(message)"
             class="run-approval-banner"
           />
+          <div v-if="shouldShowCanceledSystemBubble(message)" class="message-wrap canceled-assistant-message">
+            <div class="message-bubble">
+              <span class="message-system-event-text">{{ t("chat.messages.userCanceledTask") }}</span>
+            </div>
+            <div class="message-time message-system-event-time">{{ formatMessageTime(canceledSystemBubbleTime(message)) }}</div>
+          </div>
         </div>
 
-        <div
-          v-if="conversationStore.currentConversationUid
-            && conversationStore.runningConversationUid === conversationStore.currentConversationUid
-            && !conversationRunsStore.runsByMessageUid[latestMessageUid]"
-          class="message-wrap"
-        >
-          <div class="message-role">ASSISTANT</div>
+        <div v-if="conversationStore.currentConversationUid && shouldShowTypingIndicator" class="message-wrap">
           <div class="typing-indicator">
             <span v-for="index in 3" :key="index" />
           </div>
         </div>
       </template>
     </div>
-    <ComposerPanel />
+    <ComposerPanel v-if="!props.hideComposer" />
   </section>
 </template>
 
@@ -811,7 +969,7 @@ onMounted(() => {
   min-height: calc(1.45em * 3);
 }
 
-@media (max-width: var(--size-breakpoint-lg)) {
+@media (max-width: 1120px) {
   .conversation-empty-hero {
     width: min(100%, var(--container-sm));
   }
@@ -821,7 +979,7 @@ onMounted(() => {
   }
 }
 
-@media (max-width: var(--size-breakpoint-md)) {
+@media (max-width: 860px) {
   .conversation-empty-hero {
     width: 100%;
     padding: var(--space-5);
@@ -1124,40 +1282,14 @@ onMounted(() => {
 }
 
 .message-action-btn.saved {
-  border-color: var(--color-border-spinner-soft);
-  background: var(--color-bg-brand-tint-14);
-  color: var(--color-text-brand-strong);
+  background: color-mix(in srgb, var(--color-accent-brand) 12%, transparent);
+  color: var(--color-accent-brand);
+  opacity: 1;
 }
 
 .save-tip-wrap {
   position: relative;
   display: inline-flex;
-}
-
-.message-action-hint {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + var(--space-1_5));
-  white-space: nowrap;
-  font-size: var(--text-caption-size);
-  color: var(--color-text-brand-strong);
-  background: var(--color-bg-brand-tint-12);
-  border: var(--size-1) solid var(--color-border-accent-soft);
-  border-radius: var(--radius-pill);
-  padding: var(--space-1) var(--space-2);
-  box-shadow: var(--shadow-soft-md);
-  animation: hint-in 0.16s ease-out;
-}
-
-@keyframes hint-in {
-  from {
-    opacity: 0;
-    transform: translateY(var(--space-1));
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 @keyframes copied-flash {
@@ -1180,7 +1312,7 @@ onMounted(() => {
 }
 
 .run-title {
-  width: 100%;
+  flex: 1;
   text-align: left;
   font-size: var(--text-body-size);
   font-weight: 700;
@@ -1189,9 +1321,38 @@ onMounted(() => {
   color: var(--text-muted);
 }
 
+.run-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
 .run-summary {
   margin-top: var(--space-1_5);
   line-height: 1.7;
+}
+
+.canceled-assistant-message {
+  align-self: flex-start;
+  margin-top: var(--space-4);
+  width: min(var(--size-percent-message-max), var(--container-xl));
+}
+
+.canceled-assistant-message .message-time {
+  margin-top: var(--space-1_5);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(calc(var(--size-1) * -1));
+  transition: opacity 0.14s ease, transform 0.14s ease, visibility 0.14s ease;
+}
+
+.canceled-assistant-message:hover .message-time,
+.canceled-assistant-message:focus-within .message-time {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
 }
 
 .run-details {
@@ -1368,7 +1529,7 @@ onMounted(() => {
   }
 }
 
-@media (max-width: var(--size-breakpoint-lg)) {
+@media (max-width: 1120px) {
   .message-list {
     padding-bottom: calc(var(--space-chat-mobile-input-offset) + env(safe-area-inset-bottom));
     -webkit-overflow-scrolling: touch;

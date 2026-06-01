@@ -14,6 +14,7 @@ import { loadChatLastViewState, saveChatLastViewState } from "@/stores/chatViewS
 import { resolveApprovalFromPayload, resolveApprovalFromStep } from "@/utils/approvalRenderer";
 import type { ApprovalLabelKey } from "@/utils/approvalRenderer";
 import type {
+  ApprovalMode,
   AgentEvent,
   ConversationAttachment,
   ConversationMessage,
@@ -25,6 +26,8 @@ import type {
   UploadPolicy
 } from "@/types/api";
 
+const APPROVAL_MODE_STORAGE_KEY = "chat:approval-mode-by-conversation";
+
 interface ApprovalState {
   stepUid: string | null;
   title: string;
@@ -32,6 +35,7 @@ interface ApprovalState {
   labelKey: ApprovalLabelKey;
   command: string;
   toolName: string;
+  policyReasonCode: string;
   riskLevel: string;
   submitting: boolean;
   submittingAction: "allow_once" | "allow_session" | "allow_agent" | "allow_user" | "deny_once" | null;
@@ -92,10 +96,19 @@ function normalizeUploadPolicy(policy?: UploadPolicy | null): UploadPolicy {
 }
 
 function isProviderConfigured(provider: ModelConfig["providers"][number]) {
+  if (!provider.requireApiKey) {
+    return Boolean(provider.configured);
+  }
   if (provider.local) {
     return Boolean(provider.baseUrl?.trim());
   }
   return Boolean(provider.apiKey?.trim());
+}
+
+function isEmbeddingModel(model: ModelProviderOption) {
+  const id = (model.id || "").toLowerCase();
+  const name = (model.name || "").toLowerCase();
+  return id.includes("embedding") || name.includes("embedding");
 }
 
 function normalizeMimeGroupFromName(fileName: string) {
@@ -146,6 +159,7 @@ export const useConversationStore = defineStore("conversation", () => {
   const modelConfig = ref<ModelConfig>({ providers: [] });
   const selectedModelProvider = ref("");
   const selectedModelName = ref("");
+  const approvalMode = ref<ApprovalMode>("default");
   const approval = ref<ApprovalState>({
     stepUid: null,
     title: "",
@@ -153,6 +167,7 @@ export const useConversationStore = defineStore("conversation", () => {
     labelKey: "chat.approval.commandLabel",
     command: "",
     toolName: "",
+    policyReasonCode: "",
     riskLevel: "HIGH",
     submitting: false,
     submittingAction: null
@@ -174,9 +189,59 @@ export const useConversationStore = defineStore("conversation", () => {
     overallPercent: -1,
     completedArtifacts: []
   });
+  const skipConversationListRefresh = ref(false);
 
   let eventSource: EventSource | null = null;
   const streamingAssistantByParentUid = ref<Record<string, number>>({});
+  let messageLoadToken = 0;
+
+  function loadApprovalModeMap(): Record<string, ApprovalMode> {
+    if (typeof window === "undefined") return {};
+    const raw = window.localStorage.getItem(APPROVAL_MODE_STORAGE_KEY);
+    if (!raw) return {};
+    try {
+      const parsed = JSON.parse(raw) as Record<string, string>;
+      const out: Record<string, ApprovalMode> = {};
+      Object.entries(parsed || {}).forEach(([key, value]) => {
+        if (!key) return;
+        out[key] = value === "full_access" ? "full_access" : "default";
+      });
+      return out;
+    } catch {
+      return {};
+    }
+  }
+
+  function saveApprovalModeMap(map: Record<string, ApprovalMode>) {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(APPROVAL_MODE_STORAGE_KEY, JSON.stringify(map));
+  }
+
+  function restoreApprovalModeForConversation(conversationUid: string | null) {
+    if (!conversationUid) {
+      approvalMode.value = "default";
+      return;
+    }
+    const map = loadApprovalModeMap();
+    approvalMode.value = map[conversationUid] || "default";
+  }
+
+  function setApprovalMode(mode: ApprovalMode) {
+    approvalMode.value = mode;
+    if (!currentConversationUid.value) {
+      return;
+    }
+    const conversationUid = currentConversationUid.value;
+    const map = loadApprovalModeMap();
+    map[conversationUid] = mode;
+    saveApprovalModeMap(map);
+    void conversationApi.updateApprovalMode(conversationUid, {
+      approvalMode: mode,
+      applyToRunning: true
+    }).catch((err) => {
+      console.warn("[conversation] update approval mode failed", err);
+    });
+  }
 
   const filteredConversations = computed(() =>
     conversations.value.filter((item) => agentCatalogStore.matchesConversation(item))
@@ -193,7 +258,16 @@ export const useConversationStore = defineStore("conversation", () => {
       .filter((provider) => isProviderConfigured(provider))
       .map((provider) => ({
         ...provider,
-        models: provider.models.filter((model) => Boolean(model.id?.trim()))
+        models: provider.models.filter((model) => {
+          if (!model.id?.trim()) {
+            return false;
+          }
+          // Hide embedding models only for local providers in chat model selector.
+          if (provider.local && isEmbeddingModel(model)) {
+            return false;
+          }
+          return true;
+        })
       }))
       .filter((provider) => provider.models.length)
   );
@@ -272,6 +346,7 @@ export const useConversationStore = defineStore("conversation", () => {
       labelKey: "chat.approval.commandLabel",
       command: "",
       toolName: "",
+      policyReasonCode: "",
       riskLevel: "HIGH",
       submitting: false,
       submittingAction: null
@@ -299,8 +374,8 @@ export const useConversationStore = defineStore("conversation", () => {
   }
 
   function updateBrowserRuntimeOverlayFromStepEvent(event: AgentEvent) {
-    const toolName = String(event.payload.toolName || "");
-    if (toolName !== "browser_tool" && toolName !== "browser_control_tool") {
+    const toolName = String(event.payload.toolName || "").trim();
+    if (toolName !== "BrowserTool") {
       return;
     }
     const metrics = (event.payload.progressMetrics || {}) as Record<string, any>;
@@ -429,6 +504,7 @@ export const useConversationStore = defineStore("conversation", () => {
       labelKey: rendered.labelKey,
       command: rendered.command,
       toolName: rendered.toolName,
+      policyReasonCode: current.step.policyReasonCode || "",
       riskLevel: "HIGH",
       submitting: approval.value.stepUid === current.step.stepUid ? approval.value.submitting : false,
       submittingAction: approval.value.stepUid === current.step.stepUid ? approval.value.submittingAction : null
@@ -566,10 +642,17 @@ export const useConversationStore = defineStore("conversation", () => {
   }
 
   async function loadMessages(conversationUid: string) {
+    const token = ++messageLoadToken;
     const [loadedMessages, runs] = await Promise.all([
       conversationApi.listMessages(conversationUid),
       conversationApi.listMessageRuns(conversationUid)
     ]);
+    if (token !== messageLoadToken) {
+      return;
+    }
+    if (currentConversationUid.value !== conversationUid) {
+      return;
+    }
     messages.value = loadedMessages;
     reconcileRunningConversationByMessages(conversationUid, loadedMessages);
     conversationRunsStore.setRuns(runs);
@@ -646,8 +729,13 @@ export const useConversationStore = defineStore("conversation", () => {
     agentCatalogStore.ensureSelection();
   }
 
-  async function refreshConversations(preferredConversationUid: string | null = currentConversationUid.value) {
-    loading.value = true;
+  async function refreshConversations(
+    preferredConversationUid: string | null = currentConversationUid.value,
+    withLoading = true
+  ) {
+    if (withLoading) {
+      loading.value = true;
+    }
     try {
       await loadConversationSummaries();
 
@@ -673,7 +761,9 @@ export const useConversationStore = defineStore("conversation", () => {
 
       syncRuntimeModelSelection();
     } finally {
-      loading.value = false;
+      if (withLoading) {
+        loading.value = false;
+      }
     }
   }
 
@@ -721,6 +811,7 @@ export const useConversationStore = defineStore("conversation", () => {
     draftAttachments.value = [];
     resetRuntimePanels();
     disconnectEventSource();
+    approvalMode.value = "default";
     saveChatLastViewState({ mode: "draft", conversationUid: null });
     if (previousConversationModel) {
       selectedModelProvider.value = previousConversationModel.modelProvider;
@@ -731,11 +822,24 @@ export const useConversationStore = defineStore("conversation", () => {
   }
 
   async function selectConversation(conversationUid: string) {
+    if (currentConversationUid.value !== conversationUid) {
+      messages.value = [];
+    }
     currentConversationUid.value = conversationUid;
+    restoreApprovalModeForConversation(conversationUid);
     saveChatLastViewState({ mode: "conversation", conversationUid });
     draftAttachments.value = [];
     resetRuntimePanels();
     await loadMessages(conversationUid);
+    void conversationApi.markConversationRead(conversationUid).then(() => {
+      conversations.value = conversations.value.map((item) =>
+        item.conversationUid === conversationUid
+          ? { ...item, unread: false }
+          : item
+      );
+    }).catch(() => {
+      // best effort: next refresh will reconcile unread state
+    });
     syncRuntimeModelSelection();
     subscribeEvents();
   }
@@ -779,7 +883,7 @@ export const useConversationStore = defineStore("conversation", () => {
     const createAgentUid = agentCatalogStore.selectedAgentUid;
     const created = await conversationApi.createConversation(createGroupUid, createAgentUid);
     currentConversationUid.value = created.conversationUid;
-    await refreshConversations(created.conversationUid);
+    await refreshConversations(created.conversationUid, false);
     subscribeEvents();
     return created.conversationUid;
   }
@@ -908,12 +1012,13 @@ export const useConversationStore = defineStore("conversation", () => {
         message: content,
         fileUrls: attachments.map((item) => item.fileUrl),
         modelProvider: effectiveProvider,
-        modelName: effectiveModelName
+        modelName: effectiveModelName,
+        approvalMode: approvalMode.value
       });
       tempMessage.messageUid = accepted.messageUid;
       runningConversationUid.value = conversationUid;
       runtimeLogStore.append(tr("chat.runtime.messageSubmitted", { messageUid: accepted.messageUid }));
-      await refreshConversations(conversationUid);
+      await refreshConversations(conversationUid, false);
     } catch (error) {
       messages.value = messages.value.filter((item) => item !== tempMessage);
       draftMessage.value = content;
@@ -924,13 +1029,38 @@ export const useConversationStore = defineStore("conversation", () => {
 
   async function cancelRunningMessage() {
     if (!currentConversationUid.value) return;
-    await conversationApi.cancelConversation(currentConversationUid.value);
+    const activeConversationUid = currentConversationUid.value;
+    markConversationReadLocally(activeConversationUid);
+    await conversationApi.cancelConversation(activeConversationUid);
+    await keepCurrentConversationRead(activeConversationUid);
     runningConversationUid.value = null;
+  }
+
+  function markConversationReadLocally(conversationUid: string) {
+    conversations.value = conversations.value.map((item) =>
+      item.conversationUid === conversationUid
+        ? { ...item, unread: false }
+        : item
+    );
+  }
+
+  async function keepCurrentConversationRead(conversationUid: string) {
+    markConversationReadLocally(conversationUid);
+    try {
+      await conversationApi.markConversationRead(conversationUid);
+      markConversationReadLocally(conversationUid);
+    } catch {
+      // best effort: next refresh will reconcile unread state
+    }
   }
 
   async function decideStep(action: "allow" | "deny", scope: "once" | "session" | "agent" | "user") {
     if (!currentConversationUid.value || !approval.value.stepUid || approval.value.submitting) return;
     const stepUid = approval.value.stepUid;
+    const activeConversationUid = String(currentConversationUid.value || "").trim();
+    const previousUnread = activeConversationUid
+      ? conversations.value.find((item) => item.conversationUid === activeConversationUid)?.unread
+      : undefined;
     const submittingAction = action === "deny"
       ? "deny_once"
       : (scope === "session" ? "allow_session"
@@ -943,6 +1073,19 @@ export const useConversationStore = defineStore("conversation", () => {
     };
     try {
       await conversationApi.decideStep(currentConversationUid.value, stepUid, { action, scope });
+      clearApproval();
+      if (activeConversationUid) {
+        conversations.value = conversations.value.map((item) =>
+          item.conversationUid === activeConversationUid
+            ? { ...item, waitingApproval: false, unread: previousUnread ?? item.unread }
+            : item
+        );
+        if (previousUnread === false) {
+          void conversationApi.markConversationRead(activeConversationUid).catch(() => {
+            // best effort: next refresh will reconcile read state
+          });
+        }
+      }
       if (action === "allow") {
         message.success(tr("toast.approveSuccess"));
       } else {
@@ -1037,6 +1180,22 @@ export const useConversationStore = defineStore("conversation", () => {
     });
   }
 
+  function handleReasoningEvent(event: AgentEvent) {
+    if (!event.messageUid) return;
+    const roundIndex = Number(event.payload.roundIndex || 1);
+    const stepUid = `reasoning-${event.messageUid}-${roundIndex}`;
+    conversationRunsStore.updateRunStep(event.messageUid, stepUid, {
+      roundIndex,
+      stepIndex: 0,
+      status: "completed",
+      toolName: "Reasoning",
+      displayTitle: tr("chat.runtime.stepTitle.reasoning"),
+      displaySummary: tr("chat.runtime.reasoningSummary"),
+      displayDetails: String(event.payload.content || ""),
+      updatedTime: new Date().toISOString()
+    });
+  }
+
   function showApprovalAlert(event: AgentEvent) {
     const rendered = resolveApprovalFromPayload(event.payload || {});
     approval.value = {
@@ -1046,6 +1205,7 @@ export const useConversationStore = defineStore("conversation", () => {
       labelKey: rendered.labelKey,
       command: rendered.command,
       toolName: rendered.toolName,
+      policyReasonCode: String(event.payload.policyReasonCode || ""),
       riskLevel: event.payload.riskLevel || "HIGH",
       submitting: approval.value.stepUid === (event.stepUid || null) ? approval.value.submitting : false,
       submittingAction: approval.value.stepUid === (event.stepUid || null) ? approval.value.submittingAction : null
@@ -1083,6 +1243,10 @@ export const useConversationStore = defineStore("conversation", () => {
       runtimeLogStore.append(tr("chat.runtime.modelToolCall", { round: event.payload.roundIndex || 1 }));
       renderPlanSteps(event.payload.steps || []);
       handlePlanCreated(event);
+      return;
+    }
+    if (type === "MESSAGE_REASONING") {
+      handleReasoningEvent(event);
       return;
     }
     if (type === "STEP_WAITING_APPROVAL") {
@@ -1131,10 +1295,11 @@ export const useConversationStore = defineStore("conversation", () => {
     if (type === "ROUND_TOKEN_USAGE") {
       const round = Number(event.payload.roundIndex || 1);
       const input = Number(event.payload.inputTokens || 0);
+      const cachedInput = Number(event.payload.cachedInputTokens || 0);
       const output = Number(event.payload.outputTokens || 0);
       const total = Number(event.payload.totalTokens || 0);
       const modelName = event.payload.modelName || "-";
-      runtimeLogStore.append(tr("chat.runtime.roundTokenUsage", { round, input, output, total, modelName }));
+      runtimeLogStore.append(tr("chat.runtime.roundTokenUsage", { round, input, cachedInput, output, total, modelName }));
       return;
     }
     if (type === "MESSAGE_COMPLETED") {
@@ -1153,8 +1318,12 @@ export const useConversationStore = defineStore("conversation", () => {
       }
       runningConversationUid.value = null;
       if (currentConversationUid.value) {
-        await loadMessages(currentConversationUid.value);
-        await refreshConversations(currentConversationUid.value);
+        const activeConversationUid = currentConversationUid.value;
+        await loadMessages(activeConversationUid);
+        if (!skipConversationListRefresh.value) {
+          await refreshConversations(activeConversationUid, false);
+        }
+        await keepCurrentConversationRead(activeConversationUid);
       }
       return;
     }
@@ -1178,10 +1347,18 @@ export const useConversationStore = defineStore("conversation", () => {
       }
       runningConversationUid.value = null;
       if (currentConversationUid.value) {
-        await loadMessages(currentConversationUid.value);
-        await refreshConversations(currentConversationUid.value);
+        const activeConversationUid = currentConversationUid.value;
+        await loadMessages(activeConversationUid);
+        if (!skipConversationListRefresh.value) {
+          await refreshConversations(activeConversationUid, false);
+        }
+        await keepCurrentConversationRead(activeConversationUid);
       }
     }
+  }
+
+  function setSkipConversationListRefresh(value: boolean) {
+    skipConversationListRefresh.value = value;
   }
 
   async function confirmDeleteConversation(conversationUid: string, title: string) {
@@ -1217,6 +1394,8 @@ export const useConversationStore = defineStore("conversation", () => {
     currentModelOption,
     selectedModelProvider,
     selectedModelName,
+    approvalMode,
+    setApprovalMode,
     selectedModelKey,
     currentUploadPolicy,
     uploadDisabledReason,
@@ -1235,6 +1414,7 @@ export const useConversationStore = defineStore("conversation", () => {
     cancelRunningMessage,
     approveStep,
     rejectStep,
+    setSkipConversationListRefresh,
     openFile,
     renameConversation,
     updateConversationPin,

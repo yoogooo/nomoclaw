@@ -1,5 +1,7 @@
 package ai.nomoclaw.bot.tool;
 
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import ai.nomoclaw.bot.config.AgentProperties;
 import ai.nomoclaw.bot.model.ToolRequest;
 import ai.nomoclaw.bot.model.ToolResult;
@@ -7,6 +9,7 @@ import ai.nomoclaw.bot.orchestrator.MessageCancellationRegistry;
 import ai.nomoclaw.bot.workspace.NomoClawPaths;
 import com.microsoft.playwright.*;
 import com.microsoft.playwright.options.LoadState;
+import com.microsoft.playwright.options.WaitForSelectorState;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -16,13 +19,17 @@ import tools.jackson.databind.node.ObjectNode;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
 import java.lang.ProcessBuilder.Redirect;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.URL;
 import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -35,8 +42,6 @@ import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-@Component
-@Slf4j
 /**
  * Browser tool backed by Playwright persistent context.
  *
@@ -50,6 +55,8 @@ import java.util.regex.Pattern;
  * progress will be measured against one directory while the actual download is
  * written to another.
  */
+@Component
+@Slf4j
 public class BrowserTool implements Tool {
     private static final long DOWNLOAD_REPORT_INTERVAL_MS = 800L;
     private static final long DOWNLOAD_REPORT_MIN_DELTA_BYTES = 256L * 1024L;
@@ -62,6 +69,8 @@ public class BrowserTool implements Tool {
     private static final Pattern PLAYWRIGHT_DOWNLOAD_START_PATTERN = Pattern.compile("^Downloading\\s+(.+?)\\s+from\\s+.+$", Pattern.CASE_INSENSITIVE);
     private static final Pattern PLAYWRIGHT_DOWNLOAD_DONE_PATTERN = Pattern.compile("^(.+?)\\s+downloaded\\s+to\\s+.+$", Pattern.CASE_INSENSITIVE);
     private static final long PLAYWRIGHT_UNKNOWN_ARTIFACT_ESTIMATED_BYTES = 32L * 1024L * 1024L;
+    private static final String PLAYWRIGHT_DRIVER_TEMP_PREFIX = "playwright-java-";
+    private static final Duration PLAYWRIGHT_DRIVER_TEMP_RETENTION = Duration.ofHours(6);
     private static final List<String> PLAYWRIGHT_DEFAULT_ARTIFACTS = List.of(
             "chromium",
             "ffmpeg",
@@ -98,6 +107,7 @@ public class BrowserTool implements Tool {
     private final Map<String, Process> processByProfile = new ConcurrentHashMap<>();
     private final Map<String, String> profileByConversation = new ConcurrentHashMap<>();
     private final Map<String, Page> pageByConversation = new ConcurrentHashMap<>();
+    private final Map<String, BrowserMode> modeByConversation = new ConcurrentHashMap<>();
     private final AgentProperties agentProperties;
     private final MessageCancellationRegistry cancellationRegistry;
     private volatile boolean chromiumInstallEnsured;
@@ -111,7 +121,7 @@ public class BrowserTool implements Tool {
 
     @Override
     public String name() {
-        return "browser_tool";
+        return "BrowserTool";
     }
 
     @Override
@@ -125,7 +135,7 @@ public class BrowserTool implements Tool {
             if (cancellationRegistry.isCanceled(request.messageUid())) {
                 return ToolResult.failure("CANCELLED", "message canceled", metric(start));
             }
-            String action = request.args().path("action").asText("");
+            String action = request.args().path("action").asString("");
             log.info("[Tool][browser] execute conversationUid={} messageUid={} stepUid={} action={}",
                     request.conversationUid(), request.messageUid(), request.stepUid(), action);
             return executeWithRecovery(request, profileKey, start);
@@ -140,10 +150,11 @@ public class BrowserTool implements Tool {
         Exception last = null;
         for (int attempt = 0; attempt < 2; attempt++) {
             try {
-                BrowserContext context = resolveContext(profileKey, request);
+                BrowserMode initialMode = selectInitialMode(request);
+                BrowserContext context = resolveContext(profileKey, request, initialMode);
                 Page page = currentPage(request.conversationUid(), context);
                 page.setDefaultTimeout(request.timeoutMs());
-                return executeAction(request, page, start);
+                return executeAction(request, page, start, profileKey, initialMode);
             } catch (Exception ex) {
                 last = ex;
                 if (!isTargetClosed(ex) || attempt == 1) {
@@ -158,55 +169,72 @@ public class BrowserTool implements Tool {
         throw new IllegalStateException(last == null ? "browser action failed" : last.getMessage(), last);
     }
 
-    private ToolResult executeAction(ToolRequest request, Page page, long start) throws Exception {
-        String action = request.args().path("action").asText("");
+    private ToolResult executeAction(ToolRequest request,
+                                     Page page,
+                                     long start,
+                                     String profileKey,
+                                     BrowserMode initialMode) throws Exception {
+        String action = request.args().path("action").asString("");
         return switch (action) {
             case "open" -> {
-                String url = request.args().path("url").asText("");
-                page.navigate(url);
-                page.waitForLoadState(LoadState.NETWORKIDLE);
-                yield ToolResult.success("opened " + url, textArtifacts("url", url), metric(start));
+                String url = request.args().path("url").asString("");
+                yield navigateWithModeSelection(request, profileKey, page, start, initialMode, url, "opened ");
             }
             case "navigate" -> {
-                String url = request.args().path("url").asText("");
-                page.navigate(url);
-                page.waitForLoadState(LoadState.NETWORKIDLE);
-                yield ToolResult.success("navigated " + url, textArtifacts("url", url), metric(start));
+                String url = request.args().path("url").asString("");
+                yield navigateWithModeSelection(request, profileKey, page, start, initialMode, url, "navigated ");
             }
             case "navigate_back" -> {
                 page.goBack();
                 yield ToolResult.success("navigated back", textArtifacts("url", page.url()), metric(start));
             }
             case "click" -> {
-                String selector = request.args().path("selector").asText("");
-                page.locator(selector).first().click();
-                yield ToolResult.success("clicked " + selector, textArtifacts("selector", selector), metric(start));
+                String selector = request.args().path("selector").asString("");
+                double clickTimeoutMs = Math.max(1_000L, agentProperties.getBrowser().getClickTimeoutSeconds() * 1000L);
+                Locator target = resolveVisibleFirstLocator(page, selector);
+                target.waitFor(new Locator.WaitForOptions()
+                        .setState(WaitForSelectorState.VISIBLE)
+                        .setTimeout(clickTimeoutMs));
+                target.scrollIntoViewIfNeeded(new Locator.ScrollIntoViewIfNeededOptions().setTimeout(clickTimeoutMs));
+                boolean forceFallbackUsed = false;
+                try {
+                    target.click(new Locator.ClickOptions().setTimeout(clickTimeoutMs));
+                } catch (Exception clickEx) {
+                    if (!agentProperties.getBrowser().isForceClickFallbackEnabled()) {
+                        throw clickEx;
+                    }
+                    target.click(new Locator.ClickOptions().setTimeout(clickTimeoutMs).setForce(true));
+                    forceFallbackUsed = true;
+                }
+                ObjectNode artifacts = textArtifacts("selector", selector);
+                artifacts.put("forceFallbackUsed", forceFallbackUsed);
+                yield ToolResult.success("clicked " + selector, artifacts, metric(start));
             }
             case "type" -> {
-                String selector = request.args().path("selector").asText("");
-                String text = request.args().path("text").asText("");
+                String selector = request.args().path("selector").asString("");
+                String text = request.args().path("text").asString("");
                 page.locator(selector).first().fill(text);
                 yield ToolResult.success("typed into " + selector, textArtifacts("selector", selector), metric(start));
             }
             case "extract_text" -> {
-                String selector = request.args().path("selector").asText("body");
+                String selector = request.args().path("selector").asString("body");
                 String text = page.locator(selector).first().innerText();
                 ObjectNode artifacts = textArtifacts("selector", selector);
                 artifacts.put("length", text.length());
                 yield ToolResult.success(text, artifacts, metric(start));
             }
             case "screenshot" -> {
-                String output = request.args().path("output").asText("");
+                String output = request.args().path("output").asString("");
                 Path outputPath = output == null || output.isBlank()
-                        ? request.tmpDirectory().resolve(UUID.randomUUID() + ".png").toAbsolutePath().normalize()
+                        ? request.tmpDirectory().resolve(UuidUtil.newUuid() + ".png").toAbsolutePath().normalize()
                         : PathResolver.resolveInAgentWorkspace(output, request);
                 java.nio.file.Files.createDirectories(outputPath.getParent());
                 page.screenshot(new Page.ScreenshotOptions().setPath(outputPath));
                 yield ToolResult.success("screenshot saved", textArtifacts("path", outputPath.toString()), metric(start));
             }
             case "download" -> {
-                String selector = request.args().path("selector").asText("");
-                String output = request.args().path("output").asText("");
+                String selector = request.args().path("selector").asString("");
+                String output = request.args().path("output").asString("");
                 Download download = page.waitForDownload(() -> page.locator(selector).first().click());
                 Path targetPath = resolveDownloadPath(request, download, output);
                 Files.createDirectories(targetPath.getParent());
@@ -223,12 +251,20 @@ public class BrowserTool implements Tool {
                 yield ToolResult.success(ToolTextUtils.truncateHead(html), artifacts, metric(start));
             }
             case "wait_for" -> {
-                String selector = request.args().path("selector").asText("");
+                String selector = request.args().path("selector").asString("");
+                String normalized = selector == null ? "" : selector.trim();
+                if (normalized.startsWith("--load ")) {
+                    String stateValue = normalized.substring("--load ".length()).trim().toLowerCase(Locale.ROOT);
+                    LoadState loadState = parseLoadState(stateValue);
+                    page.waitForLoadState(loadState);
+                    ObjectNode artifacts = textArtifacts("loadState", stateValue);
+                    yield ToolResult.success("waited for load state " + stateValue, artifacts, metric(start));
+                }
                 page.locator(selector).first().waitFor();
                 yield ToolResult.success("waited for " + selector, textArtifacts("selector", selector), metric(start));
             }
             case "press_key" -> {
-                String key = request.args().path("key").asText("");
+                String key = request.args().path("key").asString("");
                 page.keyboard().press(key);
                 yield ToolResult.success("pressed key " + key, textArtifacts("key", key), metric(start));
             }
@@ -241,6 +277,45 @@ public class BrowserTool implements Tool {
         };
     }
 
+    private ToolResult navigateWithModeSelection(ToolRequest request,
+                                                 String profileKey,
+                                                 Page managedPage,
+                                                 long start,
+                                                 BrowserMode initialMode,
+                                                 String url,
+                                                 String successPrefix) {
+        BrowserMode selectedMode = initialMode;
+        boolean fallback = false;
+        String switchReason = "initial";
+        try {
+            if (selectedMode == BrowserMode.LOCAL_BRIDGE) {
+                Page page = ensurePageForMode(request, profileKey, selectedMode);
+                page.navigate(url);
+                page.waitForLoadState(LoadState.DOMCONTENTLOADED);
+            } else {
+                managedPage.navigate(url);
+                managedPage.waitForLoadState(LoadState.DOMCONTENTLOADED);
+            }
+        } catch (Exception ex) {
+            if (selectedMode != BrowserMode.LOCAL_BRIDGE || !agentProperties.getBrowser().getLocalBridge().isFallbackToManaged()) {
+                throw ex;
+            }
+            Page fallbackPage = ensurePageForMode(request, profileKey, BrowserMode.MANAGED);
+            fallbackPage.navigate(url);
+            fallbackPage.waitForLoadState(LoadState.DOMCONTENTLOADED);
+            fallback = true;
+            selectedMode = BrowserMode.MANAGED;
+            switchReason = "local_bridge_unavailable";
+            log.warn("[Tool][browser] local bridge unavailable, fallback to managed err={}", buildErrorMessage(ex));
+        }
+        modeByConversation.put(request.conversationUid(), selectedMode);
+        ObjectNode artifacts = textArtifacts("url", url);
+        artifacts.put("selectedMode", selectedMode.value);
+        artifacts.put("switchReason", switchReason);
+        artifacts.put("fallback", fallback);
+        return ToolResult.success(successPrefix + url, artifacts, metric(start));
+    }
+
     @PreDestroy
     public void closeAll() {
         for (Page page : pageByConversation.values()) {
@@ -251,6 +326,7 @@ public class BrowserTool implements Tool {
         }
         pageByConversation.clear();
         profileByConversation.clear();
+        modeByConversation.clear();
 
         for (BrowserContext context : contextByProfile.values()) {
             try {
@@ -276,19 +352,20 @@ public class BrowserTool implements Tool {
         }
     }
 
-    private BrowserContext resolveContext(String profileKey, ToolRequest request) {
+    private BrowserContext resolveContext(String profileKey, ToolRequest request, BrowserMode mode) {
+        String modeProfileKey = modeProfileKey(profileKey, mode);
         synchronized (contextByProfile) {
-            BrowserContext existing = contextByProfile.get(profileKey);
+            BrowserContext existing = contextByProfile.get(modeProfileKey);
             if (isContextUsable(existing)) {
                 return existing;
             }
             if (existing != null) {
                 safelyCloseContext(existing);
-                contextByProfile.remove(profileKey);
+                contextByProfile.remove(modeProfileKey);
                 resetPagesForProfile(profileKey);
             }
-            BrowserContext created = createContext(profileKey, request);
-            contextByProfile.put(profileKey, created);
+            BrowserContext created = createContext(profileKey, request, mode);
+            contextByProfile.put(modeProfileKey, created);
             return created;
         }
     }
@@ -310,7 +387,10 @@ public class BrowserTool implements Tool {
      * {@code estimatedTotalBytes} is only a UI estimate used to derive an approximate
      * percent; it is not the real download size reported by Playwright.
      */
-    private synchronized BrowserContext createContext(String profileKey, ToolRequest request) {
+    private synchronized BrowserContext createContext(String profileKey, ToolRequest request, BrowserMode mode) {
+        if (mode == BrowserMode.LOCAL_BRIDGE) {
+            return createLocalBridgeContext(profileKey, request);
+        }
         configurePlaywrightDriverTmpDirectory();
         Path cacheRoot = resolvePlaywrightCacheRoot();
         Map<String, String> playwrightEnv = buildPlaywrightEnv(cacheRoot);
@@ -409,6 +489,200 @@ public class BrowserTool implements Tool {
         }
     }
 
+    private synchronized BrowserContext createLocalBridgeContext(String profileKey, ToolRequest request) {
+        String endpoint = normalizeCdpEndpoint(agentProperties.getBrowser().getLocalBridge().getCdpEndpoint());
+        ensureLoopbackEndpoint(endpoint);
+        ensureLocalBridgeEndpointReady(endpoint);
+        if (playwright == null) {
+            Path cacheRoot = resolvePlaywrightCacheRoot();
+            Map<String, String> playwrightEnv = buildPlaywrightEnv(cacheRoot);
+            playwright = Playwright.create(new Playwright.CreateOptions().setEnv(playwrightEnv));
+        }
+        Browser browser = playwright.chromium().connectOverCDP(
+                endpoint,
+                new BrowserType.ConnectOverCDPOptions()
+                        .setIsLocal(true)
+                        .setTimeout((double) Math.max(1, agentProperties.getBrowser().getLocalBridge().getConnectTimeoutMs()))
+        );
+        BrowserContext context = resolveConnectedContext(browser);
+        String key = modeProfileKey(profileKey, BrowserMode.LOCAL_BRIDGE);
+        Browser staleBrowser = browserByProfile.put(key, browser);
+        if (staleBrowser != null && staleBrowser != browser) {
+            try {
+                staleBrowser.close();
+            } catch (Exception ignored) {
+            }
+        }
+        safelyDestroyProcess(processByProfile.remove(key));
+        log.info("[Tool][browser] local bridge connected profile={} endpoint={}", profileKey, endpoint);
+        return context;
+    }
+
+    private void ensureLocalBridgeEndpointReady(String endpoint) {
+        String probeUrl = normalizeDevToolsVersionUrl(endpoint);
+        if (probeUrl.isBlank()) {
+            return;
+        }
+        if (isDevToolsEndpointReady(endpoint)) {
+            return;
+        }
+        launchLocalChromeForCdp(endpoint);
+        long timeoutMs = Math.max(3_000L, agentProperties.getBrowser().getLocalBridge().getConnectTimeoutMs());
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        while (System.currentTimeMillis() < deadline) {
+            if (isDevToolsEndpointReady(endpoint)) {
+                return;
+            }
+            try {
+                Thread.sleep(200L);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("interrupted while waiting local bridge endpoint ready", ex);
+            }
+        }
+        throw new IllegalStateException("local bridge endpoint not ready: " + endpoint);
+    }
+
+    private boolean isDevToolsEndpointReady(String endpoint) {
+        List<String> probeUrls = devToolsProbeUrls(endpoint);
+        if (probeUrls.isEmpty()) {
+            return true;
+        }
+        for (String probeUrl : probeUrls) {
+            HttpURLConnection connection = null;
+            try {
+                connection = (HttpURLConnection) new URL(probeUrl).openConnection();
+                connection.setConnectTimeout(Math.max(500, agentProperties.getBrowser().getLocalBridge().getConnectTimeoutMs() / 2));
+                connection.setReadTimeout(Math.max(500, agentProperties.getBrowser().getLocalBridge().getConnectTimeoutMs() / 2));
+                connection.setRequestMethod("GET");
+                int status = connection.getResponseCode();
+                if (status != 200) {
+                    continue;
+                }
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
+                    StringBuilder body = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        body.append(line);
+                    }
+                    if (body.toString().contains("webSocketDebuggerUrl")) {
+                        return true;
+                    }
+                }
+            } catch (Exception ignored) {
+            } finally {
+                if (connection != null) {
+                    connection.disconnect();
+                }
+            }
+        }
+        return false;
+    }
+
+    private void launchLocalChromeForCdp(String endpoint) {
+        int port = parseEndpointPort(endpoint);
+        String launcherKey = "local_bridge_launcher::" + port;
+        Process existing = processByProfile.get(launcherKey);
+        if (existing != null && existing.isAlive()) {
+            return;
+        }
+        if (!PlatformSupport.isMac()) {
+            throw new IllegalStateException("local bridge auto-start is currently supported on macOS only");
+        }
+        Path chromeExecutable = Path.of("/Applications", "Google Chrome.app", "Contents", "MacOS", "Google Chrome");
+        if (!Files.isRegularFile(chromeExecutable)) {
+            throw new IllegalStateException(
+                    "google chrome is not installed or executable missing: " + chromeExecutable
+                    + " please install Google Chrome from https://www.google.com/chrome/"
+            );
+        }
+        Path userDataDir = NomoClawPaths.ensureRuntimeBrowserProfilesRoot()
+                .resolve("local-bridge-cdp")
+                .toAbsolutePath()
+                .normalize();
+        try {
+            Files.createDirectories(userDataDir);
+        } catch (Exception ex) {
+            throw new IllegalStateException("failed to create local bridge profile dir: " + userDataDir, ex);
+        }
+        List<String> command = new ArrayList<>();
+        command.add(chromeExecutable.toString());
+        command.add("--remote-debugging-address=127.0.0.1");
+        command.add("--remote-debugging-port=" + port);
+        command.add("--user-data-dir=" + userDataDir);
+        command.add("about:blank");
+        ProcessBuilder pb = new ProcessBuilder(command);
+        pb.redirectErrorStream(true);
+        pb.redirectOutput(Redirect.DISCARD);
+        try {
+            Process process = pb.start();
+            Process stale = processByProfile.put(launcherKey, process);
+            if (stale != null && stale != process) {
+                safelyDestroyProcess(stale);
+            }
+            log.info("[Tool][browser] started local bridge chrome launcher endpoint={} pid={}", endpoint, process.pid());
+        } catch (Exception ex) {
+            throw new IllegalStateException("failed to auto-start local chrome for endpoint: " + endpoint, ex);
+        }
+    }
+
+    private String normalizeDevToolsVersionUrl(String endpoint) {
+        if (endpoint == null || endpoint.isBlank()) {
+            return "";
+        }
+        try {
+            URI uri = URI.create(endpoint.trim());
+            String scheme = uri.getScheme() == null ? "http" : uri.getScheme().toLowerCase(Locale.ROOT);
+            if (!"http".equals(scheme) && !"https".equals(scheme)) {
+                return "";
+            }
+            int port = uri.getPort();
+            if (port <= 0) {
+                port = "https".equals(scheme) ? 443 : 80;
+            }
+            return scheme + "://" + uri.getHost() + ":" + port + "/json/version";
+        } catch (Exception ignored) {
+            return "";
+        }
+    }
+
+    private int parseEndpointPort(String endpoint) {
+        try {
+            URI uri = URI.create(endpoint);
+            if (uri.getPort() > 0) {
+                return uri.getPort();
+            }
+            return "https".equalsIgnoreCase(uri.getScheme()) ? 443 : 80;
+        } catch (Exception ex) {
+            return 9222;
+        }
+    }
+
+    private List<String> devToolsProbeUrls(String endpoint) {
+        String primary = normalizeDevToolsVersionUrl(endpoint);
+        if (primary.isBlank()) {
+            return List.of();
+        }
+        LinkedHashSet<String> urls = new LinkedHashSet<>();
+        urls.add(primary);
+        try {
+            URI uri = URI.create(endpoint.trim());
+            String scheme = uri.getScheme() == null ? "http" : uri.getScheme().toLowerCase(Locale.ROOT);
+            if (!"http".equals(scheme) && !"https".equals(scheme)) {
+                return List.copyOf(urls);
+            }
+            int port = uri.getPort();
+            if (port <= 0) {
+                port = "https".equals(scheme) ? 443 : 80;
+            }
+            urls.add(scheme + "://localhost:" + port + "/json/version");
+            urls.add(scheme + "://127.0.0.1:" + port + "/json/version");
+            urls.add(scheme + "://[::1]:" + port + "/json/version");
+        } catch (Exception ignored) {
+        }
+        return List.copyOf(urls);
+    }
+
     private synchronized void ensureChromiumInstalled(ToolRequest request,
                                                       Path cacheRoot,
                                                       Map<String, String> playwrightEnv,
@@ -495,14 +769,15 @@ public class BrowserTool implements Tool {
                     userDataDir,
                     buildLaunchOptions(headless, playwrightEnv, executablePath)
             );
-            Browser staleBrowser = browserByProfile.remove(profileKey);
+            String modeProfileKey = modeProfileKey(profileKey, BrowserMode.MANAGED);
+            Browser staleBrowser = browserByProfile.remove(modeProfileKey);
             if (staleBrowser != null) {
                 try {
                     staleBrowser.close();
                 } catch (Exception ignored) {
                 }
             }
-            safelyDestroyProcess(processByProfile.remove(profileKey));
+            safelyDestroyProcess(processByProfile.remove(modeProfileKey));
             return context;
         } catch (Exception launchEx) {
             throw enrichLaunchFailure("persistent", launchEx, cacheRoot, userDataDir, executablePath, null);
@@ -530,14 +805,15 @@ public class BrowserTool implements Tool {
                             .setTimeout((double) WINDOWS_CDP_CONNECT_TIMEOUT_MS)
             );
             BrowserContext context = resolveConnectedContext(browser);
-            Browser staleBrowser = browserByProfile.put(profileKey, browser);
+            String modeProfileKey = modeProfileKey(profileKey, BrowserMode.MANAGED);
+            Browser staleBrowser = browserByProfile.put(modeProfileKey, browser);
             if (staleBrowser != null && staleBrowser != browser) {
                 try {
                     staleBrowser.close();
                 } catch (Exception ignored) {
                 }
             }
-            Process staleProcess = processByProfile.put(profileKey, process);
+            Process staleProcess = processByProfile.put(modeProfileKey, process);
             if (staleProcess != null && staleProcess != process) {
                 safelyDestroyProcess(staleProcess);
             }
@@ -1147,7 +1423,7 @@ public class BrowserTool implements Tool {
             return;
         }
         try (var walk = Files.walk(root)) {
-            walk.sorted(java.util.Comparator.reverseOrder()).forEach(path -> {
+            walk.sorted(Comparator.reverseOrder()).forEach(path -> {
                 try {
                     Files.deleteIfExists(path);
                 } catch (Exception ignored) {
@@ -1164,9 +1440,45 @@ public class BrowserTool implements Tool {
                 .normalize();
         try {
             Files.createDirectories(driverTmpDir);
+            cleanupStalePlaywrightDriverTempDirectories(driverTmpDir);
             System.setProperty("playwright.driver.tmpdir", driverTmpDir.toString());
         } catch (Exception ex) {
             log.warn("[Tool][browser] failed to prepare playwright driver temp dir {}", driverTmpDir, ex);
+        }
+    }
+
+    private void cleanupStalePlaywrightDriverTempDirectories(Path driverTmpDir) {
+        if (driverTmpDir == null || !Files.isDirectory(driverTmpDir)) {
+            return;
+        }
+        Instant cutoff = Instant.now().minus(PLAYWRIGHT_DRIVER_TEMP_RETENTION);
+        int removed = 0;
+        try (var stream = Files.list(driverTmpDir)) {
+            List<Path> staleDirs = stream
+                    .filter(Files::isDirectory)
+                    .filter(path -> {
+                        String name = path.getFileName() == null ? "" : path.getFileName().toString();
+                        return name.startsWith(PLAYWRIGHT_DRIVER_TEMP_PREFIX);
+                    })
+                    .filter(path -> isOlderThan(path, cutoff))
+                    .toList();
+            for (Path staleDir : staleDirs) {
+                deleteRecursively(staleDir);
+                removed++;
+            }
+            if (removed > 0) {
+                log.info("[Tool][browser] removed stale playwright driver temp dirs count={} root={}", removed, driverTmpDir);
+            }
+        } catch (Exception ex) {
+            log.warn("[Tool][browser] failed to cleanup playwright driver temp dirs root={} err={}", driverTmpDir, ex.getMessage());
+        }
+    }
+
+    private boolean isOlderThan(Path path, Instant cutoff) {
+        try {
+            return Files.getLastModifiedTime(path).toInstant().isBefore(cutoff);
+        } catch (Exception ex) {
+            return false;
         }
     }
 
@@ -1265,7 +1577,7 @@ public class BrowserTool implements Tool {
 
         private synchronized void beginAttempt() {
             attemptIndex += 1;
-            attemptId = UUID.randomUUID().toString();
+            attemptId = UuidUtil.newUuid();
             maxOverallPercent = -1;
             currentArtifact = "";
             segmentPercent = -1;
@@ -1504,24 +1816,37 @@ public class BrowserTool implements Tool {
                 } catch (Exception ignored) {
                 }
             }
+            modeByConversation.remove(conversationUid);
         });
     }
 
     private void invalidateProfileContext(String profileKey) {
         synchronized (contextByProfile) {
-            BrowserContext stale = contextByProfile.remove(profileKey);
-            if (stale != null) {
-                safelyCloseContext(stale);
+            BrowserContext managed = contextByProfile.remove(modeProfileKey(profileKey, BrowserMode.MANAGED));
+            if (managed != null) {
+                safelyCloseContext(managed);
+            }
+            BrowserContext local = contextByProfile.remove(modeProfileKey(profileKey, BrowserMode.LOCAL_BRIDGE));
+            if (local != null) {
+                safelyCloseContext(local);
             }
         }
-        Browser staleBrowser = browserByProfile.remove(profileKey);
+        Browser staleBrowser = browserByProfile.remove(modeProfileKey(profileKey, BrowserMode.MANAGED));
         if (staleBrowser != null) {
             try {
                 staleBrowser.close();
             } catch (Exception ignored) {
             }
         }
-        safelyDestroyProcess(processByProfile.remove(profileKey));
+        Browser localBridgeBrowser = browserByProfile.remove(modeProfileKey(profileKey, BrowserMode.LOCAL_BRIDGE));
+        if (localBridgeBrowser != null) {
+            try {
+                localBridgeBrowser.close();
+            } catch (Exception ignored) {
+            }
+        }
+        safelyDestroyProcess(processByProfile.remove(modeProfileKey(profileKey, BrowserMode.MANAGED)));
+        safelyDestroyProcess(processByProfile.remove(modeProfileKey(profileKey, BrowserMode.LOCAL_BRIDGE)));
         resetPagesForProfile(profileKey);
     }
 
@@ -1588,7 +1913,7 @@ public class BrowserTool implements Tool {
 
     private Path resolveDownloadPath(ToolRequest request, Download download, String output) {
         String fileName = download.suggestedFilename() == null || download.suggestedFilename().isBlank()
-                ? UUID.randomUUID() + ".bin"
+                ? UuidUtil.newUuid() + ".bin"
                 : download.suggestedFilename();
         if (output == null || output.isBlank()) {
             return request.tmpDirectory().resolve(fileName).toAbsolutePath().normalize();
@@ -1604,6 +1929,159 @@ public class BrowserTool implements Tool {
         String name = path.getFileName() == null ? "" : path.getFileName().toString();
         int dotIndex = name.lastIndexOf('.');
         return dotIndex > 0 && dotIndex < name.length() - 1;
+    }
+
+    private LoadState parseLoadState(String stateValue) {
+        if (stateValue == null || stateValue.isBlank()) {
+            throw new IllegalArgumentException("wait_for load state is required, expected one of: load, domcontentloaded, networkidle");
+        }
+        return switch (stateValue) {
+            case "load" -> LoadState.LOAD;
+            case "domcontentloaded" -> LoadState.DOMCONTENTLOADED;
+            case "networkidle" -> LoadState.NETWORKIDLE;
+            default -> throw new IllegalArgumentException(
+                    "unsupported wait_for load state: " + stateValue + ", expected one of: load, domcontentloaded, networkidle"
+            );
+        };
+    }
+
+    private Locator resolveVisibleFirstLocator(Page page, String selector) {
+        String normalized = selector == null ? "" : selector.trim();
+        Locator base = page.locator(normalized).first();
+        if (normalized.isBlank() || normalized.contains(":visible")) {
+            return base;
+        }
+        try {
+            Locator visible = page.locator(normalized + ":visible").first();
+            if (visible.count() > 0) {
+                return visible;
+            }
+        } catch (Exception ignored) {
+        }
+        return base;
+    }
+
+    private BrowserMode selectInitialMode(ToolRequest request) {
+        String action = request.args().path("action").asString("").trim().toLowerCase(Locale.ROOT);
+        BrowserMode configured = configuredMode();
+        BrowserMode current = modeByConversation.get(request.conversationUid());
+        if (!"open".equals(action) && !"navigate".equals(action)) {
+            if (current != null) {
+                return current;
+            }
+            return configured == BrowserMode.LOCAL_BRIDGE ? BrowserMode.LOCAL_BRIDGE : BrowserMode.MANAGED;
+        }
+        if (configured == BrowserMode.MANAGED) {
+            return BrowserMode.MANAGED;
+        }
+        if (configured == BrowserMode.LOCAL_BRIDGE) {
+            return BrowserMode.LOCAL_BRIDGE;
+        }
+        String host = extractHost(request.args().path("url").asString(""));
+        if (matchesDomain(host, agentProperties.getBrowser().getLocalBridge().getLocalBridgeDomains())) {
+            return BrowserMode.LOCAL_BRIDGE;
+        }
+        return BrowserMode.MANAGED;
+    }
+
+    private Page ensurePageForMode(ToolRequest request, String profileKey, BrowserMode mode) {
+        if (modeByConversation.get(request.conversationUid()) != mode) {
+            Page existing = pageByConversation.remove(request.conversationUid());
+            if (existing != null) {
+                try {
+                    existing.close();
+                } catch (Exception ignored) {
+                }
+            }
+        }
+        BrowserContext context = resolveContext(profileKey, request, mode);
+        Page page = currentPage(request.conversationUid(), context);
+        page.setDefaultTimeout(request.timeoutMs());
+        return page;
+    }
+
+    private BrowserMode configuredMode() {
+        String raw = agentProperties.getBrowser().getMode();
+        if (raw == null || raw.isBlank()) {
+            return BrowserMode.AUTO;
+        }
+        String normalized = raw.trim().toLowerCase(Locale.ROOT);
+        return switch (normalized) {
+            case "managed" -> BrowserMode.MANAGED;
+            case "local_bridge" -> BrowserMode.LOCAL_BRIDGE;
+            default -> BrowserMode.AUTO;
+        };
+    }
+
+    private String modeProfileKey(String profileKey, BrowserMode mode) {
+        return mode.value + "::" + profileKey;
+    }
+
+    private String normalizeCdpEndpoint(String endpoint) {
+        String normalized = endpoint == null ? "" : endpoint.trim();
+        return normalized.isBlank() ? "http://localhost:9222" : normalized;
+    }
+
+    private void ensureLoopbackEndpoint(String endpoint) {
+        URI uri;
+        try {
+            uri = URI.create(endpoint);
+        } catch (Exception ex) {
+            throw new IllegalStateException("invalid local bridge cdp endpoint: " + endpoint, ex);
+        }
+        String host = uri.getHost() == null ? "" : uri.getHost().trim().toLowerCase(Locale.ROOT);
+        if (!"127.0.0.1".equals(host) && !"localhost".equals(host) && !"::1".equals(host)) {
+            throw new IllegalStateException("local bridge endpoint must be loopback: " + endpoint);
+        }
+    }
+
+    private String extractHost(String rawUrl) {
+        if (rawUrl == null || rawUrl.isBlank()) {
+            return "";
+        }
+        try {
+            URI uri = URI.create(rawUrl.trim());
+            String host = uri.getHost();
+            return host == null ? "" : host.toLowerCase(Locale.ROOT);
+        } catch (Exception ignored) {
+            return "";
+        }
+    }
+
+    private boolean matchesDomain(String host, List<String> patterns) {
+        if (host == null || host.isBlank() || patterns == null || patterns.isEmpty()) {
+            return false;
+        }
+        String normalizedHost = host.trim().toLowerCase(Locale.ROOT);
+        for (String pattern : patterns) {
+            if (pattern == null || pattern.isBlank()) {
+                continue;
+            }
+            String normalizedPattern = pattern.trim().toLowerCase(Locale.ROOT);
+            if (normalizedPattern.startsWith("*.")) {
+                String suffix = normalizedPattern.substring(1);
+                if (normalizedHost.endsWith(suffix)) {
+                    return true;
+                }
+                continue;
+            }
+            if (normalizedHost.equals(normalizedPattern) || normalizedHost.endsWith("." + normalizedPattern)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private enum BrowserMode {
+        MANAGED("managed"),
+        LOCAL_BRIDGE("local_bridge"),
+        AUTO("auto");
+
+        private final String value;
+
+        BrowserMode(String value) {
+            this.value = value;
+        }
     }
 
     private String resolveProfileKey(ToolRequest request) {

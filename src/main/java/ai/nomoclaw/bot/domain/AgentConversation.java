@@ -10,8 +10,11 @@ public record AgentConversation(
         String title,
         boolean pinned,
         int inputTokens,
+        int cachedInputTokens,
         int outputTokens,
         int totalTokens,
+        Instant lastTaskTerminalAt,
+        Instant lastReadAt,
         Instant createdAt,
         Instant updatedAt
 ) {

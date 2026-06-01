@@ -58,6 +58,9 @@ export interface ManagedTool {
   toolKey: string;
   name: string;
   description: string;
+  serverUid?: string;
+  serverName?: string;
+  serverDisplayName?: string;
   enabled: boolean;
 }
 
@@ -66,6 +69,7 @@ export interface ManagedAgent extends AgentCatalogAgent {
   avatarColor: string;
   managedSkills: ManagedSkill[];
   managedTools: ManagedTool[];
+  managedMcpTools: ManagedTool[];
   tips: AgentTip[];
   docs: AgentDocConfig;
   docStates: Record<DocKey, DocState>;

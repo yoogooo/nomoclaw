@@ -109,3 +109,5 @@ desktop/tauri/src-tauri/resources/backend/*
 ### RustRover / JetBrains ###
 # https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
 #.idea/
+
+logs

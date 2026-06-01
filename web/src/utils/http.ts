@@ -1,18 +1,47 @@
 import { router } from "@/router";
 import { message } from "@/discrete";
 import { tr } from "@/i18n";
+import { getI18nLocale } from "@/i18n";
 
 const ERROR_TOAST_DEDUP_WINDOW_MS = 2500;
 const errorToastLastShownAt = new Map<string, number>();
 
-export async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
+export interface RequestJsonOptions {
+  suppressErrorToast?: boolean;
+}
+
+export class HttpRequestError extends Error {
+  readonly status: number | null;
+  readonly reason: string;
+  readonly networkError: boolean;
+
+  constructor(message: string, options: { status?: number; reason?: string; networkError?: boolean; cause?: unknown } = {}) {
+    super(message, { cause: options.cause });
+    this.name = "HttpRequestError";
+    this.status = options.status ?? null;
+    this.reason = options.reason ?? "";
+    this.networkError = Boolean(options.networkError);
+  }
+}
+
+export async function requestJson<T>(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  options?: RequestJsonOptions
+): Promise<T> {
+  const suppressErrorToast = Boolean(options?.suppressErrorToast);
   let response: Response;
   try {
-    response = await fetch(input, init);
+    response = await fetch(input, withLocaleHeader(init));
   } catch (error) {
     const errorMessage = tr("http.networkError");
-    showErrorToastDedup(errorMessage);
-    throw new Error(errorMessage, { cause: error });
+    if (!suppressErrorToast) {
+      showErrorToastDedup(errorMessage);
+    }
+    throw new HttpRequestError(errorMessage, {
+      networkError: true,
+      cause: error
+    });
   }
 
   if (!response.ok) {
@@ -26,10 +55,13 @@ export async function requestJson<T>(input: RequestInfo | URL, init?: RequestIni
           message: userFriendlyMessage
         }
       });
-    } else {
+    } else if (!suppressErrorToast) {
       showErrorToastDedup(userFriendlyMessage);
     }
-    throw new Error(userFriendlyMessage);
+    throw new HttpRequestError(userFriendlyMessage, {
+      status: response.status,
+      reason
+    });
   }
 
   if (response.status === 204) {
@@ -37,6 +69,21 @@ export async function requestJson<T>(input: RequestInfo | URL, init?: RequestIni
   }
 
   return response.json() as Promise<T>;
+}
+
+function withLocaleHeader(init?: RequestInit): RequestInit {
+  const headers = new Headers(init?.headers);
+  const locale = getI18nLocale();
+  if (!headers.has("Accept-Language")) {
+    headers.set("Accept-Language", locale);
+  }
+  if (!headers.has("X-App-Locale")) {
+    headers.set("X-App-Locale", locale);
+  }
+  return {
+    ...init,
+    headers
+  };
 }
 
 function showErrorToastDedup(text: string) {
@@ -89,7 +136,7 @@ function normalizeErrorMessage(text: string): string {
 }
 
 function buildUserFriendlyMessage(status: number, reason: string): string {
-  const normalizedReason = reason?.trim() || "";
+  const normalizedReason = translateBackendReason(reason?.trim() || "");
   const withReason = (base: string) => (normalizedReason ? tr("http.withReason", { base, reason: normalizedReason }) : base);
   if (status === 400) {
     return normalizedReason || tr("http.400");
@@ -122,4 +169,21 @@ function buildUserFriendlyMessage(status: number, reason: string): string {
     return withReason(tr("http.500"));
   }
   return withReason(tr("http.default", { status }));
+}
+
+function translateBackendReason(reason: string): string {
+  const normalized = reason.trim();
+  if (!normalized) {
+    return "";
+  }
+  if (normalized === "pageSize must be one of 10, 20, 50" || normalized === "pageSize must be 20") {
+    return tr("http.invalidPageSize");
+  }
+  if (normalized.startsWith("invalid status:")) {
+    return tr("http.invalidStatus");
+  }
+  if (normalized === "startDate cannot be later than endDate") {
+    return tr("http.invalidDateRange");
+  }
+  return normalized;
 }

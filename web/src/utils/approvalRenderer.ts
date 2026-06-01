@@ -3,7 +3,12 @@ import type { ConversationRunStep } from "@/types/api";
 export type ApprovalPromptKey =
   | "chat.approval.riskPrompt"
   | "chat.approval.riskPromptGeneric"
-  | "chat.approval.riskPromptScreenshot";
+  | "chat.approval.riskPromptScreenshot"
+  | "chat.approval.riskPromptPrivacyDevice"
+  | "chat.approval.riskPromptScreenCapture"
+  | "chat.approval.riskPromptRemoteControl"
+  | "chat.approval.riskPromptPrivilegeEscalation"
+  | "chat.approval.riskPromptDataExfiltration";
 
 export type ApprovalLabelKey =
   | "chat.approval.commandLabel"
@@ -80,17 +85,17 @@ function extractPath(payload: Record<string, any>) {
 }
 
 function normalizeToolName(raw: string, command: string, stepLike?: StepLike) {
-  const normalized = String(raw || "").trim().toLowerCase();
+  const normalized = String(raw || "").trim();
   if (normalized) {
     return normalized;
   }
   if (command) {
-    return "command_tool";
+    return "CommandTool";
   }
   const title = String(stepLike?.displayTitle || "").toLowerCase();
   const details = String(stepLike?.displayDetails || stepLike?.displaySummary || "").toLowerCase();
   if (title.includes("截取桌面画面") || details.includes("截取桌面画面") || title.includes("desktop screenshot")) {
-    return "desktop_screenshot_tool";
+    return "DesktopScreenshotTool";
   }
   return "";
 }
@@ -100,7 +105,7 @@ function renderByToolName(toolName: string,
                           path: string,
                           bodyFallback: string,
                           toolArgsRaw: unknown): Pick<ApprovalRenderResult, "body" | "promptKey" | "labelKey"> {
-  if (toolName === "command_tool" || command) {
+  if (toolName === "CommandTool" || command) {
     return {
       body: toBashCodeBlock(command) || toJsonCodeBlock(toolArgsRaw) || bodyFallback,
       promptKey: "chat.approval.riskPrompt",
@@ -108,7 +113,7 @@ function renderByToolName(toolName: string,
     };
   }
 
-  if (toolName === "desktop_screenshot_tool") {
+  if (toolName === "DesktopScreenshotTool") {
     return {
       body: toTextCodeBlock(path) || toJsonCodeBlock(toolArgsRaw) || bodyFallback,
       promptKey: "chat.approval.riskPromptScreenshot",
@@ -123,6 +128,17 @@ function renderByToolName(toolName: string,
   };
 }
 
+function resolvePromptKeyByReasonCode(rawCode: unknown): ApprovalPromptKey | null {
+  const code = String(rawCode || "").trim().toUpperCase();
+  if (!code) return null;
+  if (code === "HARD_GUARD_PRIVACY_DEVICE_ASK") return "chat.approval.riskPromptPrivacyDevice";
+  if (code === "HARD_GUARD_SCREEN_CAPTURE_ASK") return "chat.approval.riskPromptScreenCapture";
+  if (code === "HARD_GUARD_REMOTE_CONTROL_ASK") return "chat.approval.riskPromptRemoteControl";
+  if (code === "HARD_GUARD_PRIVILEGE_ESCALATION_ASK") return "chat.approval.riskPromptPrivilegeEscalation";
+  if (code === "HARD_GUARD_DATA_EXFILTRATION_ASK") return "chat.approval.riskPromptDataExfiltration";
+  return null;
+}
+
 export function resolveApprovalFromPayload(payload: Record<string, any>): ApprovalRenderResult {
   const command = extractCommand(payload);
   const path = extractPath(payload);
@@ -134,12 +150,13 @@ export function resolveApprovalFromPayload(payload: Record<string, any>): Approv
     "",
     payload.toolArgs
   );
+  const promptByReasonCode = resolvePromptKeyByReasonCode(payload.policyReasonCode);
   return {
     toolName,
     command,
     path,
     body: rendered.body,
-    promptKey: rendered.promptKey,
+    promptKey: promptByReasonCode || rendered.promptKey,
     labelKey: rendered.labelKey
   };
 }
@@ -157,12 +174,13 @@ export function resolveApprovalFromStep(step: ConversationRunStep): ApprovalRend
     toTextCodeBlock(details),
     toolArgsRaw
   );
+  const promptByReasonCode = resolvePromptKeyByReasonCode((step as any).policyReasonCode);
   return {
     toolName,
     command,
     path,
     body: rendered.body,
-    promptKey: rendered.promptKey,
+    promptKey: promptByReasonCode || rendered.promptKey,
     labelKey: rendered.labelKey
   };
 }

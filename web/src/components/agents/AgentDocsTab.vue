@@ -18,6 +18,7 @@ const props = defineProps<{
   selectedDocEnabled: boolean;
   docEditable: boolean;
   selectedDocContent: string;
+  refreshLoading: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -25,6 +26,7 @@ const emit = defineEmits<{
   (e: "toggle-doc", key: string, enabled: boolean): void;
   (e: "toggle-edit"): void;
   (e: "save"): void;
+  (e: "refresh"): void;
   (e: "update-content", value: string): void;
 }>();
 const { t } = useI18n();
@@ -69,6 +71,14 @@ const { t } = useI18n();
             <n-button
               size="small"
               tertiary
+              :loading="props.refreshLoading"
+              @click="emit('refresh')"
+            >
+              {{ t("common.refresh") }}
+            </n-button>
+            <n-button
+              size="small"
+              tertiary
               :disabled="!selectedDocEnabled"
               @click="emit('toggle-edit')"
             >
@@ -85,9 +95,10 @@ const { t } = useI18n();
           </div>
         </div>
         <n-input
+          class="docs-editor-input"
           :value="selectedDocContent"
           type="textarea"
-          :autosize="{ minRows: 18, maxRows: 34 }"
+          :autosize="{ minRows: 18, maxRows: 18 }"
           :disabled="!docEditable || !selectedDocEnabled"
           @update:value="emit('update-content', $event)"
         />
@@ -99,17 +110,27 @@ const { t } = useI18n();
 <style scoped>
 .tab-body {
   padding-top: var(--space-1_5);
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .docs-split {
   margin-top: var(--space-1);
   display: grid;
-  grid-template-columns: var(--size-300) minmax(0, 1fr);
+  grid-template-columns: var(--size-260) minmax(0, 1fr);
   gap: var(--space-3_5);
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
 }
 
 .docs-list {
   padding: var(--space-3);
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
 }
 
 .docs-list-title {
@@ -157,6 +178,10 @@ const { t } = useI18n();
 
 .docs-editor {
   padding: var(--space-3);
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .docs-editor-head {
@@ -164,7 +189,12 @@ const { t } = useI18n();
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-3);
-  margin-bottom: var(--space-2_5);
+  margin-bottom: var(--space-2);
+}
+
+.docs-editor-head > div:first-child {
+  width: 50%;
+  min-width: 0;
 }
 
 .docs-actions {
@@ -179,11 +209,83 @@ const { t } = useI18n();
 
 .docs-editor-path {
   margin-top: var(--space-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-@media (max-width: var(--size-breakpoint-lg)) {
+.docs-editor-input :deep(textarea) {
+  overflow-y: auto !important;
+}
+
+.docs-editor-input {
+  margin-bottom: var(--space-0_5);
+}
+
+@media (max-width: 1120px) {
+  .tab-body {
+    height: auto;
+    min-height: unset;
+  }
+
   .docs-split {
     grid-template-columns: 1fr;
+    height: auto;
+    min-height: unset;
+  }
+
+  .docs-list {
+    height: auto;
+    overflow: visible;
+  }
+
+  .docs-editor {
+    height: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .tab-body {
+    padding-top: var(--space-1);
+  }
+
+  .docs-split {
+    gap: var(--space-2_5);
+  }
+
+  .docs-list,
+  .docs-editor {
+    padding: var(--space-2);
+  }
+
+  .docs-editor-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+
+  .docs-editor-head > div:first-child {
+    width: 100%;
+  }
+
+  .docs-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .docs-actions :deep(.n-button) {
+    flex: 1 1 calc(50% - var(--space-1));
+    min-width: 0;
+  }
+
+  .docs-editor-path {
+    white-space: normal;
+    word-break: break-all;
+  }
+
+  .docs-editor-input :deep(textarea) {
+    min-height: 44vh;
   }
 }
 </style>

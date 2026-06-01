@@ -17,7 +17,7 @@ public class CurrentTimeTool implements Tool {
 
     @Override
     public String name() {
-        return "current_time_tool";
+        return "CurrentTimeTool";
     }
 
     @Override

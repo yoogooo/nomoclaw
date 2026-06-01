@@ -1,26 +1,40 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { NButton } from "naive-ui";
 import DirectoryRail from "@/components/chat/DirectoryRail.vue";
 import AppPageHeader from "@/components/layout/AppPageHeader.vue";
 import CronCreateModal from "@/components/cron/CronCreateModal.vue";
-import CronDetailPanel from "@/components/cron/CronDetailPanel.vue";
 import CronListPanel from "@/components/cron/CronListPanel.vue";
+import CronExecutionTimelinePanel from "@/components/cron/CronExecutionTimelinePanel.vue";
+import CronEditModal from "@/components/cron/CronEditModal.vue";
 import { buildCronTaskTemplates } from "@/components/cron/cronTaskTemplates";
 import { message } from "@/discrete";
 import { useCronJobsStore } from "@/stores/cronJobs";
+import type { CronJob } from "@/types/api";
 
 const cronJobsStore = useCronJobsStore();
 const showCreateModal = ref(false);
 const createTemplateId = ref<string | null>(null);
+const showEditModal = ref(false);
+const editingJob = ref<CronJob | null>(null);
 const hasJobs = computed(() => cronJobsStore.jobs.length > 0);
+const hasRunningJobs = computed(() => {
+  return cronJobsStore.runningGlobalResults.length > 0;
+});
 const { t } = useI18n();
 const cronTaskTemplates = computed(() => buildCronTaskTemplates(t));
+let executionPollTimer: number | null = null;
 
 function openCreateModal(templateId?: string) {
   createTemplateId.value = templateId ?? null;
   showCreateModal.value = true;
+}
+
+function openEditModal(job: CronJob) {
+  editingJob.value = job;
+  showEditModal.value = true;
+  void cronJobsStore.selectJob(job.jobUid);
 }
 
 async function refreshJobs() {
@@ -33,10 +47,34 @@ async function refreshJobs() {
   }
 }
 
-onMounted(() => {
-  if (!cronJobsStore.jobs.length) {
-    void cronJobsStore.refresh();
+function stopExecutionPolling() {
+  if (executionPollTimer !== null) {
+    window.clearInterval(executionPollTimer);
+    executionPollTimer = null;
   }
+}
+
+function startExecutionPolling() {
+  stopExecutionPolling();
+  executionPollTimer = window.setInterval(async () => {
+    if (!hasRunningJobs.value) {
+      return;
+    }
+    try {
+      await cronJobsStore.refreshExecutionState();
+    } catch {
+      // Polling is best-effort; manual refresh remains available.
+    }
+  }, 3000);
+}
+
+onMounted(() => {
+  void cronJobsStore.refresh(null);
+  startExecutionPolling();
+});
+
+onBeforeUnmount(() => {
+  stopExecutionPolling();
 });
 </script>
 
@@ -48,7 +86,6 @@ onMounted(() => {
         <div class="app-page-content cron-page-content">
           <AppPageHeader
             :title="t('pages.cron.title')"
-            :subtitle="t('pages.cron.subtitle')"
           >
             <template #actions>
               <n-button :loading="cronJobsStore.loading" @click="refreshJobs">{{ t("common.refresh") }}</n-button>
@@ -56,8 +93,8 @@ onMounted(() => {
           </AppPageHeader>
 
           <div v-if="hasJobs" class="grid-cron cron-page-grid">
-            <CronListPanel @create="openCreateModal()" />
-            <CronDetailPanel />
+            <CronListPanel @create="openCreateModal()" @edit="openEditModal" />
+            <CronExecutionTimelinePanel />
           </div>
 
           <div v-else class="panel cron-empty-layout">
@@ -96,6 +133,13 @@ onMounted(() => {
     :initial-template-id="createTemplateId"
     @update:show="showCreateModal = $event; if (!$event) createTemplateId = null"
   />
+
+  <CronEditModal
+    :show="showEditModal"
+    :job="editingJob"
+    @update:show="showEditModal = $event"
+    @submit="editingJob && cronJobsStore.updateJob(editingJob.jobUid, $event)"
+  />
 </template>
 
 <style scoped>
@@ -107,10 +151,13 @@ onMounted(() => {
 }
 
 .cron-page-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   min-height: 0;
   height: auto;
   max-height: none;
   padding: 0;
+  gap: var(--space-4);
 }
 
 .cron-empty-layout {

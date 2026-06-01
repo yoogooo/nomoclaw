@@ -3,6 +3,7 @@ package ai.nomoclaw.bot.workspace;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -16,6 +17,7 @@ import java.util.Map;
 public final class NomoClawWorkspaceBootstrap {
 
     private static final Map<String, String> DEFAULT_AGENT_FILES = buildDefaultAgentFiles();
+    private static final String DEFAULT_AGENT_PROMPT_RESOURCE_DIR = "prompts/agents/default/zh";
     private static final String SKILL_FILE = "SKILL.md";
     private static final String DEFAULT_BUNDLED_SKILLS_DIR = "skills";
     private static final String SKILLS_INIT_SENTINEL = ".bootstrap.done";
@@ -32,9 +34,10 @@ public final class NomoClawWorkspaceBootstrap {
         Path agentsRoot = normalizedRoot.resolve(NomoClawPaths.AGENTS_DIR_NAME);
         Path defaultAgentRoot = agentsRoot.resolve(NomoClawPaths.DEFAULT_AGENT_NAME);
         Path skillsRoot = normalizedRoot.resolve(NomoClawPaths.SKILLS_DIR_NAME);
+        Map<String, String> defaultAgentTemplates = loadDefaultAgentTemplates();
         try {
             NomoClawPaths.ensureAgentWorkspace(defaultAgentRoot);
-            for (Map.Entry<String, String> entry : DEFAULT_AGENT_FILES.entrySet()) {
+            for (Map.Entry<String, String> entry : defaultAgentTemplates.entrySet()) {
                 Path file = defaultAgentRoot.resolve(entry.getKey());
                 if (Files.notExists(file)) {
                     Files.writeString(file, entry.getValue(), StandardCharsets.UTF_8);
@@ -46,6 +49,27 @@ public final class NomoClawWorkspaceBootstrap {
             throw new IllegalStateException("failed to initialize nomoclaw workspace: " + normalizedRoot, ex);
         }
         log.info("[Workspace] initialized root={} defaultAgent={} skillsRoot={}", normalizedRoot, defaultAgentRoot, skillsRoot);
+    }
+
+    private static Map<String, String> loadDefaultAgentTemplates() {
+        Map<String, String> templates = new LinkedHashMap<>();
+        ClassLoader classLoader = NomoClawWorkspaceBootstrap.class.getClassLoader();
+        for (Map.Entry<String, String> fallback : DEFAULT_AGENT_FILES.entrySet()) {
+            String fileName = fallback.getKey();
+            String resourcePath = DEFAULT_AGENT_PROMPT_RESOURCE_DIR + "/" + fileName;
+            try (InputStream input = classLoader.getResourceAsStream(resourcePath)) {
+                if (input != null) {
+                    templates.put(fileName, new String(input.readAllBytes(), StandardCharsets.UTF_8));
+                } else {
+                    templates.put(fileName, fallback.getValue());
+                }
+            } catch (IOException ex) {
+                log.warn("[Workspace] failed to read default prompt resource, fallback to built-in file={} resource={}",
+                        fileName, resourcePath, ex);
+                templates.put(fileName, fallback.getValue());
+            }
+        }
+        return templates;
     }
 
     private static Path resolveBundledSkillsRoot() {

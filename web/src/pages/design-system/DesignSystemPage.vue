@@ -1239,7 +1239,7 @@ function switchTheme(mode: "light" | "dark") {
   background: #0F151D !important;
 }
 
-@media (max-width: var(--size-breakpoint-lg)) {
+@media (max-width: 1120px) {
   .design-spec-shell {
     padding: var(--space-4);
   }
@@ -1277,7 +1277,7 @@ function switchTheme(mode: "light" | "dark") {
   }
 }
 
-@media (max-width: var(--size-breakpoint-md)) {
+@media (max-width: 860px) {
   .core-ui-grid {
     grid-template-columns: 1fr;
   }

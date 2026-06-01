@@ -1,6 +1,6 @@
 package ai.nomoclaw.bot.agent;
 
-import ai.nomoclaw.bot.orchestrator.ModelCatalogService;
+import ai.nomoclaw.bot.modelconfig.ModelCatalogService;
 import ai.nomoclaw.bot.workspace.NomoClawPaths;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

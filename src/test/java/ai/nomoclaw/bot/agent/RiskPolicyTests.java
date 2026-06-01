@@ -11,6 +11,7 @@ import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class RiskPolicyTests {
 
@@ -22,9 +23,41 @@ class RiskPolicyTests {
 
         ObjectNode args = JsonNodeFactory.instance.objectNode();
         args.put("command", "rm -rf /tmp/test");
-        PlanStep step = new PlanStep("s1", 1, 1, "danger", "command_tool", args,
+        PlanStep step = new PlanStep("s1", 1, 1, "danger", "CommandTool", args,
                 RiskLevel.LOW, "done", StepStatus.CREATED, 0, null, null, ApprovalStatus.NONE);
 
         assertTrue(riskPolicy.requiresApproval(step));
+    }
+
+    @Test
+    void readFileToolShouldBeLowRisk() {
+        AgentProperties properties = new AgentProperties();
+        RiskPolicy riskPolicy = new RiskPolicy(properties);
+        assertEquals(RiskLevel.LOW, riskPolicy.evaluateRisk("ReadFileTool", JsonNodeFactory.instance.objectNode()));
+    }
+
+    @Test
+    void createFileToolOutsideWorkspaceShouldBeHighRisk() {
+        AgentProperties properties = new AgentProperties();
+        RiskPolicy riskPolicy = new RiskPolicy(properties);
+
+        ObjectNode args = JsonNodeFactory.instance.objectNode();
+        args.put("path", "/etc/hosts");
+        assertEquals(RiskLevel.HIGH, riskPolicy.evaluateRisk("CreateFileTool", args));
+    }
+
+    @Test
+    void webToolsShouldBeLowRisk() {
+        AgentProperties properties = new AgentProperties();
+        RiskPolicy riskPolicy = new RiskPolicy(properties);
+        assertEquals(RiskLevel.LOW, riskPolicy.evaluateRisk("WebSearchTool", JsonNodeFactory.instance.objectNode()));
+        assertEquals(RiskLevel.LOW, riskPolicy.evaluateRisk("WebFetchTool", JsonNodeFactory.instance.objectNode()));
+    }
+
+    @Test
+    void mcpToolsShouldBeLowRisk() {
+        AgentProperties properties = new AgentProperties();
+        RiskPolicy riskPolicy = new RiskPolicy(properties);
+        assertEquals(RiskLevel.LOW, riskPolicy.evaluateRisk("mcp_maps_weather_91b24b61", JsonNodeFactory.instance.objectNode()));
     }
 }

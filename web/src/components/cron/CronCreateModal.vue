@@ -2,8 +2,10 @@
 import { computed, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { BellRing, Clock3 } from "lucide-vue-next";
-import { NButton, NEmpty, NForm, NFormItem, NInput, NInputNumber, NModal, NSelect } from "naive-ui";
+import { NButton, NEmpty, NForm, NFormItem, NInput, NInputNumber, NModal, NSelect, NTabPane, NTabs } from "naive-ui";
 import { useCronJobsStore } from "@/stores/cronJobs";
+import { modelApi } from "@/api/modelApi";
+import type { ModelConfig } from "@/types/api";
 import { buildCronTaskTemplates, type ExecutionType, type RecurringMode } from "./cronTaskTemplates";
 import { humanizeCronExpression, humanizeTimezone } from "@/utils/format";
 
@@ -32,10 +34,6 @@ const weekdayOptions = computed(() => [
   { label: t("cron.weekday.saturday"), short: t("cron.weekdayShort.saturday"), value: "7" },
   { label: t("cron.weekday.sunday"), short: t("cron.weekdayShort.sunday"), value: "1" }
 ]);
-const executionTypeOptions = computed<Array<{ value: ExecutionType; label: string }>>(() => [
-  { value: "once", label: t("cron.executionType.once") },
-  { value: "recurring", label: t("cron.executionType.recurring") }
-]);
 const recurringModeOptions = computed<Array<{ value: RecurringMode; label: string }>>(() => [
   { value: "minute", label: t("cron.recurringMode.minute") },
   { value: "hour", label: t("cron.recurringMode.hour") },
@@ -59,7 +57,9 @@ const form = reactive({
   onceDate: "",
   onceTime: "",
   endAtLocal: "",
-  timezone: fallbackTimezone
+  timezone: fallbackTimezone,
+  modelProvider: "",
+  modelName: ""
 });
 
 const submitting = ref(false);
@@ -85,6 +85,21 @@ const agentOptions = computed(() =>
     }))
   )
 );
+const modelConfig = ref<ModelConfig>({ providers: [] });
+const providerOptions = computed(() =>
+  modelConfig.value.providers
+    .filter((provider) => String(provider.id || "").trim())
+    .map((provider) => ({ label: provider.name || provider.id, value: provider.id }))
+);
+const modelOptions = computed(() => {
+  const provider = modelConfig.value.providers.find((item) => item.id === form.modelProvider);
+  if (!provider) {
+    return [];
+  }
+  return provider.models
+    .filter((model) => String(model.id || "").trim())
+    .map((model) => ({ label: model.name || model.id, value: model.id }));
+});
 
 watch(
   agentOptions,
@@ -98,8 +113,9 @@ watch(
 
 watch(
   () => props.show,
-  (show) => {
+  async (show) => {
     if (!show) return;
+    await loadModelConfig();
     resetCreateForm();
   }
 );
@@ -121,6 +137,7 @@ function resetCreateForm() {
   form.onceTime = defaultRunAt.time;
   form.endAtLocal = "";
   form.timezone = fallbackTimezone;
+  applyDefaultModelSelection();
 
   if (props.initialTemplateId) {
     const template = cronTaskTemplates.value.find((item) => item.id === props.initialTemplateId);
@@ -288,6 +305,8 @@ async function createCronJob() {
       expression: scheduleExpression.value,
       timezone: form.timezone.trim(),
       endAt: form.executionType === "recurring" ? endAtValue.value : undefined,
+      modelProvider: form.modelProvider || undefined,
+      modelName: form.modelName || undefined,
       taskContent: form.taskContent.trim(),
       status: "ACTIVE"
     });
@@ -469,6 +488,40 @@ function formatPreviewTime(value: Date) {
     hour12: false
   });
 }
+
+async function loadModelConfig() {
+  const available = await modelApi.getAvailableModelConfig();
+  modelConfig.value = available || { providers: [] };
+}
+
+function applyDefaultModelSelection() {
+  if (!providerOptions.value.length) {
+    form.modelProvider = "";
+    form.modelName = "";
+    return;
+  }
+  if (!providerOptions.value.some((item) => item.value === form.modelProvider)) {
+    form.modelProvider = String(providerOptions.value[0].value || "");
+  }
+  const currentModels = modelOptions.value;
+  if (!currentModels.length) {
+    form.modelName = "";
+    return;
+  }
+  if (!currentModels.some((item) => item.value === form.modelName)) {
+    form.modelName = String(currentModels[0].value || "");
+  }
+}
+
+watch(
+  () => form.modelProvider,
+  () => {
+    const currentModels = modelOptions.value;
+    if (!currentModels.some((item) => item.value === form.modelName)) {
+      form.modelName = currentModels.length ? String(currentModels[0].value || "") : "";
+    }
+  }
+);
 </script>
 
 <template>
@@ -505,6 +558,22 @@ function formatPreviewTime(value: Date) {
                     :placeholder="t('cron.form.taskTitlePlaceholder')"
                   />
                 </n-form-item>
+
+                <n-form-item :label="t('cron.form.modelProvider')">
+                  <n-select
+                    v-model:value="form.modelProvider"
+                    :placeholder="t('cron.form.modelProviderPlaceholder')"
+                    :options="providerOptions"
+                  />
+                </n-form-item>
+
+                <n-form-item :label="t('cron.form.modelName')">
+                  <n-select
+                    v-model:value="form.modelName"
+                    :placeholder="t('cron.form.modelNamePlaceholder')"
+                    :options="modelOptions"
+                  />
+                </n-form-item>
               </div>
 
               <n-form-item :label="t('cron.form.taskContent')" class="task-content-item" :show-feedback="false">
@@ -527,18 +596,10 @@ function formatPreviewTime(value: Date) {
 
               <div class="schedule-field">
                 <div class="field-label">{{ t("cron.form.executionType") }}</div>
-                <div class="segmented-group">
-                  <button
-                    v-for="option in executionTypeOptions"
-                    :key="option.value"
-                    type="button"
-                    class="segmented-item"
-                    :class="{ active: form.executionType === option.value }"
-                    @click="form.executionType = option.value"
-                  >
-                    {{ option.label }}
-                  </button>
-                </div>
+                <n-tabs v-model:value="form.executionType" type="segment" animated size="small">
+                  <n-tab-pane name="once" :tab="t('cron.executionType.once')" />
+                  <n-tab-pane name="recurring" :tab="t('cron.executionType.recurring')" />
+                </n-tabs>
               </div>
 
               <div class="schedule-dynamic-block">

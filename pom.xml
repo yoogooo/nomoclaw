@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.0.5</version>
+        <version>4.0.6</version>
         <relativePath/>
     </parent>
     <groupId>ai.nomoclaw</groupId>
@@ -15,11 +15,10 @@
     <description>Demo project for Spring Boot</description>
     <properties>
         <java.version>21</java.version>
-        <langchain4j.version>1.12.2</langchain4j.version>
-        <langchain4j.skills.version>1.12.2-beta22</langchain4j.skills.version>
-        <langchain4j.dashscope.version>1.12.2-beta22</langchain4j.dashscope.version>
-        <langchain4j.agentic.version>1.12.2-beta22</langchain4j.agentic.version>
-        <langchain4j.openai.official.version>1.12.2-beta22</langchain4j.openai.official.version>
+        <langchain4j.version>1.15.0</langchain4j.version>
+        <langchain4j.skills.version>1.15.0-beta25</langchain4j.skills.version>
+        <langchain4j.dashscope.version>1.15.0-beta25</langchain4j.dashscope.version>
+        <langchain4j.agentic.version>1.15.0-beta25</langchain4j.agentic.version>
         <mybatis-plus.version>3.5.16</mybatis-plus.version>
         <springdoc.version>3.0.2</springdoc.version>
         <jackson.version>3.1.0</jackson.version>
@@ -73,6 +72,11 @@
         <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-skills</artifactId>
+            <version>${langchain4j.skills.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-mcp</artifactId>
             <version>${langchain4j.skills.version}</version>
         </dependency>
         <dependency>

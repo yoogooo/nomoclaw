@@ -156,7 +156,7 @@ const { t } = useI18n();
   color: var(--color-text-runtime-line);
 }
 
-@media (max-width: var(--size-breakpoint-lg)) {
+@media (max-width: 1120px) {
   .runtime-panel {
     position: fixed;
     left: 0;

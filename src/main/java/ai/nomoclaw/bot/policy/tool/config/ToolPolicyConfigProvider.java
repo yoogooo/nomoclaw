@@ -54,7 +54,7 @@ public class ToolPolicyConfigProvider {
         }
         java.util.LinkedHashSet<String> values = new java.util.LinkedHashSet<>();
         for (JsonNode item : node) {
-            String text = item == null ? "" : item.asText("");
+            String text = item == null ? "" : item.asString("");
             if (Objects.isNull(text)) {
                 continue;
             }

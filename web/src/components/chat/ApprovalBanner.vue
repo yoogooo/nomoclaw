@@ -18,8 +18,10 @@ const bannerRef = ref<HTMLElement | null>(null);
 const isSubmitting = computed(() => conversationStore.approval.submitting);
 const allowOnceLoading = computed(() => isSubmitting.value && conversationStore.approval.submittingAction === "allow_once");
 const allowAgentLoading = computed(() => isSubmitting.value && conversationStore.approval.submittingAction === "allow_agent");
+const allowSessionLoading = computed(() => isSubmitting.value && conversationStore.approval.submittingAction === "allow_session");
 const rejectLoading = computed(() => isSubmitting.value && conversationStore.approval.submittingAction === "deny_once");
 const missingStepUid = computed(() => !conversationStore.approval.stepUid);
+const isHardGuardApproval = computed(() => String(conversationStore.approval.policyReasonCode || "").startsWith("HARD_GUARD_"));
 const approvalPrompt = computed(() => conversationStore.approval.title || t("chat.approval.riskPrompt"));
 const approvalBodyLabel = computed(() => {
   return t(conversationStore.approval.labelKey || "chat.approval.payloadLabel");
@@ -100,11 +102,15 @@ onMounted(() => {
         <n-button
           class="ui-approval-approve-btn"
           secondary
-          :loading="allowAgentLoading"
+          :loading="isHardGuardApproval ? allowSessionLoading : allowAgentLoading"
           :disabled="isSubmitting || missingStepUid"
-          @click="conversationStore.approveStep('agent')"
+          @click="conversationStore.approveStep(isHardGuardApproval ? 'session' : 'agent')"
         >
-          {{ allowAgentLoading ? t("chat.approval.approving") : t("chat.approval.approveAgent") }}
+          {{
+            (isHardGuardApproval ? allowSessionLoading : allowAgentLoading)
+              ? t("chat.approval.approving")
+              : (isHardGuardApproval ? t("chat.approval.approveSession") : t("chat.approval.approveAgent"))
+          }}
         </n-button>
         <n-button
           class="ui-approval-reject-btn"

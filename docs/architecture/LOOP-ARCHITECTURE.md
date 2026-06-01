@@ -23,9 +23,12 @@
 
 ## 2. 入口与核心组件
 
-Loop 主控制逻辑位于：
+Loop 主控制逻辑由 Facade 协调，主要实现位于：
 
-- [AgentApplicationService.java](../../src/main/java/ai/nomoclaw/bot/orchestrator/AgentApplicationService.java)
+- [AgentApplicationService.java](../../src/main/java/ai/nomoclaw/bot/orchestrator/AgentApplicationService.java)（入口与协调）
+- [StepExecutionService.java](../../src/main/java/ai/nomoclaw/bot/orchestrator/StepExecutionService.java)（单步执行与重试）
+- [ExecutionFeedbackBuilder.java](../../src/main/java/ai/nomoclaw/bot/orchestrator/ExecutionFeedbackBuilder.java)（展示文案与 payload）
+- [RunViewAssembler.java](../../src/main/java/ai/nomoclaw/bot/orchestrator/RunViewAssembler.java)（运行视图聚合）
 
 相关协作组件：
 
@@ -120,7 +123,7 @@ Loop 相关配置来自 `agent.*`：
 
 ## 6. 单步骤执行流程
 
-一个步骤的真实控制流如下：
+一个步骤的真实控制流如下（由 `AgentApplicationService` + `StepExecutionService` 协作完成）：
 
 ```mermaid
 flowchart TD
@@ -234,19 +237,11 @@ flowchart TD
 2. 先前轮次的 assistant 消息
 3. 当前轮次的 tool result messages
 
-也就是说，系统不再显式做“失败后重规划 JSON”，而是把工具结果回填给模型，让模型自行决定下一步。
-   - 当前轮次与最大轮次
-   - 失败步骤 ID
-   - 失败原因
-   - 当前任务下所有步骤的 round、step、title、tool、status、lastError 摘要
-4. 生成新的 `PlanStep[]`，或者直接返回最终答案
-5. 如果返回步骤，则将新步骤写入数据库，并把 `roundIndex` 改为下一轮
-6. 任务状态更新为 `PLANNED`
-7. 发送新一轮 `PLAN_CREATED`
-8. 进入下一轮执行
-9. 如果直接返回答案，则任务在该轮内直接结束，不再继续执行步骤
+在当前架构中，系统将工具结果回填到 memory 后再次调用模型，由模型决定下一步：
 
-用于重规划的输入不是一句简单失败原因，而是原始用户消息加结构化执行上下文。
+4. 返回新的 `PlanStep[]`（继续执行），或直接返回最终答案（结束任务）
+5. 若返回步骤：写入数据库，更新任务状态为 `PLANNED`，发送下一轮 `PLAN_CREATED`
+6. 若返回答案：当前消息直接完成，不再进入下一轮步骤执行
 
 ## 10. 最大循环次数保护
 
@@ -277,6 +272,20 @@ flowchart TD
 
 当前总结由 `TaskPlanner.summarize(...)` 通过模型生成自然语言收束答案，不再使用固定模板字符串。
 
+## 11. 当前模块职责分工
+
+| 组件 | 主要职责 |
+| --- | --- |
+| `AgentApplicationService` | Loop 入口与跨组件协调（Facade） |
+| `StepExecutionService` | 单步执行、重试、policy 判定、进度与结果事件发布 |
+| `ExecutionFeedbackBuilder` | 步骤展示文案与用户可见 payload 组装 |
+| `RunViewAssembler` | 基于 `agent_step + agent_event` 聚合运行视图 |
+
+说明：
+
+- 对外事件名称与状态机定义不变（`STEP_STARTED/STEP_WAITING_APPROVAL/STEP_FINISHED/STEP_FAILED` 等）。
+- 不引入新的协议字段与状态语义。
+
 ## 12. 取消与中断
 
 当前系统通过 `MessageCancellationRegistry` 记录被取消的任务。
@@ -285,7 +294,7 @@ flowchart TD
 
 - 编排层在 round 开始前、步骤开始前、步骤重试前都会检查取消状态
 - `ToolExecutor` 分发前也会做一次取消检查
-- `command_tool` 在命令执行期间会轮询取消状态，并在取消后强制销毁子进程
+- `CommandTool` 在命令执行期间会轮询取消状态，并在取消后强制销毁子进程
 
 这意味着：
 
@@ -330,7 +339,7 @@ Loop 相关关键事件包括：
 
 ## 15. Cron 与启动恢复
 
-当前 `cron_tool` 已从“纯内存任务”升级为“数据库持久化 + 启动恢复”：
+当前 `CronCreateTool`、`CronDeleteTool`、`CronListTool` 已从“纯内存任务”升级为“数据库持久化 + 启动恢复”：
 
 - 创建 cron 时，先写 `agent_cron_job`
 - 然后注册到当前进程内的 `ThreadPoolTaskScheduler`
@@ -342,7 +351,9 @@ Loop 相关关键事件包括：
 如果要理解当前 loop 的真实执行方式，建议按以下顺序阅读代码：
 
 1. [AgentApplicationService.java](../../src/main/java/ai/nomoclaw/bot/orchestrator/AgentApplicationService.java)
-2. [RiskPolicy.java](../../src/main/java/ai/nomoclaw/bot/policy/RiskPolicy.java)
-3. [StepReviewer.java](../../src/main/java/ai/nomoclaw/bot/orchestrator/StepReviewer.java)
-4. [LoopRoundGuard.java](../../src/main/java/ai/nomoclaw/bot/orchestrator/LoopRoundGuard.java)
-5. [TaskPlanner.java](../../src/main/java/ai/nomoclaw/bot/planner/TaskPlanner.java)
+2. [StepExecutionService.java](../../src/main/java/ai/nomoclaw/bot/orchestrator/StepExecutionService.java)
+3. [ExecutionFeedbackBuilder.java](../../src/main/java/ai/nomoclaw/bot/orchestrator/ExecutionFeedbackBuilder.java)
+4. [RunViewAssembler.java](../../src/main/java/ai/nomoclaw/bot/orchestrator/RunViewAssembler.java)
+5. [RiskPolicy.java](../../src/main/java/ai/nomoclaw/bot/policy/RiskPolicy.java)
+6. [StepReviewer.java](../../src/main/java/ai/nomoclaw/bot/orchestrator/StepReviewer.java)
+7. [TaskPlanner.java](../../src/main/java/ai/nomoclaw/bot/planner/TaskPlanner.java)

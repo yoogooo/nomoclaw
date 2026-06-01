@@ -251,14 +251,14 @@ NomoClaw-1.0.0-windows-x64.msi
 
 | Location   | Example                             |
 | ---------- | ----------------------------------- |
-| Logs       | `Build Version: 1.0.0+260415.42305` |
-| About page | `Version: 1.0.0 (260415.42305)`     |
+| Logs       | `Build Version: 1.0.0 (g1a2b3c4)`   |
+| About page | `Version: 1.0.0 (g1a2b3c4)`         |
 | File       | `build/version.txt`                 |
 
 Content:
 
 ```
-1.0.0+260415.42305
+1.0.0 (g1a2b3c4)
 ```
 
 ------
@@ -278,19 +278,12 @@ Content:
 
 ```bash
 APP_VERSION="1.0.0"
+GIT_SHORT_SHA="$(git rev-parse --short=7 HEAD)"
 
-BUILD_DATE="$(date +%y%m%d)"
-HOUR="$(date +%H)"
-MINUTE="$(date +%M)"
-SECOND="$(date +%S)"
-
-SECONDS_OF_DAY=$((10#$HOUR * 3600 + 10#$MINUTE * 60 + 10#$SECOND))
-
-BUILD_NO="${BUILD_DATE}.${SECONDS_OF_DAY}"
-FULL_VERSION="${APP_VERSION}+${BUILD_NO}"
+FULL_VERSION="${APP_VERSION} (g${GIT_SHORT_SHA})"
 
 echo "APP_VERSION=${APP_VERSION}"
-echo "BUILD_NO=${BUILD_NO}"
+echo "GIT_SHORT_SHA=${GIT_SHORT_SHA}"
 echo "FULL_VERSION=${FULL_VERSION}"
 ```
 
@@ -301,6 +294,6 @@ echo "FULL_VERSION=${FULL_VERSION}"
 | Item           | Example                          |
 | -------------- | -------------------------------- |
 | Public Version | `1.0.0`                          |
-| Build Number   | `260415.42305`                   |
-| Full Version   | `1.0.0+260415.42305`             |
+| Build Number   | `g1a2b3c4`                       |
+| Full Version   | `1.0.0 (g1a2b3c4)`               |
 | Artifact       | `NomoClaw-1.0.0-windows-x64.msi` |

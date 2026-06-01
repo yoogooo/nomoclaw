@@ -1,10 +1,10 @@
 package ai.nomoclaw.bot.tool;
 
-import ai.nomoclaw.bot.store.repository.AgentMessageRepository;
-import ai.nomoclaw.bot.store.entity.AgentMessageEntity;
-import org.springframework.stereotype.Component;
 import ai.nomoclaw.bot.model.ToolRequest;
 import ai.nomoclaw.bot.model.ToolResult;
+import ai.nomoclaw.bot.store.entity.AgentMessageEntity;
+import ai.nomoclaw.bot.store.repository.AgentMessageRepository;
+import org.springframework.stereotype.Component;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
@@ -27,15 +27,15 @@ public class TokenUsageTool implements Tool {
 
     @Override
     public String name() {
-        return "token_usage_tool";
+        return "TokenUsageTool";
     }
 
     @Override
     public ToolResult execute(ToolRequest request) {
         long start = System.currentTimeMillis();
-        int days = Math.max(1, Math.min(365, request.args().path("days").asInt(30)));
-        String modelName = request.args().path("modelName").asText("");
-        String provider = request.args().path("provider").asText("");
+        int days = Math.clamp(request.args().path("days").asInt(30), 1, 365);
+        String modelName = request.args().path("modelName").asString("");
+        String provider = request.args().path("provider").asString("");
         LocalDateTime since = LocalDateTime.now().minusDays(days);
 
         List<AgentMessageEntity> messages = messageRepository.lambdaQuery()
@@ -50,6 +50,7 @@ public class TokenUsageTool implements Tool {
         }
 
         int input = messages.stream().mapToInt(it -> safeInt(it.getInputTokens())).sum();
+        int cachedInput = messages.stream().mapToInt(it -> safeInt(it.getCachedInputTokens())).sum();
         int output = messages.stream().mapToInt(it -> safeInt(it.getOutputTokens())).sum();
         int total = messages.stream().mapToInt(it -> safeInt(it.getTotalTokens())).sum();
 
@@ -61,7 +62,7 @@ public class TokenUsageTool implements Tool {
 
         ArrayNode modelStats = JsonNodeFactory.instance.arrayNode();
         byModel.entrySet().stream()
-                .sorted(Map.Entry.<String, Integer>comparingByValue(Comparator.reverseOrder()))
+                .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
                 .forEach(entry -> {
                     ObjectNode node = JsonNodeFactory.instance.objectNode();
                     node.put("modelName", entry.getKey());
@@ -72,9 +73,11 @@ public class TokenUsageTool implements Tool {
         ObjectNode artifacts = JsonNodeFactory.instance.objectNode();
         artifacts.put("days", days);
         artifacts.put("inputTokens", input);
+        artifacts.put("cachedInputTokens", cachedInput);
         artifacts.put("outputTokens", output);
         artifacts.put("totalTokens", total);
         artifacts.put("messageCount", messages.size());
+        artifacts.put("cachedRatio", input <= 0 ? 0D : (double) cachedInput / (double) input);
         artifacts.set("byModel", modelStats);
 
         String outputText = """
@@ -82,9 +85,10 @@ public class TokenUsageTool implements Tool {
                 - days: %d
                 - total tokens: %d
                 - input tokens: %d
+                - cached input tokens: %d
                 - output tokens: %d
                 - messages: %d
-                """.formatted(days, total, input, output, messages.size()).trim();
+                """.formatted(days, total, input, cachedInput, output, messages.size()).trim();
         return ToolResult.success(outputText, artifacts, metrics(start));
     }
 

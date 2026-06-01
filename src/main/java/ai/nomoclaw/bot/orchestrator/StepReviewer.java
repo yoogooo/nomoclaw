@@ -21,7 +21,7 @@ public class StepReviewer {
         if (!result.success()) {
             String message = result.errorMessage() == null ? "tool execution failed" : result.errorMessage();
             if (result.errorCode() != null
-                    && (TERMINAL_ERROR_CODES.contains(result.errorCode()) || result.errorCode().startsWith("POLICY_"))) {
+                && (TERMINAL_ERROR_CODES.contains(result.errorCode()) || result.errorCode().startsWith("POLICY_"))) {
                 return ReviewDecision.failure(message);
             }
             return ReviewDecision.retryableFailure(message);
@@ -53,7 +53,7 @@ public class StepReviewer {
         if (outputContainsAll.isArray()) {
             String output = safe(result.output());
             for (JsonNode item : outputContainsAll) {
-                String expected = item.asText("");
+                String expected = item.asString("");
                 if (!expected.isBlank() && !output.contains(expected)) {
                     return ReviewDecision.failure("output does not contain expected text: " + expected);
                 }
@@ -64,7 +64,7 @@ public class StepReviewer {
         if (artifactsPresent.isArray()) {
             JsonNode artifacts = result.artifacts();
             for (JsonNode item : artifactsPresent) {
-                String field = item.asText("");
+                String field = item.asString("");
                 if (!field.isBlank() && (artifacts == null || artifacts.path(field).isMissingNode() || artifacts.path(field).isNull())) {
                     return ReviewDecision.failure("missing artifact field: " + field);
                 }
@@ -79,20 +79,18 @@ public class StepReviewer {
 
     private boolean allowsArtifactOnlySuccess(PlanStep step, ToolResult result) {
         String toolName = safe(step.toolName());
-        if ("cron_tool".equals(toolName)) {
-            return hasUsefulArtifacts(result);
-        }
-        if ("answer_tool".equals(toolName)) {
-            return hasMeaningfulOutput(result);
-        }
-        if ("file_tool".equals(toolName)) {
-            String action = step.toolArgs().path("action").asText("");
-            return ("write".equals(action) || "list".equals(action)) && hasUsefulArtifacts(result);
-        }
-        if ("browser_tool".equals(toolName)) {
-            String action = step.toolArgs().path("action").asText("");
-            return ("open".equals(action) || "click".equals(action) || "type".equals(action) || "screenshot".equals(action))
-                    && hasUsefulArtifacts(result);
+        switch (toolName) {
+            case "CronCreateTool", "CronDeleteTool", "CronListTool", "CreateFileTool", "ListFileTool" -> {
+                return hasUsefulArtifacts(result);
+            }
+            case "answer_tool" -> {
+                return hasMeaningfulOutput(result);
+            }
+            case "BrowserTool" -> {
+                String action = step.toolArgs().path("action").asString("");
+                return ("open".equals(action) || "click".equals(action) || "type".equals(action) || "screenshot".equals(action))
+                       && hasUsefulArtifacts(result);
+            }
         }
         return false;
     }
@@ -103,7 +101,7 @@ public class StepReviewer {
 
     private boolean hasUsefulArtifacts(ToolResult result) {
         JsonNode artifacts = result.artifacts();
-        return artifacts != null && !artifacts.isMissingNode() && !artifacts.isNull() && artifacts.size() > 0;
+        return artifacts != null && !artifacts.isMissingNode() && !artifacts.isNull() && !artifacts.isEmpty();
     }
 
     private String safe(String text) {

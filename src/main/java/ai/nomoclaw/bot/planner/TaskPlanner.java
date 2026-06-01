@@ -1,6 +1,9 @@
 package ai.nomoclaw.bot.planner;
 
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import ai.nomoclaw.bot.llm.config.LlmProperties;
+import ai.nomoclaw.bot.llm.debug.LlmDebugLogger;
 import ai.nomoclaw.bot.prompt.PromptLoader;
 import ai.nomoclaw.bot.prompt.SkillPromptLoader;
 import dev.langchain4j.agent.tool.ToolSpecification;
@@ -27,13 +30,16 @@ public class TaskPlanner implements Planner {
     private final LlmProperties llmProperties;
     private final RuntimeChatModelResolver runtimeChatModelResolver;
     private final SkillPromptLoader skillPromptLoader;
+    private final LlmDebugLogger llmDebugLogger;
 
     public TaskPlanner(LlmProperties llmProperties,
                        RuntimeChatModelResolver runtimeChatModelResolver,
-                       SkillPromptLoader skillPromptLoader) {
+                       SkillPromptLoader skillPromptLoader,
+                       LlmDebugLogger llmDebugLogger) {
         this.llmProperties = llmProperties;
         this.runtimeChatModelResolver = runtimeChatModelResolver;
         this.skillPromptLoader = skillPromptLoader;
+        this.llmDebugLogger = llmDebugLogger;
     }
 
     @Override
@@ -44,10 +50,31 @@ public class TaskPlanner implements Planner {
         PreparedRequest preparedRequest = buildRequest(memory, toolSpecifications, toolChoice, promptContext);
         ChatRequest request = preparedRequest.request();
         RuntimeChatModelResolver.ResolvedModel resolvedModel = runtimeChatModelResolver.resolve(promptContext);
+        String requestId = UuidUtil.newUuid();
+        long startNanos = System.nanoTime();
+        llmDebugLogger.logRequest(
+                requestId,
+                "task_reason",
+                resolvedModel.providerId(),
+                resolvedModel.modelId(),
+                promptContext,
+                preparedRequest.systemPrompt(),
+                request.messages(),
+                toolChoice,
+                extractToolNames(toolSpecifications)
+        );
         logReasonStart(resolvedModel, memory, toolSpecifications, toolChoice, preparedRequest.systemPrompt());
-        ChatResponse response = resolvedModel.model().chat(request);
-        logReasonFinish(response);
-        return response;
+        try {
+            ChatResponse response = resolvedModel.model().chat(request);
+            llmDebugLogger.logResponse(requestId, "task_reason", resolvedModel.providerId(), resolvedModel.modelId(),
+                    promptContext, response, elapsedMillis(startNanos));
+            logReasonFinish(response);
+            return response;
+        } catch (Exception ex) {
+            llmDebugLogger.logError(requestId, "task_reason", resolvedModel.providerId(), resolvedModel.modelId(),
+                    promptContext, ex, elapsedMillis(startNanos));
+            throw ex;
+        }
     }
 
     @Override
@@ -59,13 +86,34 @@ public class TaskPlanner implements Planner {
         PreparedRequest preparedRequest = buildRequest(memory, toolSpecifications, toolChoice, promptContext);
         ChatRequest request = preparedRequest.request();
         RuntimeChatModelResolver.ResolvedModel resolvedModel = runtimeChatModelResolver.resolve(promptContext);
+        String requestId = UuidUtil.newUuid();
+        long startNanos = System.nanoTime();
+        llmDebugLogger.logRequest(
+                requestId,
+                "task_reason",
+                resolvedModel.providerId(),
+                resolvedModel.modelId(),
+                promptContext,
+                preparedRequest.systemPrompt(),
+                request.messages(),
+                toolChoice,
+                extractToolNames(toolSpecifications)
+        );
         logReasonStart(resolvedModel, memory, toolSpecifications, toolChoice, preparedRequest.systemPrompt());
         if (!resolvedModel.supportsStreaming()) {
             log.info("[Reasoning] stream fallback disabled provider={} model={}", resolvedModel.providerId(), resolvedModel.modelId());
-            ChatResponse response = resolvedModel.model().chat(request);
-            String text = response.aiMessage() == null ? "" : response.aiMessage().text();
-            logReasonFinish(response);
-            return new StreamReasonResult(response, text == null ? "" : text, false);
+            try {
+                ChatResponse response = resolvedModel.model().chat(request);
+                llmDebugLogger.logResponse(requestId, "task_reason", resolvedModel.providerId(), resolvedModel.modelId(),
+                        promptContext, response, elapsedMillis(startNanos));
+                String text = response.aiMessage() == null ? "" : response.aiMessage().text();
+                logReasonFinish(response);
+                return new StreamReasonResult(response, text == null ? "" : text, false);
+            } catch (Exception ex) {
+                llmDebugLogger.logError(requestId, "task_reason", resolvedModel.providerId(), resolvedModel.modelId(),
+                        promptContext, ex, elapsedMillis(startNanos));
+                throw ex;
+            }
         }
 
         StringBuilder buffer = new StringBuilder();
@@ -95,9 +143,19 @@ public class TaskPlanner implements Planner {
             }
         });
 
-        ChatResponse response = completion.join();
+        ChatResponse response;
+        try {
+            response = completion.join();
+        } catch (Exception ex) {
+            Throwable cause = ex.getCause() == null ? ex : ex.getCause();
+            llmDebugLogger.logError(requestId, "task_reason", resolvedModel.providerId(), resolvedModel.modelId(),
+                    promptContext, cause, elapsedMillis(startNanos));
+            throw ex;
+        }
         log.info("[Reasoning] stream completed provider={} model={} deltas={} chars={}",
                 resolvedModel.providerId(), resolvedModel.modelId(), deltaCount[0], buffer.length());
+        llmDebugLogger.logResponse(requestId, "task_reason", resolvedModel.providerId(), resolvedModel.modelId(),
+                promptContext, response, elapsedMillis(startNanos));
         logReasonFinish(response);
         return new StreamReasonResult(response, buffer.toString(), true);
     }
@@ -188,18 +246,26 @@ public class TaskPlanner implements Planner {
         String fallback = (configured != null && !configured.isBlank())
                 ? configured
                 : "You are an autonomous agent. Use tools when needed and answer naturally when finished.";
-        String builtinToolsPrompt = renderBuiltinToolsPrompt(toolSpecifications);
+        String builtinToolsPrompt = renderToolsPrompt(toolSpecifications, false);
+        String mcpToolsPrompt = renderToolsPrompt(toolSpecifications, true);
         String toolkitPrompt = skillPromptLoader.buildAgentSkillPrompt(promptContext);
-        return PromptLoader.buildSystemPrompt(promptContext, builtinToolsPrompt, toolkitPrompt, fallback);
+        return PromptLoader.buildSystemPrompt(promptContext, builtinToolsPrompt, mcpToolsPrompt, toolkitPrompt, fallback);
     }
 
-    private String renderBuiltinToolsPrompt(List<ToolSpecification> toolSpecifications) {
+    private String renderToolsPrompt(List<ToolSpecification> toolSpecifications, boolean mcpTools) {
         if (toolSpecifications == null || toolSpecifications.isEmpty()) {
             return "";
         }
         StringBuilder builder = new StringBuilder();
-        builder.append("以下为当前内置工具，请按名称直接发起 tool calls：\n");
+        builder.append(mcpTools
+                ? "以下为当前 MCP 工具，请按名称直接发起 tool calls：\n"
+                : "以下为当前内置工具，请按名称直接发起 tool calls：\n");
+        boolean hasRenderedTool = false;
         for (ToolSpecification toolSpecification : toolSpecifications) {
+            if (isMcpTool(toolSpecification) != mcpTools) {
+                continue;
+            }
+            hasRenderedTool = true;
             builder.append("- ").append(toolSpecification.name());
             if (toolSpecification.description() != null && !toolSpecification.description().isBlank()) {
                 builder.append(": ").append(toolSpecification.description());
@@ -219,7 +285,16 @@ public class TaskPlanner implements Planner {
             }
             builder.append('\n');
         }
+        if (!hasRenderedTool) {
+            return "";
+        }
         return builder.toString().trim();
+    }
+
+    private boolean isMcpTool(ToolSpecification toolSpecification) {
+        return toolSpecification != null
+                && toolSpecification.name() != null
+                && toolSpecification.name().startsWith("mcp_");
     }
 
     private String summarize(String text) {
@@ -227,5 +302,19 @@ public class TaskPlanner implements Planner {
             return "";
         }
         return text.length() <= 1200 ? text : text.substring(0, 1200) + "...";
+    }
+
+    private long elapsedMillis(long startNanos) {
+        return (System.nanoTime() - startNanos) / 1_000_000L;
+    }
+
+    private List<String> extractToolNames(List<ToolSpecification> toolSpecifications) {
+        if (toolSpecifications == null || toolSpecifications.isEmpty()) {
+            return List.of();
+        }
+        return toolSpecifications.stream()
+                .map(item -> item == null ? "" : item.name())
+                .filter(item -> item != null && !item.isBlank())
+                .toList();
     }
 }

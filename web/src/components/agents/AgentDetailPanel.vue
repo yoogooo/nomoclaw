@@ -22,9 +22,9 @@ const { t } = useI18n();
 
 <style scoped>
 .agent-detail-column {
-  max-height: calc(100vh - 250px);
+  height: 100%;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: var(--space-3_5);
@@ -32,13 +32,25 @@ const { t } = useI18n();
 
 .detail-tabs-card {
   min-height: 0;
-  flex-shrink: 0;
+  height: 100%;
+  flex: 1 1 auto;
+  overflow: auto;
+  box-shadow: none;
 }
 
-@media (max-width: var(--size-breakpoint-lg)) {
+@media (max-width: 700px) {
   .agent-detail-column {
+    height: auto;
+    min-height: unset;
     overflow: visible;
     max-height: none;
+  }
+
+  .detail-tabs-card {
+    height: auto;
+    min-height: unset;
+    flex: 0 0 auto;
+    overflow: visible;
   }
 }
 </style>

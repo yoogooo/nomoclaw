@@ -33,6 +33,15 @@ export const modelApi = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
+    }, {
+      suppressErrorToast: true
+    });
+  },
+  startCodexLogin() {
+    return requestJson<ModelProviderTestResult>("/api/system/models/codex/login", {
+      method: "POST"
+    }, {
+      suppressErrorToast: true
     });
   }
 };

@@ -26,6 +26,8 @@ const loading = ref(false);
 const saving = ref(false);
 const loadingLocalModels = ref(false);
 const testingProviderConnection = ref(false);
+const startingCodexLogin = ref(false);
+const codexLoginApiUnsupported = ref(false);
 const showEditor = ref(false);
 const editingProviderId = ref("");
 const modelGateStore = useModelGateStore();
@@ -37,14 +39,21 @@ const modelCardRefs = ref<Array<HTMLElement | null>>([]);
 
 const providerCards = computed(() =>
   config.providers.map((provider) => {
-    const configured = provider.local
-      ? Boolean(provider.baseUrl.trim())
-      : Boolean(provider.apiKey.trim());
+    const configured = provider.requireApiKey
+      ? provider.local
+        ? Boolean(provider.baseUrl.trim())
+        : Boolean(provider.apiKey.trim())
+      : Boolean(provider.configured);
+    const isCodexNotConfigured = provider.id === "codex" && !configured;
     return {
       ...provider,
       statusText: configured
         ? t("models.status.configured")
-        : provider.local
+        : isCodexNotConfigured
+          ? t("models.status.pendingCodexLogin")
+          : !provider.requireApiKey && provider.authMessage
+          ? t("models.status.pendingApiKey")
+          : provider.local
           ? t("models.status.pendingLocalUrl")
           : t("models.status.pendingApiKey"),
       statusType: (configured ? "success" : "warning") as ProviderStatusType
@@ -98,6 +107,9 @@ function normalizeProvider(provider: ModelProvider): ModelProvider {
     freezeUrl: Boolean(provider.freezeUrl),
     baseUrl: provider.baseUrl ?? "",
     apiKey: provider.apiKey ?? "",
+    configured: Boolean(provider.configured),
+    authStatus: provider.authStatus ?? "",
+    authMessage: provider.authMessage ?? "",
     defaultModel: provider.defaultModel ?? "",
     models: Array.isArray(provider.models) ? provider.models.map(normalizeModel) : []
   };
@@ -253,9 +265,43 @@ function uploadSummary(model: ModelProviderOption) {
   });
 }
 
+function isCodexProvider(provider: ModelProvider) {
+  return provider.id === "codex";
+}
+
+function canShowCodexLoginAction(provider: ModelProvider) {
+  return isCodexProvider(provider) && !provider.configured && !codexLoginApiUnsupported.value;
+}
+
+async function startCodexLogin() {
+  startingCodexLogin.value = true;
+  try {
+    const result = await modelApi.startCodexLogin();
+    if (result.success) {
+      message.success(result.message || t("models.toast.codexLoginStarted"));
+      return;
+    }
+    message.warning(result.message || t("models.toast.codexLoginFailed"));
+  } catch (error) {
+    const text = error instanceof Error ? error.message : "";
+    if (text.includes("resource not found")) {
+      codexLoginApiUnsupported.value = true;
+      message.warning("当前后端版本不支持一键登录，请在终端运行：codex login");
+    } else {
+      message.error(text || t("models.toast.codexLoginFailed"));
+    }
+  } finally {
+    startingCodexLogin.value = false;
+  }
+}
+
 async function testProviderConnection() {
   const provider = editingProvider.value;
   if (!provider) {
+    return;
+  }
+  if (isCodexProvider(provider) && !provider.configured) {
+    message.warning("Codex 未登录，请先运行 codex login");
     return;
   }
   testingProviderConnection.value = true;
@@ -263,7 +309,7 @@ async function testProviderConnection() {
     const result = await modelApi.testProviderConnection({
       providerId: provider.id,
       baseUrl: provider.baseUrl.trim(),
-      apiKey: provider.apiKey.trim()
+      apiKey: provider.requireApiKey ? provider.apiKey.trim() : ""
     });
     if (result.success) {
       message.success(result.message || t("models.toast.connectionTestSuccess"));
@@ -271,9 +317,12 @@ async function testProviderConnection() {
     }
     message.warning(result.message || t("models.toast.connectionTestFailed"));
   } catch (error) {
-    if (!(error instanceof Error)) {
-      message.error(t("models.toast.connectionTestFailed"));
+    const text = error instanceof Error ? error.message : "";
+    if (text.includes("Codex 未登录")) {
+      message.warning("Codex 未登录，请先运行 codex login");
+      return;
     }
+    message.error(text || t("models.toast.connectionTestFailed"));
   } finally {
     testingProviderConnection.value = false;
   }
@@ -354,6 +403,16 @@ onMounted(() => {
               </div>
 
               <div class="provider-card-footer">
+                <n-button
+                  v-if="canShowCodexLoginAction(provider)"
+                  size="small"
+                  type="primary"
+                  secondary
+                  :loading="startingCodexLogin"
+                  @click.stop="startCodexLogin"
+                >
+                  {{ t("models.actions.codexLogin") }}
+                </n-button>
                 <n-button size="small" tertiary type="primary">{{ t("models.actions.editConfig") }}</n-button>
               </div>
             </n-card>
@@ -371,7 +430,7 @@ onMounted(() => {
           <n-input v-model:value="editingProvider.baseUrl" :disabled="editingProvider.freezeUrl" />
         </n-form-item>
 
-        <n-form-item v-if="!editingProvider.local" label="API Key">
+        <n-form-item v-if="!editingProvider.local && editingProvider.requireApiKey" label="API Key">
           <div class="api-key-test-inline">
             <n-input class="api-key-test-input" v-model:value="editingProvider.apiKey" type="password" show-password-on="click" :placeholder="t('models.editor.apiKeyPlaceholder')" />
             <n-button class="api-key-test-btn" :loading="testingProviderConnection" @click="testProviderConnection">
@@ -380,10 +439,31 @@ onMounted(() => {
           </div>
         </n-form-item>
 
-        <n-form-item v-else>
+        <n-form-item v-else-if="editingProvider.local">
           <n-button :loading="testingProviderConnection" @click="testProviderConnection">
             {{ t("models.actions.testConnection") }}
           </n-button>
+        </n-form-item>
+
+        <n-form-item v-else label="Codex Login">
+          <div class="api-key-test-inline">
+            <n-tag :type="editingProvider.configured ? 'success' : 'warning'">
+              {{ editingProvider.authMessage || (editingProvider.configured ? t("models.status.configured") : t("models.status.pendingApiKey")) }}
+            </n-tag>
+            <n-button
+              v-if="canShowCodexLoginAction(editingProvider)"
+              class="api-key-test-btn"
+              type="primary"
+              secondary
+              :loading="startingCodexLogin"
+              @click="startCodexLogin"
+            >
+              {{ t("models.actions.codexLogin") }}
+            </n-button>
+            <n-button class="api-key-test-btn" :loading="testingProviderConnection" @click="testProviderConnection">
+              {{ t("models.actions.testConnection") }}
+            </n-button>
+          </div>
         </n-form-item>
 
         <n-form-item :label="t('models.labels.defaultModel')">
@@ -486,9 +566,14 @@ onMounted(() => {
   border-radius: var(--radius-xl);
 }
 
+.provider-card :deep(.n-card-header__main) {
+  min-width: 0;
+}
+
 .provider-name {
   font-size: var(--text-title-sm-size);
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .provider-protocol {
@@ -517,10 +602,24 @@ onMounted(() => {
 .provider-card-footer {
   display: flex;
   justify-content: flex-end;
+  gap: var(--space-2);
 }
 
 .provider-card-footer {
   margin-top: var(--space-5);
+}
+
+.provider-card :deep(.n-tag) {
+  flex: 0 0 auto;
+  max-width: 68%;
+}
+
+.provider-card :deep(.n-tag__content) {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .models-toolbar {

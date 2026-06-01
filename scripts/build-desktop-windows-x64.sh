@@ -54,6 +54,8 @@ DESKTOP_PRODUCT_NAME=""
 TAURI_CONFIG_OVERRIDE_PATH=""
 BUILD_NO=""
 FULL_VERSION=""
+MSI_VERSION=""
+GIT_SHORT_SHA=""
 MSI_BUILD_MARKER_FILE=""
 
 log() {
@@ -74,6 +76,12 @@ normalize_bool() {
     true|1|yes|y) printf 'true' ;;
     *) printf 'false' ;;
   esac
+}
+
+resolve_git_short_sha() {
+  command -v git >/dev/null 2>&1 || fail "Missing command: git"
+  GIT_SHORT_SHA="$(git rev-parse --short=7 HEAD 2>/dev/null || true)"
+  [[ -n "$GIT_SHORT_SHA" ]] || fail "Failed to resolve git short SHA"
 }
 
 setup_windows_target() {
@@ -159,7 +167,10 @@ setup_version_metadata() {
   seconds_of_day=$((10#$hour * 3600 + 10#$minute * 60 + 10#$second))
 
   BUILD_NO="${build_date}.${seconds_of_day}"
-  FULL_VERSION="${DESKTOP_VERSION}+${BUILD_NO}"
+  resolve_git_short_sha
+  FULL_VERSION="${DESKTOP_VERSION} (g${GIT_SHORT_SHA})"
+  # MSI product versions must stay numeric and within 0..65535 for the build field.
+  MSI_VERSION="${DESKTOP_VERSION}.$((10#$seconds_of_day % 65536))"
 }
 
 write_version_file() {
@@ -375,7 +386,7 @@ build_tauri_config_override() {
 
   node -e '
 const fs = require("fs");
-const [basePath, outPath, productName, version, updaterPubkey, iconPath, bundlesRaw] = process.argv.slice(1);
+const [basePath, outPath, productName, version, wixVersion, updaterPubkey, iconPath, bundlesRaw] = process.argv.slice(1);
 const cfg = JSON.parse(fs.readFileSync(basePath, "utf8"));
 cfg.productName = productName;
 cfg.version = version;
@@ -383,11 +394,14 @@ if (cfg.app && Array.isArray(cfg.app.windows)) {
   cfg.app.windows = cfg.app.windows.map((w) => ({ ...w, title: productName }));
 }
 cfg.bundle = cfg.bundle || {};
+cfg.bundle.windows = cfg.bundle.windows || {};
+cfg.bundle.windows.wix = cfg.bundle.windows.wix || {};
 const bundles = String(bundlesRaw || "msi")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
 cfg.bundle.targets = bundles.length ? bundles : ["msi"];
+cfg.bundle.windows.wix.version = wixVersion;
 if (iconPath) {
   cfg.bundle.icon = [iconPath];
 }
@@ -396,7 +410,7 @@ if (updaterPubkey && cfg.plugins && cfg.plugins.updater) {
   cfg.plugins.updater.pubkey = updaterPubkey;
 }
 fs.writeFileSync(outPath, JSON.stringify(cfg, null, 2) + "\n");
-' "$base_config_path" "$TAURI_CONFIG_OVERRIDE_PATH" "$DESKTOP_PRODUCT_NAME" "$DESKTOP_VERSION" "$TAURI_UPDATER_PUBKEY" "$icon_path" "$TAURI_BUNDLES"
+' "$base_config_path" "$TAURI_CONFIG_OVERRIDE_PATH" "$DESKTOP_PRODUCT_NAME" "$DESKTOP_VERSION" "$MSI_VERSION" "$TAURI_UPDATER_PUBKEY" "$icon_path" "$TAURI_BUNDLES"
 }
 
 build_tauri_bundle() {

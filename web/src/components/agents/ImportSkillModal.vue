@@ -3,6 +3,7 @@ import { computed, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { NButton, NForm, NFormItem, NInput, NModal, NSwitch, NTabPane, NTabs } from "naive-ui";
 import { conversationApi } from "@/api/conversationApi";
+import { message as discreteMessage } from "@/discrete";
 import type { ImportedSkillResponse } from "@/types/api";
 
 const props = defineProps<{
@@ -20,6 +21,7 @@ const activeTab = ref<"url" | "archive" | "create">("archive");
 const attachToAgent = ref(true);
 const importing = ref(false);
 const archiveFile = ref<File | null>(null);
+const isArchiveDragActive = ref(false);
 
 const urlForm = reactive({
   url: ""
@@ -86,7 +88,69 @@ async function submit() {
 
 function handleFileChange(event: Event) {
   const target = event.target as HTMLInputElement | null;
-  archiveFile.value = target?.files?.[0] || null;
+  const file = target?.files?.[0] || null;
+  if (!selectArchiveFile(file)) {
+    if (target) {
+      target.value = "";
+    }
+  }
+}
+
+function containsFiles(event: DragEvent) {
+  return Array.from(event.dataTransfer?.types || []).includes("Files");
+}
+
+function isSupportedArchive(file: File) {
+  const name = file.name.toLowerCase();
+  return name.endsWith(".zip") || name.endsWith(".tgz") || name.endsWith(".tar.gz");
+}
+
+function selectArchiveFile(file: File | null) {
+  if (!file) {
+    archiveFile.value = null;
+    return false;
+  }
+  if (!isSupportedArchive(file)) {
+    archiveFile.value = null;
+    discreteMessage.warning(t("agents.import.archiveInvalidFormat"));
+    return false;
+  }
+  archiveFile.value = file;
+  return true;
+}
+
+function handleArchiveDragEnter(event: DragEvent) {
+  if (!containsFiles(event)) {
+    return;
+  }
+  event.preventDefault();
+  isArchiveDragActive.value = true;
+}
+
+function handleArchiveDragOver(event: DragEvent) {
+  if (!containsFiles(event)) {
+    return;
+  }
+  event.preventDefault();
+  event.dataTransfer!.dropEffect = "copy";
+  isArchiveDragActive.value = true;
+}
+
+function handleArchiveDragLeave(event: DragEvent) {
+  const nextTarget = event.relatedTarget as Node | null;
+  if (nextTarget && (event.currentTarget as HTMLElement | null)?.contains(nextTarget)) {
+    return;
+  }
+  isArchiveDragActive.value = false;
+}
+
+function handleArchiveDrop(event: DragEvent) {
+  if (!containsFiles(event)) {
+    return;
+  }
+  event.preventDefault();
+  isArchiveDragActive.value = false;
+  selectArchiveFile(event.dataTransfer?.files?.[0] || null);
 }
 </script>
 
@@ -106,7 +170,16 @@ function handleFileChange(event: Event) {
       <n-tab-pane name="archive" :tab="t('agents.import.tabArchive')">
         <div class="import-skill-panel">
           <div class="import-hint-text">{{ t("agents.import.archiveHint") }}</div>
-          <label class="ui-upload-card" role="button" :aria-label="t('agents.import.pickArchive')">
+          <label
+            class="ui-upload-card"
+            :class="{ 'ui-upload-card-dragging': isArchiveDragActive }"
+            role="button"
+            :aria-label="t('agents.import.pickArchive')"
+            @dragenter="handleArchiveDragEnter"
+            @dragover="handleArchiveDragOver"
+            @dragleave="handleArchiveDragLeave"
+            @drop="handleArchiveDrop"
+          >
             <input
               class="ui-upload-card-input"
               type="file"
@@ -222,6 +295,12 @@ function handleFileChange(event: Event) {
 
 .ui-upload-card:focus-within {
   border-color: var(--color-border-active);
+  box-shadow: 0 0 0 var(--size-4) var(--color-bg-brand-soft);
+}
+
+.ui-upload-card-dragging {
+  border-color: var(--color-border-active);
+  background: var(--color-bg-brand-soft);
   box-shadow: 0 0 0 var(--size-4) var(--color-bg-brand-soft);
 }
 

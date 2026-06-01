@@ -13,6 +13,9 @@ import java.lang.reflect.Method;
 import java.util.Map;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -71,6 +74,29 @@ class BrowserToolRuntimePathTests {
         );
         assertThat(Files.isDirectory(Path.of(configuredDriverTmpDir))).isTrue();
         assertThat(Files.isDirectory(Path.of(configuredTmpDir))).isTrue();
+    }
+
+    @Test
+    void removesStalePlaywrightDriverTempDirectories() throws Exception {
+        NomoClawPaths.configureRoot(tempDir);
+        BrowserTool tool = new BrowserTool(new AgentProperties(), new MessageCancellationRegistry());
+        Path driverTmpDir = tempDir.resolve("runtime").resolve("plugins").resolve("browser").resolve("lib");
+        Path staleDir = driverTmpDir.resolve("playwright-java-1");
+        Path freshDir = driverTmpDir.resolve("playwright-java-2");
+        Path unrelatedDir = driverTmpDir.resolve("other-temp");
+        Files.createDirectories(staleDir);
+        Files.createDirectories(freshDir);
+        Files.createDirectories(unrelatedDir);
+        Files.writeString(staleDir.resolve("driver.txt"), "stale");
+        Files.writeString(freshDir.resolve("driver.txt"), "fresh");
+        Files.setLastModifiedTime(staleDir, FileTime.from(Instant.now().minus(2, ChronoUnit.DAYS)));
+        Files.setLastModifiedTime(freshDir, FileTime.from(Instant.now()));
+
+        invoke(tool, "configurePlaywrightDriverTmpDirectory");
+
+        assertThat(staleDir).doesNotExist();
+        assertThat(freshDir).isDirectory();
+        assertThat(unrelatedDir).isDirectory();
     }
 
     private Object invoke(BrowserTool tool, String methodName, Object... args) throws Exception {

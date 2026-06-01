@@ -18,6 +18,9 @@ public enum PermissionResourceType {
         if (normalized.contains("browser")) {
             return BROWSER;
         }
+        if (normalized.contains("websearch") || normalized.contains("webfetch")) {
+            return BROWSER;
+        }
         if (normalized.contains("cron")) {
             return CRON;
         }

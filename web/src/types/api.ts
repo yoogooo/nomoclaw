@@ -84,6 +84,79 @@ export interface AgentTool {
   updatedTime: string;
 }
 
+export interface AgentMcpTool {
+  toolKey: string;
+  serverUid: string;
+  serverName: string;
+  serverDisplayName: string;
+  originalToolName: string;
+  displayName: string;
+  description: string;
+  enabled: boolean;
+  updatedTime: string;
+}
+
+export interface McpServer {
+  serverUid: string;
+  serverName: string;
+  transport: "HTTP" | "STDIO";
+  status: string;
+  timeoutSeconds: number;
+  autoStart: boolean;
+  endpoint: string;
+  headers: Record<string, string>;
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+  cwd: string;
+  lastConnectedTime?: string | null;
+  lastError?: string | null;
+  toolCount: number;
+  createdTime: string;
+  updatedTime: string;
+}
+
+export interface McpTool {
+  toolKey: string;
+  serverUid: string;
+  originalToolName: string;
+  displayName: string;
+  description: string;
+  inputSchemaJson?: string;
+  status: string;
+  lastSyncedTime: string;
+}
+
+export interface SaveMcpServerPayload {
+  serverName: string;
+  transport: "HTTP" | "STDIO";
+  timeoutSeconds: number;
+  autoStart: boolean;
+  endpoint?: string;
+  headers?: Record<string, string>;
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  cwd?: string;
+}
+
+export interface SystemErrorLog {
+  logUid: string;
+  level: "ERROR" | "WARN";
+  source: string;
+  code: string;
+  title: string;
+  message: string;
+  detail: string;
+  occurredTime: string;
+}
+
+export interface SystemErrorLogSummary {
+  hasErrors: boolean;
+  recent24hCount: number;
+  latestOccurredTime: string | null;
+}
+
 export interface AgentTip {
   tipUid: string;
   agentUid: string;
@@ -120,6 +193,26 @@ export interface ChannelConfig {
       enabled: boolean;
       bots: ChannelDingTalkBotConfig[];
     };
+    discord: {
+      enabled: boolean;
+      bots: ChannelDiscordBotConfig[];
+    };
+    telegram: {
+      enabled: boolean;
+      bots: ChannelTelegramBotConfig[];
+    };
+    qq: {
+      enabled: boolean;
+      bots: ChannelQqBotConfig[];
+    };
+    wecom: {
+      enabled: boolean;
+      bots: ChannelWeComBotConfig[];
+    };
+    weixin: {
+      enabled: boolean;
+      bots: ChannelWeixinBotConfig[];
+    };
   };
 }
 
@@ -149,6 +242,66 @@ export interface ChannelDingTalkBotConfig {
   clientId: string;
   clientSecret: string;
   robotCode: string;
+}
+
+export interface ChannelDiscordBotConfig {
+  botId: string;
+  displayName: string;
+  enabled: boolean;
+  isDefault: boolean;
+  requireMention: boolean;
+  allowList: string[];
+  token: string;
+  botUserId: string;
+  acceptBotMessages: boolean;
+}
+
+export interface ChannelTelegramBotConfig {
+  botId: string;
+  displayName: string;
+  enabled: boolean;
+  isDefault: boolean;
+  requireMention: boolean;
+  allowList: string[];
+  token: string;
+  botUsername: string;
+}
+
+export interface ChannelQqBotConfig {
+  botId: string;
+  displayName: string;
+  enabled: boolean;
+  isDefault: boolean;
+  requireMention: boolean;
+  allowList: string[];
+  appId: string;
+  clientSecret: string;
+  botUserId: string;
+  sandbox: boolean;
+  markdownEnabled: boolean;
+}
+
+export interface ChannelWeComBotConfig {
+  botId: string;
+  displayName: string;
+  enabled: boolean;
+  isDefault: boolean;
+  requireMention: boolean;
+  allowList: string[];
+  wecomBotId: string;
+  secret: string;
+}
+
+export interface ChannelWeixinBotConfig {
+  botId: string;
+  displayName: string;
+  enabled: boolean;
+  isDefault: boolean;
+  requireMention: boolean;
+  allowList: string[];
+  botToken: string;
+  botTokenFile: string;
+  baseUrl: string;
 }
 
 export interface ChannelTargetOption {
@@ -185,6 +338,9 @@ export interface ModelProvider {
   freezeUrl: boolean;
   baseUrl: string;
   apiKey: string;
+  configured: boolean;
+  authStatus: string;
+  authMessage: string;
   defaultModel: string;
   models: ModelProviderOption[];
 }
@@ -245,6 +401,8 @@ export interface ApprovalDecisionResponse {
   matchedRuleId?: string;
 }
 
+export type ApprovalMode = "default" | "full_access";
+
 export interface ModelCatalogStatus {
   catalogVersion: string;
   generatedAt: string;
@@ -270,6 +428,9 @@ export interface ConversationSummary {
   agentUid: string;
   title: string;
   pinned: boolean;
+  waitingApproval: boolean;
+  unread: boolean;
+  lastTaskTerminalTime?: string | null;
   createdTime: string;
   updatedTime: string;
 }
@@ -288,6 +449,7 @@ export interface ConversationMessage {
   provider?: string;
   modelName?: string;
   inputTokens?: number;
+  cachedInputTokens?: number;
   outputTokens?: number;
   totalTokens?: number;
   createdTime: string;
@@ -341,8 +503,15 @@ export interface CronJob {
   expression: string;
   timezone: string;
   endAt?: string | null;
+  modelProvider?: string | null;
+  modelName?: string | null;
   taskContent: string;
   status: string;
+  currentExecutionUid?: string | null;
+  currentConversationUid?: string | null;
+  currentMessageUid?: string | null;
+  currentExecutionStatus?: string | null;
+  currentExecutionStartedTime?: string | null;
   lastRunTime: string | null;
   nextRunTime: string | null;
   lastResult: string;
@@ -359,11 +528,51 @@ export interface CronJobReport {
 }
 
 export interface CronJobExecutionResult {
+  executionUid?: string | null;
+  unread?: boolean;
+  jobUid?: string | null;
+  jobTitle?: string | null;
+  agentUid?: string | null;
+  agentDisplayName?: string | null;
+  conversationUid?: string | null;
+  messageUid?: string | null;
   executedTime: string;
   status: string;
   summary: string;
   reportPath?: string | null;
   reportContent?: string | null;
+}
+
+export interface CronJobExecutionHistoryPage {
+  items: CronJobExecutionResult[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export interface SystemErrorLogPage {
+  items: SystemErrorLog[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export interface CronExecutionDetail {
+  executionUid: string;
+  jobUid: string;
+  jobTitle: string;
+  agentUid: string;
+  agentDisplayName: string;
+  conversationUid: string;
+  messageUid: string;
+  status: string;
+  summary: string;
+  reportPath?: string | null;
+  reportContent?: string | null;
+  executedTime: string;
+  runs: ConversationMessageRun[];
 }
 
 export interface CronSubscription {

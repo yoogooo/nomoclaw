@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { NButton, NDropdown, NInput, NModal, NSelect, type DropdownOption, type InputInst, type SelectOption } from "naive-ui";
-import { Pin, RefreshCw } from "lucide-vue-next";
+import { Clock3, MoreHorizontal, Pin, RefreshCw } from "lucide-vue-next";
+import { useRoute } from "vue-router";
+import { cronApi } from "@/api/cronApi";
 import { useAgentCatalogStore } from "@/stores/agentCatalog";
 import { useConversationStore } from "@/stores/conversation";
 import { message as discreteMessage } from "@/discrete";
-import { formatFriendlyDateTime } from "@/utils/format";
+import { formatConversationListTime, formatDateTime } from "@/utils/format";
 import { getSortLocale } from "@/i18n";
 
 type AgentSelectOption = SelectOption & {
@@ -16,13 +18,18 @@ type AgentSelectOption = SelectOption & {
 
 const conversationStore = useConversationStore();
 const agentCatalogStore = useAgentCatalogStore();
-const { t } = useI18n();
+const route = useRoute();
+const { t, locale } = useI18n();
 const renameDialogVisible = ref(false);
 const renameConversationUid = ref("");
 const renameInput = ref("");
 const renameSubmitting = ref(false);
 const renameInputRef = ref<InputInst | null>(null);
 const refreshingHistory = ref(false);
+const refreshAnimating = ref(false);
+const cronTaskByConversationUid = ref<Record<string, string>>({});
+const conversationListRef = ref<HTMLElement | null>(null);
+const lastAutoScrolledConversationUid = ref("");
 
 const agentOptions = computed<AgentSelectOption[]>(() =>
   [...agentCatalogStore.allAgents]
@@ -120,15 +127,109 @@ async function refreshHistoryConversations() {
   if (refreshingHistory.value) {
     return;
   }
+  const startedAt = Date.now();
   refreshingHistory.value = true;
+  refreshAnimating.value = true;
   try {
     await conversationStore.refreshConversations();
+    await refreshCronConversationBindings();
   } catch {
     discreteMessage.error(t("toast.refreshFailed"));
   } finally {
     refreshingHistory.value = false;
+    const elapsed = Date.now() - startedAt;
+    window.setTimeout(() => {
+      refreshAnimating.value = false;
+    }, Math.max(0, 650 - elapsed));
   }
 }
+
+async function refreshCronConversationBindings() {
+  try {
+    const [recentResults, runningResults] = await Promise.all([
+      cronApi.listGlobalRecentResults(200),
+      cronApi.listGlobalRunningResults(200)
+    ]);
+    const nextMap: Record<string, string> = {};
+    for (const item of [...runningResults, ...recentResults]) {
+      const conversationUid = String(item.conversationUid || "").trim();
+      if (!conversationUid || nextMap[conversationUid]) {
+        continue;
+      }
+      const title = String(item.jobTitle || "").trim();
+      if (title) {
+        nextMap[conversationUid] = title;
+      }
+    }
+    cronTaskByConversationUid.value = nextMap;
+  } catch {
+    // best effort
+  }
+}
+
+void refreshCronConversationBindings();
+
+watch(
+  () => [
+    String(route.query.source || "").trim().toLowerCase(),
+    String(route.query.conversationUid || "").trim(),
+    String(route.query.executionUid || "").trim(),
+    String(route.query.jobUid || "").trim()
+  ],
+  async ([source, conversationUid, executionUid, jobUid]) => {
+    if (source !== "cron" || !conversationUid) return;
+    if (cronTaskByConversationUid.value[conversationUid]) return;
+
+    let title = "";
+    if (executionUid) {
+      try {
+        const detail = await cronApi.getExecutionDetail(executionUid, { suppressErrorToast: true });
+        title = String(detail?.jobTitle || "").trim();
+      } catch {
+        // best effort
+      }
+    }
+    if (!title && jobUid) {
+      try {
+        const jobs = await cronApi.listCronJobs();
+        const matched = jobs.find((item) => String(item.jobUid || "").trim() === jobUid);
+        title = String(matched?.title || matched?.taskContent || "").trim();
+      } catch {
+        // best effort
+      }
+    }
+    if (title) {
+      cronTaskByConversationUid.value = {
+        ...cronTaskByConversationUid.value,
+        [conversationUid]: title
+      };
+    }
+  },
+  { immediate: true }
+);
+
+async function scrollActiveConversationIntoViewIfNeeded() {
+  const source = String(route.query.source || "").trim().toLowerCase();
+  if (source !== "cron") return;
+  const conversationUid = String(conversationStore.currentConversationUid || "").trim();
+  if (!conversationUid) return;
+  if (lastAutoScrolledConversationUid.value === conversationUid) return;
+  await nextTick();
+  const container = conversationListRef.value;
+  if (!container) return;
+  const activeRow = container.querySelector(".conversation-row.active") as HTMLElement | null;
+  if (!activeRow) return;
+  activeRow.scrollIntoView({ block: "center", inline: "nearest", behavior: "auto" });
+  lastAutoScrolledConversationUid.value = conversationUid;
+}
+
+watch(
+  () => [conversationStore.currentConversationUid, conversationStore.filteredConversations.length, String(route.query.source || "")],
+  () => {
+    void scrollActiveConversationIntoViewIfNeeded();
+  },
+  { immediate: true }
+);
 
 function handleAgentChange(agentUid: string | number | null) {
   if (!agentUid) {
@@ -141,23 +242,30 @@ function handleAgentChange(agentUid: string | number | null) {
   agentCatalogStore.selectAgent(selected.agentGroupUid, selected.value);
   void conversationStore.applyAgentSelection();
 }
+
+function isCronConversation(conversationUid: string) {
+  return Boolean(cronTaskByConversationUid.value[String(conversationUid || "").trim()]);
+}
+
 </script>
 
 <template>
   <aside class="panel conversation-shell">
     <div class="panel-header conversation-header">
       <div class="conversation-header-top">
-        <div class="panel-title">{{ t("chat.sidebar.history") }}</div>
-        <div class="conversation-header-actions">
+        <div class="conversation-header-title-row">
+          <div class="panel-title">{{ t("chat.sidebar.history") }}</div>
           <button
             class="refresh-conversation-button ui-pill-btn"
             :title="t('chat.sidebar.refreshHistoryTooltip')"
             :disabled="refreshingHistory"
             @click="refreshHistoryConversations()"
           >
-            <RefreshCw :size="14" :class="{ spinning: refreshingHistory }" />
+            <RefreshCw :size="14" :class="{ spinning: refreshAnimating }" />
           </button>
-          <button class="create-conversation-button ui-pill-btn" @click="createConversationAndFocusInput()">
+        </div>
+        <div class="conversation-header-actions">
+          <button class="create-conversation-button ui-control-btn" @click="createConversationAndFocusInput()">
             {{ t("chat.sidebar.createConversation") }}
           </button>
         </div>
@@ -175,7 +283,7 @@ function handleAgentChange(agentUid: string | number | null) {
       </div>
     </div>
     <div class="panel-body conversation-panel">
-      <div class="scroll-area conversation-list">
+      <div ref="conversationListRef" class="scroll-area conversation-list">
         <div v-if="conversationStore.filteredConversations.length">
           <div
             v-for="item in conversationStore.filteredConversations"
@@ -185,21 +293,34 @@ function handleAgentChange(agentUid: string | number | null) {
           >
             <button class="conversation-main" @click="conversationStore.selectConversation(item.conversationUid)">
               <div class="conversation-title">
+                <span v-if="item.unread" class="conversation-unread-dot" :title="t('chat.sidebar.unreadHint')" aria-label="unread" />
                 <span v-if="item.pinned" class="conversation-pinned-icon" :title="t('chat.sidebar.pinned')">
                   <Pin :size="12" />
                 </span>
+                <span v-if="isCronConversation(item.conversationUid)" class="conversation-cron-icon" aria-hidden="true">
+                  <Clock3 :size="12" />
+                </span>
                 <span class="conversation-title-text">{{ item.title || t("chat.sidebar.unnamed") }}</span>
               </div>
-              <div class="conversation-time">{{ t("chat.sidebar.updatedAt", { time: formatFriendlyDateTime(item.updatedTime) }) }}</div>
             </button>
-            <div class="conversation-menu-wrap">
-              <n-dropdown
-                trigger="click"
-                :options="menuOptions(Boolean(item.pinned))"
-                @select="(key) => handleMenuSelect(key, item.conversationUid, item.title || '', Boolean(item.pinned))"
-              >
-                <button class="history-menu-button">...</button>
-              </n-dropdown>
+            <div class="conversation-meta-slot">
+              <div v-if="item.waitingApproval" class="conversation-status-pill waiting-approval-pill">
+                {{ t("chat.sidebar.waitingApproval") }}
+              </div>
+              <div v-else class="conversation-time-inline" :title="formatDateTime(item.updatedTime)">
+                {{ formatConversationListTime(item.updatedTime, locale) }}
+              </div>
+              <div class="conversation-menu-wrap">
+                <n-dropdown
+                  trigger="click"
+                  :options="menuOptions(Boolean(item.pinned))"
+                  @select="(key) => handleMenuSelect(key, item.conversationUid, item.title || '', Boolean(item.pinned))"
+                >
+                  <button class="history-menu-button" aria-label="actions">
+                    <MoreHorizontal :size="16" />
+                  </button>
+                </n-dropdown>
+              </div>
             </div>
           </div>
         </div>
@@ -231,24 +352,40 @@ function handleAgentChange(agentUid: string | number | null) {
   min-height: 0;
 }
 
-.conversation-panel {
+.conversation-shell .conversation-panel {
   display: flex;
   min-height: 0;
   flex-direction: column;
   gap: 0;
+  padding-top: var(--space-5);
+  padding-right: 0 !important;
+  padding-bottom: 0;
+  padding-left: 0 !important;
 }
 
 .conversation-header-top {
   display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.conversation-header-title-row {
+  display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
+  width: 100%;
+  gap: var(--space-2);
 }
 
 .conversation-header-actions {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  width: 100%;
+  justify-content: flex-start;
+  min-width: 0;
 }
 
 .agent-select-wrap {
@@ -271,15 +408,15 @@ function handleAgentChange(agentUid: string | number | null) {
   width: var(--size-32);
   height: var(--size-32);
   padding: 0;
-  border-color: var(--color-border-strong);
-  background: var(--color-bg-surface-soft);
+  border-color: transparent;
+  background: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;
   transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease;
 }
 
 .refresh-conversation-button:hover:not(:disabled) {
-  border-color: var(--color-border-active);
+  border-color: transparent;
   background: var(--color-bg-soft-hover);
   color: var(--color-text-primary);
 }
@@ -290,8 +427,15 @@ function handleAgentChange(agentUid: string | number | null) {
 }
 
 .create-conversation-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex: none;
   white-space: nowrap;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   padding: var(--space-1_5) var(--space-3);
   border-color: var(--color-border-strong);
   background: var(--color-bg-surface-soft);
@@ -310,8 +454,8 @@ function handleAgentChange(agentUid: string | number | null) {
 
 .conversation-list {
   flex: 1;
-  width: calc(100% + var(--size-48));
-  margin: 0 calc(var(--space-6) * -1);
+  width: 100%;
+  margin: 0;
 }
 
 .conversation-list-empty {
@@ -323,15 +467,25 @@ function handleAgentChange(agentUid: string | number | null) {
 }
 
 .conversation-row {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-1_5);
-  padding: var(--space-4) var(--space-3);
+  --conversation-meta-min-width: 3.5rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-1_5);
+  padding-top: var(--space-2_5);
+  padding-right: var(--space-2);
+  padding-bottom: var(--space-2_5);
+  padding-left: var(--space-2);
   margin: 0;
   border-left: var(--size-3) solid transparent;
   border-radius: 0;
-  border-bottom: var(--size-1) solid var(--color-border-panel);
+  border-bottom: var(--size-1) solid color-mix(in srgb, var(--color-border-panel) 58%, transparent);
   transition: background-color 0.18s ease, border-color 0.18s ease;
+}
+
+.conversation-row:hover:not(.active) {
+  background: color-mix(in srgb, var(--color-bg-surface-soft) 82%, var(--color-bg-soft-hover) 18%);
+  border-left-color: color-mix(in srgb, var(--color-border-active) 36%, transparent);
 }
 
 .conversation-row.active {
@@ -340,7 +494,7 @@ function handleAgentChange(agentUid: string | number | null) {
 }
 
 .conversation-main {
-  flex: 1;
+  width: 100%;
   min-width: 0;
   border: 0;
   background: transparent;
@@ -352,6 +506,14 @@ function handleAgentChange(agentUid: string | number | null) {
 
 .conversation-row.active .conversation-main {
   color: var(--color-text-brand);
+}
+
+.conversation-row:hover:not(.active) .conversation-main {
+  color: var(--color-text-heading);
+}
+
+.conversation-row:hover:not(.active) .conversation-time-inline {
+  color: var(--color-text-secondary);
 }
 
 .conversation-title {
@@ -384,34 +546,96 @@ function handleAgentChange(agentUid: string | number | null) {
   color: var(--color-text-brand);
 }
 
-.conversation-time {
-  margin-top: var(--space-2);
-  font-size: var(--text-caption-size);
-  color: var(--text-muted);
+.conversation-unread-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e5484d;
+  flex: none;
+}
+
+.conversation-cron-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  flex: none;
+}
+
+.conversation-time-inline {
+  min-width: 0;
+  text-align: right;
+  font-size: 10px;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+  transition: opacity 0.18s ease, visibility 0.18s ease;
+}
+
+.conversation-status-pill {
+  min-width: 0;
+  max-width: 100%;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 9px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-right: 2px;
+}
+
+.waiting-approval-pill {
+  color: #8a4b00;
+  background: #ffe5bf;
+  border: 1px solid #ffcc80;
+  margin-right: -8px;
+}
+
+.conversation-meta-slot {
+  position: relative;
+  min-width: var(--conversation-meta-min-width);
+  width: max-content;
+  height: var(--size-24);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 6px;
 }
 
 .conversation-menu-wrap {
-  position: relative;
+  position: absolute;
+  inset: 0;
   display: flex;
-  flex-shrink: 0;
-  align-self: center;
-  margin-right: calc(var(--space-2) * -1);
+  align-items: center;
+  justify-content: flex-end;
+  width: 100%;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.18s ease, visibility 0.18s ease;
+  padding-right: 6px;
+}
+
+.conversation-menu-wrap :deep(.n-dropdown-trigger) {
+  display: flex;
+  width: var(--size-24);
+  height: var(--size-24);
+  align-items: center;
+  justify-content: center;
 }
 
 .history-menu-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
   width: var(--size-24);
   height: var(--size-24);
+  padding: 0;
+  line-height: 0;
   border: 0;
   background: transparent;
   color: var(--color-text-tertiary);
-  font-weight: 700;
   cursor: pointer;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.18s ease, color 0.18s ease;
+  transition: color 0.18s ease;
 }
 
 .rename-dialog-body {
@@ -427,9 +651,20 @@ function handleAgentChange(agentUid: string | number | null) {
   gap: var(--space-2);
 }
 
-.conversation-row:hover .history-menu-button {
+.conversation-row:hover .conversation-menu-wrap {
   opacity: 1;
   visibility: visible;
+  pointer-events: auto;
+}
+
+.conversation-row:hover .conversation-time-inline {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.conversation-row:hover .conversation-status-pill {
+  opacity: 0;
+  visibility: hidden;
 }
 
 .history-menu-button:hover {
@@ -441,6 +676,7 @@ function handleAgentChange(agentUid: string | number | null) {
 }
 
 .spinning {
+  transform-origin: center;
   animation: spin 0.8s linear infinite;
 }
 
@@ -450,9 +686,16 @@ function handleAgentChange(agentUid: string | number | null) {
   }
 }
 
-@media (max-width: var(--size-breakpoint-lg)) {
-  .conversation-panel {
+@media (max-width: 1120px) {
+  .conversation-header-actions {
+    justify-content: flex-start;
+  }
+
+  .conversation-shell .conversation-panel {
     gap: var(--space-3);
+    padding-top: var(--space-3_5);
+    padding-right: 0 !important;
+    padding-left: 0 !important;
   }
 
   .create-conversation-button {
@@ -463,11 +706,10 @@ function handleAgentChange(agentUid: string | number | null) {
   .conversation-list {
     width: 100%;
     margin: 0;
-    max-height: var(--size-280);
   }
 
   .conversation-row {
-    padding: var(--space-3_5) var(--space-2_5);
+    padding: var(--space-2) var(--space-1_5);
   }
 }
 </style>

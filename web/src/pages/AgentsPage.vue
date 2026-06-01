@@ -47,7 +47,7 @@ import { getSortLocale } from "@/i18n";
 import { message } from "@/discrete";
 
 const AGENTS_PAGE_STATE_STORAGE_KEY = "agents-page:selection:v1";
-const AGENT_DETAIL_TABS = ["basic", "skills", "tools", "tips", "docs"] as const;
+const AGENT_DETAIL_TABS = ["basic", "skills", "tools", "mcp", "tips", "docs"] as const;
 
 interface AgentsPagePersistedState {
   selectedAgentUid: string;
@@ -99,6 +99,7 @@ const skillDrawerVisible = ref(false);
 const selectedSkillId = ref("");
 const importSkillVisible = ref(false);
 const refreshingConfig = ref(false);
+const refreshingDocs = ref(false);
 const { t } = useI18n();
 
 const avatarIconOptions: AvatarIconOption[] = [
@@ -228,6 +229,10 @@ function onToggleTool(toolId: string, enabled: boolean) {
   management.setToolEnabled(selectedAgent.value, toolId, enabled);
 }
 
+function onToggleMcpTool(toolId: string, enabled: boolean) {
+  management.setMcpToolEnabled(selectedAgent.value, toolId, enabled);
+}
+
 function onToggleDoc(key: string, enabled: boolean) {
   management.setDocEnabled(selectedAgent.value, key as DocKey, enabled);
 }
@@ -249,10 +254,10 @@ async function refreshAgentsConfig(notify = true) {
   try {
     await management.init();
     selectedAgentUid.value = management.ensureSelectedAgent(preferredAgentUid);
-    management.syncDocsFormFromSelection(selectedAgent.value);
     management.syncBasicFormFromSelection(selectedAgent.value);
     if (selectedAgentUid.value) {
       await management.loadAgentWorkspace(selectedAgentUid.value);
+      management.syncDocsFormFromSelection(selectedAgent.value);
     }
     if (notify) {
       message.success(t("toast.configRefreshed"));
@@ -263,6 +268,26 @@ async function refreshAgentsConfig(notify = true) {
     }
   } finally {
     refreshingConfig.value = false;
+  }
+}
+
+async function refreshSelectedAgentDocs(notify = true) {
+  if (!selectedAgentUid.value || refreshingDocs.value) {
+    return;
+  }
+  refreshingDocs.value = true;
+  try {
+    await management.loadAgentWorkspace(selectedAgentUid.value);
+    management.syncDocsFormFromSelection(selectedAgent.value);
+    if (notify) {
+      message.success(t("toast.configRefreshed"));
+    }
+  } catch {
+    if (notify) {
+      message.error(t("toast.refreshFailed"));
+    }
+  } finally {
+    refreshingDocs.value = false;
   }
 }
 
@@ -287,6 +312,13 @@ watch(selectedAgentUid, async (agentUid) => {
   if (!agentUid) return;
   await management.loadAgentWorkspace(agentUid);
   management.syncDocsFormFromSelection(selectedAgent.value);
+});
+
+watch([selectedAgentUid, detailTab], async ([agentUid, tab]) => {
+  if (!agentUid || tab !== "docs") {
+    return;
+  }
+  await refreshSelectedAgentDocs(false);
 });
 
 watch([selectedAgentUid, detailTab], ([agentUid, tab]) => {
@@ -359,6 +391,14 @@ watch([selectedAgentUid, detailTab], ([agentUid, tab]) => {
                   />
                 </n-tab-pane>
 
+                <n-tab-pane name="mcp" :tab="t('pages.agents.tabMcp')">
+                  <AgentToolsTab
+                    :tools="selectedAgent.managedMcpTools"
+                    group-by-server
+                    @toggle="onToggleMcpTool"
+                  />
+                </n-tab-pane>
+
                 <n-tab-pane name="tips" :tab="t('pages.agents.tabTips')">
                   <AgentTipsTab
                     :tips="selectedAgent.tips"
@@ -381,9 +421,11 @@ watch([selectedAgentUid, detailTab], ([agentUid, tab]) => {
                     :selected-doc-enabled="selectedDocEnabled"
                     :doc-editable="docEditable"
                     :selected-doc-content="selectedDocContent"
+                    :refresh-loading="refreshingDocs"
                     @select-doc="selectedDocKey = $event as DocKey"
                     @toggle-doc="onToggleDoc"
                     @toggle-edit="docEditable = !docEditable"
+                    @refresh="refreshSelectedAgentDocs()"
                     @save="management.saveDocs(selectedAgent, selectedDocKey)"
                     @update-content="management.updateDocContent(selectedDocKey, $event)"
                   />
@@ -426,16 +468,27 @@ watch([selectedAgentUid, detailTab], ([agentUid, tab]) => {
 </template>
 
 <style scoped>
+.agents-page {
+  height: 100%;
+}
+
 .agent-main-grid {
   display: grid;
-  grid-template-columns: var(--size-320) minmax(0, 1fr);
+  grid-template-columns: var(--size-260) minmax(0, 1fr);
   gap: var(--space-4);
+  flex: 1;
   min-height: 0;
 }
 
-@media (max-width: var(--size-breakpoint-lg)) {
+@media (max-width: 1120px) {
   .agent-main-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: var(--size-280) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 700px) {
+  .agent-main-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>

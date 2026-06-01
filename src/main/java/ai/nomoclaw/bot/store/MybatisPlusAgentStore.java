@@ -65,12 +65,15 @@ public class MybatisPlusAgentStore implements AgentStore {
         entity.setTitle("");
         entity.setPinned(false);
         entity.setInputTokens(0);
+        entity.setCachedInputTokens(0);
         entity.setOutputTokens(0);
         entity.setTotalTokens(0);
+        entity.setLastTaskTerminalTime(null);
+        entity.setLastReadAt(toLocalDateTime(now));
         entity.setCreatedTime(toLocalDateTime(now));
         entity.setUpdatedTime(toLocalDateTime(now));
         conversationRepository.save(entity);
-        return new AgentConversation(conversationUid, agentGroupUid, agentUid, entity.getChannel(), "", false, 0, 0, 0, now, now);
+        return new AgentConversation(conversationUid, agentGroupUid, agentUid, entity.getChannel(), "", false, 0, 0, 0, 0, null, now, now, now);
     }
 
     @Override
@@ -118,6 +121,19 @@ public class MybatisPlusAgentStore implements AgentStore {
     }
 
     @Override
+    public void markConversationRead(String conversationUid, Instant readAt) {
+        if (conversationUid == null || conversationUid.isBlank()) {
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime readAtTime = readAt == null ? now : toLocalDateTime(readAt);
+        conversationRepository.update(new LambdaUpdateWrapper<AgentConversationEntity>()
+                .eq(AgentConversationEntity::getConversationUid, conversationUid)
+                .set(AgentConversationEntity::getLastReadAt, readAtTime)
+                .set(AgentConversationEntity::getUpdatedTime, now));
+    }
+
+    @Override
     public AgentMessage createUserMessage(String messageUid,
                                           String conversationUid,
                                           String content,
@@ -135,6 +151,7 @@ public class MybatisPlusAgentStore implements AgentStore {
         entity.setProvider(provider == null ? "" : provider.trim());
         entity.setModelName(modelName == null ? "" : modelName.trim());
         entity.setInputTokens(0);
+        entity.setCachedInputTokens(0);
         entity.setOutputTokens(0);
         entity.setTotalTokens(0);
         entity.setCreatedTime(toLocalDateTime(now));
@@ -157,6 +174,7 @@ public class MybatisPlusAgentStore implements AgentStore {
         entity.setProvider("");
         entity.setModelName("");
         entity.setInputTokens(0);
+        entity.setCachedInputTokens(0);
         entity.setOutputTokens(0);
         entity.setTotalTokens(0);
         entity.setCreatedTime(toLocalDateTime(now));
@@ -188,10 +206,24 @@ public class MybatisPlusAgentStore implements AgentStore {
 
     @Override
     public void updateMessageStatus(String messageUid, MessageStatus status) {
-        messageRepository.update(new LambdaUpdateWrapper<AgentMessageEntity>()
+        LocalDateTime now = LocalDateTime.now();
+        boolean updated = messageRepository.update(new LambdaUpdateWrapper<AgentMessageEntity>()
                 .eq(AgentMessageEntity::getMessageUid, messageUid)
+                .notIn(AgentMessageEntity::getStatus,
+                        MessageStatus.COMPLETED.name(),
+                        MessageStatus.FAILED.name(),
+                        MessageStatus.CANCELED.name())
                 .set(AgentMessageEntity::getStatus, status.name())
-                .set(AgentMessageEntity::getUpdatedTime, LocalDateTime.now()));
+                .set(AgentMessageEntity::getUpdatedTime, now));
+        if (status == MessageStatus.COMPLETED || status == MessageStatus.FAILED || status == MessageStatus.CANCELED) {
+            AgentMessageEntity messageEntity = messageRepository.findByMessageId(messageUid);
+            if (updated && messageEntity != null && messageEntity.getConversationUid() != null && !messageEntity.getConversationUid().isBlank()) {
+                conversationRepository.update(new LambdaUpdateWrapper<AgentConversationEntity>()
+                        .eq(AgentConversationEntity::getConversationUid, messageEntity.getConversationUid())
+                        .set(AgentConversationEntity::getLastTaskTerminalTime, now)
+                        .set(AgentConversationEntity::getUpdatedTime, now));
+            }
+        }
     }
 
     @Override
@@ -199,16 +231,21 @@ public class MybatisPlusAgentStore implements AgentStore {
                                             String provider,
                                             String modelName,
                                             Integer inputTokens,
+                                            Integer cachedInputTokens,
                                             Integer outputTokens,
                                             Integer totalTokens) {
         int input = sanitizeTokenCount(inputTokens);
+        int cachedInput = sanitizeTokenCount(cachedInputTokens);
         int output = sanitizeTokenCount(outputTokens);
         int total = sanitizeTokenCount(totalTokens);
         if (total == 0 && (input > 0 || output > 0)) {
             total = input + output;
         }
+        if (input > 0 && cachedInput > input) {
+            cachedInput = input;
+        }
 
-        if (input <= 0 && output <= 0 && total <= 0) {
+        if (input <= 0 && cachedInput <= 0 && output <= 0 && total <= 0) {
             return;
         }
 
@@ -217,6 +254,9 @@ public class MybatisPlusAgentStore implements AgentStore {
                 .set(AgentMessageEntity::getUpdatedTime, LocalDateTime.now());
         if (input > 0) {
             update.setSql("input_tokens = input_tokens + " + input);
+        }
+        if (cachedInput > 0) {
+            update.setSql("cached_input_tokens = cached_input_tokens + " + cachedInput);
         }
         if (output > 0) {
             update.setSql("output_tokens = output_tokens + " + output);
@@ -235,6 +275,9 @@ public class MybatisPlusAgentStore implements AgentStore {
                 .set(AgentConversationEntity::getUpdatedTime, LocalDateTime.now());
         if (input > 0) {
             conversationUpdate.setSql("input_tokens = input_tokens + " + input);
+        }
+        if (cachedInput > 0) {
+            conversationUpdate.setSql("cached_input_tokens = cached_input_tokens + " + cachedInput);
         }
         if (output > 0) {
             conversationUpdate.setSql("output_tokens = output_tokens + " + output);
@@ -366,8 +409,11 @@ public class MybatisPlusAgentStore implements AgentStore {
                 entity.getTitle(),
                 Boolean.TRUE.equals(entity.getPinned()),
                 entity.getInputTokens() == null ? 0 : entity.getInputTokens(),
+                entity.getCachedInputTokens() == null ? 0 : entity.getCachedInputTokens(),
                 entity.getOutputTokens() == null ? 0 : entity.getOutputTokens(),
                 entity.getTotalTokens() == null ? 0 : entity.getTotalTokens(),
+                toNullableInstant(entity.getLastTaskTerminalTime()),
+                toNullableInstant(entity.getLastReadAt()),
                 toInstant(entity.getCreatedTime()),
                 toInstant(entity.getUpdatedTime())
         );
@@ -384,6 +430,7 @@ public class MybatisPlusAgentStore implements AgentStore {
                 entity.getProvider(),
                 entity.getModelName(),
                 entity.getInputTokens() == null ? 0 : entity.getInputTokens(),
+                entity.getCachedInputTokens() == null ? 0 : entity.getCachedInputTokens(),
                 entity.getOutputTokens() == null ? 0 : entity.getOutputTokens(),
                 entity.getTotalTokens() == null ? 0 : entity.getTotalTokens(),
                 toInstant(entity.getCreatedTime()),
@@ -439,5 +486,9 @@ public class MybatisPlusAgentStore implements AgentStore {
 
     private Instant toInstant(LocalDateTime time) {
         return time == null ? Instant.now() : Timestamp.valueOf(time).toInstant();
+    }
+
+    private Instant toNullableInstant(LocalDateTime time) {
+        return time == null ? null : Timestamp.valueOf(time).toInstant();
     }
 }

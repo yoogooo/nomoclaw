@@ -1,10 +1,10 @@
 package ai.nomoclaw.bot.tool;
 
-import ai.nomoclaw.bot.store.repository.AgentMessageRepository;
-import ai.nomoclaw.bot.store.entity.AgentMessageEntity;
-import org.springframework.stereotype.Component;
 import ai.nomoclaw.bot.model.ToolRequest;
 import ai.nomoclaw.bot.model.ToolResult;
+import ai.nomoclaw.bot.store.entity.AgentMessageEntity;
+import ai.nomoclaw.bot.store.repository.AgentMessageRepository;
+import org.springframework.stereotype.Component;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
@@ -23,21 +23,21 @@ public class MemorySearchTool implements Tool {
 
     @Override
     public String name() {
-        return "memory_search_tool";
+        return "MemorySearchTool";
     }
 
     @Override
     public ToolResult execute(ToolRequest request) {
         long start = System.currentTimeMillis();
-        String query = request.args().path("query").asText("");
-        int maxResults = Math.max(1, Math.min(20, request.args().path("maxResults").asInt(5)));
+        String query = request.args().path("query").asString("");
+        int maxResults = Math.clamp(request.args().path("maxResults").asInt(5), 1, 20);
         if (query.isBlank()) {
             return ToolResult.failure("INVALID_ARGS", "query is required", metrics(start));
         }
 
         List<AgentMessageEntity> matched = messageRepository.lambdaQuery()
                 .like(AgentMessageEntity::getContent, query)
-                .orderByDesc(AgentMessageEntity::getCreatedTime)
+                .orderByDesc(AgentMessageEntity::getId)
                 .last("LIMIT " + maxResults)
                 .list();
 

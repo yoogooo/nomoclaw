@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { NConfigProvider, NGlobalStyle, darkTheme } from "naive-ui";
+import { NConfigProvider, NGlobalStyle, darkTheme, zhCN, enUS, dateZhCN, dateEnUS } from "naive-ui";
 import { useI18n } from "vue-i18n";
 import { RouterView, useRoute, useRouter } from "vue-router";
 import { resolveThemeOverrides } from "@/theme";
@@ -18,6 +18,8 @@ void modelGateStore.refreshModelReadiness();
 
 const appThemeOverrides = computed(() => resolveThemeOverrides(uiPreferencesStore.themeMode));
 const naiveTheme = computed(() => (uiPreferencesStore.themeMode === "dark" ? darkTheme : undefined));
+const naiveLocale = computed(() => (uiPreferencesStore.locale === "zh-CN" ? zhCN : enUS));
+const naiveDateLocale = computed(() => (uiPreferencesStore.locale === "zh-CN" ? dateZhCN : dateEnUS));
 const shouldShowModelGate = computed(() => modelGateStore.shouldShowPrompt && route.path !== "/models");
 const modelGateStatus = computed(() =>
   modelGateStore.checkError ? t("modelGate.status.checkFailed") : t("modelGate.status.missingModel")
@@ -33,7 +35,12 @@ function dismissModelGate() {
 </script>
 
 <template>
-  <n-config-provider :theme="naiveTheme" :theme-overrides="appThemeOverrides">
+  <n-config-provider
+    :theme="naiveTheme"
+    :theme-overrides="appThemeOverrides"
+    :locale="naiveLocale"
+    :date-locale="naiveDateLocale"
+  >
     <n-global-style />
     <div class="app-root-shell">
       <RouterView />
@@ -136,7 +143,7 @@ function dismissModelGate() {
   color: var(--color-button-neutral-text-light);
 }
 
-@media (max-width: var(--size-breakpoint-lg)) {
+@media (max-width: 1120px) {
   .model-gate-overlay {
     inset: 0;
   }

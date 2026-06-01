@@ -4,6 +4,9 @@ import jakarta.validation.constraints.Min;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Validated
 @ConfigurationProperties(prefix = "agent")
 public class AgentProperties {
@@ -14,8 +17,9 @@ public class AgentProperties {
     private final Loop loop = new Loop();
     private final Approval approval = new Approval();
     private final Api api = new Api();
+    private final WebSearch webSearch = new WebSearch();
 
-    public Command getCommand() {
+    public Command getParam() {
         return command;
     }
 
@@ -39,6 +43,10 @@ public class AgentProperties {
         return api;
     }
 
+    public WebSearch getWebSearch() {
+        return webSearch;
+    }
+
     public static class Command {
         @Min(1)
         private int timeoutSeconds = 60;
@@ -55,9 +63,14 @@ public class AgentProperties {
     public static class Browser {
         @Min(1)
         private int stepTimeoutSeconds = 60;
+        @Min(1)
+        private int clickTimeoutSeconds = 15;
+        private String mode = "auto";
         private boolean headless = true;
+        private boolean forceClickFallbackEnabled = false;
         private boolean sharedProfileEnabled = true;
         private String sharedProfileName = "shared";
+        private final LocalBridge localBridge = new LocalBridge();
 
         public int getStepTimeoutSeconds() {
             return stepTimeoutSeconds;
@@ -67,12 +80,28 @@ public class AgentProperties {
             this.stepTimeoutSeconds = stepTimeoutSeconds;
         }
 
+        public int getClickTimeoutSeconds() {
+            return clickTimeoutSeconds;
+        }
+
+        public void setClickTimeoutSeconds(int clickTimeoutSeconds) {
+            this.clickTimeoutSeconds = clickTimeoutSeconds;
+        }
+
         public boolean isHeadless() {
             return headless;
         }
 
         public void setHeadless(boolean headless) {
             this.headless = headless;
+        }
+
+        public boolean isForceClickFallbackEnabled() {
+            return forceClickFallbackEnabled;
+        }
+
+        public void setForceClickFallbackEnabled(boolean forceClickFallbackEnabled) {
+            this.forceClickFallbackEnabled = forceClickFallbackEnabled;
         }
 
         public boolean isSharedProfileEnabled() {
@@ -89,6 +118,66 @@ public class AgentProperties {
 
         public void setSharedProfileName(String sharedProfileName) {
             this.sharedProfileName = sharedProfileName;
+        }
+
+        public String getMode() {
+            return mode;
+        }
+
+        public void setMode(String mode) {
+            this.mode = mode;
+        }
+
+        public LocalBridge getLocalBridge() {
+            return localBridge;
+        }
+    }
+
+    public static class LocalBridge {
+        private String cdpEndpoint = "http://localhost:9222";
+        private List<String> localBridgeDomains = new ArrayList<>(List.of("xiaohongshu.com", "*.xiaohongshu.com"));
+        private int connectTimeoutMs = 10_000;
+        private boolean fallbackToManaged = true;
+        private boolean consentRequired = true;
+
+        public String getCdpEndpoint() {
+            return cdpEndpoint;
+        }
+
+        public void setCdpEndpoint(String cdpEndpoint) {
+            this.cdpEndpoint = cdpEndpoint;
+        }
+
+        public List<String> getLocalBridgeDomains() {
+            return localBridgeDomains;
+        }
+
+        public void setLocalBridgeDomains(List<String> localBridgeDomains) {
+            this.localBridgeDomains = localBridgeDomains == null ? new ArrayList<>() : new ArrayList<>(localBridgeDomains);
+        }
+
+        public int getConnectTimeoutMs() {
+            return connectTimeoutMs;
+        }
+
+        public void setConnectTimeoutMs(int connectTimeoutMs) {
+            this.connectTimeoutMs = connectTimeoutMs;
+        }
+
+        public boolean isFallbackToManaged() {
+            return fallbackToManaged;
+        }
+
+        public void setFallbackToManaged(boolean fallbackToManaged) {
+            this.fallbackToManaged = fallbackToManaged;
+        }
+
+        public boolean isConsentRequired() {
+            return consentRequired;
+        }
+
+        public void setConsentRequired(boolean consentRequired) {
+            this.consentRequired = consentRequired;
         }
     }
 
@@ -139,6 +228,25 @@ public class AgentProperties {
 
         public void setLocalOnlyEnabled(boolean localOnlyEnabled) {
             this.localOnlyEnabled = localOnlyEnabled;
+        }
+    }
+
+    public static class WebSearch {
+        /**
+         * Search endpoint templates in priority order.
+         * Supported placeholders:
+         * - {query}: URL-encoded query
+         * - {rawQuery}: raw query text
+         * If no placeholder exists, `q=<encoded query>` will be appended.
+         */
+        private List<String> endpoints = new ArrayList<>();
+
+        public List<String> getEndpoints() {
+            return endpoints;
+        }
+
+        public void setEndpoints(List<String> endpoints) {
+            this.endpoints = endpoints;
         }
     }
 

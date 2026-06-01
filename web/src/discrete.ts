@@ -1,5 +1,7 @@
+import { shallowRef } from "vue";
 import { createDiscreteApi, darkTheme } from "naive-ui";
-import type { DialogApi, MessageApi } from "naive-ui";
+import type { DialogApi, MessageApi, NotificationApi } from "naive-ui";
+import type { ConfigProviderProps } from "naive-ui";
 import type { DialogOptions } from "naive-ui";
 import { resolveThemeOverrides } from "@/theme";
 import type { UiThemeMode } from "@/stores/uiPreferences";
@@ -7,10 +9,19 @@ import type { UiThemeMode } from "@/stores/uiPreferences";
 interface DiscreteApis {
   message: MessageApi;
   dialog: DialogApi;
+  notification: NotificationApi;
 }
 
 let cachedMode: UiThemeMode | null = null;
 let cachedApis: DiscreteApis | null = null;
+const discreteConfigProviderProps = shallowRef<ConfigProviderProps>(buildConfigProviderProps("dark"));
+
+function buildConfigProviderProps(mode: UiThemeMode): ConfigProviderProps {
+  return {
+    theme: mode === "dark" ? darkTheme : undefined,
+    themeOverrides: resolveThemeOverrides(mode)
+  };
+}
 
 function resolveThemeMode(): UiThemeMode {
   if (typeof document === "undefined") {
@@ -21,23 +32,33 @@ function resolveThemeMode(): UiThemeMode {
 
 function resolveApis(): DiscreteApis {
   const mode = resolveThemeMode();
-  if (cachedApis && cachedMode === mode) {
+  syncDiscreteTheme(mode);
+  if (cachedApis) {
     return cachedApis;
   }
-  const apis = createDiscreteApi(["message", "dialog"], {
+  const apis = createDiscreteApi(["message", "dialog", "notification"], {
     messageProviderProps: {
       placement: "top",
       duration: 2200,
       max: 3
     },
-    configProviderProps: {
-      theme: mode === "dark" ? darkTheme : undefined,
-      themeOverrides: resolveThemeOverrides(mode)
-    }
+    notificationProviderProps: {
+      placement: "top-right",
+      max: 3
+    },
+    configProviderProps: discreteConfigProviderProps
   });
   cachedMode = mode;
   cachedApis = apis;
   return apis;
+}
+
+export function syncDiscreteTheme(mode: UiThemeMode) {
+  if (cachedMode === mode) {
+    return;
+  }
+  cachedMode = mode;
+  discreteConfigProviderProps.value = buildConfigProviderProps(mode);
 }
 
 function readToken(name: string, fallback: string): string {
@@ -60,6 +81,7 @@ function createProxy<T extends object>(key: keyof DiscreteApis): T {
 
 export const message = createProxy<MessageApi>("message");
 export const dialog = createProxy<DialogApi>("dialog");
+export const notification = createProxy<NotificationApi>("notification");
 
 export function warningDialogPreset(): Pick<DialogOptions, "showIcon" | "positiveButtonProps" | "negativeButtonProps"> {
   if (resolveThemeMode() === "dark") {
