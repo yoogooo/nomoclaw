@@ -774,15 +774,6 @@ onMounted(() => {
                     <div class="run-title">{{ t("chat.messages.runTitle") }}</div>
                   </div>
                 </template>
-                <template #header-extra>
-                  <n-tag
-                    v-if="runDisplayStatus(message.messageUid || '') !== 'planned'"
-                    size="small"
-                    :type="runTone(runDisplayStatus(message.messageUid || ''))"
-                  >
-                    {{ runStatusText(runDisplayStatus(message.messageUid || '')) }}
-                  </n-tag>
-                </template>
                 <div class="run-summary">{{ runProgressText(message.messageUid || "") }}</div>
                 <n-collapse class="run-steps-collapse">
                   <n-collapse-item

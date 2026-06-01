@@ -349,19 +349,29 @@ Playwright 浏览器二进制缓存目录（下载目录）采用以下优先级
 - 进度优先解析 Playwright CLI stdout 中的真实百分比（如 `90% of ...`）；若无法可靠解析，前端以“不确定进度”样式展示，避免误导性固定百分比。
 - 下载链路中断（例如 `server closed connection`）时，安装器会重试并可能从 0% 重新开始，通常不保证断点续传。
 
-### 6.4 `CronCreateTool`、`CronDeleteTool`、`CronListTool`
+### 6.4 Cron 调度与执行（Quartz）
 
 能力：
 
-- 创建本地定时任务触发器
+- 创建/暂停/恢复/立即触发本地定时任务
+- 记录执行历史、摘要、报告路径与已读状态
+- 支持审批等待、审批超时、重启后状态收敛
 
 实现特点：
 
-- 基于 `ThreadPoolTaskScheduler`
+- 调度器基于 Quartz（`CronJobSchedulerService` + `QuartzCronJob` + `scheduler/config/QuartzConfig`）
 - 支持 5/6 段 cron 表达式，5 段会自动补齐秒位
-- 创建任务时先写入 `agent_cron_job`
-- 应用启动时会尝试恢复 `ACTIVE` 任务
-- 内存中的 `jobs` 仅用于持有当前进程调度句柄，不再是任务真源
+- 创建任务时先写入 `agent_cron_job`，再注册 Quartz Job/Trigger
+- 应用启动后会恢复 `agent_cron_job` 中 `ACTIVE` 任务（`ApplicationReadyEvent`）
+- 执行记录持久化到 `agent_cron_job_execution`，状态包括：
+  - `RUNNING`
+  - `WAITING_APPROVAL`
+  - `COMPLETED`
+  - `FAILED`
+  - `CANCELED`
+  - `TIMED_OUT_APPROVAL`
+- 后台恢复线程（`CronExecutionResumeWorker`）会轮询活动执行并对齐消息状态
+- 重启后若出现“消息仍是运行态但运行上下文丢失”的僵尸执行，超过 `nomoclaw.cron.running-stale-timeout-seconds`（默认 60s）后收敛为 `FAILED`
 
 ### 6.5 Cron 结果直推（Channel Fanout）
 
@@ -532,28 +542,22 @@ Playwright 浏览器二进制缓存目录（下载目录）采用以下优先级
 用途：
 
 - 持久化 cron 任务及其运行状态
+- 字段细节见数据库 schema 与独立 Cron 运行手册
 
-关键字段：
+### 8.10 `agent_cron_job_execution`
 
-- `job_uid`
-- `agent_uid`
-- `conversation_uid`
-- `message_uid`
-- `expression`
-- `timezone`
-- `task_content`
-- `status`
-- `last_run_time`
-- `next_run_time`
-- `last_result`
+用途：
 
-### 8.10 `agent_cron_subscription`
+- 持久化每次 cron 执行实例与状态流转
+- 支撑“执行历史/详情/已读标记/恢复轮询”
+- 字段细节见数据库 schema 与独立 Cron 运行手册
+
+### 8.11 `agent_cron_subscription`
 
 用途：
 
 - 持久化 cron 任务与 channel 推送订阅关系
-
-关键字段：
+- 字段细节见数据库 schema 与独立 Cron 运行手册
 
 - `subscription_uid`
 - `job_uid`
@@ -561,7 +565,7 @@ Playwright 浏览器二进制缓存目录（下载目录）采用以下优先级
 - `target`
 - `enabled`
 
-### 8.11 `agent_channel_session`
+### 8.12 `agent_channel_session`
 
 用途：
 
@@ -576,7 +580,7 @@ Playwright 浏览器二进制缓存目录（下载目录）采用以下优先级
 - `conversation_uid`
 - `reply_target`
 
-### 8.12 存储实现选择
+### 8.13 存储实现选择
 
 `AgentStoreConfig` 的策略是：
 
@@ -585,7 +589,7 @@ Playwright 浏览器二进制缓存目录（下载目录）采用以下优先级
 
 当前默认启动方式通常会连 MySQL，因此主路径是 JDBC 持久化。
 
-### 8.13 当前开发态限制
+### 8.14 当前开发态限制
 
 当前 [schema-mysql.sql](../../src/main/resources/db/schema-mysql.sql) 在启动时会先执行：
 

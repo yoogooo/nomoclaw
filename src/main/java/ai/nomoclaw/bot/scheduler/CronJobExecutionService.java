@@ -7,6 +7,8 @@ import ai.nomoclaw.bot.conversation.model.ConversationMessageDto;
 import ai.nomoclaw.bot.domain.AgentMessage;
 import ai.nomoclaw.bot.model.MessageStatus;
 import ai.nomoclaw.bot.orchestrator.AgentApplicationService;
+import ai.nomoclaw.bot.orchestrator.execution.ExecutionRuntimeStateStore;
+import ai.nomoclaw.bot.store.AgentStore;
 import ai.nomoclaw.bot.store.entity.AgentCronJobEntity;
 import ai.nomoclaw.bot.store.entity.AgentCronJobExecutionEntity;
 import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
@@ -43,7 +45,10 @@ public class CronJobExecutionService {
     private final CronNotificationFanoutService cronNotificationFanoutService;
     private final CronJobSchedulerService cronJobSchedulerService;
     private final AgentDefinitionRepository agentDefinitionRepository;
+    private final AgentStore store;
     private final int defaultApprovalTimeoutSeconds;
+    private final int runningStaleTimeoutSeconds;
+    private final ExecutionRuntimeStateStore executionRuntimeStateStore;
 
     public CronJobExecutionService(AgentCronJobRepository agentCronJobRepository,
                                    AgentCronJobExecutionRepository agentCronJobExecutionRepository,
@@ -51,14 +56,20 @@ public class CronJobExecutionService {
                                    CronNotificationFanoutService cronNotificationFanoutService,
                                    CronJobSchedulerService cronJobSchedulerService,
                                    AgentDefinitionRepository agentDefinitionRepository,
-                                   @Value("${nomoclaw.cron.approval-timeout-seconds:1800}") int defaultApprovalTimeoutSeconds) {
+                                   AgentStore store,
+                                   @Value("${nomoclaw.cron.approval-timeout-seconds:1800}") int defaultApprovalTimeoutSeconds,
+                                   @Value("${nomoclaw.cron.running-stale-timeout-seconds:60}") int runningStaleTimeoutSeconds,
+                                   ExecutionRuntimeStateStore executionRuntimeStateStore) {
         this.agentCronJobRepository = agentCronJobRepository;
         this.agentCronJobExecutionRepository = agentCronJobExecutionRepository;
         this.agentApplicationService = agentApplicationService;
         this.cronNotificationFanoutService = cronNotificationFanoutService;
         this.cronJobSchedulerService = cronJobSchedulerService;
         this.agentDefinitionRepository = agentDefinitionRepository;
+        this.store = store;
         this.defaultApprovalTimeoutSeconds = Math.max(defaultApprovalTimeoutSeconds, 1);
+        this.runningStaleTimeoutSeconds = Math.max(runningStaleTimeoutSeconds, 1);
+        this.executionRuntimeStateStore = executionRuntimeStateStore;
     }
 
     public void executeJob(String jobUid) {
@@ -127,13 +138,14 @@ public class CronJobExecutionService {
         if (executionUid == null || messageUid == null) {
             return;
         }
+        LocalDateTime now = LocalDateTime.now();
         AgentMessage message = agentApplicationService.getMessage(messageUid);
         if (message == null || message.status() == null) {
+            failExecutionIfStale(execution, now, "任务状态丢失（服务重启或进程中断），执行已终止。");
             return;
         }
 
         MessageStatus messageStatus = message.status();
-        LocalDateTime now = LocalDateTime.now();
         if (messageStatus == MessageStatus.WAITING_APPROVAL) {
             handleWaitingApproval(execution, now);
             return;
@@ -142,6 +154,13 @@ public class CronJobExecutionService {
                 || messageStatus == MessageStatus.CREATED
                 || messageStatus == MessageStatus.PLANNED
                 || messageStatus == MessageStatus.REPLANNING) {
+            boolean runtimeRunning = executionRuntimeStateStore.isRunning(messageUid);
+            boolean executionStale = isExecutionStateStale(execution, now);
+            boolean messageStale = isMessageStateStale(message, now);
+            if (executionStale && (!runtimeRunning || messageStale)) {
+                failExecutionIfStale(execution, now, "任务在服务重启后未恢复运行，执行已终止。");
+                return;
+            }
             touchExecutionActiveState(executionUid, "RUNNING", now);
             return;
         }
@@ -317,6 +336,42 @@ public class CronJobExecutionService {
                 .set(AgentCronJobEntity::getUpdatedTime, now));
     }
 
+    private void failExecutionIfStale(AgentCronJobExecutionEntity execution, LocalDateTime now, String summary) {
+        if (!isExecutionStateStale(execution, now)) {
+            return;
+        }
+        AgentCronJobEntity job = agentCronJobRepository.findByJobUid(execution.getJobUid());
+        if (job == null) {
+            return;
+        }
+        updateJobResult(
+                job,
+                now,
+                summarize(summary),
+                null,
+                "FAILED",
+                blankToNull(execution.getExecutionUid()),
+                blankToNull(execution.getConversationUid()),
+                blankToNull(execution.getMessageUid())
+        );
+    }
+
+    private boolean isExecutionStateStale(AgentCronJobExecutionEntity execution, LocalDateTime now) {
+        LocalDateTime referenceTime = execution.getUpdatedTime() == null ? execution.getStartedTime() : execution.getUpdatedTime();
+        if (referenceTime == null) {
+            return true;
+        }
+        return referenceTime.plusSeconds(runningStaleTimeoutSeconds).isBefore(now);
+    }
+
+    private boolean isMessageStateStale(AgentMessage message, LocalDateTime now) {
+        if (message == null || message.updatedAt() == null) {
+            return true;
+        }
+        LocalDateTime messageUpdatedTime = LocalDateTime.ofInstant(message.updatedAt(), ZoneId.systemDefault());
+        return messageUpdatedTime.plusSeconds(runningStaleTimeoutSeconds).isBefore(now);
+    }
+
     private String loadFinalAnswer(String conversationUid, String messageUid, AgentMessage completedMessage) {
         if (conversationUid != null && !conversationUid.isBlank() && messageUid != null && !messageUid.isBlank()) {
             List<ConversationMessageDto> messages = agentApplicationService.listMessages(conversationUid);
@@ -411,6 +466,23 @@ public class CronJobExecutionService {
                 .set(AgentCronJobEntity::getConversationUid, normalizedConversationUid)
                 .set(AgentCronJobEntity::getMessageUid, normalizedMessageUid)
                 .set(AgentCronJobEntity::getUpdatedTime, now));
+        syncMessageTerminalStatus(normalizedMessageUid, executionStatus);
+    }
+
+    private void syncMessageTerminalStatus(String messageUid, String executionStatus) {
+        if (messageUid == null || messageUid.isBlank() || executionStatus == null || executionStatus.isBlank()) {
+            return;
+        }
+        MessageStatus messageStatus = switch (executionStatus) {
+            case "COMPLETED" -> MessageStatus.COMPLETED;
+            case "CANCELED" -> MessageStatus.CANCELED;
+            case "FAILED", "TIMED_OUT_APPROVAL" -> MessageStatus.FAILED;
+            default -> null;
+        };
+        if (messageStatus == null) {
+            return;
+        }
+        store.updateMessageStatus(messageUid, messageStatus);
     }
 
     private AgentDefinitionEntity resolveAgent(AgentCronJobEntity job) {

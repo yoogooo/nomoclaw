@@ -342,8 +342,11 @@ Loop 相关关键事件包括：
 当前 `CronCreateTool`、`CronDeleteTool`、`CronListTool` 已从“纯内存任务”升级为“数据库持久化 + 启动恢复”：
 
 - 创建 cron 时，先写 `agent_cron_job`
-- 然后注册到当前进程内的 `ThreadPoolTaskScheduler`
+- 然后注册到 Quartz（`CronJobSchedulerService` -> `QuartzCronJob`）
 - 应用启动时会读取 `agent_cron_job` 中 `ACTIVE` 任务尝试恢复
+- 执行实例落库到 `agent_cron_job_execution`，并由 `CronExecutionResumeWorker` 轮询对齐执行状态
+- 审批等待超过超时时间会转为 `TIMED_OUT_APPROVAL`
+- 重启后若执行记录长期 `RUNNING` 但运行上下文丢失，会按 `nomoclaw.cron.running-stale-timeout-seconds` 收敛为 `FAILED`
 - 若数据库还未迁移出该表，恢复阶段会记录告警并跳过，不阻塞应用启动
 
 ## 16. 推荐阅读顺序
