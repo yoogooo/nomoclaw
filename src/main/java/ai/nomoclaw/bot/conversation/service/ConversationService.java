@@ -191,8 +191,16 @@ public class ConversationService {
     }
 
     public void markConversationRead(String conversationUid) {
-        store.findConversation(conversationUid)
+        AgentConversation conversation = store.findConversation(conversationUid)
                 .orElseThrow(() -> new IllegalArgumentException("conversation not found: " + conversationUid));
+        AgentMessage latestUserMessage = store.findLatestUserMessageByConversation(conversationUid).orElse(null);
+        if (latestUserMessage == null || latestUserMessage.updatedAt() == null) {
+            return;
+        }
+        Instant lastReadAt = conversation.lastReadAt();
+        if (lastReadAt != null && !latestUserMessage.updatedAt().isAfter(lastReadAt)) {
+            return;
+        }
         store.markConversationRead(conversationUid, Instant.now());
     }
 

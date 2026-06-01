@@ -2,7 +2,7 @@
 import { computed, nextTick, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { NButton, NDropdown, NInput, NModal, NSelect, type DropdownOption, type InputInst, type SelectOption } from "naive-ui";
-import { Clock3, MoreHorizontal, Pin, RefreshCw } from "lucide-vue-next";
+import { Clock3, LoaderCircle, MoreHorizontal, Pin, RefreshCw } from "lucide-vue-next";
 import { useRoute } from "vue-router";
 import { cronApi } from "@/api/cronApi";
 import { useAgentCatalogStore } from "@/stores/agentCatalog";
@@ -247,6 +247,12 @@ function isCronConversation(conversationUid: string) {
   return Boolean(cronTaskByConversationUid.value[String(conversationUid || "").trim()]);
 }
 
+function isConversationRunning(conversationUid: string) {
+  const normalizedConversationUid = String(conversationUid || "").trim();
+  const normalizedRunningUid = String(conversationStore.runningConversationUid || "").trim();
+  return Boolean(normalizedConversationUid && normalizedRunningUid && normalizedConversationUid === normalizedRunningUid);
+}
+
 </script>
 
 <template>
@@ -296,6 +302,14 @@ function isCronConversation(conversationUid: string) {
                 <span v-if="item.unread" class="conversation-unread-dot" :title="t('chat.sidebar.unreadHint')" aria-label="unread" />
                 <span v-if="item.pinned" class="conversation-pinned-icon" :title="t('chat.sidebar.pinned')">
                   <Pin :size="12" />
+                </span>
+                <span
+                  v-if="isConversationRunning(item.conversationUid)"
+                  class="conversation-running-icon"
+                  :title="t('cron.execution.statusRunning')"
+                  aria-label="running"
+                >
+                  <LoaderCircle :size="12" />
                 </span>
                 <span v-if="isCronConversation(item.conversationUid)" class="conversation-cron-icon" aria-hidden="true">
                   <Clock3 :size="12" />
@@ -542,6 +556,19 @@ function isCronConversation(conversationUid: string) {
   flex: none;
 }
 
+.conversation-running-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-success-500);
+  flex: none;
+}
+
+.conversation-running-icon :deep(svg) {
+  transform-origin: center;
+  animation: conversation-running-spin 0.9s linear infinite;
+}
+
 .conversation-row.active .conversation-title {
   color: var(--color-text-brand);
 }
@@ -681,6 +708,12 @@ function isCronConversation(conversationUid: string) {
 }
 
 @keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes conversation-running-spin {
   to {
     transform: rotate(360deg);
   }
