@@ -2,13 +2,7 @@ package ai.nomoclaw.bot.orchestrator.view;
 
 import ai.nomoclaw.bot.config.I18nConfig;
 import ai.nomoclaw.bot.domain.AgentMessage;
-import ai.nomoclaw.bot.model.AgentEvent;
-import ai.nomoclaw.bot.model.AgentEventType;
-import ai.nomoclaw.bot.model.ApprovalStatus;
-import ai.nomoclaw.bot.model.MessageStatus;
-import ai.nomoclaw.bot.model.PlanStep;
-import ai.nomoclaw.bot.model.RiskLevel;
-import ai.nomoclaw.bot.model.StepStatus;
+import ai.nomoclaw.bot.model.*;
 import ai.nomoclaw.bot.util.LocalizedMessages;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -22,9 +16,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class RunViewAssemblerTests {
 
@@ -194,7 +186,7 @@ class RunViewAssemblerTests {
                 JsonNodeFactory.instance.objectNode().put("query", "abc"),
                 RiskLevel.LOW,
                 "",
-                StepStatus.SUCCEEDED,
+                StepStatus.COMPLETED,
                 0,
                 null,
                 null,
@@ -209,7 +201,7 @@ class RunViewAssemblerTests {
                 JsonNodeFactory.instance.objectNode().put("action", "navigate"),
                 RiskLevel.LOW,
                 "",
-                StepStatus.SUCCEEDED,
+                StepStatus.COMPLETED,
                 0,
                 null,
                 null,
@@ -224,7 +216,7 @@ class RunViewAssemblerTests {
                 JsonNodeFactory.instance.objectNode().put("action", "extract_text"),
                 RiskLevel.LOW,
                 "",
-                StepStatus.SUCCEEDED,
+                StepStatus.COMPLETED,
                 0,
                 null,
                 null,
