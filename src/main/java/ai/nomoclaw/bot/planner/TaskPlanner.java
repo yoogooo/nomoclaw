@@ -1,5 +1,7 @@
 package ai.nomoclaw.bot.planner;
 
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import ai.nomoclaw.bot.llm.config.LlmProperties;
 import ai.nomoclaw.bot.llm.debug.LlmDebugLogger;
 import ai.nomoclaw.bot.prompt.PromptLoader;
@@ -18,7 +20,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
@@ -49,7 +50,7 @@ public class TaskPlanner implements Planner {
         PreparedRequest preparedRequest = buildRequest(memory, toolSpecifications, toolChoice, promptContext);
         ChatRequest request = preparedRequest.request();
         RuntimeChatModelResolver.ResolvedModel resolvedModel = runtimeChatModelResolver.resolve(promptContext);
-        String requestId = UUID.randomUUID().toString();
+        String requestId = UuidUtil.newUuid();
         long startNanos = System.nanoTime();
         llmDebugLogger.logRequest(
                 requestId,
@@ -85,7 +86,7 @@ public class TaskPlanner implements Planner {
         PreparedRequest preparedRequest = buildRequest(memory, toolSpecifications, toolChoice, promptContext);
         ChatRequest request = preparedRequest.request();
         RuntimeChatModelResolver.ResolvedModel resolvedModel = runtimeChatModelResolver.resolve(promptContext);
-        String requestId = UUID.randomUUID().toString();
+        String requestId = UuidUtil.newUuid();
         long startNanos = System.nanoTime();
         llmDebugLogger.logRequest(
                 requestId,

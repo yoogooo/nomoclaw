@@ -1,5 +1,7 @@
 package ai.nomoclaw.bot.policy.tool.permission;
 
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import ai.nomoclaw.bot.util.JsonUtil;
 import ai.nomoclaw.bot.workspace.NomoClawPaths;
 import lombok.extern.slf4j.Slf4j;
@@ -91,7 +93,7 @@ public class PermissionSettingsStore {
         List<PermissionRule> rules = new ArrayList<>();
         for (String path : stringList(policies.path("allowWritePaths"))) {
             rules.add(new PermissionRule(
-                    "legacy-allow-" + UUID.randomUUID(),
+                    "legacy-allow-" + UuidUtil.newUuid(),
                     source,
                     PermissionEffect.ALLOW,
                     "file_*",
@@ -105,7 +107,7 @@ public class PermissionSettingsStore {
         }
         for (String path : stringList(policies.path("denyWritePaths"))) {
             rules.add(new PermissionRule(
-                    "legacy-deny-" + UUID.randomUUID(),
+                    "legacy-deny-" + UuidUtil.newUuid(),
                     source,
                     PermissionEffect.DENY,
                     "file_*",
@@ -119,7 +121,7 @@ public class PermissionSettingsStore {
         }
         for (String pattern : stringList(policies.path("highRiskCommandPatterns"))) {
             rules.add(new PermissionRule(
-                    "legacy-cmd-" + UUID.randomUUID(),
+                    "legacy-cmd-" + UuidUtil.newUuid(),
                     source,
                     PermissionEffect.ASK,
                     "CommandTool",
@@ -133,7 +135,7 @@ public class PermissionSettingsStore {
         }
         for (String action : stringList(policies.path("highRiskFileActions"))) {
             rules.add(new PermissionRule(
-                    "legacy-file-action-" + UUID.randomUUID(),
+                    "legacy-file-action-" + UuidUtil.newUuid(),
                     source,
                     PermissionEffect.ASK,
                     "file_*",
@@ -180,7 +182,7 @@ public class PermissionSettingsStore {
             }
             String ruleId = item.path("ruleId").asString("").trim();
             if (ruleId.isBlank()) {
-                ruleId = source.name().toLowerCase(Locale.ROOT) + "-" + UUID.randomUUID();
+                ruleId = source.name().toLowerCase(Locale.ROOT) + "-" + UuidUtil.newUuid();
             }
             Instant expiresAt = null;
             String expiresAtRaw = item.path("expiresAt").asString("").trim();

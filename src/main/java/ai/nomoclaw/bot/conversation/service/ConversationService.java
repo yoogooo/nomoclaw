@@ -1,5 +1,7 @@
 package ai.nomoclaw.bot.conversation.service;
 
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import ai.nomoclaw.bot.config.AgentProperties;
 import ai.nomoclaw.bot.conversation.model.ConversationAttachmentDto;
 import ai.nomoclaw.bot.conversation.model.ConversationMessageDto;
@@ -32,7 +34,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 import java.util.function.Consumer;
 
 /**
@@ -71,7 +72,7 @@ public class ConversationService {
     }
 
     public String createConversation(String agentGroupUid, String agentUid, String channel) {
-        String conversationUid = UUID.randomUUID().toString();
+        String conversationUid = UuidUtil.newUuid();
         String normalizedGroupUid = normalizeAgentGroupUid(agentGroupUid);
         String normalizedAgentUid = normalizeOptionalAgentUid(agentUid);
         String normalizedChannel = channel == null || channel.isBlank() ? "web" : channel.trim();
@@ -209,7 +210,7 @@ public class ConversationService {
         AgentConversation conversation = store.findConversation(conversationUid)
                 .orElseGet(() -> store.createConversation(conversationUid, "", DEFAULT_AGENT_UID, normalizedChannel));
         RuntimeModelSelection runtimeModel = executionScopeResolver.resolveForMessageSubmission(conversation, modelProvider, modelName);
-        String messageUid = UUID.randomUUID().toString();
+        String messageUid = UuidUtil.newUuid();
         int maxRounds = properties.getLoop().getMaxRounds();
         store.createUserMessage(
                 messageUid,

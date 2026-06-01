@@ -1,5 +1,7 @@
 package ai.nomoclaw.bot.policy.tool;
 
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import ai.nomoclaw.bot.policy.tool.permission.PermissionDecision;
 import ai.nomoclaw.bot.policy.tool.permission.PermissionEffect;
 import ai.nomoclaw.bot.policy.tool.permission.PermissionEngine;
@@ -55,7 +57,7 @@ public class ToolPermissionPolicyService {
                                   String pathPattern,
                                   String commandPattern) {
         return new PermissionRule(
-                java.util.UUID.randomUUID().toString(),
+                UuidUtil.newUuid(),
                 source,
                 effect,
                 tool == null || tool.isBlank() ? "*" : tool,

@@ -1,5 +1,7 @@
 package ai.nomoclaw.bot.orchestrator.execution;
 
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import ai.nomoclaw.bot.config.AgentProperties;
 import ai.nomoclaw.bot.domain.AgentConversation;
 import ai.nomoclaw.bot.domain.AgentMessage;
@@ -32,7 +34,6 @@ import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
 import java.time.Instant;
-import java.util.UUID;
 import java.util.function.Supplier;
 
 /**
@@ -311,7 +312,7 @@ public class StepExecutionService {
     private void publishEvent(AgentEventType type, String conversationUid, String messageUid, String stepUid, ObjectNode payload) {
         // Event persistence and publish stay coupled to preserve replayability and live SSE consistency.
         AgentEvent event = new AgentEvent(
-                UUID.randomUUID().toString(),
+                UuidUtil.newUuid(),
                 type,
                 conversationUid,
                 messageUid,

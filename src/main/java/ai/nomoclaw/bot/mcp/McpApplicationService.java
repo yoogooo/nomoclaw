@@ -1,5 +1,7 @@
 package ai.nomoclaw.bot.mcp;
 
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import ai.nomoclaw.bot.model.ToolRequest;
 import ai.nomoclaw.bot.model.ToolResult;
 import ai.nomoclaw.bot.orchestrator.SystemErrorLogService;
@@ -37,7 +39,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -87,7 +88,7 @@ public class McpApplicationService {
     public McpServerDto createServer(SaveMcpServerParam command) {
         LocalDateTime now = LocalDateTime.now();
         McpServerDefinitionEntity server = new McpServerDefinitionEntity();
-        server.setServerUid(UUID.randomUUID().toString());
+        server.setServerUid(UuidUtil.newUuid());
         applyParam(server, command, now, true);
         ensureServerNameAvailable(server.getServerName(), null);
         server.setCreatedTime(now);
@@ -337,7 +338,7 @@ public class McpApplicationService {
         String nextStatus = enabled ? "ACTIVE" : "DISABLED";
         if (relation == null) {
             relation = new AgentMcpToolRelationEntity();
-            relation.setRelationUid(UUID.randomUUID().toString());
+            relation.setRelationUid(UuidUtil.newUuid());
             relation.setAgentUid(normalizedAgentUid);
             relation.setToolKey(normalizedToolKey);
             relation.setSortIndex(500);
@@ -448,7 +449,7 @@ public class McpApplicationService {
         String toolKey = toolKeyGenerator.generate(server.getServerName(), originalName);
         if (snapshot == null) {
             snapshot = new McpToolSnapshotEntity();
-            snapshot.setSnapshotUid(UUID.randomUUID().toString());
+            snapshot.setSnapshotUid(UuidUtil.newUuid());
             snapshot.setServerUid(server.getServerUid());
             snapshot.setOriginalToolName(originalName);
             snapshot.setCreatedTime(now);
@@ -474,7 +475,7 @@ public class McpApplicationService {
         String toolKey = toolKeyGenerator.generate(server.getServerName(), originalName);
         if (snapshot == null) {
             snapshot = new McpToolSnapshotEntity();
-            snapshot.setSnapshotUid(UUID.randomUUID().toString());
+            snapshot.setSnapshotUid(UuidUtil.newUuid());
             snapshot.setServerUid(server.getServerUid());
             snapshot.setOriginalToolName(originalName);
             snapshot.setCreatedTime(now);

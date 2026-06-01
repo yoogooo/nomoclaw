@@ -1,5 +1,7 @@
 package ai.nomoclaw.bot.tip;
 
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import ai.nomoclaw.bot.tip.model.CreateAgentTipParam;
 import ai.nomoclaw.bot.tip.model.UpdateAgentTipParam;
 import ai.nomoclaw.bot.tip.model.AgentTipDto;
@@ -28,7 +30,6 @@ import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.Comparator;
 import java.util.List;
-import java.util.UUID;
 
 @Service
 public class AgentTipService {
@@ -117,7 +118,7 @@ public class AgentTipService {
         }
 
         AgentTipEntity tip = new AgentTipEntity();
-        tip.setTipUid(UUID.randomUUID().toString());
+        tip.setTipUid(UuidUtil.newUuid());
         tip.setAgentUid(normalizedAgentUid);
         tip.setTitle(title);
         tip.setSummary(summary);

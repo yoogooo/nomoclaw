@@ -1,12 +1,13 @@
 package ai.nomoclaw.bot.channel.repository;
 
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import ai.nomoclaw.bot.channel.model.InboundEnvelope;
 import ai.nomoclaw.bot.channel.store.entity.AgentChannelInboundLogEntity;
 import ai.nomoclaw.bot.channel.store.repository.AgentChannelInboundLogRepository;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Component
 public class ChannelInboundDedupRepository {
@@ -33,7 +34,7 @@ public class ChannelInboundDedupRepository {
             return;
         }
         AgentChannelInboundLogEntity entity = new AgentChannelInboundLogEntity();
-        entity.setLogUid(UUID.randomUUID().toString());
+        entity.setLogUid(UuidUtil.newUuid());
         entity.setChannel(envelope.channel().value());
         entity.setTenantId(envelope.tenantId());
         entity.setSessionKey(envelope.sessionKey());

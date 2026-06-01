@@ -1,5 +1,7 @@
 package ai.nomoclaw.bot.conversation.support;
 
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import ai.nomoclaw.bot.conversation.model.ConversationAttachmentDto;
 import ai.nomoclaw.bot.modelconfig.model.ModelConfigDto;
 import ai.nomoclaw.bot.modelconfig.ModelCatalogService;
@@ -83,7 +85,7 @@ public class ConversationAttachmentService {
         for (int i = 0; i < normalizedFiles.size(); i++) {
             MultipartFile file = normalizedFiles.get(i);
             PendingAttachment pending = incoming.get(i);
-            String uploadUid = UUID.randomUUID().toString();
+            String uploadUid = UuidUtil.newUuid();
             String extension = extensionOf(file.getOriginalFilename());
             Path target = uploadRoot.resolve(uploadUid + (extension.isBlank() ? "" : "." + extension));
             try {
@@ -235,7 +237,7 @@ public class ConversationAttachmentService {
             }
 
             AgentMessageAttachmentEntity entity = new AgentMessageAttachmentEntity();
-            entity.setUploadUid(UUID.randomUUID().toString());
+            entity.setUploadUid(UuidUtil.newUuid());
             entity.setConversationUid(conversationUid);
             entity.setMessageUid(messageUid);
             entity.setOriginalName(name.isBlank() ? "image" : name);

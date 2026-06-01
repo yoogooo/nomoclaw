@@ -1,5 +1,7 @@
 package ai.nomoclaw.bot.orchestrator;
 
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import ai.nomoclaw.bot.channel.model.ChannelMessageCompletedEvent;
 import ai.nomoclaw.bot.config.AgentProperties;
 import ai.nomoclaw.bot.conversation.model.ApprovalDecisionDto;
@@ -59,7 +61,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -635,7 +636,7 @@ public class AgentApplicationService {
         JsonNode toolArgs = parseToolArgs(toolCall);
         RiskLevel riskLevel = riskPolicy.evaluateRisk(toolCall.name(), toolArgs);
         steps.add(new PlanStep(
-                UUID.randomUUID().toString(),
+                UuidUtil.newUuid(),
                 roundIndex,
                 stepIndex,
                 feedbackBuilder.buildStepTitle(toolCall.name(), toolArgs),
@@ -668,7 +669,7 @@ public class AgentApplicationService {
                 node.put("raw", rawArgs);
             }
         }
-        node.put("_toolCallId", toolCall.id() == null ? UUID.randomUUID().toString() : toolCall.id());
+        node.put("_toolCallId", toolCall.id() == null ? UuidUtil.newUuid() : toolCall.id());
         return node;
     }
 
@@ -833,7 +834,7 @@ public class AgentApplicationService {
 
     private void publishEvent(AgentEventType type, String conversationUid, String messageUid, String stepUid, ObjectNode payload) {
         AgentEvent event = new AgentEvent(
-                UUID.randomUUID().toString(),
+                UuidUtil.newUuid(),
                 type,
                 conversationUid,
                 messageUid,
@@ -847,7 +848,7 @@ public class AgentApplicationService {
 
     private void publishTransientEvent(AgentEventType type, String conversationUid, String messageUid, String stepUid, ObjectNode payload) {
         AgentEvent event = new AgentEvent(
-                UUID.randomUUID().toString(),
+                UuidUtil.newUuid(),
                 type,
                 conversationUid,
                 messageUid,
@@ -862,7 +863,7 @@ public class AgentApplicationService {
         if (content == null || content.isBlank()) {
             return;
         }
-        store.createAssistantMessage(UUID.randomUUID().toString(), parentMessage.conversationUid(), parentMessage.messageUid(), content);
+        store.createAssistantMessage(UuidUtil.newUuid(), parentMessage.conversationUid(), parentMessage.messageUid(), content);
     }
 
     private void openPathInHostOs(Path file) throws IOException {

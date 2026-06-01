@@ -1,5 +1,7 @@
 package ai.nomoclaw.bot.channel.platform.sender;
 
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import ai.nomoclaw.bot.channel.config.ChannelBotCredentialResolver;
 import ai.nomoclaw.bot.channel.model.ChannelAddress;
 import ai.nomoclaw.bot.channel.model.ChannelType;
@@ -19,7 +21,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @Component
 @ConditionalOnProperty(prefix = "agent.channels.weixin", name = "enabled", havingValue = "true")
@@ -61,7 +62,7 @@ public class WeixinChannelMessageSender implements ChannelMessageSender {
             Map<String, Object> msg = Map.of(
                     "from_user_id", "",
                     "to_user_id", target.toUserId(),
-                    "client_id", UUID.randomUUID().toString(),
+                    "client_id", UuidUtil.newUuid(),
                     "message_type", 2,
                     "message_state", 2,
                     "context_token", target.contextToken(),

@@ -1,5 +1,7 @@
 package ai.nomoclaw.bot.policy.tool.permission;
 
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import ai.nomoclaw.bot.policy.tool.ToolPolicyContext;
 import ai.nomoclaw.bot.tool.PathResolver;
 import org.springframework.stereotype.Component;
@@ -142,7 +144,7 @@ public class CommandRuleResolver {
         String normalized = normalize(command);
         if (containsThirdPartyBrowserCliFallback(normalized)) {
             return List.of(new PermissionRule(
-                    "command-deny-third-party-browser-cli-" + UUID.randomUUID(),
+                    "command-deny-third-party-browser-cli-" + UuidUtil.newUuid(),
                     PermissionSource.COMMAND,
                     PermissionEffect.DENY,
                     "CommandTool",
@@ -157,7 +159,7 @@ public class CommandRuleResolver {
 
         if (matchesHighRiskPattern(command)) {
             return List.of(new PermissionRule(
-                    "command-risk-" + UUID.randomUUID(),
+                    "command-risk-" + UuidUtil.newUuid(),
                     PermissionSource.COMMAND,
                     PermissionEffect.ASK,
                     "CommandTool",

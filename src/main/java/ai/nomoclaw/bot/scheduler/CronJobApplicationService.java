@@ -1,5 +1,7 @@
 package ai.nomoclaw.bot.scheduler;
 
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import ai.nomoclaw.bot.scheduler.model.CreateCronJobParam;
 import ai.nomoclaw.bot.scheduler.model.UpdateCronJobParam;
 import ai.nomoclaw.bot.common.page.PageRequest;
@@ -126,7 +128,7 @@ public class CronJobApplicationService {
         LocalDateTime now = LocalDateTime.now();
 
         AgentCronJobEntity job = new AgentCronJobEntity();
-        job.setJobUid(UUID.randomUUID().toString());
+        job.setJobUid(UuidUtil.newUuid());
         job.setAgentUid(agent.getAgentUid());
         job.setConversationUid(null);
         job.setMessageUid(null);

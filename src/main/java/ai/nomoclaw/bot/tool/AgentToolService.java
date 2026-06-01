@@ -1,5 +1,7 @@
 package ai.nomoclaw.bot.tool;
 
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import ai.nomoclaw.bot.store.entity.AgentToolRelationEntity;
 import ai.nomoclaw.bot.store.entity.ToolDefinitionEntity;
 import ai.nomoclaw.bot.store.repository.AgentToolRelationRepository;
@@ -11,7 +13,6 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -71,7 +72,7 @@ public class AgentToolService {
         String nextStatus = enabled ? "ACTIVE" : "DISABLED";
         if (relation == null) {
             relation = new AgentToolRelationEntity();
-            relation.setRelationUid(UUID.randomUUID().toString());
+            relation.setRelationUid(UuidUtil.newUuid());
             relation.setAgentUid(normalizedAgentUid);
             relation.setToolKey(normalizedToolKey);
             relation.setStatus(nextStatus);
@@ -99,7 +100,7 @@ public class AgentToolService {
         List<ToolDefinitionEntity> tools = toolDefinitionRepository.listAllActive();
         for (ToolDefinitionEntity tool : tools) {
             AgentToolRelationEntity relation = new AgentToolRelationEntity();
-            relation.setRelationUid(UUID.randomUUID().toString());
+            relation.setRelationUid(UuidUtil.newUuid());
             relation.setAgentUid(agentUid);
             relation.setToolKey(tool.getToolKey());
             relation.setStatus("ACTIVE");

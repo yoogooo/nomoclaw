@@ -1,5 +1,7 @@
 package ai.nomoclaw.bot.tool;
 
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import ai.nomoclaw.bot.model.ToolRequest;
 import ai.nomoclaw.bot.model.ToolResult;
 import ai.nomoclaw.bot.scheduler.CronJobSchedulerService;
@@ -14,7 +16,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
 import java.util.TimeZone;
-import java.util.UUID;
 
 @Component
 public class CronCreateTool implements Tool {
@@ -50,7 +51,7 @@ public class CronCreateTool implements Tool {
 
             String normalizedCron = normalizeCron(expression);
             ZoneId zoneId = ZoneId.of(timezone);
-            String jobId = UUID.randomUUID().toString();
+            String jobId = UuidUtil.newUuid();
             AgentCronJobEntity job = new AgentCronJobEntity();
             job.setJobUid(jobId);
             job.setAgentUid(request.agentUid() == null ? "" : request.agentUid());

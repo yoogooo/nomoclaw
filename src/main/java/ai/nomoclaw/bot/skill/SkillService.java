@@ -1,5 +1,7 @@
 package ai.nomoclaw.bot.skill;
 
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import ai.nomoclaw.bot.skill.model.UpdateSkillBindingsParam;
 import ai.nomoclaw.bot.skill.model.GlobalSkillDto;
 import ai.nomoclaw.bot.skill.model.SkillBindingAgentDto;
@@ -29,7 +31,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -107,7 +108,7 @@ public class SkillService {
             AgentSkillRelationEntity relation = existingByAgentUid.get(agentUid);
             if (relation == null) {
                 relation = new AgentSkillRelationEntity();
-                relation.setRelationUid(UUID.randomUUID().toString());
+                relation.setRelationUid(UuidUtil.newUuid());
                 relation.setAgentUid(agentUid);
                 relation.setSkillKey(definition.getSkillKey());
                 relation.setSortIndex(0);

@@ -1,5 +1,7 @@
 package ai.nomoclaw.bot.agentprofile;
 
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import ai.nomoclaw.bot.agentprofile.model.CreateAgentParam;
 import ai.nomoclaw.bot.agentprofile.model.UpdateAgentBasicInfoParam;
 import ai.nomoclaw.bot.agentprofile.model.AgentCatalogAgentDto;
@@ -15,8 +17,6 @@ import ai.nomoclaw.bot.orchestrator.execution.MessageExecutionOrchestrator;
 import ai.nomoclaw.bot.store.AgentStore;
 import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
 import ai.nomoclaw.bot.store.entity.AgentGroupMemberEntity;
-import ai.nomoclaw.bot.store.entity.AgentMcpToolRelationEntity;
-import ai.nomoclaw.bot.store.entity.AgentSkillRelationEntity;
 import ai.nomoclaw.bot.store.repository.AgentDefinitionRepository;
 import ai.nomoclaw.bot.store.repository.AgentGroupMemberRepository;
 import ai.nomoclaw.bot.store.repository.AgentMcpToolRelationRepository;
@@ -46,7 +46,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 
 /**
  * Agent 基础档案与配置管理应用服务。
@@ -173,7 +172,7 @@ public class AgentProfileService {
         }
 
         LocalDateTime now = LocalDateTime.now();
-        String agentUid = "agent_" + UUID.randomUUID().toString().replace("-", "");
+        String agentUid = "agent_" + UuidUtil.newUuid().replace("-", "");
         AgentDefinitionEntity agent = new AgentDefinitionEntity();
         agent.setAgentUid(agentUid);
         agent.setAgentName(agentName);

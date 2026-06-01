@@ -1,5 +1,7 @@
 package ai.nomoclaw.bot.orchestrator;
 
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import ai.nomoclaw.bot.llm.debug.LlmDebugLogger;
 import ai.nomoclaw.bot.planner.RuntimeChatModelResolver;
 import ai.nomoclaw.bot.prompt.PromptLoader;
@@ -21,7 +23,6 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-import java.util.UUID;
 
 @Service
 @Slf4j
@@ -92,7 +93,7 @@ public class TipSummaryChatService {
                         UserMessage.from(prompt)
                 ))
                 .build();
-        String requestId = UUID.randomUUID().toString();
+        String requestId = UuidUtil.newUuid();
         long startNanos = System.nanoTime();
         llmDebugLogger.logRequest(
                 requestId,

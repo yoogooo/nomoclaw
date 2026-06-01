@@ -1,5 +1,7 @@
 package ai.nomoclaw.bot.scheduler;
 
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import ai.nomoclaw.bot.conversation.model.ConversationMessageDto;
 import ai.nomoclaw.bot.domain.AgentMessage;
@@ -28,7 +30,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.UUID;
 
 @Service
 @Slf4j
@@ -87,7 +88,7 @@ public class CronJobExecutionService {
         if (job == null) {
             throw new IllegalArgumentException("cron job not found: " + jobUid);
         }
-        String executionUid = UUID.randomUUID().toString();
+        String executionUid = UuidUtil.newUuid();
         String conversationUid = createCronConversation(job);
         RuntimeModelSelection runtimeModel = resolveRuntimeModel(job);
         String messageUid = submitCronMessage(conversationUid, job.getTaskContent(), runtimeModel);
@@ -244,7 +245,7 @@ public class CronJobExecutionService {
                     blankToNull(running.getMessageUid())
             );
         }
-        String executionUid = UUID.randomUUID().toString();
+        String executionUid = UuidUtil.newUuid();
         createRunningExecution(job, executionUid, null, null, now);
         return new CurrentExecutionContext(executionUid, null, null);
     }

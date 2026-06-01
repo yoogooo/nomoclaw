@@ -1,5 +1,7 @@
 package ai.nomoclaw.bot.skill;
 
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import ai.nomoclaw.bot.skill.model.CreateSkillParam;
 import ai.nomoclaw.bot.skill.model.ImportSkillFromUrlParam;
 import ai.nomoclaw.bot.skill.model.AgentSkillDto;
@@ -228,7 +230,7 @@ public class SkillImportService {
         AgentSkillRelationEntity relation = agentSkillRelationRepository.findByAgentUidAndSkillKey(agentUid, skillKey);
         if (relation == null) {
             relation = new AgentSkillRelationEntity();
-            relation.setRelationUid(UUID.randomUUID().toString());
+            relation.setRelationUid(UuidUtil.newUuid());
             relation.setAgentUid(agentUid);
             relation.setSkillKey(skillKey);
             relation.setStatus("ACTIVE");

@@ -1,5 +1,7 @@
 package ai.nomoclaw.bot.skill;
 
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import ai.nomoclaw.bot.skill.model.AgentSkillDto;
 import ai.nomoclaw.bot.store.entity.AgentSkillRelationEntity;
 import ai.nomoclaw.bot.store.entity.SkillDefinitionEntity;
@@ -11,7 +13,6 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -85,7 +86,7 @@ public class AgentSkillService {
         String nextStatus = enabled ? "ACTIVE" : "DISABLED";
         if (relation == null) {
             relation = new AgentSkillRelationEntity();
-            relation.setRelationUid(UUID.randomUUID().toString());
+            relation.setRelationUid(UuidUtil.newUuid());
             relation.setAgentUid(normalizedAgentUid);
             relation.setSkillKey(normalizedSkillKey);
             relation.setStatus(nextStatus);

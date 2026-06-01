@@ -1,5 +1,7 @@
 package ai.nomoclaw.bot.orchestrator;
 
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import ai.nomoclaw.bot.permission.model.UpdatePermissionRulesParam;
 import ai.nomoclaw.bot.permission.model.PermissionRuleDto;
 import ai.nomoclaw.bot.permission.model.PermissionRulesDto;
@@ -124,7 +126,7 @@ public class PermissionAppService {
             }
         }
         return new PermissionRule(
-                UUID.randomUUID().toString(),
+                UuidUtil.newUuid(),
                 source,
                 effect,
                 normalizedTool,
@@ -360,7 +362,9 @@ public class PermissionAppService {
                 }
             }
             out.add(new PermissionRule(
-                    payload.ruleId() == null || payload.ruleId().isBlank() ? UUID.randomUUID().toString() : payload.ruleId().trim(),
+                    payload.ruleId() == null || payload.ruleId().isBlank()
+                            ? UuidUtil.newUuid()
+                            : UuidUtil.normalize(payload.ruleId().trim()),
                     source,
                     effect,
                     payload.tool() == null || payload.tool().isBlank() ? "*" : payload.tool().trim(),

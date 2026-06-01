@@ -1,5 +1,7 @@
 package ai.nomoclaw.bot.tool;
 
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import ai.nomoclaw.bot.model.ToolRequest;
 import ai.nomoclaw.bot.model.ToolResult;
 import org.springframework.stereotype.Component;
@@ -12,7 +14,6 @@ import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 @Component
@@ -30,7 +31,7 @@ public class DesktopScreenshotTool implements Tool {
             String output = request.args().path("path").asString("");
             boolean captureWindow = request.args().path("captureWindow").asBoolean(false);
             Path outputPath = output == null || output.isBlank()
-                    ? request.tmpDirectory().resolve(UUID.randomUUID() + ".png").toAbsolutePath().normalize()
+                    ? request.tmpDirectory().resolve(UuidUtil.newUuid() + ".png").toAbsolutePath().normalize()
                     : PathResolver.resolveInAgentWorkspace(output, request);
             Files.createDirectories(outputPath.getParent());
 

@@ -1,5 +1,7 @@
 package ai.nomoclaw.bot.tool;
 
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import ai.nomoclaw.bot.config.AgentProperties;
 import ai.nomoclaw.bot.model.ToolRequest;
 import ai.nomoclaw.bot.model.ToolResult;
@@ -224,7 +226,7 @@ public class BrowserTool implements Tool {
             case "screenshot" -> {
                 String output = request.args().path("output").asString("");
                 Path outputPath = output == null || output.isBlank()
-                        ? request.tmpDirectory().resolve(UUID.randomUUID() + ".png").toAbsolutePath().normalize()
+                        ? request.tmpDirectory().resolve(UuidUtil.newUuid() + ".png").toAbsolutePath().normalize()
                         : PathResolver.resolveInAgentWorkspace(output, request);
                 java.nio.file.Files.createDirectories(outputPath.getParent());
                 page.screenshot(new Page.ScreenshotOptions().setPath(outputPath));
@@ -1575,7 +1577,7 @@ public class BrowserTool implements Tool {
 
         private synchronized void beginAttempt() {
             attemptIndex += 1;
-            attemptId = UUID.randomUUID().toString();
+            attemptId = UuidUtil.newUuid();
             maxOverallPercent = -1;
             currentArtifact = "";
             segmentPercent = -1;
@@ -1911,7 +1913,7 @@ public class BrowserTool implements Tool {
 
     private Path resolveDownloadPath(ToolRequest request, Download download, String output) {
         String fileName = download.suggestedFilename() == null || download.suggestedFilename().isBlank()
-                ? UUID.randomUUID() + ".bin"
+                ? UuidUtil.newUuid() + ".bin"
                 : download.suggestedFilename();
         if (output == null || output.isBlank()) {
             return request.tmpDirectory().resolve(fileName).toAbsolutePath().normalize();

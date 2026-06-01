@@ -1,5 +1,7 @@
 package ai.nomoclaw.bot.scheduler;
 
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import ai.nomoclaw.bot.channel.model.ChannelType;
 import ai.nomoclaw.bot.store.entity.AgentCronSubscriptionEntity;
 import ai.nomoclaw.bot.store.repository.AgentCronSubscriptionRepository;
@@ -10,7 +12,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @Component
 public class MybatisCronSubscriptionRepository implements CronSubscriptionRepository {
@@ -47,7 +48,7 @@ public class MybatisCronSubscriptionRepository implements CronSubscriptionReposi
         List<AgentCronSubscriptionEntity> entities = new ArrayList<>(normalized.size());
         for (CronSubscriptionUpsert item : normalized) {
             AgentCronSubscriptionEntity entity = new AgentCronSubscriptionEntity();
-            entity.setSubscriptionUid(UUID.randomUUID().toString());
+            entity.setSubscriptionUid(UuidUtil.newUuid());
             entity.setJobUid(normalizedJobUid);
             entity.setChannel(ChannelType.from(item.channel()).value());
             entity.setTarget(item.target().trim());

@@ -1,5 +1,7 @@
 package ai.nomoclaw.bot.orchestrator;
 
+import ai.nomoclaw.bot.util.UuidUtil;
+
 import ai.nomoclaw.bot.common.page.PageRequest;
 import ai.nomoclaw.bot.common.page.PageResult;
 import ai.nomoclaw.bot.common.page.PageResultMapper;
@@ -17,7 +19,6 @@ import java.io.StringWriter;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
-import java.util.UUID;
 
 @Service
 @Slf4j
@@ -78,7 +79,7 @@ public class SystemErrorLogService {
     protected void recordInternal(String level, String source, String code, String title, String message, String detail) {
         LocalDateTime now = LocalDateTime.now();
         SystemErrorLogEntity entity = new SystemErrorLogEntity();
-        entity.setLogUid(UUID.randomUUID().toString());
+        entity.setLogUid(UuidUtil.newUuid());
         entity.setLevel(normalizeLevel(level));
         entity.setSource(truncate(source, 64));
         entity.setCode(truncate(code, 128));
