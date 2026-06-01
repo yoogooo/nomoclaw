@@ -4,9 +4,13 @@ import ai.nomoclaw.bot.prompt.PromptLoader;
 import ai.nomoclaw.bot.util.JsonUtil;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.Content;
+import dev.langchain4j.data.message.ImageContent;
 import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.TextContent;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.data.image.Image;
 import dev.langchain4j.model.chat.request.ToolChoice;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.output.TokenUsage;
@@ -144,7 +148,10 @@ public class LlmDebugJsonlLogger implements LlmDebugLogger {
 
     private String extractMessageText(ChatMessage message) {
         if (message instanceof UserMessage userMessage) {
-            return normalizeText(userMessage.singleText());
+            if (userMessage.hasSingleText()) {
+                return normalizeText(userMessage.singleText());
+            }
+            return normalizeText(extractUserContents(userMessage.contents()));
         }
         if (message instanceof SystemMessage systemMessage) {
             return normalizeText(systemMessage.text());
@@ -156,6 +163,42 @@ public class LlmDebugJsonlLogger implements LlmDebugLogger {
             return normalizeText(toolResultMessage.text());
         }
         return normalizeText(message.toString());
+    }
+
+    private String extractUserContents(List<Content> contents) {
+        if (contents == null || contents.isEmpty()) {
+            return "";
+        }
+        List<String> items = new ArrayList<>(contents.size());
+        for (Content content : contents) {
+            if (content instanceof TextContent textContent) {
+                String text = normalizeText(textContent.text());
+                if (!text.isBlank()) {
+                    items.add(text);
+                }
+                continue;
+            }
+            if (content instanceof ImageContent imageContent) {
+                items.add(renderImageContent(imageContent));
+                continue;
+            }
+            items.add(normalizeText(content.toString()));
+        }
+        return String.join("\n", items);
+    }
+
+    private String renderImageContent(ImageContent imageContent) {
+        Image image = imageContent == null ? null : imageContent.image();
+        if (image == null) {
+            return "[image]";
+        }
+        if (image.url() != null) {
+            return "[image] " + normalizeText(image.url().toString());
+        }
+        if (!normalizeText(image.base64Data()).isBlank()) {
+            return "[image] <base64>";
+        }
+        return "[image]";
     }
 
     private List<Map<String, String>> toToolCallPayload(List<ToolExecutionRequest> toolExecutionRequests) {
