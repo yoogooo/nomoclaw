@@ -23,7 +23,7 @@ public class AgentEventRepository extends CrudRepository<AgentEventMapper, Agent
     public List<AgentEventEntity> listByMessageUid(String messageUid) {
         return lambdaQuery()
                 .eq(AgentEventEntity::getMessageUid, messageUid)
-                .orderByAsc(AgentEventEntity::getCreatedTime)
+                .orderByAsc(AgentEventEntity::getId)
                 .list();
     }
 
