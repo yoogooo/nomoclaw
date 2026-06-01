@@ -37,7 +37,7 @@ public class MemorySearchTool implements Tool {
 
         List<AgentMessageEntity> matched = messageRepository.lambdaQuery()
                 .like(AgentMessageEntity::getContent, query)
-                .orderByDesc(AgentMessageEntity::getCreatedTime)
+                .orderByDesc(AgentMessageEntity::getId)
                 .last("LIMIT " + maxResults)
                 .list();
 

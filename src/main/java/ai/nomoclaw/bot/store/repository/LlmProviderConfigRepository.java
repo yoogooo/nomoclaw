@@ -13,7 +13,7 @@ public class LlmProviderConfigRepository extends CrudRepository<LlmProviderConfi
 
     public List<LlmProviderConfigEntity> listAll() {
         return lambdaQuery()
-                .orderByAsc(LlmProviderConfigEntity::getCreatedTime, LlmProviderConfigEntity::getProviderName)
+                .orderByAsc(LlmProviderConfigEntity::getId, LlmProviderConfigEntity::getProviderName)
                 .list();
     }
 

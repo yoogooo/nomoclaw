@@ -27,13 +27,13 @@ public class McpServerDefinitionRepository extends CrudRepository<McpServerDefin
     public List<McpServerDefinitionEntity> listActive() {
         return lambdaQuery()
                 .eq(McpServerDefinitionEntity::getStatus, "ACTIVE")
-                .orderByAsc(McpServerDefinitionEntity::getCreatedTime)
+                .orderByAsc(McpServerDefinitionEntity::getId)
                 .list();
     }
 
     public List<McpServerDefinitionEntity> listAll() {
         return lambdaQuery()
-                .orderByAsc(McpServerDefinitionEntity::getCreatedTime)
+                .orderByAsc(McpServerDefinitionEntity::getId)
                 .list();
     }
 }

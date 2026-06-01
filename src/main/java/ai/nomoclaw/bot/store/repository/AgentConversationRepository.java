@@ -19,7 +19,7 @@ public class AgentConversationRepository extends CrudRepository<AgentConversatio
 
     public List<AgentConversationEntity> listAllDesc() {
         return lambdaQuery()
-                .orderByDesc(AgentConversationEntity::getPinned, AgentConversationEntity::getUpdatedTime, AgentConversationEntity::getCreatedTime)
+                .orderByDesc(AgentConversationEntity::getPinned, AgentConversationEntity::getUpdatedTime, AgentConversationEntity::getId)
                 .list();
     }
 
@@ -30,7 +30,7 @@ public class AgentConversationRepository extends CrudRepository<AgentConversatio
         }
         return lambdaQuery()
                 .ne(AgentConversationEntity::getChannel, channel)
-                .orderByDesc(AgentConversationEntity::getPinned, AgentConversationEntity::getUpdatedTime, AgentConversationEntity::getCreatedTime)
+                .orderByDesc(AgentConversationEntity::getPinned, AgentConversationEntity::getUpdatedTime, AgentConversationEntity::getId)
                 .list();
     }
 
@@ -46,7 +46,7 @@ public class AgentConversationRepository extends CrudRepository<AgentConversatio
         }
         return lambdaQuery()
                 .eq(AgentConversationEntity::getAgentUid, agentUid)
-                .orderByDesc(AgentConversationEntity::getPinned, AgentConversationEntity::getUpdatedTime, AgentConversationEntity::getCreatedTime)
+                .orderByDesc(AgentConversationEntity::getPinned, AgentConversationEntity::getUpdatedTime, AgentConversationEntity::getId)
                 .list();
     }
 }
