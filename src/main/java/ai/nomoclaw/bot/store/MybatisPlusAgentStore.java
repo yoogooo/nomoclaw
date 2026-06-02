@@ -10,6 +10,9 @@ import ai.nomoclaw.bot.model.MessageStatus;
 import ai.nomoclaw.bot.model.PlanStep;
 import ai.nomoclaw.bot.model.RiskLevel;
 import ai.nomoclaw.bot.model.StepStatus;
+import ai.nomoclaw.bot.store.query.ConversationPageQuery;
+import ai.nomoclaw.bot.store.query.MessagePageQuery;
+import ai.nomoclaw.bot.store.query.PageSlice;
 import ai.nomoclaw.bot.store.entity.AgentEventEntity;
 import ai.nomoclaw.bot.store.entity.AgentMessageEntity;
 import ai.nomoclaw.bot.store.entity.AgentConversationEntity;
@@ -85,9 +88,34 @@ public class MybatisPlusAgentStore implements AgentStore {
     }
 
     @Override
+    public PageSlice<AgentConversation> listConversationPage(ConversationPageQuery query) {
+        List<AgentConversationEntity> entities = conversationRepository.listConversationPage(
+                query.agentUid(),
+                toLocalDateTime(query.asOf()),
+                query.beforePinned(),
+                query.beforeUpdatedAt() == null ? null : toLocalDateTime(query.beforeUpdatedAt()),
+                query.beforeId(),
+                query.limit() + 1
+        );
+        boolean hasMore = entities.size() > query.limit();
+        if (hasMore) {
+            entities = entities.subList(0, query.limit());
+        }
+        return new PageSlice<>(
+                entities.stream().map(this::toDomain).toList(),
+                hasMore
+        );
+    }
+
+    @Override
     public Optional<AgentConversation> findConversation(String conversationUid) {
         AgentConversationEntity entity = conversationRepository.findByConversationUid(conversationUid);
         return Optional.ofNullable(entity).map(this::toDomain);
+    }
+
+    @Override
+    public Optional<Long> findConversationSortId(String conversationUid) {
+        return Optional.ofNullable(conversationRepository.findSortIdByConversationUid(conversationUid));
     }
 
     @Override
@@ -191,11 +219,33 @@ public class MybatisPlusAgentStore implements AgentStore {
     }
 
     @Override
+    public Optional<Long> findMessageSortId(String messageUid) {
+        return Optional.ofNullable(messageRepository.findSortIdByMessageUid(messageUid));
+    }
+
+    @Override
     public List<AgentMessage> listMessagesByConversation(String conversationUid) {
         return messageRepository.listByConversation(conversationUid)
                 .stream()
                 .map(this::toDomain)
                 .toList();
+    }
+
+    @Override
+    public PageSlice<AgentMessage> listMessagePage(MessagePageQuery query) {
+        List<AgentMessageEntity> entities = messageRepository.listPageByConversation(
+                query.conversationUid(),
+                query.beforeId(),
+                query.limit() + 1
+        );
+        boolean hasMore = entities.size() > query.limit();
+        if (hasMore) {
+            entities = entities.subList(0, query.limit());
+        }
+        return new PageSlice<>(
+                entities.stream().map(this::toDomain).toList(),
+                hasMore
+        );
     }
 
     @Override

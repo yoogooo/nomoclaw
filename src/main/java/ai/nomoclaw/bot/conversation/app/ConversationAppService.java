@@ -3,8 +3,10 @@ package ai.nomoclaw.bot.conversation.app;
 import ai.nomoclaw.bot.orchestrator.AgentApplicationService;
 
 import ai.nomoclaw.bot.conversation.model.ConversationMessageDto;
+import ai.nomoclaw.bot.conversation.model.ConversationMessagePageDto;
 import ai.nomoclaw.bot.conversation.model.ConversationMessageRunDto;
 import ai.nomoclaw.bot.conversation.model.ConversationSummaryDto;
+import ai.nomoclaw.bot.conversation.model.ConversationSummaryPageDto;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -26,8 +28,16 @@ public class ConversationAppService {
         return facade.listConversations();
     }
 
+    public ConversationSummaryPageDto listConversationPage(String agentUid, Integer limit, String beforeSortKey, String asOf) {
+        return facade.listConversationPage(agentUid, limit, beforeSortKey, asOf);
+    }
+
     public List<ConversationMessageDto> listMessages(String conversationUid) {
         return facade.listMessages(conversationUid);
+    }
+
+    public ConversationMessagePageDto listMessagePage(String conversationUid, Integer limit, String beforeMessageUid) {
+        return facade.listMessagePage(conversationUid, limit, beforeMessageUid);
     }
 
     public List<ConversationMessageRunDto> listMessageRuns(String conversationUid) {

@@ -2,6 +2,9 @@ package ai.nomoclaw.bot.store;
 
 import ai.nomoclaw.bot.domain.AgentConversation;
 import ai.nomoclaw.bot.domain.AgentMessage;
+import ai.nomoclaw.bot.store.query.ConversationPageQuery;
+import ai.nomoclaw.bot.store.query.MessagePageQuery;
+import ai.nomoclaw.bot.store.query.PageSlice;
 import ai.nomoclaw.bot.model.AgentEvent;
 import ai.nomoclaw.bot.model.ApprovalStatus;
 import ai.nomoclaw.bot.model.MessageStatus;
@@ -22,7 +25,11 @@ public interface AgentStore {
 
     List<AgentConversation> listConversations();
 
+    PageSlice<AgentConversation> listConversationPage(ConversationPageQuery query);
+
     Optional<AgentConversation> findConversation(String conversationUid);
+
+    Optional<Long> findConversationSortId(String conversationUid);
 
     void deleteConversation(String conversationUid);
 
@@ -52,7 +59,11 @@ public interface AgentStore {
 
     Optional<AgentMessage> findMessage(String messageUid);
 
+    Optional<Long> findMessageSortId(String messageUid);
+
     List<AgentMessage> listMessagesByConversation(String conversationUid);
+
+    PageSlice<AgentMessage> listMessagePage(MessagePageQuery query);
 
     Optional<AgentMessage> findLatestUserMessageByConversation(String conversationUid);
 

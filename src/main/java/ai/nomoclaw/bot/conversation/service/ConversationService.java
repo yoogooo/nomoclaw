@@ -5,8 +5,10 @@ import ai.nomoclaw.bot.util.UuidUtil;
 import ai.nomoclaw.bot.config.AgentProperties;
 import ai.nomoclaw.bot.conversation.model.ConversationAttachmentDto;
 import ai.nomoclaw.bot.conversation.model.ConversationMessageDto;
+import ai.nomoclaw.bot.conversation.model.ConversationMessagePageDto;
 import ai.nomoclaw.bot.conversation.model.ConversationMessageRunDto;
 import ai.nomoclaw.bot.conversation.model.ConversationSummaryDto;
+import ai.nomoclaw.bot.conversation.model.ConversationSummaryPageDto;
 import ai.nomoclaw.bot.conversation.model.MessageFileLinkDto;
 import ai.nomoclaw.bot.conversation.support.ConversationAttachmentService;
 import ai.nomoclaw.bot.domain.AgentConversation;
@@ -20,6 +22,9 @@ import ai.nomoclaw.bot.orchestrator.execution.MessageExecutionOrchestrator;
 import ai.nomoclaw.bot.orchestrator.execution.RuntimeModelSelection;
 import ai.nomoclaw.bot.orchestrator.view.RunViewAssembler;
 import ai.nomoclaw.bot.store.AgentStore;
+import ai.nomoclaw.bot.store.query.ConversationPageQuery;
+import ai.nomoclaw.bot.store.query.MessagePageQuery;
+import ai.nomoclaw.bot.store.query.PageSlice;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
@@ -28,7 +33,11 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -46,6 +55,8 @@ public class ConversationService {
     public static final String APPROVAL_MODE_DEFAULT = "default";
     private static final String APPROVAL_MODE_FULL_ACCESS = "full_access";
     private static final String DEFAULT_AGENT_UID = "agent_general_assistant";
+    private static final int DEFAULT_PAGE_LIMIT = 20;
+    private static final int MAX_PAGE_LIMIT = 50;
 
     private final AgentStore store;
     private final AgentProperties properties;
@@ -89,27 +100,30 @@ public class ConversationService {
 
     public List<ConversationSummaryDto> listConversations() {
         return store.listConversations().stream()
-                .map(conversation -> {
-                    AgentMessage latestUserMessage = store.findLatestUserMessageByConversation(conversation.conversationUid()).orElse(null);
-                    boolean waitingApproval = latestUserMessage != null && latestUserMessage.status() == MessageStatus.WAITING_APPROVAL;
-                    boolean running = isRunning(latestUserMessage);
-                    boolean unread = isUnread(conversation)
-                            || isWaitingApprovalUnread(conversation, latestUserMessage, waitingApproval);
-                    return new ConversationSummaryDto(
-                            conversation.conversationUid(),
-                            conversation.agentGroupUid(),
-                            conversation.agentUid(),
-                            conversation.title(),
-                            conversation.pinned(),
-                            running,
-                            waitingApproval,
-                            unread,
-                            conversation.lastTaskTerminalAt(),
-                            conversation.createdAt(),
-                            conversation.updatedAt()
-                    );
-                })
+                .map(this::toConversationSummary)
                 .toList();
+    }
+
+    public ConversationSummaryPageDto listConversationPage(String agentUid, Integer limit, String beforeSortKey, String asOf) {
+        int normalizedLimit = normalizePageLimit(limit);
+        Instant snapshotTime = parseAsOf(asOf);
+        ConversationSortCursor cursor = parseConversationSortCursor(beforeSortKey);
+        PageSlice<AgentConversation> page = store.listConversationPage(new ConversationPageQuery(
+                normalizeOptionalAgentUid(agentUid),
+                normalizedLimit,
+                snapshotTime,
+                cursor == null ? null : cursor.pinned(),
+                cursor == null ? null : cursor.updatedAt(),
+                cursor == null ? null : cursor.id()
+        ));
+        List<ConversationSummaryDto> items = page.items().stream()
+                .map(this::toConversationSummary)
+                .toList();
+        String nextBeforeSortKey = null;
+        if (page.hasMore() && !page.items().isEmpty()) {
+            nextBeforeSortKey = encodeConversationSortCursor(page.items().get(page.items().size() - 1));
+        }
+        return new ConversationSummaryPageDto(items, page.hasMore(), nextBeforeSortKey, snapshotTime);
     }
 
     private boolean isRunning(AgentMessage latestUserMessage) {
@@ -126,6 +140,38 @@ public class ConversationService {
         store.findConversation(conversationUid)
                 .orElseThrow(() -> new IllegalArgumentException("conversation not found: " + conversationUid));
         List<AgentMessage> messages = store.listMessagesByConversation(conversationUid);
+        return toConversationMessages(messages);
+    }
+
+    public ConversationMessagePageDto listMessagePage(String conversationUid, Integer limit, String beforeMessageUid) {
+        store.findConversation(conversationUid)
+                .orElseThrow(() -> new IllegalArgumentException("conversation not found: " + conversationUid));
+        int normalizedLimit = normalizePageLimit(limit);
+        Long beforeId = null;
+        if (beforeMessageUid != null && !beforeMessageUid.isBlank()) {
+            AgentMessage beforeMessage = store.findMessage(beforeMessageUid)
+                    .orElseThrow(() -> new IllegalArgumentException("message not found: " + beforeMessageUid));
+            if (!conversationUid.equals(beforeMessage.conversationUid())) {
+                throw new IllegalArgumentException("message does not belong to conversation: " + beforeMessageUid);
+            }
+            beforeId = store.findMessageSortId(beforeMessageUid)
+                    .orElseThrow(() -> new IllegalArgumentException("message not found: " + beforeMessageUid));
+        }
+        PageSlice<AgentMessage> page = store.listMessagePage(new MessagePageQuery(conversationUid, normalizedLimit, beforeId));
+        List<AgentMessage> ascendingMessages = new ArrayList<>(page.items());
+        Collections.reverse(ascendingMessages);
+        String nextBeforeMessageUid = null;
+        if (page.hasMore() && !ascendingMessages.isEmpty()) {
+            nextBeforeMessageUid = ascendingMessages.get(0).messageUid();
+        }
+        return new ConversationMessagePageDto(
+                toConversationMessages(ascendingMessages),
+                page.hasMore(),
+                nextBeforeMessageUid
+        );
+    }
+
+    private List<ConversationMessageDto> toConversationMessages(List<AgentMessage> messages) {
         Map<String, List<ConversationAttachmentDto>> attachmentsByMessage = conversationAttachmentService.listByMessageUids(
                 messages.stream().map(AgentMessage::messageUid).toList()
         );
@@ -161,6 +207,27 @@ public class ConversationService {
                 ))
                 .filter(Objects::nonNull)
                 .toList();
+    }
+
+    private ConversationSummaryDto toConversationSummary(AgentConversation conversation) {
+        AgentMessage latestUserMessage = store.findLatestUserMessageByConversation(conversation.conversationUid()).orElse(null);
+        boolean waitingApproval = latestUserMessage != null && latestUserMessage.status() == MessageStatus.WAITING_APPROVAL;
+        boolean running = isRunning(latestUserMessage);
+        boolean unread = isUnread(conversation)
+                || isWaitingApprovalUnread(conversation, latestUserMessage, waitingApproval);
+        return new ConversationSummaryDto(
+                conversation.conversationUid(),
+                conversation.agentGroupUid(),
+                conversation.agentUid(),
+                conversation.title(),
+                conversation.pinned(),
+                running,
+                waitingApproval,
+                unread,
+                conversation.lastTaskTerminalAt(),
+                conversation.createdAt(),
+                conversation.updatedAt()
+        );
     }
 
     public AgentConversation getConversation(String conversationUid) {
@@ -351,6 +418,55 @@ public class ConversationService {
         return agentUid == null || agentUid.isBlank() ? "" : agentUid.trim();
     }
 
+    private int normalizePageLimit(Integer limit) {
+        if (limit == null || limit <= 0) {
+            return DEFAULT_PAGE_LIMIT;
+        }
+        return Math.min(limit, MAX_PAGE_LIMIT);
+    }
+
+    private Instant parseAsOf(String asOf) {
+        if (asOf == null || asOf.isBlank()) {
+            return Instant.now();
+        }
+        try {
+            return Instant.parse(asOf.trim());
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("invalid asOf: " + asOf, ex);
+        }
+    }
+
+    private String encodeConversationSortCursor(AgentConversation conversation) {
+        Long sortId = store.findConversationSortId(conversation.conversationUid())
+                .orElseThrow(() -> new IllegalArgumentException("conversation not found: " + conversation.conversationUid()));
+        String raw = (conversation.pinned() ? 1 : 0)
+                + "|"
+                + conversation.updatedAt().toEpochMilli()
+                + "|"
+                + sortId;
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private ConversationSortCursor parseConversationSortCursor(String cursor) {
+        if (cursor == null || cursor.isBlank()) {
+            return null;
+        }
+        try {
+            String decoded = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
+            String[] parts = decoded.split("\\|");
+            if (parts.length != 3) {
+                throw new IllegalArgumentException("invalid beforeSortKey");
+            }
+            return new ConversationSortCursor(
+                    Integer.parseInt(parts[0]),
+                    Instant.ofEpochMilli(Long.parseLong(parts[1])),
+                    Long.parseLong(parts[2])
+            );
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("invalid beforeSortKey", ex);
+        }
+    }
+
     private String summarize(String text) {
         if (text == null) {
             return "";
@@ -402,5 +518,12 @@ public class ConversationService {
             return null;
         }
         return parseLocaleHeader(tag);
+    }
+
+    private record ConversationSortCursor(
+            Integer pinned,
+            Instant updatedAt,
+            Long id
+    ) {
     }
 }

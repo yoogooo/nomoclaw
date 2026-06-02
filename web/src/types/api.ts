@@ -436,6 +436,13 @@ export interface ConversationSummary {
   updatedTime: string;
 }
 
+export interface ConversationSummaryPage {
+  items: ConversationSummary[];
+  hasMore: boolean;
+  nextBeforeSortKey?: string | null;
+  asOf: string;
+}
+
 export interface MessageFileLink {
   name: string;
   path: string;
@@ -456,6 +463,12 @@ export interface ConversationMessage {
   createdTime: string;
   fileLinks?: MessageFileLink[];
   attachments?: ConversationAttachment[];
+}
+
+export interface ConversationMessagePage {
+  items: ConversationMessage[];
+  hasMore: boolean;
+  nextBeforeMessageUid?: string | null;
 }
 
 export interface ConversationAttachment {

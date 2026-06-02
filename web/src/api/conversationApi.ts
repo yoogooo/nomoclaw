@@ -10,7 +10,9 @@ import type {
   AgentMcpTool,
   CreateSkillPayload,
   ConversationMessage,
+  ConversationMessagePage,
   ConversationMessageRun,
+  ConversationSummaryPage,
   ConversationSummary,
   ApprovalDecisionResponse,
   CreateConversationResponse,
@@ -36,6 +38,19 @@ export const conversationApi = {
   },
   listConversations() {
     return requestJson<ConversationSummary[]>("/api/conversations");
+  },
+  listConversationPage(params: {
+    agentUid?: string;
+    limit?: number;
+    beforeSortKey?: string;
+    asOf?: string;
+  }) {
+    const query = new URLSearchParams();
+    if (params.agentUid) query.set("agentUid", params.agentUid);
+    if (params.limit) query.set("limit", String(params.limit));
+    if (params.beforeSortKey) query.set("beforeSortKey", params.beforeSortKey);
+    if (params.asOf) query.set("asOf", params.asOf);
+    return requestJson<ConversationSummaryPage>(`/api/conversations/page?${query.toString()}`);
   },
   deleteConversation(conversationUid: string) {
     return requestJson<SimpleResponse>(`/api/conversations/${conversationUid}`, {
@@ -235,6 +250,15 @@ export const conversationApi = {
   },
   listMessages(conversationUid: string) {
     return requestJson<ConversationMessage[]>(`/api/conversations/${conversationUid}/messages`);
+  },
+  listMessagesPage(conversationUid: string, params: {
+    limit?: number;
+    beforeMessageUid?: string;
+  }) {
+    const query = new URLSearchParams();
+    if (params.limit) query.set("limit", String(params.limit));
+    if (params.beforeMessageUid) query.set("beforeMessageUid", params.beforeMessageUid);
+    return requestJson<ConversationMessagePage>(`/api/conversations/${conversationUid}/messages/page?${query.toString()}`);
   },
   listMessageRuns(conversationUid: string) {
     return requestJson<ConversationMessageRun[]>(`/api/conversations/${conversationUid}/message-runs`);

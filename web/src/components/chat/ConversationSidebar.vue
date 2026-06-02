@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { NButton, NDropdown, NInput, NModal, NSelect, type DropdownOption, type InputInst, type SelectOption } from "naive-ui";
 import { Clock3, MoreHorizontal, Pin, RefreshCw } from "lucide-vue-next";
@@ -135,6 +135,7 @@ async function refreshHistoryConversations() {
   try {
     await conversationStore.refreshConversations();
     await refreshCronConversationBindings();
+    await fillConversationViewportIfNeeded();
   } catch {
     discreteMessage.error(t("toast.refreshFailed"));
   } finally {
@@ -280,10 +281,30 @@ async function scrollActiveConversationIntoViewIfNeeded() {
   lastAutoScrolledConversationUid.value = conversationUid;
 }
 
+async function fillConversationViewportIfNeeded() {
+  await nextTick();
+  const element = conversationListRef.value;
+  if (!element) {
+    return;
+  }
+  let guard = 0;
+  while (
+    conversationStore.conversationListHasMore
+    && !conversationStore.conversationListLoading
+    && element.scrollHeight <= element.clientHeight
+    && guard < 20
+  ) {
+    guard += 1;
+    await conversationStore.loadMoreConversations();
+    await nextTick();
+  }
+}
+
 watch(
   () => [conversationStore.currentConversationUid, conversationStore.filteredConversations.length, String(route.query.source || "")],
   () => {
     void scrollActiveConversationIntoViewIfNeeded();
+    void fillConversationViewportIfNeeded();
   },
   { immediate: true }
 );
@@ -318,6 +339,30 @@ function isConversationRunning(conversationUid: string, running?: boolean) {
   const normalizedRunningUid = String(conversationStore.runningConversationUid || "").trim();
   return Boolean(normalizedRunningUid && normalizedConversationUid === normalizedRunningUid);
 }
+
+function handleConversationListScroll(event: Event) {
+  const element = event.target as HTMLElement | null;
+  if (!element) {
+    return;
+  }
+  const remaining = element.scrollHeight - element.scrollTop - element.clientHeight;
+  if (remaining <= 120) {
+    void conversationStore.loadMoreConversations();
+  }
+}
+
+function handleWindowResize() {
+  void fillConversationViewportIfNeeded();
+}
+
+onMounted(() => {
+  window.addEventListener("resize", handleWindowResize);
+  void fillConversationViewportIfNeeded();
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", handleWindowResize);
+});
 
 </script>
 
@@ -355,7 +400,24 @@ function isConversationRunning(conversationUid: string, running?: boolean) {
       </div>
     </div>
     <div class="panel-body conversation-panel">
-      <div ref="conversationListRef" class="scroll-area conversation-list">
+      <div
+        v-if="conversationStore.hasConversationListUpdates"
+        class="conversation-update-banner"
+      >
+        <span>{{ t("chat.sidebar.updatesAvailable", { count: conversationStore.dirtyConversationUids.length }) }}</span>
+        <button
+          type="button"
+          class="conversation-update-banner-btn"
+          @click="refreshHistoryConversations()"
+        >
+          {{ t("chat.sidebar.refreshToLatest") }}
+        </button>
+      </div>
+      <div
+        ref="conversationListRef"
+        class="scroll-area conversation-list"
+        @scroll.passive="handleConversationListScroll"
+      >
         <div v-if="conversationStore.filteredConversations.length">
           <div
             v-for="item in conversationStore.filteredConversations"
@@ -414,6 +476,21 @@ function isConversationRunning(conversationUid: string, running?: boolean) {
           </div>
         </div>
         <div v-else class="conversation-list-empty">{{ t("chat.sidebar.noConversations") }}</div>
+        <div v-if="conversationStore.conversationListLoading" class="conversation-list-loading">
+          {{ t("chat.sidebar.loadingMore") }}
+        </div>
+        <div
+          v-else-if="conversationStore.conversationListHasMore"
+          class="conversation-list-load-more-wrap"
+        >
+          <button
+            type="button"
+            class="conversation-list-load-more-btn"
+            @click="conversationStore.loadMoreConversations()"
+          >
+            {{ t("chat.sidebar.loadMore") }}
+          </button>
+        </div>
       </div>
     </div>
     <n-modal v-model:show="renameDialogVisible" preset="card" :title="t('chat.sidebar.rename')" style="width: min(520px, 92vw)">
@@ -450,6 +527,59 @@ function isConversationRunning(conversationUid: string, running?: boolean) {
   padding-right: 0 !important;
   padding-bottom: 0;
   padding-left: 0 !important;
+}
+
+.conversation-update-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: 0 var(--space-4) var(--space-3);
+  padding: var(--space-2_5) var(--space-3);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-warning-soft) 78%, white);
+  color: var(--color-text-secondary);
+  font-size: var(--text-caption-size);
+}
+
+.conversation-update-banner-btn {
+  border: none;
+  background: transparent;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+
+.conversation-list-loading {
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
+  text-align: center;
+}
+
+.conversation-list-load-more-wrap {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-2) var(--space-4) var(--space-4);
+}
+
+.conversation-list-load-more-btn {
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-surface);
+  color: var(--color-text-secondary);
+  padding: var(--space-2) var(--space-4);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.16s ease, color 0.16s ease, background-color 0.16s ease;
+}
+
+.conversation-list-load-more-btn:hover {
+  border-color: var(--color-border-active);
+  color: var(--color-text-primary);
+  background: var(--color-bg-soft-hover);
 }
 
 .conversation-header-top {

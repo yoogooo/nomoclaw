@@ -17,6 +17,11 @@ public class AgentMessageRepository extends CrudRepository<AgentMessageMapper, A
                 .one();
     }
 
+    public Long findSortIdByMessageUid(String messageUid) {
+        AgentMessageEntity entity = findByMessageId(messageUid);
+        return entity == null ? null : entity.getId();
+    }
+
     public AgentMessageEntity findLatestUserMessageByConversation(String conversationUid) {
         return lambdaQuery()
                 .eq(AgentMessageEntity::getConversationUid, conversationUid)
@@ -40,6 +45,18 @@ public class AgentMessageRepository extends CrudRepository<AgentMessageMapper, A
         return lambdaQuery()
                 .eq(AgentMessageEntity::getConversationUid, conversationUid)
                 .orderByAsc(AgentMessageEntity::getId)
+                .list();
+    }
+
+    public List<AgentMessageEntity> listPageByConversation(String conversationUid, Long beforeId, int limit) {
+        var query = lambdaQuery()
+                .eq(AgentMessageEntity::getConversationUid, conversationUid);
+        if (beforeId != null) {
+            query.lt(AgentMessageEntity::getId, beforeId);
+        }
+        return query
+                .orderByDesc(AgentMessageEntity::getId)
+                .last("LIMIT " + limit)
                 .list();
     }
 

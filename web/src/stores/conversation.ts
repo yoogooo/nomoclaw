@@ -27,6 +27,8 @@ import type {
 } from "@/types/api";
 
 const APPROVAL_MODE_STORAGE_KEY = "chat:approval-mode-by-conversation";
+const CONVERSATION_PAGE_SIZE = 20;
+const MESSAGE_PAGE_SIZE = 20;
 
 interface ApprovalState {
   stepUid: string | null;
@@ -149,9 +151,18 @@ export const useConversationStore = defineStore("conversation", () => {
   const modelGateStore = useModelGateStore();
 
   const conversations = ref<ConversationSummary[]>([]);
+  const conversationListAsOf = ref("");
+  const conversationListCursor = ref<string | null>(null);
+  const conversationListHasMore = ref(false);
+  const conversationListLoading = ref(false);
+  const dirtyConversationUids = ref<string[]>([]);
   const currentConversationUid = ref<string | null>(null);
   const runningConversationUid = ref<string | null>(null);
   const messages = ref<ConversationMessage[]>([]);
+  const messageHistoryCursor = ref<string | null>(null);
+  const messageHistoryHasMore = ref(false);
+  const messageHistoryLoading = ref(false);
+  const messageInitialLoaded = ref(false);
   const draftMessage = ref("");
   const draftAttachments = ref<ConversationAttachment[]>([]);
   const uploadingFiles = ref(false);
@@ -245,9 +256,8 @@ export const useConversationStore = defineStore("conversation", () => {
     });
   }
 
-  const filteredConversations = computed(() =>
-    conversations.value.filter((item) => agentCatalogStore.matchesConversation(item))
-  );
+  const filteredConversations = computed(() => conversations.value);
+  const hasConversationListUpdates = computed(() => dirtyConversationUids.value.length > 0);
 
   const currentConversation = computed(() =>
     conversations.value.find((item) => item.conversationUid === currentConversationUid.value) || null
@@ -527,18 +537,14 @@ export const useConversationStore = defineStore("conversation", () => {
     }
   }
 
-  function hasTrackedConversationStatus() {
-    return conversations.value.some((item) => item.running || item.waitingApproval);
-  }
-
   function scheduleConversationSummaryPolling() {
     stopConversationSummaryPolling();
-    if (typeof window === "undefined" || !hasTrackedConversationStatus()) {
+    if (typeof window === "undefined" || !agentCatalogStore.selectedAgentUid) {
       return;
     }
     conversationSummaryPollTimer = window.setTimeout(() => {
       void pollConversationSummaries();
-    }, 3000);
+    }, 5000);
   }
 
   function shouldReuseConversationSummary(current: ConversationSummary, next: ConversationSummary) {
@@ -579,15 +585,85 @@ export const useConversationStore = defineStore("conversation", () => {
     return changed ? merged : current;
   }
 
+  function sortKeyChanged(current: ConversationSummary, next: ConversationSummary) {
+    return current.pinned !== next.pinned || current.updatedTime !== next.updatedTime;
+  }
+
+  function markConversationDirty(conversationUid: string) {
+    if (!conversationUid) return;
+    if (dirtyConversationUids.value.includes(conversationUid)) {
+      return;
+    }
+    dirtyConversationUids.value = [...dirtyConversationUids.value, conversationUid];
+  }
+
+  function clearConversationDirty(conversationUid: string) {
+    dirtyConversationUids.value = dirtyConversationUids.value.filter((item) => item !== conversationUid);
+  }
+
+  function patchConversationListWithLatest(nextConversations: ConversationSummary[]) {
+    if (!conversations.value.length) {
+      nextConversations.forEach((item) => markConversationDirty(item.conversationUid));
+      return;
+    }
+    const currentByUid = new Map(conversations.value.map((item) => [item.conversationUid, item] as const));
+    const latestByUid = new Map(nextConversations.map((item) => [item.conversationUid, item] as const));
+    conversations.value = conversations.value.map((item) => {
+        const latest = latestByUid.get(item.conversationUid);
+        if (!latest) {
+          return item;
+        }
+        if (sortKeyChanged(item, latest)) {
+          markConversationDirty(item.conversationUid);
+        } else {
+          clearConversationDirty(item.conversationUid);
+        }
+        return shouldReuseConversationSummary(item, latest)
+          ? item
+          : {
+            ...item,
+            ...latest,
+            updatedTime: sortKeyChanged(item, latest) ? item.updatedTime : latest.updatedTime,
+            pinned: sortKeyChanged(item, latest) ? item.pinned : latest.pinned
+          };
+      });
+
+    nextConversations.forEach((item) => {
+      if (!currentByUid.has(item.conversationUid)) {
+        markConversationDirty(item.conversationUid);
+      }
+    });
+  }
+
+  async function fetchConversationPage(params: {
+    beforeSortKey?: string | null;
+    asOf?: string;
+  }) {
+    return conversationApi.listConversationPage({
+      agentUid: agentCatalogStore.selectedAgentUid || "",
+      limit: CONVERSATION_PAGE_SIZE,
+      beforeSortKey: params.beforeSortKey || undefined,
+      asOf: params.asOf
+    });
+  }
+
   async function syncConversationSummaries() {
-    const nextConversations = await conversationApi.listConversations();
-    conversations.value = reuseStableConversationSummaries(conversations.value, nextConversations);
+    const latestPage = await fetchConversationPage({});
+    patchConversationListWithLatest(latestPage.items);
     agentCatalogStore.ensureSelection();
 
-    if (currentConversationUid.value && !nextConversations.some((item) => item.conversationUid === currentConversationUid.value)) {
+    const knownConversationUids = new Set([
+      ...conversations.value.map((item) => item.conversationUid),
+      ...latestPage.items.map((item) => item.conversationUid)
+    ]);
+    if (currentConversationUid.value && !knownConversationUids.has(currentConversationUid.value)) {
       currentConversationUid.value = null;
       runningConversationUid.value = null;
       messages.value = [];
+      messageHistoryCursor.value = null;
+      messageHistoryHasMore.value = false;
+      messageHistoryLoading.value = false;
+      messageInitialLoaded.value = false;
       resetRuntimePanels();
       disconnectEventSource();
       saveChatLastViewState({ mode: "draft", conversationUid: null });
@@ -596,7 +672,8 @@ export const useConversationStore = defineStore("conversation", () => {
     }
 
     if (currentConversationUid.value && runningConversationUid.value) {
-      const currentSummary = nextConversations.find((item) => item.conversationUid === currentConversationUid.value);
+      const currentSummary = conversations.value.find((item) => item.conversationUid === currentConversationUid.value)
+        || latestPage.items.find((item) => item.conversationUid === currentConversationUid.value);
       if (currentSummary && !currentSummary.running && runningConversationUid.value === currentSummary.conversationUid) {
         runningConversationUid.value = null;
       }
@@ -742,10 +819,28 @@ export const useConversationStore = defineStore("conversation", () => {
     syncRuntimeModelSelection();
   }
 
+  function dedupeMessages(source: ConversationMessage[]) {
+    const seen = new Set<string>();
+    const deduped: ConversationMessage[] = [];
+    source.forEach((item) => {
+      const key = item.messageUid
+        ? `uid:${item.messageUid}`
+        : `draft:${item.parentMessageUid || ""}:${item.createdTime}:${item.role}`;
+      if (seen.has(key)) {
+        return;
+      }
+      seen.add(key);
+      deduped.push(item);
+    });
+    return deduped;
+  }
+
   async function loadMessages(conversationUid: string) {
     const token = ++messageLoadToken;
-    const [loadedMessages, runs] = await Promise.all([
-      conversationApi.listMessages(conversationUid),
+    const [messagePage, runs] = await Promise.all([
+      conversationApi.listMessagesPage(conversationUid, {
+        limit: MESSAGE_PAGE_SIZE
+      }),
       conversationApi.listMessageRuns(conversationUid)
     ]);
     if (token !== messageLoadToken) {
@@ -754,10 +849,59 @@ export const useConversationStore = defineStore("conversation", () => {
     if (currentConversationUid.value !== conversationUid) {
       return;
     }
-    messages.value = loadedMessages;
-    reconcileRunningConversationByMessages(conversationUid, loadedMessages);
+    messages.value = dedupeMessages(messagePage.items);
+    messageHistoryCursor.value = messagePage.nextBeforeMessageUid || null;
+    messageHistoryHasMore.value = Boolean(messagePage.hasMore);
+    messageHistoryLoading.value = false;
+    messageInitialLoaded.value = true;
+    reconcileRunningConversationByMessages(conversationUid, messagePage.items);
     conversationRunsStore.setRuns(runs);
     restoreApprovalFromRuns(runs);
+  }
+
+  async function loadOlderMessages() {
+    const conversationUid = currentConversationUid.value;
+    if (!conversationUid || !messageHistoryHasMore.value || messageHistoryLoading.value) {
+      return;
+    }
+    messageHistoryLoading.value = true;
+    try {
+      const page = await conversationApi.listMessagesPage(conversationUid, {
+        limit: MESSAGE_PAGE_SIZE,
+        beforeMessageUid: messageHistoryCursor.value || undefined
+      });
+      if (currentConversationUid.value !== conversationUid) {
+        return;
+      }
+      messages.value = dedupeMessages([...page.items, ...messages.value]);
+      messageHistoryCursor.value = page.nextBeforeMessageUid || null;
+      messageHistoryHasMore.value = Boolean(page.hasMore);
+    } finally {
+      if (currentConversationUid.value === conversationUid) {
+        messageHistoryLoading.value = false;
+      }
+    }
+  }
+
+  async function refreshLatestMessages(conversationUid: string) {
+    const page = await conversationApi.listMessagesPage(conversationUid, {
+      limit: MESSAGE_PAGE_SIZE
+    });
+    if (currentConversationUid.value !== conversationUid) {
+      return;
+    }
+    const olderMessages = messages.value.filter((item) => {
+      if (!item.messageUid) {
+        return false;
+      }
+      return !page.items.some((latest) => latest.messageUid && latest.messageUid === item.messageUid);
+    });
+    messages.value = dedupeMessages([...olderMessages, ...page.items]);
+    messageHistoryHasMore.value = olderMessages.length > 0 ? messageHistoryHasMore.value : Boolean(page.hasMore);
+    if (!olderMessages.length) {
+      messageHistoryCursor.value = page.nextBeforeMessageUid || null;
+    }
+    reconcileRunningConversationByMessages(conversationUid, messages.value);
   }
 
   function subscribeEvents() {
@@ -826,8 +970,50 @@ export const useConversationStore = defineStore("conversation", () => {
   }
 
   async function loadConversationSummaries() {
-    await syncConversationSummaries();
-    scheduleConversationSummaryPolling();
+    conversationListLoading.value = true;
+    try {
+      const page = await fetchConversationPage({});
+      conversations.value = page.items;
+      conversationListAsOf.value = page.asOf;
+      conversationListCursor.value = page.nextBeforeSortKey || null;
+      conversationListHasMore.value = Boolean(page.hasMore);
+      dirtyConversationUids.value = [];
+    } finally {
+      conversationListLoading.value = false;
+      scheduleConversationSummaryPolling();
+    }
+  }
+
+  async function loadMoreConversations() {
+    if (conversationListLoading.value || !conversationListHasMore.value) {
+      return;
+    }
+    conversationListLoading.value = true;
+    try {
+      const page = await fetchConversationPage({
+        beforeSortKey: conversationListCursor.value,
+        asOf: conversationListAsOf.value || undefined
+      });
+      conversations.value = reuseStableConversationSummaries(
+        conversations.value,
+        dedupeConversations([...conversations.value, ...page.items])
+      );
+      conversationListCursor.value = page.nextBeforeSortKey || null;
+      conversationListHasMore.value = Boolean(page.hasMore);
+    } finally {
+      conversationListLoading.value = false;
+    }
+  }
+
+  function dedupeConversations(source: ConversationSummary[]) {
+    const seen = new Set<string>();
+    return source.filter((item) => {
+      if (seen.has(item.conversationUid)) {
+        return false;
+      }
+      seen.add(item.conversationUid);
+      return true;
+    });
   }
 
   async function refreshConversations(
@@ -844,6 +1030,10 @@ export const useConversationStore = defineStore("conversation", () => {
         currentConversationUid.value = null;
         runningConversationUid.value = null;
         messages.value = [];
+        messageHistoryCursor.value = null;
+        messageHistoryHasMore.value = false;
+        messageHistoryLoading.value = false;
+        messageInitialLoaded.value = false;
         resetRuntimePanels();
         disconnectEventSource();
         stopConversationSummaryPolling();
@@ -859,6 +1049,13 @@ export const useConversationStore = defineStore("conversation", () => {
       if (nextConversationUid && nextConversationUid !== currentConversationUid.value) {
         await selectConversation(nextConversationUid);
         return;
+      }
+
+      if (nextConversationUid && currentConversationUid.value === nextConversationUid) {
+        const previous = conversations.value.find((item) => item.conversationUid === nextConversationUid);
+        if (!previous && preferredConversationUid) {
+          clearConversationDirty(preferredConversationUid);
+        }
       }
 
       syncRuntimeModelSelection();
@@ -909,6 +1106,10 @@ export const useConversationStore = defineStore("conversation", () => {
     currentConversationUid.value = null;
     runningConversationUid.value = null;
     messages.value = [];
+    messageHistoryCursor.value = null;
+    messageHistoryHasMore.value = false;
+    messageHistoryLoading.value = false;
+    messageInitialLoaded.value = false;
     draftMessage.value = "";
     draftAttachments.value = [];
     resetRuntimePanels();
@@ -927,8 +1128,13 @@ export const useConversationStore = defineStore("conversation", () => {
   async function selectConversation(conversationUid: string) {
     if (currentConversationUid.value !== conversationUid) {
       messages.value = [];
+      messageHistoryCursor.value = null;
+      messageHistoryHasMore.value = false;
+      messageHistoryLoading.value = false;
+      messageInitialLoaded.value = false;
     }
     currentConversationUid.value = conversationUid;
+    clearConversationDirty(conversationUid);
     restoreApprovalModeForConversation(conversationUid);
     saveChatLastViewState({ mode: "conversation", conversationUid });
     draftAttachments.value = [];
@@ -1141,6 +1347,12 @@ export const useConversationStore = defineStore("conversation", () => {
       });
       tempMessage.messageUid = accepted.messageUid;
       runningConversationUid.value = conversationUid;
+      patchConversationSummaryLocally(conversationUid, {
+        running: true,
+        waitingApproval: false,
+        unread: false,
+        updatedTime: new Date().toISOString()
+      });
       runtimeLogStore.append(tr("chat.runtime.messageSubmitted", { messageUid: accepted.messageUid }));
       await refreshConversations(conversationUid, false);
       scheduleConversationSummaryPolling();
@@ -1162,12 +1374,16 @@ export const useConversationStore = defineStore("conversation", () => {
     scheduleConversationSummaryPolling();
   }
 
-  function markConversationReadLocally(conversationUid: string) {
+  function patchConversationSummaryLocally(conversationUid: string, patch: Partial<ConversationSummary>) {
     conversations.value = conversations.value.map((item) =>
       item.conversationUid === conversationUid
-        ? { ...item, unread: false }
+        ? { ...item, ...patch }
         : item
     );
+  }
+
+  function markConversationReadLocally(conversationUid: string) {
+    patchConversationSummaryLocally(conversationUid, { unread: false });
   }
 
   async function keepCurrentConversationRead(conversationUid: string) {
@@ -1380,12 +1596,24 @@ export const useConversationStore = defineStore("conversation", () => {
       runtimeLogStore.append(tr("chat.runtime.stepWaitingApproval", { stepUid: event.stepUid }));
       handleRunStepEvent(event);
       showApprovalAlert(event);
+      if (event.conversationUid) {
+        patchConversationSummaryLocally(event.conversationUid, {
+          waitingApproval: true,
+          running: true
+        });
+      }
       scheduleConversationSummaryPolling();
       return;
     }
     if (type === "STEP_STARTED") {
       if (approval.value.stepUid && approval.value.stepUid === event.stepUid) {
         clearApproval();
+      }
+      if (event.conversationUid) {
+        patchConversationSummaryLocally(event.conversationUid, {
+          waitingApproval: false,
+          running: true
+        });
       }
       updateBrowserRuntimeOverlayFromStepEvent(event);
       const silentLog = Boolean(event.payload.silentLog);
@@ -1418,6 +1646,11 @@ export const useConversationStore = defineStore("conversation", () => {
       runtimeLogStore.append(tr("chat.runtime.stepRejected", { title: event.payload.title }));
       handleRunStepEvent(event);
       clearApproval();
+      if (event.conversationUid) {
+        patchConversationSummaryLocally(event.conversationUid, {
+          waitingApproval: false
+        });
+      }
       scheduleConversationSummaryPolling();
       return;
     }
@@ -1448,7 +1681,7 @@ export const useConversationStore = defineStore("conversation", () => {
       runningConversationUid.value = null;
       if (currentConversationUid.value) {
         const activeConversationUid = currentConversationUid.value;
-        await loadMessages(activeConversationUid);
+        await refreshLatestMessages(activeConversationUid);
         if (!skipConversationListRefresh.value) {
           await refreshConversations(activeConversationUid, false);
         }
@@ -1480,7 +1713,7 @@ export const useConversationStore = defineStore("conversation", () => {
       runningConversationUid.value = null;
       if (currentConversationUid.value) {
         const activeConversationUid = currentConversationUid.value;
-        await loadMessages(activeConversationUid);
+        await refreshLatestMessages(activeConversationUid);
         if (!skipConversationListRefresh.value) {
           await refreshConversations(activeConversationUid, false);
         }
@@ -1518,6 +1751,13 @@ export const useConversationStore = defineStore("conversation", () => {
     currentConversationTitle,
     runningConversationUid,
     messages,
+    conversationListHasMore,
+    conversationListLoading,
+    hasConversationListUpdates,
+    dirtyConversationUids,
+    messageHistoryHasMore,
+    messageHistoryLoading,
+    messageInitialLoaded,
     draftMessage,
     draftAttachments,
     uploadingFiles,
@@ -1539,6 +1779,7 @@ export const useConversationStore = defineStore("conversation", () => {
     init,
     loadModelConfig,
     refreshConversations,
+    loadMoreConversations,
     startDraftConversation,
     selectConversation,
     applyAgentSelection,
@@ -1549,6 +1790,7 @@ export const useConversationStore = defineStore("conversation", () => {
     cancelRunningMessage,
     approveStep,
     rejectStep,
+    loadOlderMessages,
     setSkipConversationListRefresh,
     openFile,
     renameConversation,

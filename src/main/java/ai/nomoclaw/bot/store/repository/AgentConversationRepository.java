@@ -5,6 +5,7 @@ import ai.nomoclaw.bot.store.entity.AgentConversationEntity;
 import ai.nomoclaw.bot.store.mapper.AgentConversationMapper;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -15,6 +16,11 @@ public class AgentConversationRepository extends CrudRepository<AgentConversatio
                 .eq(AgentConversationEntity::getConversationUid, conversationUid)
                 .last("LIMIT 1")
                 .one();
+    }
+
+    public Long findSortIdByConversationUid(String conversationUid) {
+        AgentConversationEntity entity = findByConversationUid(conversationUid);
+        return entity == null ? null : entity.getId();
     }
 
     public List<AgentConversationEntity> listAllDesc() {
@@ -48,5 +54,21 @@ public class AgentConversationRepository extends CrudRepository<AgentConversatio
                 .eq(AgentConversationEntity::getAgentUid, agentUid)
                 .orderByDesc(AgentConversationEntity::getPinned, AgentConversationEntity::getUpdatedTime, AgentConversationEntity::getId)
                 .list();
+    }
+
+    public List<AgentConversationEntity> listConversationPage(String agentUid,
+                                                              LocalDateTime asOf,
+                                                              Integer beforePinned,
+                                                              LocalDateTime beforeUpdatedTime,
+                                                              Long beforeId,
+                                                              int limit) {
+        return getBaseMapper().listConversationPage(
+                agentUid,
+                asOf,
+                beforePinned,
+                beforeUpdatedTime,
+                beforeId,
+                limit
+        );
     }
 }

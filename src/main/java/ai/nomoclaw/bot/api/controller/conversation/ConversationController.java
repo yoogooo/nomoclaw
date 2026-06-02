@@ -9,8 +9,10 @@ import ai.nomoclaw.bot.api.dto.conversation.request.UpdateConversationPinnedRequ
 import ai.nomoclaw.bot.api.dto.conversation.request.UpdateConversationTitleRequest;
 import ai.nomoclaw.bot.api.dto.conversation.response.ApprovalDecisionResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.ConversationMessageResponse;
+import ai.nomoclaw.bot.api.dto.conversation.response.ConversationMessagePageResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.ConversationMessageRunResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.ConversationSummaryResponse;
+import ai.nomoclaw.bot.api.dto.conversation.response.ConversationSummaryPageResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.CreateConversationResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.MessageResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.UploadFilesResponse;
@@ -81,6 +83,18 @@ public class ConversationController {
         return ConversationApiMapper.toConversationSummaries(conversationAppService.listConversations());
     }
 
+    @GetMapping("/conversations/page")
+    public ConversationSummaryPageResponse listConversationPage(@RequestParam(value = "agentUid", required = false) String agentUid,
+                                                                @RequestParam(value = "limit", required = false) Integer limit,
+                                                                @RequestParam(value = "beforeSortKey", required = false) String beforeSortKey,
+                                                                @RequestParam(value = "asOf", required = false) String asOf) {
+        log.info("[AgentAPI] listConversationPage agentUid={} limit={} beforeSortKey={} asOf={}",
+                agentUid, limit, beforeSortKey, asOf);
+        return ConversationApiMapper.toConversationSummaryPage(
+                conversationAppService.listConversationPage(agentUid, limit, beforeSortKey, asOf)
+        );
+    }
+
     @DeleteMapping("/conversations/{conversationUid}")
     public SimpleResponse deleteConversation(@PathVariable String conversationUid) {
         log.info("[AgentAPI] deleteConversation conversationUid={}", conversationUid);
@@ -115,6 +129,17 @@ public class ConversationController {
     public List<ConversationMessageResponse> listMessages(@PathVariable String conversationUid) {
         log.info("[AgentAPI] listMessages conversationUid={}", conversationUid);
         return ConversationApiMapper.toConversationMessages(conversationAppService.listMessages(conversationUid));
+    }
+
+    @GetMapping("/conversations/{conversationUid}/messages/page")
+    public ConversationMessagePageResponse listMessagePage(@PathVariable String conversationUid,
+                                                           @RequestParam(value = "limit", required = false) Integer limit,
+                                                           @RequestParam(value = "beforeMessageUid", required = false) String beforeMessageUid) {
+        log.info("[AgentAPI] listMessagePage conversationUid={} limit={} beforeMessageUid={}",
+                conversationUid, limit, beforeMessageUid);
+        return ConversationApiMapper.toConversationMessagePage(
+                conversationAppService.listMessagePage(conversationUid, limit, beforeMessageUid)
+        );
     }
 
     @GetMapping("/conversations/{conversationUid}/message-runs")

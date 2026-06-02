@@ -597,6 +597,34 @@ async function scrollToConversationBottom() {
   attemptScroll(6);
 }
 
+async function loadOlderMessagesAndPreserveViewport() {
+  const element = messageListRef.value;
+  if (!element || !conversationStore.messageHistoryHasMore || conversationStore.messageHistoryLoading) {
+    return;
+  }
+  const previousScrollHeight = element.scrollHeight;
+  const previousScrollTop = element.scrollTop;
+  shouldScrollToBottomOnNextRender.value = false;
+  await conversationStore.loadOlderMessages();
+  await nextTick();
+  const nextElement = messageListRef.value;
+  if (!nextElement) {
+    return;
+  }
+  const heightDelta = nextElement.scrollHeight - previousScrollHeight;
+  nextElement.scrollTop = previousScrollTop + Math.max(0, heightDelta);
+}
+
+function handleMessageListScroll(event: Event) {
+  const element = event.target as HTMLElement | null;
+  if (!element) {
+    return;
+  }
+  if (element.scrollTop <= 80) {
+    void loadOlderMessagesAndPreserveViewport();
+  }
+}
+
 // Entering a conversation should always jump to the latest message immediately.
 watch(
   () => conversationStore.currentConversationUid,
@@ -626,7 +654,11 @@ onMounted(() => {
 
 <template>
   <section class="panel message-panel">
-    <div ref="messageListRef" class="panel-body message-list scroll-area">
+    <div
+      ref="messageListRef"
+      class="panel-body message-list scroll-area"
+      @scroll.passive="handleMessageListScroll"
+    >
       <div
         v-if="!displayedMessages.length && !isRunningCurrentConversation"
         class="conversation-empty-state"
@@ -649,6 +681,12 @@ onMounted(() => {
         </div>
       </div>
       <template v-else>
+        <div
+          v-if="conversationStore.messageHistoryHasMore || conversationStore.messageHistoryLoading"
+          class="message-history-status"
+        >
+          {{ conversationStore.messageHistoryLoading ? t("chat.messages.loadingHistory") : t("chat.messages.scrollForHistory") }}
+        </div>
         <div
           v-for="message in displayedMessages"
           :key="`${message.createdTime}-${message.messageUid || message.content}`"
@@ -880,6 +918,13 @@ onMounted(() => {
 
 .message-list {
   flex: 1;
+}
+
+.message-history-status {
+  padding: var(--space-2) 0 var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
+  text-align: center;
 }
 
 .conversation-empty-state {

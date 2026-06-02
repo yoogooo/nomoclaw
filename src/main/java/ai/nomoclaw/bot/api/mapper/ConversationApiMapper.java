@@ -2,15 +2,19 @@ package ai.nomoclaw.bot.api.mapper;
 
 import ai.nomoclaw.bot.api.dto.conversation.response.ConversationAttachmentResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.ConversationMessageResponse;
+import ai.nomoclaw.bot.api.dto.conversation.response.ConversationMessagePageResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.ConversationMessageRunResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.ConversationRunStepResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.ConversationSummaryResponse;
+import ai.nomoclaw.bot.api.dto.conversation.response.ConversationSummaryPageResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.MessageFileLinkResponse;
 import ai.nomoclaw.bot.conversation.model.ConversationAttachmentDto;
 import ai.nomoclaw.bot.conversation.model.ConversationMessageDto;
+import ai.nomoclaw.bot.conversation.model.ConversationMessagePageDto;
 import ai.nomoclaw.bot.conversation.model.ConversationMessageRunDto;
 import ai.nomoclaw.bot.conversation.model.ConversationRunStepDto;
 import ai.nomoclaw.bot.conversation.model.ConversationSummaryDto;
+import ai.nomoclaw.bot.conversation.model.ConversationSummaryPageDto;
 import ai.nomoclaw.bot.conversation.model.MessageFileLinkDto;
 
 import java.util.List;
@@ -43,6 +47,15 @@ public final class ConversationApiMapper {
         );
     }
 
+    public static ConversationSummaryPageResponse toConversationSummaryPage(ConversationSummaryPageDto dto) {
+        return new ConversationSummaryPageResponse(
+                toConversationSummaries(dto.items()),
+                dto.hasMore(),
+                dto.nextBeforeSortKey(),
+                dto.asOf()
+        );
+    }
+
     public static List<ConversationMessageResponse> toConversationMessages(List<ConversationMessageDto> dtos) {
         return dtos.stream().map(ConversationApiMapper::toConversationMessage).toList();
     }
@@ -63,6 +76,14 @@ public final class ConversationApiMapper {
                 dto.createdTime(),
                 dto.fileLinks().stream().map(ConversationApiMapper::toMessageFileLink).toList(),
                 dto.attachments().stream().map(ConversationApiMapper::toConversationAttachment).toList()
+        );
+    }
+
+    public static ConversationMessagePageResponse toConversationMessagePage(ConversationMessagePageDto dto) {
+        return new ConversationMessagePageResponse(
+                toConversationMessages(dto.items()),
+                dto.hasMore(),
+                dto.nextBeforeMessageUid()
         );
     }
 
