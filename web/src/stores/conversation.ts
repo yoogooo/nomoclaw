@@ -891,6 +891,24 @@ export const useConversationStore = defineStore("conversation", () => {
     return created.conversationUid;
   }
 
+  async function ensureConversationForMessageSend() {
+    if (currentConversationUid.value) {
+      return currentConversationUid.value;
+    }
+
+    const createGroupUid = "";
+    const createAgentUid = agentCatalogStore.selectedAgentUid;
+    const created = await conversationApi.createConversation(createGroupUid, createAgentUid);
+    const conversationUid = created.conversationUid;
+    currentConversationUid.value = conversationUid;
+    restoreApprovalModeForConversation(conversationUid);
+    saveChatLastViewState({ mode: "conversation", conversationUid });
+    disconnectEventSource();
+    subscribeEvents();
+    void refreshConversations(conversationUid, false);
+    return conversationUid;
+  }
+
   async function changeRuntimeModel(value: string) {
     const { modelProvider, modelName } = splitModelKey(value);
     if (!modelProvider || !modelName) {
@@ -982,7 +1000,6 @@ export const useConversationStore = defineStore("conversation", () => {
 
     const lockedProvider = selectedModelProvider.value;
     const lockedModelName = selectedModelName.value;
-    const conversationUid = await ensureConversationForInteraction();
     const effectiveProvider = hasConfiguredModel(lockedProvider, lockedModelName) ? lockedProvider : selectedModelProvider.value;
     const effectiveModelName = hasConfiguredModel(lockedProvider, lockedModelName) ? lockedModelName : selectedModelName.value;
     if (!effectiveProvider || !effectiveModelName) {
@@ -1011,6 +1028,7 @@ export const useConversationStore = defineStore("conversation", () => {
     draftAttachments.value = [];
 
     try {
+      const conversationUid = await ensureConversationForMessageSend();
       const accepted = await conversationApi.sendMessage(conversationUid, {
         message: content,
         fileUrls: attachments.map((item) => item.fileUrl),
