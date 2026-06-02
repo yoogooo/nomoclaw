@@ -28,6 +28,7 @@ const renameInputRef = ref<InputInst | null>(null);
 const refreshingHistory = ref(false);
 const refreshAnimating = ref(false);
 const cronTaskByConversationUid = ref<Record<string, string>>({});
+const runningConversationUids = ref<Record<string, true>>({});
 const conversationListRef = ref<HTMLElement | null>(null);
 const lastAutoScrolledConversationUid = ref("");
 
@@ -151,6 +152,14 @@ async function refreshCronConversationBindings() {
       cronApi.listGlobalRunningResults(200)
     ]);
     const nextMap: Record<string, string> = {};
+    const nextRunning: Record<string, true> = {};
+    for (const item of runningResults) {
+      const conversationUid = String(item.conversationUid || "").trim();
+      if (!conversationUid) {
+        continue;
+      }
+      nextRunning[conversationUid] = true;
+    }
     for (const item of [...runningResults, ...recentResults]) {
       const conversationUid = String(item.conversationUid || "").trim();
       if (!conversationUid || nextMap[conversationUid]) {
@@ -162,6 +171,7 @@ async function refreshCronConversationBindings() {
       }
     }
     cronTaskByConversationUid.value = nextMap;
+    runningConversationUids.value = nextRunning;
   } catch {
     // best effort
   }
@@ -247,10 +257,19 @@ function isCronConversation(conversationUid: string) {
   return Boolean(cronTaskByConversationUid.value[String(conversationUid || "").trim()]);
 }
 
-function isConversationRunning(conversationUid: string) {
+function isConversationRunning(conversationUid: string, running?: boolean) {
+  if (running) {
+    return true;
+  }
   const normalizedConversationUid = String(conversationUid || "").trim();
+  if (!normalizedConversationUid) {
+    return false;
+  }
+  if (runningConversationUids.value[normalizedConversationUid]) {
+    return true;
+  }
   const normalizedRunningUid = String(conversationStore.runningConversationUid || "").trim();
-  return Boolean(normalizedConversationUid && normalizedRunningUid && normalizedConversationUid === normalizedRunningUid);
+  return Boolean(normalizedRunningUid && normalizedConversationUid === normalizedRunningUid);
 }
 
 </script>
@@ -299,17 +318,8 @@ function isConversationRunning(conversationUid: string) {
           >
             <button class="conversation-main" @click="conversationStore.selectConversation(item.conversationUid)">
               <div class="conversation-title">
-                <span v-if="item.unread" class="conversation-unread-dot" :title="t('chat.sidebar.unreadHint')" aria-label="unread" />
                 <span v-if="item.pinned" class="conversation-pinned-icon" :title="t('chat.sidebar.pinned')">
                   <Pin :size="12" />
-                </span>
-                <span
-                  v-if="isConversationRunning(item.conversationUid)"
-                  class="conversation-running-icon"
-                  :title="t('cron.execution.statusRunning')"
-                  aria-label="running"
-                >
-                  <LoaderCircle :size="12" />
                 </span>
                 <span v-if="isCronConversation(item.conversationUid)" class="conversation-cron-icon" aria-hidden="true">
                   <Clock3 :size="12" />
@@ -320,6 +330,22 @@ function isConversationRunning(conversationUid: string) {
             <div class="conversation-meta-slot">
               <div v-if="item.waitingApproval" class="conversation-status-pill waiting-approval-pill">
                 {{ t("chat.sidebar.waitingApproval") }}
+              </div>
+              <div
+                v-else-if="isConversationRunning(item.conversationUid, item.running)"
+                class="conversation-running-meta-icon"
+                :title="t('cron.execution.statusRunning')"
+                aria-label="running"
+              >
+                <LoaderCircle :size="12" />
+              </div>
+              <div
+                v-else-if="item.unread"
+                class="conversation-unread-meta-icon"
+                :title="t('chat.sidebar.unreadHint')"
+                aria-label="unread"
+              >
+                <span class="conversation-unread-dot" />
               </div>
               <div v-else class="conversation-time-inline" :title="formatDateTime(item.updatedTime)">
                 {{ formatConversationListTime(item.updatedTime, locale) }}
@@ -556,17 +582,31 @@ function isConversationRunning(conversationUid: string) {
   flex: none;
 }
 
-.conversation-running-icon {
+.conversation-running-meta-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: var(--color-success-500);
-  flex: none;
+  width: var(--size-24);
+  height: var(--size-24);
+  margin-right: 2px;
+  transition: opacity 0.18s ease, visibility 0.18s ease;
 }
 
-.conversation-running-icon :deep(svg) {
+.conversation-unread-meta-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-24);
+  height: var(--size-24);
+  margin-right: 2px;
+  transition: opacity 0.18s ease, visibility 0.18s ease;
+}
+
+.conversation-running-meta-icon :deep(svg) {
   transform-origin: center;
   animation: conversation-running-spin 0.9s linear infinite;
+  stroke-width: 2.6;
 }
 
 .conversation-row.active .conversation-title {
@@ -690,6 +730,16 @@ function isConversationRunning(conversationUid: string) {
 }
 
 .conversation-row:hover .conversation-status-pill {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.conversation-row:hover .conversation-running-meta-icon {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.conversation-row:hover .conversation-unread-meta-icon {
   opacity: 0;
   visibility: hidden;
 }

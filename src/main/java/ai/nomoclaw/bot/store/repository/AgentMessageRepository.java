@@ -26,6 +26,16 @@ public class AgentMessageRepository extends CrudRepository<AgentMessageMapper, A
                 .one();
     }
 
+    public AgentMessageEntity findLatestInProgressUserMessageByConversation(String conversationUid) {
+        return lambdaQuery()
+                .eq(AgentMessageEntity::getConversationUid, conversationUid)
+                .eq(AgentMessageEntity::getRole, "user")
+                .notIn(AgentMessageEntity::getStatus, "COMPLETED", "FAILED", "CANCELED")
+                .orderByDesc(AgentMessageEntity::getId)
+                .last("LIMIT 1")
+                .one();
+    }
+
     public List<AgentMessageEntity> listByConversation(String conversationUid) {
         return lambdaQuery()
                 .eq(AgentMessageEntity::getConversationUid, conversationUid)

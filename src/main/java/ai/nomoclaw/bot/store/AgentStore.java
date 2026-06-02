@@ -56,6 +56,8 @@ public interface AgentStore {
 
     Optional<AgentMessage> findLatestUserMessageByConversation(String conversationUid);
 
+    boolean hasInProgressUserMessage(String conversationUid);
+
     void updateMessageStatus(String messageUid, MessageStatus status);
 
     void accumulateMessageTokenUsage(String messageUid,

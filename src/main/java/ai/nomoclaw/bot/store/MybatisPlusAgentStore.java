@@ -205,6 +205,15 @@ public class MybatisPlusAgentStore implements AgentStore {
     }
 
     @Override
+    public boolean hasInProgressUserMessage(String conversationUid) {
+        if (conversationUid == null || conversationUid.isBlank()) {
+            return false;
+        }
+        AgentMessageEntity entity = messageRepository.findLatestInProgressUserMessageByConversation(conversationUid);
+        return entity != null;
+    }
+
+    @Override
     public void updateMessageStatus(String messageUid, MessageStatus status) {
         LocalDateTime now = LocalDateTime.now();
         boolean updated = messageRepository.update(new LambdaUpdateWrapper<AgentMessageEntity>()

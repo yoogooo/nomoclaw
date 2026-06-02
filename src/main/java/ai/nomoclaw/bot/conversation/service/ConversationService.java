@@ -92,6 +92,7 @@ public class ConversationService {
                 .map(conversation -> {
                     AgentMessage latestUserMessage = store.findLatestUserMessageByConversation(conversation.conversationUid()).orElse(null);
                     boolean waitingApproval = latestUserMessage != null && latestUserMessage.status() == MessageStatus.WAITING_APPROVAL;
+                    boolean running = isRunning(latestUserMessage);
                     boolean unread = isUnread(conversation)
                             || isWaitingApprovalUnread(conversation, latestUserMessage, waitingApproval);
                     return new ConversationSummaryDto(
@@ -100,6 +101,7 @@ public class ConversationService {
                             conversation.agentUid(),
                             conversation.title(),
                             conversation.pinned(),
+                            running,
                             waitingApproval,
                             unread,
                             conversation.lastTaskTerminalAt(),
@@ -108,6 +110,16 @@ public class ConversationService {
                     );
                 })
                 .toList();
+    }
+
+    private boolean isRunning(AgentMessage latestUserMessage) {
+        if (latestUserMessage == null) {
+            return false;
+        }
+        return switch (latestUserMessage.status()) {
+            case CREATED, PLANNED, RUNNING, REPLANNING -> true;
+            default -> false;
+        };
     }
 
     public List<ConversationMessageDto> listMessages(String conversationUid) {
