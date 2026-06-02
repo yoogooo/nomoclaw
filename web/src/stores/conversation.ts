@@ -541,9 +541,47 @@ export const useConversationStore = defineStore("conversation", () => {
     }, 3000);
   }
 
+  function shouldReuseConversationSummary(current: ConversationSummary, next: ConversationSummary) {
+    return current.conversationUid === next.conversationUid
+      && current.agentGroupUid === next.agentGroupUid
+      && current.agentUid === next.agentUid
+      && current.title === next.title
+      && current.pinned === next.pinned
+      && Boolean(current.running) === Boolean(next.running)
+      && current.waitingApproval === next.waitingApproval
+      && current.unread === next.unread
+      && (current.lastTaskTerminalTime || "") === (next.lastTaskTerminalTime || "")
+      && current.createdTime === next.createdTime
+      && current.updatedTime === next.updatedTime;
+  }
+
+  function reuseStableConversationSummaries(current: ConversationSummary[], next: ConversationSummary[]) {
+    if (!current.length) {
+      return next;
+    }
+    let changed = current.length !== next.length;
+    const currentByUid = new Map(current.map((item) => [item.conversationUid, item] as const));
+    const merged = next.map((item, index) => {
+      const existing = currentByUid.get(item.conversationUid);
+      if (!existing) {
+        changed = true;
+        return item;
+      }
+      if (current[index]?.conversationUid !== item.conversationUid) {
+        changed = true;
+      }
+      if (!shouldReuseConversationSummary(existing, item)) {
+        changed = true;
+        return item;
+      }
+      return existing;
+    });
+    return changed ? merged : current;
+  }
+
   async function syncConversationSummaries() {
     const nextConversations = await conversationApi.listConversations();
-    conversations.value = nextConversations;
+    conversations.value = reuseStableConversationSummaries(conversations.value, nextConversations);
     agentCatalogStore.ensureSelection();
 
     if (currentConversationUid.value && !nextConversations.some((item) => item.conversationUid === currentConversationUid.value)) {

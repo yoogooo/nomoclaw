@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { NButton, NDropdown, NInput, NModal, NSelect, type DropdownOption, type InputInst, type SelectOption } from "naive-ui";
-import { Clock3, LoaderCircle, MoreHorizontal, Pin, RefreshCw } from "lucide-vue-next";
+import { Clock3, MoreHorizontal, Pin, RefreshCw } from "lucide-vue-next";
 import { useRoute } from "vue-router";
 import { cronApi } from "@/api/cronApi";
 import { useAgentCatalogStore } from "@/stores/agentCatalog";
@@ -31,6 +31,7 @@ const cronTaskByConversationUid = ref<Record<string, string>>({});
 const runningConversationUids = ref<Record<string, true>>({});
 const conversationListRef = ref<HTMLElement | null>(null);
 const lastAutoScrolledConversationUid = ref("");
+let cronBindingsPollTimer: number | null = null;
 
 const agentOptions = computed<AgentSelectOption[]>(() =>
   [...agentCatalogStore.allAgents]
@@ -170,14 +171,60 @@ async function refreshCronConversationBindings() {
         nextMap[conversationUid] = title;
       }
     }
-    cronTaskByConversationUid.value = nextMap;
-    runningConversationUids.value = nextRunning;
+    if (!areStringRecordMapsEqual(cronTaskByConversationUid.value, nextMap)) {
+      cronTaskByConversationUid.value = nextMap;
+    }
+    if (!areStringRecordMapsEqual(runningConversationUids.value, nextRunning)) {
+      runningConversationUids.value = nextRunning;
+    }
   } catch {
     // best effort
   }
 }
 
+function areStringRecordMapsEqual(
+  current: Record<string, string | true>,
+  next: Record<string, string | true>
+) {
+  const currentKeys = Object.keys(current);
+  const nextKeys = Object.keys(next);
+  if (currentKeys.length !== nextKeys.length) {
+    return false;
+  }
+  return currentKeys.every((key) => current[key] === next[key]);
+}
+
+function stopCronBindingsPolling() {
+  if (cronBindingsPollTimer !== null) {
+    window.clearTimeout(cronBindingsPollTimer);
+    cronBindingsPollTimer = null;
+  }
+}
+
+function scheduleCronBindingsPolling() {
+  stopCronBindingsPolling();
+  if (typeof window === "undefined" || !Object.keys(runningConversationUids.value).length) {
+    return;
+  }
+  cronBindingsPollTimer = window.setTimeout(async () => {
+    await refreshCronConversationBindings();
+    scheduleCronBindingsPolling();
+  }, 3000);
+}
+
 void refreshCronConversationBindings();
+
+watch(
+  () => Object.keys(runningConversationUids.value).sort().join(","),
+  () => {
+    scheduleCronBindingsPolling();
+  },
+  { immediate: true }
+);
+
+onBeforeUnmount(() => {
+  stopCronBindingsPolling();
+});
 
 watch(
   () => [
@@ -337,7 +384,9 @@ function isConversationRunning(conversationUid: string, running?: boolean) {
                 :title="t('cron.execution.statusRunning')"
                 aria-label="running"
               >
-                <LoaderCircle :size="12" />
+                <span class="conversation-running-icon-wrap" aria-hidden="true">
+                  <span class="conversation-running-icon" />
+                </span>
               </div>
               <div
                 v-else-if="item.unread"
@@ -586,11 +635,33 @@ function isConversationRunning(conversationUid: string, running?: boolean) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-success-500);
   width: var(--size-24);
   height: var(--size-24);
   margin-right: 2px;
   transition: opacity 0.18s ease, visibility 0.18s ease;
+}
+
+.conversation-running-icon-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-16);
+  height: var(--size-16);
+  color: #0f8f5c;
+}
+
+.conversation-running-icon {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.8px solid color-mix(in srgb, currentColor 24%, transparent);
+  border-top-color: currentColor;
+  animation: spin 1s linear infinite;
+  box-sizing: border-box;
+}
+
+:root[data-theme="dark"] .conversation-running-icon-wrap {
+  color: #3dffb5;
 }
 
 .conversation-unread-meta-icon {
@@ -601,12 +672,6 @@ function isConversationRunning(conversationUid: string, running?: boolean) {
   height: var(--size-24);
   margin-right: 2px;
   transition: opacity 0.18s ease, visibility 0.18s ease;
-}
-
-.conversation-running-meta-icon :deep(svg) {
-  transform-origin: center;
-  animation: conversation-running-spin 0.9s linear infinite;
-  stroke-width: 2.6;
 }
 
 .conversation-row.active .conversation-title {
