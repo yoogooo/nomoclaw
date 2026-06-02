@@ -133,7 +133,7 @@ async function refreshHistoryConversations() {
   refreshingHistory.value = true;
   refreshAnimating.value = true;
   try {
-    await conversationStore.refreshConversations();
+    await conversationStore.refreshConversations(conversationStore.currentConversationUid, true, true);
     await refreshCronConversationBindings();
     await fillConversationViewportIfNeeded();
   } catch {

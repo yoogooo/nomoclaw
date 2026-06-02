@@ -20,6 +20,7 @@ import type {
   ConversationMessage,
   ConversationMessageRun,
   ConversationRunStep,
+  ConversationSummaryPage,
   ConversationSummary,
   ModelConfig,
   ModelProviderOption,
@@ -29,6 +30,7 @@ import type {
 const APPROVAL_MODE_STORAGE_KEY = "chat:approval-mode-by-conversation";
 const CONVERSATION_PAGE_SIZE = 20;
 const MESSAGE_PAGE_SIZE = 20;
+const CONVERSATION_PAGE_FRESH_MS = 1000;
 
 interface ApprovalState {
   stepUid: string | null;
@@ -207,6 +209,14 @@ export const useConversationStore = defineStore("conversation", () => {
   let messageLoadToken = 0;
   let conversationSummaryPollTimer: number | null = null;
   let conversationSummaryPolling = false;
+  const conversationPageRequests = new Map<string, Promise<ConversationSummaryPage>>();
+  let lastConversationPageLoadedAt = 0;
+  let lastConversationPageAgentUid = "";
+  let conversationPageLoadedOnce = false;
+
+  function hasTrackedConversationStatus() {
+    return conversations.value.some((item) => item.running || item.waitingApproval);
+  }
 
   function loadApprovalModeMap(): Record<string, ApprovalMode> {
     if (typeof window === "undefined") return {};
@@ -539,7 +549,11 @@ export const useConversationStore = defineStore("conversation", () => {
 
   function scheduleConversationSummaryPolling() {
     stopConversationSummaryPolling();
-    if (typeof window === "undefined" || !agentCatalogStore.selectedAgentUid) {
+    if (
+      typeof window === "undefined"
+      || !agentCatalogStore.selectedAgentUid
+      || !hasTrackedConversationStatus()
+    ) {
       return;
     }
     conversationSummaryPollTimer = window.setTimeout(() => {
@@ -635,20 +649,48 @@ export const useConversationStore = defineStore("conversation", () => {
     });
   }
 
+  function buildConversationPageRequestKey(params: {
+    agentUid: string;
+    limit: number;
+    beforeSortKey?: string;
+    asOf?: string;
+  }) {
+    return JSON.stringify({
+      agentUid: params.agentUid,
+      limit: params.limit,
+      beforeSortKey: params.beforeSortKey || "",
+      asOf: params.asOf || ""
+    });
+  }
+
   async function fetchConversationPage(params: {
     beforeSortKey?: string | null;
     asOf?: string;
   }) {
-    return conversationApi.listConversationPage({
+    const requestParams = {
       agentUid: agentCatalogStore.selectedAgentUid || "",
       limit: CONVERSATION_PAGE_SIZE,
       beforeSortKey: params.beforeSortKey || undefined,
       asOf: params.asOf
-    });
+    };
+    const requestKey = buildConversationPageRequestKey(requestParams);
+    const inFlight = conversationPageRequests.get(requestKey);
+    if (inFlight) {
+      return inFlight;
+    }
+    const request = conversationApi.listConversationPage(requestParams)
+      .finally(() => {
+        if (conversationPageRequests.get(requestKey) === request) {
+          conversationPageRequests.delete(requestKey);
+        }
+      });
+    conversationPageRequests.set(requestKey, request);
+    return request;
   }
 
   async function syncConversationSummaries() {
     const latestPage = await fetchConversationPage({});
+    markConversationPageLoaded();
     patchConversationListWithLatest(latestPage.items);
     agentCatalogStore.ensureSelection();
 
@@ -678,6 +720,23 @@ export const useConversationStore = defineStore("conversation", () => {
         runningConversationUid.value = null;
       }
     }
+  }
+
+  function canReuseFreshConversationPage(force: boolean) {
+    if (force || !conversationPageLoadedOnce) {
+      return false;
+    }
+    const currentAgentUid = String(agentCatalogStore.selectedAgentUid || "").trim();
+    if (!currentAgentUid || currentAgentUid !== lastConversationPageAgentUid) {
+      return false;
+    }
+    return Date.now() - lastConversationPageLoadedAt < CONVERSATION_PAGE_FRESH_MS;
+  }
+
+  function markConversationPageLoaded() {
+    lastConversationPageLoadedAt = Date.now();
+    lastConversationPageAgentUid = String(agentCatalogStore.selectedAgentUid || "").trim();
+    conversationPageLoadedOnce = true;
   }
 
   async function pollConversationSummaries() {
@@ -969,7 +1028,11 @@ export const useConversationStore = defineStore("conversation", () => {
     }
   }
 
-  async function loadConversationSummaries() {
+  async function loadConversationSummaries(force = false) {
+    if (canReuseFreshConversationPage(force)) {
+      scheduleConversationSummaryPolling();
+      return;
+    }
     conversationListLoading.value = true;
     try {
       const page = await fetchConversationPage({});
@@ -978,6 +1041,7 @@ export const useConversationStore = defineStore("conversation", () => {
       conversationListCursor.value = page.nextBeforeSortKey || null;
       conversationListHasMore.value = Boolean(page.hasMore);
       dirtyConversationUids.value = [];
+      markConversationPageLoaded();
     } finally {
       conversationListLoading.value = false;
       scheduleConversationSummaryPolling();
@@ -1018,13 +1082,14 @@ export const useConversationStore = defineStore("conversation", () => {
 
   async function refreshConversations(
     preferredConversationUid: string | null = currentConversationUid.value,
-    withLoading = true
+    withLoading = true,
+    force = false
   ) {
     if (withLoading) {
       loading.value = true;
     }
     try {
-      await loadConversationSummaries();
+      await loadConversationSummaries(force);
 
       if (!filteredConversations.value.length) {
         currentConversationUid.value = null;
@@ -1072,7 +1137,7 @@ export const useConversationStore = defineStore("conversation", () => {
     await Promise.all([agentCatalogStore.loadCatalog(), loadModelConfig()]);
     loading.value = true;
     try {
-      await loadConversationSummaries();
+      await loadConversationSummaries(true);
 
       if (!filteredConversations.value.length) {
         startDraftConversation();
@@ -1157,7 +1222,7 @@ export const useConversationStore = defineStore("conversation", () => {
   }
 
   async function applyAgentSelection() {
-    await refreshConversations();
+    await refreshConversations(currentConversationUid.value, true, true);
     if (!filteredConversations.value.length) {
       startDraftConversation();
       return;
@@ -1167,7 +1232,7 @@ export const useConversationStore = defineStore("conversation", () => {
 
   async function renameConversation(conversationUid: string, title: string) {
     await conversationApi.updateConversationTitle(conversationUid, title);
-    await refreshConversations(conversationUid);
+    await refreshConversations(conversationUid, true, true);
     if (conversationUid === currentConversationUid.value) {
       await loadMessages(conversationUid);
     }
@@ -1175,7 +1240,7 @@ export const useConversationStore = defineStore("conversation", () => {
 
   async function updateConversationPin(conversationUid: string, pinned: boolean) {
     await conversationApi.updateConversationPin(conversationUid, pinned);
-    await refreshConversations(conversationUid);
+    await refreshConversations(conversationUid, true, true);
   }
 
   async function deleteConversation(conversationUid: string) {
@@ -1183,7 +1248,7 @@ export const useConversationStore = defineStore("conversation", () => {
     if (conversationUid === currentConversationUid.value) {
       startDraftConversation();
     }
-    await refreshConversations();
+    await refreshConversations(currentConversationUid.value, true, true);
   }
 
   async function ensureConversationForInteraction() {
@@ -1195,7 +1260,7 @@ export const useConversationStore = defineStore("conversation", () => {
     const createAgentUid = agentCatalogStore.selectedAgentUid;
     const created = await conversationApi.createConversation(createGroupUid, createAgentUid);
     currentConversationUid.value = created.conversationUid;
-    await refreshConversations(created.conversationUid, false);
+    await refreshConversations(created.conversationUid, false, true);
     subscribeEvents();
     return created.conversationUid;
   }
@@ -1214,7 +1279,7 @@ export const useConversationStore = defineStore("conversation", () => {
     saveChatLastViewState({ mode: "conversation", conversationUid });
     disconnectEventSource();
     subscribeEvents();
-    void refreshConversations(conversationUid, false);
+    void refreshConversations(conversationUid, false, true);
     return conversationUid;
   }
 
@@ -1354,7 +1419,7 @@ export const useConversationStore = defineStore("conversation", () => {
         updatedTime: new Date().toISOString()
       });
       runtimeLogStore.append(tr("chat.runtime.messageSubmitted", { messageUid: accepted.messageUid }));
-      await refreshConversations(conversationUid, false);
+      await refreshConversations(conversationUid, false, true);
       scheduleConversationSummaryPolling();
     } catch (error) {
       messages.value = messages.value.filter((item) => item !== tempMessage);
@@ -1384,6 +1449,19 @@ export const useConversationStore = defineStore("conversation", () => {
 
   function markConversationReadLocally(conversationUid: string) {
     patchConversationSummaryLocally(conversationUid, { unread: false });
+  }
+
+  function finalizeActiveConversationSummary(conversationUid: string) {
+    const currentSummary = conversations.value.find((item) => item.conversationUid === conversationUid);
+    if (!currentSummary) {
+      return;
+    }
+    patchConversationSummaryLocally(conversationUid, {
+      running: false,
+      waitingApproval: false,
+      unread: false,
+      updatedTime: new Date().toISOString()
+    });
   }
 
   async function keepCurrentConversationRead(conversationUid: string) {
@@ -1683,11 +1761,11 @@ export const useConversationStore = defineStore("conversation", () => {
         const activeConversationUid = currentConversationUid.value;
         await refreshLatestMessages(activeConversationUid);
         if (!skipConversationListRefresh.value) {
-          await refreshConversations(activeConversationUid, false);
+          finalizeActiveConversationSummary(activeConversationUid);
         }
         await keepCurrentConversationRead(activeConversationUid);
       } else {
-        await loadConversationSummaries();
+        await loadConversationSummaries(true);
       }
       scheduleConversationSummaryPolling();
       return;
@@ -1715,11 +1793,11 @@ export const useConversationStore = defineStore("conversation", () => {
         const activeConversationUid = currentConversationUid.value;
         await refreshLatestMessages(activeConversationUid);
         if (!skipConversationListRefresh.value) {
-          await refreshConversations(activeConversationUid, false);
+          finalizeActiveConversationSummary(activeConversationUid);
         }
         await keepCurrentConversationRead(activeConversationUid);
       } else {
-        await loadConversationSummaries();
+        await loadConversationSummaries(true);
       }
       scheduleConversationSummaryPolling();
     }
