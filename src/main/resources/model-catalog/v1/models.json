@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "catalogVersion": "2026-04-25.1",
-  "generatedAt": "2026-04-25T00:00:00Z",
+  "catalogVersion": "2026-06-03.1",
+  "generatedAt": "2026-06-03T00:00:00Z",
   "models": [
     {
       "providerIds": [
@@ -188,6 +188,45 @@
       ],
       "lastVerifiedAt": "2026-04-16",
       "confidence": "high"
+    },
+    {
+      "providerIds": [
+        "dashscope",
+        "aliyun-codingplan"
+      ],
+      "modelId": "qwen3.7-plus",
+      "displayName": "Qwen3.7 Plus",
+      "aliases": [],
+      "inputModalities": [
+        "text",
+        "image",
+        "video"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "reasoning": true,
+      "contextWindowTokens": 1000000,
+      "maxInputTokens": 983616,
+      "maxOutputTokens": 65536,
+      "uploadPolicy": {
+        "enabled": true,
+        "allowedMimeGroups": [
+          "image",
+          "video"
+        ],
+        "maxFilesPerMessage": 1,
+        "maxImagesPerMessage": 10,
+        "maxFileBytes": 0,
+        "maxTotalBytes": 104857600,
+        "singleMimeGroupOnly": true,
+        "allowMixedImageAndFile": false
+      },
+      "sourceRefs": [
+        "https://help.aliyun.com/zh/model-studio/models"
+      ],
+      "lastVerifiedAt": "2026-06-03",
+      "confidence": "medium"
     },
     {
       "providerIds": [

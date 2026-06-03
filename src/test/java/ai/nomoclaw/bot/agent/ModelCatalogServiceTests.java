@@ -49,9 +49,12 @@ class ModelCatalogServiceTests {
 
         var alias = service.resolve("dashscope", "qwen3-max-2026-01-23");
         var global = service.resolve("aliyun-codingplan", "gpt-4o");
+        var qwen = service.resolve("dashscope", "qwen3.7-plus");
 
         assertThat(alias.matched()).isTrue();
         assertThat(global.matched()).isTrue();
+        assertThat(qwen.matched()).isTrue();
+        assertThat(qwen.displayName()).isEqualTo("Qwen3.7 Plus");
         assertThat(global.source()).isEqualTo("bundled");
     }
 

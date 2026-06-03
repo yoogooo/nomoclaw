@@ -24,9 +24,7 @@ public final class ModelProviderDefaults {
                         List.of(
                                 model("gpt-5.5", "GPT-5.5", List.of("text", "image"), true, 0, 0, 0, imageUpload()),
                                 model("gpt-5.4", "GPT-5.4", List.of("text", "image"), true, 0, 0, 0, imageUpload()),
-                                model("gpt-5.4-mini", "GPT-5.4 Mini", List.of("text", "image"), true, 0, 0, 0, imageUpload()),
-                                model("gpt-5.3-codex", "GPT-5.3 Codex", List.of("text", "image"), true, 0, 0, 0, imageUpload()),
-                                model("gpt-5.2", "GPT-5.2", List.of("text", "image"), true, 0, 0, 0, imageUpload())
+                                model("gpt-5.4-mini", "GPT-5.4 Mini", List.of("text", "image"), true, 0, 0, 0, imageUpload())
                         )
                 ),
                 provider(
@@ -57,7 +55,8 @@ public final class ModelProviderDefaults {
                         List.of(
                                 model("qwen3-max", "Qwen3 Max", List.of("text"), true, 0, 0, 0, disabledUpload()),
                                 model("qwen3.5-plus", "qwen3.5-plus", List.of("text", "image"), true, 0, 0, 0, disabledUpload()),
-                                model("qwen3.6-plus", "qwen3.6-plus", List.of("text", "image"), true, 0, 0, 0, disabledUpload())
+                                model("qwen3.6-plus", "qwen3.6-plus", List.of("text", "image"), true, 0, 0, 0, disabledUpload()),
+                                model("qwen3.7-plus", "qwen3.7-plus", List.of("text", "image"), true, 0, 0, 0, disabledUpload())
                         )
                 ),
                 provider(
@@ -73,6 +72,7 @@ public final class ModelProviderDefaults {
                                 List.of(
                                         model("qwen3.5-plus", "Qwen3.5 Plus", List.of("text"), true, 0, 0, 0,
                                         new ModelConfigDto.UploadPolicy(true, List.of("image", "pdf", "text"), 1, 5, 20971520L, 104857600L, true, false)),
+                                model("qwen3.7-plus", "Qwen3.7 Plus", List.of("text"), true, 0, 0, 0, disabledUpload()),
                                 model("glm-5", "GLM-5", List.of("text"), true, 0, 0, 0, disabledUpload()),
                                 model("glm-4.7", "GLM-4.7", List.of("text"), true, 0, 0, 0, disabledUpload()),
                                 model("MiniMax-M2.5", "MiniMax M2.5", List.of("text"), true, 0, 0, 0, disabledUpload()),
