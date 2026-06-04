@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "catalogVersion": "2026-06-03.1",
-  "generatedAt": "2026-06-03T00:00:00Z",
+  "catalogVersion": "2026-06-04.1",
+  "generatedAt": "2026-06-04T00:00:00Z",
   "models": [
     {
       "providerIds": [
@@ -81,6 +81,44 @@
         "dashscope",
         "aliyun-codingplan"
       ],
+      "modelId": "qwen3.7-max",
+      "displayName": "Qwen3.7 Max",
+      "aliases": [
+        "qwen3.7-max-2026-05-20",
+        "qwen3.7-max-preview",
+        "qwen3.7-max-2026-05-17"
+      ],
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "reasoning": true,
+      "contextWindowTokens": 1000000,
+      "maxInputTokens": 0,
+      "maxOutputTokens": 65536,
+      "uploadPolicy": {
+        "enabled": false,
+        "allowedMimeGroups": [],
+        "maxFilesPerMessage": 0,
+        "maxImagesPerMessage": 0,
+        "maxFileBytes": 0,
+        "maxTotalBytes": 0,
+        "singleMimeGroupOnly": false,
+        "allowMixedImageAndFile": false
+      },
+      "sourceRefs": [
+        "https://help.aliyun.com/zh/model-studio/text-generation-model/"
+      ],
+      "lastVerifiedAt": "2026-06-04",
+      "confidence": "high"
+    },
+    {
+      "providerIds": [
+        "dashscope",
+        "aliyun-codingplan"
+      ],
       "modelId": "qwen3-max",
       "displayName": "Qwen3 Max",
       "aliases": [
@@ -94,8 +132,8 @@
       ],
       "reasoning": true,
       "contextWindowTokens": 262144,
-      "maxInputTokens": 258048,
-      "maxOutputTokens": 65536,
+      "maxInputTokens": 0,
+      "maxOutputTokens": 0,
       "uploadPolicy": {
         "enabled": false,
         "allowedMimeGroups": [],
@@ -107,9 +145,9 @@
         "allowMixedImageAndFile": false
       },
       "sourceRefs": [
-        "https://help.aliyun.com/zh/model-studio/models"
+        "https://help.aliyun.com/zh/model-studio/text-generation-model/"
       ],
-      "lastVerifiedAt": "2026-04-16",
+      "lastVerifiedAt": "2026-06-04",
       "confidence": "high"
     },
     {
@@ -130,7 +168,7 @@
       ],
       "reasoning": true,
       "contextWindowTokens": 1000000,
-      "maxInputTokens": 983616,
+      "maxInputTokens": 0,
       "maxOutputTokens": 65536,
       "uploadPolicy": {
         "enabled": true,
@@ -138,17 +176,18 @@
           "image",
           "video"
         ],
-        "maxFilesPerMessage": 1,
-        "maxImagesPerMessage": 10,
+        "maxFilesPerMessage": 64,
+        "maxImagesPerMessage": 256,
         "maxFileBytes": 0,
-        "maxTotalBytes": 104857600,
+        "maxTotalBytes": 0,
         "singleMimeGroupOnly": true,
         "allowMixedImageAndFile": false
       },
       "sourceRefs": [
-        "https://help.aliyun.com/zh/model-studio/models"
+        "https://help.aliyun.com/zh/model-studio/text-generation-model/",
+        "https://help.aliyun.com/zh/model-studio/vision-model"
       ],
-      "lastVerifiedAt": "2026-04-16",
+      "lastVerifiedAt": "2026-06-04",
       "confidence": "high"
     },
     {
@@ -168,7 +207,7 @@
       ],
       "reasoning": true,
       "contextWindowTokens": 1000000,
-      "maxInputTokens": 983616,
+      "maxInputTokens": 0,
       "maxOutputTokens": 65536,
       "uploadPolicy": {
         "enabled": true,
@@ -176,17 +215,18 @@
           "image",
           "video"
         ],
-        "maxFilesPerMessage": 1,
-        "maxImagesPerMessage": 10,
+        "maxFilesPerMessage": 64,
+        "maxImagesPerMessage": 256,
         "maxFileBytes": 0,
-        "maxTotalBytes": 104857600,
+        "maxTotalBytes": 0,
         "singleMimeGroupOnly": true,
         "allowMixedImageAndFile": false
       },
       "sourceRefs": [
-        "https://help.aliyun.com/zh/model-studio/models"
+        "https://help.aliyun.com/zh/model-studio/text-generation-model/",
+        "https://help.aliyun.com/zh/model-studio/vision-model"
       ],
-      "lastVerifiedAt": "2026-04-16",
+      "lastVerifiedAt": "2026-06-04",
       "confidence": "high"
     },
     {
@@ -207,7 +247,7 @@
       ],
       "reasoning": true,
       "contextWindowTokens": 1000000,
-      "maxInputTokens": 983616,
+      "maxInputTokens": 0,
       "maxOutputTokens": 65536,
       "uploadPolicy": {
         "enabled": true,
@@ -215,18 +255,19 @@
           "image",
           "video"
         ],
-        "maxFilesPerMessage": 1,
-        "maxImagesPerMessage": 10,
+        "maxFilesPerMessage": 64,
+        "maxImagesPerMessage": 2048,
         "maxFileBytes": 0,
-        "maxTotalBytes": 104857600,
+        "maxTotalBytes": 0,
         "singleMimeGroupOnly": true,
         "allowMixedImageAndFile": false
       },
       "sourceRefs": [
-        "https://help.aliyun.com/zh/model-studio/models"
+        "https://help.aliyun.com/zh/model-studio/text-generation-model/",
+        "https://help.aliyun.com/zh/model-studio/vision-model"
       ],
-      "lastVerifiedAt": "2026-06-03",
-      "confidence": "medium"
+      "lastVerifiedAt": "2026-06-04",
+      "confidence": "high"
     },
     {
       "providerIds": [

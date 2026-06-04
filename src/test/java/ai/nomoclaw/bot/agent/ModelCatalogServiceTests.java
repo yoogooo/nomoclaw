@@ -48,13 +48,22 @@ class ModelCatalogServiceTests {
         ModelCatalogService service = new ModelCatalogService(HttpClient.newHttpClient(), "");
 
         var alias = service.resolve("dashscope", "qwen3-max-2026-01-23");
+        var qwenMax = service.resolve("dashscope", "qwen3.7-max");
         var global = service.resolve("aliyun-codingplan", "gpt-4o");
         var qwen = service.resolve("dashscope", "qwen3.7-plus");
 
         assertThat(alias.matched()).isTrue();
+        assertThat(qwenMax.matched()).isTrue();
         assertThat(global.matched()).isTrue();
         assertThat(qwen.matched()).isTrue();
+        assertThat(qwenMax.contextWindowTokens()).isEqualTo(1000000);
+        assertThat(qwenMax.maxOutputTokens()).isEqualTo(65536);
         assertThat(qwen.displayName()).isEqualTo("Qwen3.7 Plus");
+        assertThat(qwen.inputModalities()).contains("text", "image", "video");
+        assertThat(qwen.contextWindowTokens()).isEqualTo(1000000);
+        assertThat(qwen.maxOutputTokens()).isEqualTo(65536);
+        assertThat(qwen.uploadPolicy().enabled()).isTrue();
+        assertThat(qwen.uploadPolicy().maxImagesPerMessage()).isEqualTo(2048);
         assertThat(global.source()).isEqualTo("bundled");
     }
 

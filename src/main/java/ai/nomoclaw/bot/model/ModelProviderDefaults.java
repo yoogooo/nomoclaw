@@ -51,12 +51,16 @@ public final class ModelProviderDefaults {
                         true,
                         "https://dashscope.aliyuncs.com/compatible-mode/v1",
                         "",
-                        "qwen3-max",
+                        "qwen3.7-max",
                         List.of(
-                                model("qwen3-max", "Qwen3 Max", List.of("text"), true, 0, 0, 0, disabledUpload()),
-                                model("qwen3.5-plus", "qwen3.5-plus", List.of("text", "image"), true, 0, 0, 0, disabledUpload()),
-                                model("qwen3.6-plus", "qwen3.6-plus", List.of("text", "image"), true, 0, 0, 0, disabledUpload()),
-                                model("qwen3.7-plus", "qwen3.7-plus", List.of("text", "image"), true, 0, 0, 0, disabledUpload())
+                                model("qwen3.7-max", "Qwen3.7 Max", List.of("text"), true, 1000000, 0, 65536, disabledUpload()),
+                                model("qwen3-max", "Qwen3 Max", List.of("text"), true, 262144, 0, 0, disabledUpload()),
+                                model("qwen3.5-plus", "Qwen3.5 Plus", List.of("text", "image", "video"), true, 1000000, 0, 65536,
+                                        new ModelConfigDto.UploadPolicy(true, List.of("image", "video"), 64, 256, 0L, 0L, true, false)),
+                                model("qwen3.6-plus", "Qwen3.6 Plus", List.of("text", "image", "video"), true, 1000000, 0, 65536,
+                                        new ModelConfigDto.UploadPolicy(true, List.of("image", "video"), 64, 256, 0L, 0L, true, false)),
+                                model("qwen3.7-plus", "Qwen3.7 Plus", List.of("text", "image", "video"), true, 1000000, 0, 65536,
+                                        new ModelConfigDto.UploadPolicy(true, List.of("image", "video"), 64, 2048, 0L, 0L, true, false))
                         )
                 ),
                 provider(
