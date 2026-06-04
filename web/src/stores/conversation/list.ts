@@ -99,7 +99,7 @@ export function createConversationListModule(
     ]);
     if (state.currentConversationUid.value && !knownConversationUids.has(state.currentConversationUid.value)) {
       state.currentConversationUid.value = null;
-      state.runningConversationUid.value = null;
+      state.runningConversationUids.value = {};
       deps.messagesModule().resetMessageState();
       deps.runtimeModule().resetRuntimePanels();
       deps.disconnectEventSource();
@@ -108,11 +108,11 @@ export function createConversationListModule(
       return;
     }
 
-    if (state.currentConversationUid.value && state.runningConversationUid.value) {
+    if (state.currentConversationUid.value && isConversationRunningLocally(state.currentConversationUid.value)) {
       const currentSummary = state.conversations.value.find((item) => item.conversationUid === state.currentConversationUid.value)
         || latestPage.items.find((item) => item.conversationUid === state.currentConversationUid.value);
-      if (currentSummary && !currentSummary.running && state.runningConversationUid.value === currentSummary.conversationUid) {
-        state.runningConversationUid.value = null;
+      if (currentSummary && !currentSummary.running) {
+        clearConversationRunningLocally(currentSummary.conversationUid);
       }
     }
   }
@@ -181,6 +181,32 @@ export function createConversationListModule(
     );
   }
 
+  function markConversationRunningLocally(conversationUid: string) {
+    const normalizedConversationUid = String(conversationUid || "").trim();
+    if (!normalizedConversationUid || state.runningConversationUids.value[normalizedConversationUid]) {
+      return;
+    }
+    state.runningConversationUids.value = {
+      ...state.runningConversationUids.value,
+      [normalizedConversationUid]: true
+    };
+  }
+
+  function clearConversationRunningLocally(conversationUid: string) {
+    const normalizedConversationUid = String(conversationUid || "").trim();
+    if (!normalizedConversationUid || !state.runningConversationUids.value[normalizedConversationUid]) {
+      return;
+    }
+    const nextRunningConversationUids = { ...state.runningConversationUids.value };
+    delete nextRunningConversationUids[normalizedConversationUid];
+    state.runningConversationUids.value = nextRunningConversationUids;
+  }
+
+  function isConversationRunningLocally(conversationUid: string | null | undefined) {
+    const normalizedConversationUid = String(conversationUid || "").trim();
+    return Boolean(normalizedConversationUid && state.runningConversationUids.value[normalizedConversationUid]);
+  }
+
   function finalizeActiveConversationSummary(conversationUid: string) {
     const currentSummary = state.conversations.value.find((item) => item.conversationUid === conversationUid);
     if (!currentSummary) {
@@ -206,7 +232,7 @@ export function createConversationListModule(
 
       if (!state.filteredConversations.value.length) {
         state.currentConversationUid.value = null;
-        state.runningConversationUid.value = null;
+        state.runningConversationUids.value = {};
         deps.messagesModule().resetMessageState();
         deps.runtimeModule().resetRuntimePanels();
         deps.disconnectEventSource();
@@ -276,6 +302,9 @@ export function createConversationListModule(
     refreshConversations,
     init,
     patchConversationSummaryLocally,
-    finalizeActiveConversationSummary
+    finalizeActiveConversationSummary,
+    markConversationRunningLocally,
+    clearConversationRunningLocally,
+    isConversationRunningLocally
   };
 }

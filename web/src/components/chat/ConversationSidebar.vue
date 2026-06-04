@@ -336,8 +336,7 @@ function isConversationRunning(conversationUid: string, running?: boolean) {
   if (runningConversationUids.value[normalizedConversationUid]) {
     return true;
   }
-  const normalizedRunningUid = String(conversationStore.runningConversationUid || "").trim();
-  return Boolean(normalizedRunningUid && normalizedConversationUid === normalizedRunningUid);
+  return Boolean(conversationStore.runningConversationUids[normalizedConversationUid]);
 }
 
 function handleConversationListScroll(event: Event) {

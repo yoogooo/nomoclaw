@@ -63,7 +63,7 @@ export interface ConversationStoreStateRefs {
   conversationListHasMore: Ref<boolean>;
   conversationListLoading: Ref<boolean>;
   currentConversationUid: Ref<string | null>;
-  runningConversationUid: Ref<string | null>;
+  runningConversationUids: Ref<Record<string, true>>;
   messages: Ref<ConversationMessage[]>;
   messageHistoryCursor: Ref<string | null>;
   messageHistoryHasMore: Ref<boolean>;
@@ -145,6 +145,9 @@ export interface ConversationListModule {
   init: () => Promise<void>;
   patchConversationSummaryLocally: (conversationUid: string, patch: Partial<ConversationSummary>) => void;
   finalizeActiveConversationSummary: (conversationUid: string) => void;
+  markConversationRunningLocally: (conversationUid: string) => void;
+  clearConversationRunningLocally: (conversationUid: string) => void;
+  isConversationRunningLocally: (conversationUid: string | null | undefined) => boolean;
 }
 
 export interface ConversationMessagesModule {

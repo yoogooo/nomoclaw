@@ -170,7 +170,7 @@ export function createConversationComposerModule(
   }
 
   async function sendMessage() {
-    if (state.currentConversationUid.value && state.runningConversationUid.value === state.currentConversationUid.value) {
+    if (deps.listModule().isConversationRunningLocally(state.currentConversationUid.value)) {
       await cancelRunningMessage();
       return;
     }
@@ -227,7 +227,7 @@ export function createConversationComposerModule(
         approvalMode: state.approvalMode.value
       });
       tempMessage.messageUid = accepted.messageUid;
-      state.runningConversationUid.value = conversationUid;
+      deps.listModule().markConversationRunningLocally(conversationUid);
       const lastUserMessageTime = tempMessage.createdTime || new Date().toISOString();
       deps.listModule().patchConversationSummaryLocally(conversationUid, {
         running: true,
@@ -252,7 +252,7 @@ export function createConversationComposerModule(
     deps.messagesModule().markConversationReadLocally(activeConversationUid);
     await storeDeps.conversationApi.cancelConversation(activeConversationUid);
     await deps.messagesModule().keepCurrentConversationRead(activeConversationUid);
-    state.runningConversationUid.value = null;
+    deps.listModule().clearConversationRunningLocally(activeConversationUid);
     deps.listModule().scheduleConversationSummaryPolling();
   }
 

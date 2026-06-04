@@ -96,6 +96,7 @@ export function createConversationEventsModule(
           waitingApproval: true,
           running: true
         });
+        listModule.markConversationRunningLocally(event.conversationUid);
       }
       listModule.scheduleConversationSummaryPolling();
       return;
@@ -109,6 +110,7 @@ export function createConversationEventsModule(
           waitingApproval: false,
           running: true
         });
+        listModule.markConversationRunningLocally(event.conversationUid);
       }
       runtimeModule.updateBrowserRuntimeOverlayFromStepEvent(event);
       if (!Boolean(event.payload.silentLog)) {
@@ -180,7 +182,9 @@ export function createConversationEventsModule(
           maxRounds: event.payload.maxRounds
         }));
       }
-      state.runningConversationUid.value = null;
+      if (event.conversationUid) {
+        listModule.clearConversationRunningLocally(event.conversationUid);
+      }
       if (state.currentConversationUid.value) {
         const activeConversationUid = state.currentConversationUid.value;
         await messagesModule.refreshLatestMessages(activeConversationUid);
@@ -212,7 +216,9 @@ export function createConversationEventsModule(
       if (latestUserMessage?.messageUid) {
         storeDeps.conversationRunsStore.markRunCanceled(latestUserMessage.messageUid);
       }
-      state.runningConversationUid.value = null;
+      if (event.conversationUid) {
+        listModule.clearConversationRunningLocally(event.conversationUid);
+      }
       if (state.currentConversationUid.value) {
         const activeConversationUid = state.currentConversationUid.value;
         await messagesModule.refreshLatestMessages(activeConversationUid);

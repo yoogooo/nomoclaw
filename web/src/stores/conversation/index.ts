@@ -34,7 +34,7 @@ export const useConversationStore = defineStore("conversation", () => {
   const conversationListHasMore = ref(false);
   const conversationListLoading = ref(false);
   const currentConversationUid = ref<string | null>(null);
-  const runningConversationUid = ref<string | null>(null);
+  const runningConversationUids = ref<Record<string, true>>({});
   const messages = ref<ConversationMessage[]>([]);
   const messageHistoryCursor = ref<string | null>(null);
   const messageHistoryHasMore = ref(false);
@@ -149,7 +149,7 @@ export const useConversationStore = defineStore("conversation", () => {
       conversationListHasMore,
       conversationListLoading,
       currentConversationUid,
-      runningConversationUid,
+      runningConversationUids,
       messages,
       messageHistoryCursor,
       messageHistoryHasMore,
@@ -289,7 +289,7 @@ export const useConversationStore = defineStore("conversation", () => {
     currentConversationUid,
     currentConversation,
     currentConversationTitle,
-    runningConversationUid,
+    runningConversationUids,
     messages,
     conversationListHasMore,
     conversationListLoading,

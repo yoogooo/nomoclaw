@@ -88,8 +88,10 @@ const displayedMessages = computed(() => {
   return allMessages.slice(start);
 });
 const isRunningCurrentConversation = computed(() =>
-  Boolean(conversationStore.currentConversationUid)
-  && conversationStore.runningConversationUid === conversationStore.currentConversationUid
+  (() => {
+    const conversationUid = conversationStore.currentConversationUid;
+    return Boolean(conversationUid && conversationStore.runningConversationUids[conversationUid]);
+  })()
 );
 const hasWaitingApprovalInCurrentConversation = computed(() => {
   if (conversationStore.approval.stepUid) return true;

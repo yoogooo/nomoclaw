@@ -23,8 +23,10 @@ const previewImageUrl = ref("");
 const isImeComposing = ref(false);
 
 const isRunningCurrentConversation = computed(() =>
-  conversationStore.runningConversationUid === conversationStore.currentConversationUid
-  && Boolean(conversationStore.currentConversationUid)
+  (() => {
+    const conversationUid = conversationStore.currentConversationUid;
+    return Boolean(conversationUid && conversationStore.runningConversationUids[conversationUid]);
+  })()
 );
 const isMessageEmpty = computed(() => conversationStore.draftMessage.trim().length === 0);
 const isSubmitDisabled = computed(() => !isRunningCurrentConversation.value && isMessageEmpty.value);

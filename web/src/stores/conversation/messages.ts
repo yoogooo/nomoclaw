@@ -34,12 +34,10 @@ export function createConversationMessagesModule(
       .find((item) => item.role === "user" && item.messageUid);
     const isRunning = isInProgressMessageStatus(latestUserMessage?.status);
     if (isRunning) {
-      state.runningConversationUid.value = conversationUid;
+      deps.listModule().markConversationRunningLocally(conversationUid);
       return;
     }
-    if (state.runningConversationUid.value === conversationUid) {
-      state.runningConversationUid.value = null;
-    }
+    deps.listModule().clearConversationRunningLocally(conversationUid);
   }
 
   function resetMessageState() {
@@ -119,7 +117,6 @@ export function createConversationMessagesModule(
   function startDraftConversation() {
     const previousMessages = [...state.messages.value];
     state.currentConversationUid.value = null;
-    state.runningConversationUid.value = null;
     resetMessageState();
     state.draftMessage.value = "";
     state.draftAttachments.value = [];
