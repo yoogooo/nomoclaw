@@ -1,7 +1,5 @@
 package ai.nomoclaw.bot.conversation.service;
 
-import ai.nomoclaw.bot.util.UuidUtil;
-
 import ai.nomoclaw.bot.config.AgentProperties;
 import ai.nomoclaw.bot.conversation.model.ConversationAttachmentDto;
 import ai.nomoclaw.bot.conversation.model.ConversationMessageDto;
@@ -25,6 +23,7 @@ import ai.nomoclaw.bot.store.AgentStore;
 import ai.nomoclaw.bot.store.query.ConversationPageQuery;
 import ai.nomoclaw.bot.store.query.MessagePageQuery;
 import ai.nomoclaw.bot.store.query.PageSlice;
+import ai.nomoclaw.bot.util.UuidUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
@@ -38,6 +37,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -101,6 +101,11 @@ public class ConversationService {
     public List<ConversationSummaryDto> listConversations() {
         return store.listConversations().stream()
                 .map(this::toConversationSummary)
+                .sorted(Comparator
+                        .comparing(ConversationSummaryDto::pinned)
+                        .reversed()
+                        .thenComparing(ConversationSummaryDto::lastUserMessageTime, Comparator.reverseOrder())
+                        .thenComparing(ConversationSummaryDto::conversationUid, Comparator.reverseOrder()))
                 .toList();
     }
 
@@ -113,7 +118,7 @@ public class ConversationService {
                 normalizedLimit,
                 snapshotTime,
                 cursor == null ? null : cursor.pinned(),
-                cursor == null ? null : cursor.updatedAt(),
+                cursor == null ? null : cursor.lastUserMessageTime(),
                 cursor == null ? null : cursor.id()
         ));
         List<ConversationSummaryDto> items = page.items().stream()
@@ -121,7 +126,7 @@ public class ConversationService {
                 .toList();
         String nextBeforeSortKey = null;
         if (page.hasMore() && !page.items().isEmpty()) {
-            nextBeforeSortKey = encodeConversationSortCursor(page.items().get(page.items().size() - 1));
+            nextBeforeSortKey = encodeConversationSortCursor(items.get(items.size() - 1));
         }
         return new ConversationSummaryPageDto(items, page.hasMore(), nextBeforeSortKey, snapshotTime);
     }
@@ -225,6 +230,7 @@ public class ConversationService {
                 waitingApproval,
                 unread,
                 conversation.lastTaskTerminalAt(),
+                conversation.lastUserMessageAt(),
                 conversation.createdAt(),
                 conversation.updatedAt()
         );
@@ -436,12 +442,12 @@ public class ConversationService {
         }
     }
 
-    private String encodeConversationSortCursor(AgentConversation conversation) {
-        Long sortId = store.findConversationSortId(conversation.conversationUid())
-                .orElseThrow(() -> new IllegalArgumentException("conversation not found: " + conversation.conversationUid()));
-        String raw = (conversation.pinned() ? 1 : 0)
+    private String encodeConversationSortCursor(ConversationSummaryDto summary) {
+        Long sortId = store.findConversationSortId(summary.conversationUid())
+                .orElseThrow(() -> new IllegalArgumentException("conversation not found: " + summary.conversationUid()));
+        String raw = (summary.pinned() ? 1 : 0)
                 + "|"
-                + conversation.updatedAt().toEpochMilli()
+                + summary.lastUserMessageTime().toEpochMilli()
                 + "|"
                 + sortId;
         return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
@@ -522,7 +528,7 @@ public class ConversationService {
 
     private record ConversationSortCursor(
             Integer pinned,
-            Instant updatedAt,
+            Instant lastUserMessageTime,
             Long id
     ) {
     }

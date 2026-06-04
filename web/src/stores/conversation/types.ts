@@ -62,7 +62,6 @@ export interface ConversationStoreStateRefs {
   conversationListCursor: Ref<string | null>;
   conversationListHasMore: Ref<boolean>;
   conversationListLoading: Ref<boolean>;
-  dirtyConversationUids: Ref<string[]>;
   currentConversationUid: Ref<string | null>;
   runningConversationUid: Ref<string | null>;
   messages: Ref<ConversationMessage[]>;
@@ -83,7 +82,6 @@ export interface ConversationStoreStateRefs {
   skipConversationListRefresh: Ref<boolean>;
   streamingAssistantByParentUid: Ref<Record<string, number>>;
   filteredConversations: ComputedRef<ConversationSummary[]>;
-  hasConversationListUpdates: ComputedRef<boolean>;
   currentConversation: ComputedRef<ConversationSummary | null>;
   currentConversationTitle: ComputedRef<string>;
   configuredProviders: ComputedRef<any[]>;
@@ -147,8 +145,6 @@ export interface ConversationListModule {
   init: () => Promise<void>;
   patchConversationSummaryLocally: (conversationUid: string, patch: Partial<ConversationSummary>) => void;
   finalizeActiveConversationSummary: (conversationUid: string) => void;
-  clearConversationDirty: (conversationUid: string) => void;
-  markConversationDirty: (conversationUid: string) => void;
 }
 
 export interface ConversationMessagesModule {

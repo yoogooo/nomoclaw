@@ -12,6 +12,7 @@ public record ConversationSummaryDto(
         boolean waitingApproval,
         boolean unread,
         Instant lastTaskTerminalTime,
+        Instant lastUserMessageTime,
         Instant createdTime,
         Instant updatedTime
 ) {

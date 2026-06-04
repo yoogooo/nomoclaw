@@ -180,8 +180,6 @@ const zhCN = {
       pinned: "已置顶",
       waitingApproval: "待确认",
       unreadHint: "有未读更新",
-      updatesAvailable: "有 {count} 条对话已更新",
-      refreshToLatest: "刷新到最新",
       loadingMore: "正在加载更多对话...",
       loadMore: "加载更多",
       rename: "修改名称",

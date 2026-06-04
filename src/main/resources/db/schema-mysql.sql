@@ -276,12 +276,14 @@ CREATE TABLE IF NOT EXISTS agent_conversation (
     total_tokens INT NOT NULL DEFAULT 0 COMMENT '对话累计总 token 数',
     last_task_terminal_time DATETIME(3) NULL COMMENT '最近一次任务终态时间（completed/failed/canceled）',
     last_read_at DATETIME(3) NULL COMMENT '最后已读时间',
+    last_user_message_time DATETIME(3) NOT NULL COMMENT '最后一次用户提问时间',
     created_time DATETIME(3) NOT NULL COMMENT '创建时间',
     updated_time DATETIME(3) NOT NULL COMMENT '更新时间',
     PRIMARY KEY (id),
     UNIQUE KEY uk_agent_conversation_uid (conversation_uid),
     KEY idx_agent_conversation_group_uid (agent_group_uid) COMMENT '按 Agent 群组查询对话',
-    KEY idx_agent_conversation_agent_uid (agent_uid) COMMENT '按 Agent 查询对话'
+    KEY idx_agent_conversation_agent_pin_last_user_time (agent_uid, pinned, last_user_message_time, id) COMMENT '按 Agent 的历史对话排序查询',
+    KEY idx_agent_conversation_pin_last_user_time (pinned, last_user_message_time, id) COMMENT '全局历史对话排序查询'
 ) ENGINE=InnoDB
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_0900_ai_ci

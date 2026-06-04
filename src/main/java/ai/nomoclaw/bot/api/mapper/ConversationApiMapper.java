@@ -42,6 +42,7 @@ public final class ConversationApiMapper {
                 dto.waitingApproval(),
                 dto.unread(),
                 dto.lastTaskTerminalTime(),
+                dto.lastUserMessageTime(),
                 dto.createdTime(),
                 dto.updatedTime()
         );

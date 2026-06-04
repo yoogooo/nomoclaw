@@ -7,7 +7,7 @@ public record ConversationPageQuery(
         int limit,
         Instant asOf,
         Integer beforePinned,
-        Instant beforeUpdatedAt,
+        Instant beforeLastUserMessageTime,
         Long beforeId
 ) {
 }

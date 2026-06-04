@@ -432,6 +432,7 @@ export interface ConversationSummary {
   waitingApproval: boolean;
   unread: boolean;
   lastTaskTerminalTime?: string | null;
+  lastUserMessageTime: string;
   createdTime: string;
   updatedTime: string;
 }

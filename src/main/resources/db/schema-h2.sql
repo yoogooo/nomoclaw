@@ -243,12 +243,14 @@ CREATE TABLE IF NOT EXISTS agent_conversation (
     total_tokens INT NOT NULL DEFAULT 0,
     last_task_terminal_time TIMESTAMP(3) NULL,
     last_read_at TIMESTAMP(3) NULL,
+    last_user_message_time TIMESTAMP(3) NOT NULL,
     created_time TIMESTAMP(3) NOT NULL,
     updated_time TIMESTAMP(3) NOT NULL,
     PRIMARY KEY (id),
     UNIQUE (conversation_uid),
     INDEX idx_agent_conversation_group_uid (agent_group_uid),
-    INDEX idx_agent_conversation_agent_uid (agent_uid)
+    INDEX idx_agent_conversation_agent_pin_last_user_time (agent_uid, pinned, last_user_message_time, id),
+    INDEX idx_agent_conversation_pin_last_user_time (pinned, last_user_message_time, id)
 );
 
 CREATE TABLE IF NOT EXISTS agent_channel_session (

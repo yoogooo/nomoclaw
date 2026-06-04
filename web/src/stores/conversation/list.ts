@@ -1,4 +1,4 @@
-import { buildConversationPageRequestKey, dedupeConversations, reuseStableConversationSummaries, shouldReuseConversationSummary } from "./helpers";
+import { buildConversationPageRequestKey, dedupeConversations, reuseStableConversationSummaries } from "./helpers";
 import type { ConversationMessagesModule, ConversationRuntimeModule, ConversationStoreContext, ConversationListModule } from "./types";
 
 const CONVERSATION_PAGE_SIZE = 20;
@@ -41,53 +41,11 @@ export function createConversationListModule(
     }, 5000);
   }
 
-  function sortKeyChanged(current: any, next: any) {
-    return current.pinned !== next.pinned || current.updatedTime !== next.updatedTime;
-  }
-
-  function markConversationDirty(conversationUid: string) {
-    if (!conversationUid || state.dirtyConversationUids.value.includes(conversationUid)) {
-      return;
-    }
-    state.dirtyConversationUids.value = [...state.dirtyConversationUids.value, conversationUid];
-  }
-
-  function clearConversationDirty(conversationUid: string) {
-    state.dirtyConversationUids.value = state.dirtyConversationUids.value.filter((item) => item !== conversationUid);
-  }
-
   function patchConversationListWithLatest(nextConversations: any[]) {
-    if (!state.conversations.value.length) {
-      nextConversations.forEach((item) => markConversationDirty(item.conversationUid));
-      return;
-    }
-    const currentByUid = new Map(state.conversations.value.map((item) => [item.conversationUid, item] as const));
-    const latestByUid = new Map(nextConversations.map((item) => [item.conversationUid, item] as const));
-    state.conversations.value = state.conversations.value.map((item) => {
-      const latest = latestByUid.get(item.conversationUid);
-      if (!latest) {
-        return item;
-      }
-      if (sortKeyChanged(item, latest)) {
-        markConversationDirty(item.conversationUid);
-      } else {
-        clearConversationDirty(item.conversationUid);
-      }
-      return shouldReuseConversationSummary(item, latest)
-        ? item
-        : {
-          ...item,
-          ...latest,
-          updatedTime: sortKeyChanged(item, latest) ? item.updatedTime : latest.updatedTime,
-          pinned: sortKeyChanged(item, latest) ? item.pinned : latest.pinned
-        };
-    });
-
-    nextConversations.forEach((item) => {
-      if (!currentByUid.has(item.conversationUid)) {
-        markConversationDirty(item.conversationUid);
-      }
-    });
+    state.conversations.value = reuseStableConversationSummaries(
+      state.conversations.value,
+      dedupeConversations(nextConversations)
+    );
   }
 
   async function fetchConversationPage(params: { beforeSortKey?: string | null; asOf?: string }) {
@@ -187,7 +145,6 @@ export function createConversationListModule(
       state.conversationListAsOf.value = page.asOf;
       state.conversationListCursor.value = page.nextBeforeSortKey || null;
       state.conversationListHasMore.value = Boolean(page.hasMore);
-      state.dirtyConversationUids.value = [];
       markConversationPageLoaded();
     } finally {
       state.conversationListLoading.value = false;
@@ -232,8 +189,7 @@ export function createConversationListModule(
     patchConversationSummaryLocally(conversationUid, {
       running: false,
       waitingApproval: false,
-      unread: false,
-      updatedTime: new Date().toISOString()
+      unread: false
     });
   }
 
@@ -267,13 +223,6 @@ export function createConversationListModule(
       if (nextConversationUid && nextConversationUid !== state.currentConversationUid.value) {
         await deps.messagesModule().selectConversation(nextConversationUid);
         return;
-      }
-
-      if (nextConversationUid && state.currentConversationUid.value === nextConversationUid) {
-        const previous = state.conversations.value.find((item) => item.conversationUid === nextConversationUid);
-        if (!previous && preferredConversationUid) {
-          clearConversationDirty(preferredConversationUid);
-        }
       }
 
       deps.syncRuntimeModelSelection();
@@ -327,8 +276,6 @@ export function createConversationListModule(
     refreshConversations,
     init,
     patchConversationSummaryLocally,
-    finalizeActiveConversationSummary,
-    clearConversationDirty,
-    markConversationDirty
+    finalizeActiveConversationSummary
   };
 }

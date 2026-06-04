@@ -10,6 +10,7 @@ export function shouldReuseConversationSummary(current: ConversationSummary, nex
     && current.waitingApproval === next.waitingApproval
     && current.unread === next.unread
     && (current.lastTaskTerminalTime || "") === (next.lastTaskTerminalTime || "")
+    && current.lastUserMessageTime === next.lastUserMessageTime
     && current.createdTime === next.createdTime
     && current.updatedTime === next.updatedTime;
 }

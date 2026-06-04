@@ -23,6 +23,7 @@ public class AgentConversationEntity {
     private Integer totalTokens;
     private LocalDateTime lastTaskTerminalTime;
     private LocalDateTime lastReadAt;
+    private LocalDateTime lastUserMessageTime;
     private LocalDateTime createdTime;
     private LocalDateTime updatedTime;
 
@@ -128,6 +129,14 @@ public class AgentConversationEntity {
 
     public void setLastReadAt(LocalDateTime lastReadAt) {
         this.lastReadAt = lastReadAt;
+    }
+
+    public LocalDateTime getLastUserMessageTime() {
+        return lastUserMessageTime;
+    }
+
+    public void setLastUserMessageTime(LocalDateTime lastUserMessageTime) {
+        this.lastUserMessageTime = lastUserMessageTime;
     }
 
     public LocalDateTime getCreatedTime() {

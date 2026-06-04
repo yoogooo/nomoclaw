@@ -73,10 +73,11 @@ public class MybatisPlusAgentStore implements AgentStore {
         entity.setTotalTokens(0);
         entity.setLastTaskTerminalTime(null);
         entity.setLastReadAt(toLocalDateTime(now));
+        entity.setLastUserMessageTime(toLocalDateTime(now));
         entity.setCreatedTime(toLocalDateTime(now));
         entity.setUpdatedTime(toLocalDateTime(now));
         conversationRepository.save(entity);
-        return new AgentConversation(conversationUid, agentGroupUid, agentUid, entity.getChannel(), "", false, 0, 0, 0, 0, null, now, now, now);
+        return new AgentConversation(conversationUid, agentGroupUid, agentUid, entity.getChannel(), "", false, 0, 0, 0, 0, null, now, now, now, now);
     }
 
     @Override
@@ -93,7 +94,7 @@ public class MybatisPlusAgentStore implements AgentStore {
                 query.agentUid(),
                 toLocalDateTime(query.asOf()),
                 query.beforePinned(),
-                query.beforeUpdatedAt() == null ? null : toLocalDateTime(query.beforeUpdatedAt()),
+                query.beforeLastUserMessageTime() == null ? null : toLocalDateTime(query.beforeLastUserMessageTime()),
                 query.beforeId(),
                 query.limit() + 1
         );
@@ -185,7 +186,10 @@ public class MybatisPlusAgentStore implements AgentStore {
         entity.setCreatedTime(toLocalDateTime(now));
         entity.setUpdatedTime(toLocalDateTime(now));
         messageRepository.save(entity);
-        touchConversation(conversationUid);
+        conversationRepository.update(new LambdaUpdateWrapper<AgentConversationEntity>()
+                .eq(AgentConversationEntity::getConversationUid, conversationUid)
+                .set(AgentConversationEntity::getLastUserMessageTime, toLocalDateTime(now))
+                .set(AgentConversationEntity::getUpdatedTime, toLocalDateTime(now)));
         return toDomain(entity);
     }
 
@@ -473,6 +477,7 @@ public class MybatisPlusAgentStore implements AgentStore {
                 entity.getTotalTokens() == null ? 0 : entity.getTotalTokens(),
                 toNullableInstant(entity.getLastTaskTerminalTime()),
                 toNullableInstant(entity.getLastReadAt()),
+                toInstant(entity.getLastUserMessageTime()),
                 toInstant(entity.getCreatedTime()),
                 toInstant(entity.getUpdatedTime())
         );

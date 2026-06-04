@@ -228,11 +228,12 @@ export function createConversationComposerModule(
       });
       tempMessage.messageUid = accepted.messageUid;
       state.runningConversationUid.value = conversationUid;
+      const lastUserMessageTime = tempMessage.createdTime || new Date().toISOString();
       deps.listModule().patchConversationSummaryLocally(conversationUid, {
         running: true,
         waitingApproval: false,
         unread: false,
-        updatedTime: new Date().toISOString()
+        lastUserMessageTime
       });
       storeDeps.runtimeLogStore.append(storeDeps.tr("chat.runtime.messageSubmitted", { messageUid: accepted.messageUid }));
       await deps.listModule().refreshConversations(conversationUid, false, true);

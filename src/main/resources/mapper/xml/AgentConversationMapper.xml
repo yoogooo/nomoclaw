@@ -2,20 +2,20 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="ai.nomoclaw.bot.store.mapper.AgentConversationMapper">
     <select id="listConversationPage" resultType="ai.nomoclaw.bot.store.entity.AgentConversationEntity">
-        SELECT *
-        FROM agent_conversation
-        WHERE updated_time &lt;= #{asOf}
+        SELECT c.*
+        FROM agent_conversation c
+        WHERE c.last_user_message_time &lt;= #{asOf}
         <if test="agentUid != null and agentUid != ''">
-            AND agent_uid = #{agentUid}
+            AND c.agent_uid = #{agentUid}
         </if>
-        <if test="beforePinned != null and beforeUpdatedTime != null and beforeId != null">
+        <if test="beforePinned != null and beforeLastUserMessageTime != null and beforeId != null">
             AND (
-                pinned &lt; #{beforePinned}
-                OR (pinned = #{beforePinned} AND updated_time &lt; #{beforeUpdatedTime})
-                OR (pinned = #{beforePinned} AND updated_time = #{beforeUpdatedTime} AND id &lt; #{beforeId})
+                c.pinned &lt; #{beforePinned}
+                OR (c.pinned = #{beforePinned} AND c.last_user_message_time &lt; #{beforeLastUserMessageTime})
+                OR (c.pinned = #{beforePinned} AND c.last_user_message_time = #{beforeLastUserMessageTime} AND c.id &lt; #{beforeId})
             )
         </if>
-        ORDER BY pinned DESC, updated_time DESC, id DESC
+        ORDER BY c.pinned DESC, c.last_user_message_time DESC, c.id DESC
         LIMIT #{limit}
     </select>
 </mapper>

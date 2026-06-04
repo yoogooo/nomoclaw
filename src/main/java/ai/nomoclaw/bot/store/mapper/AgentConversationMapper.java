@@ -14,7 +14,7 @@ public interface AgentConversationMapper extends BaseMapper<AgentConversationEnt
     List<AgentConversationEntity> listConversationPage(@Param("agentUid") String agentUid,
                                                        @Param("asOf") LocalDateTime asOf,
                                                        @Param("beforePinned") Integer beforePinned,
-                                                       @Param("beforeUpdatedTime") LocalDateTime beforeUpdatedTime,
+                                                       @Param("beforeLastUserMessageTime") LocalDateTime beforeLastUserMessageTime,
                                                        @Param("beforeId") Long beforeId,
                                                        @Param("limit") int limit);
 }

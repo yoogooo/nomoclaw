@@ -180,8 +180,6 @@ const enUS = {
       pinned: "Pinned",
       waitingApproval: "Pending",
       unreadHint: "Unread updates",
-      updatesAvailable: "{count} conversations updated",
-      refreshToLatest: "Refresh to latest",
       loadingMore: "Loading more conversations...",
       loadMore: "Load more",
       rename: "Rename",

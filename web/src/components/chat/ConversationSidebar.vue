@@ -401,19 +401,6 @@ onBeforeUnmount(() => {
     </div>
     <div class="panel-body conversation-panel">
       <div
-        v-if="conversationStore.hasConversationListUpdates"
-        class="conversation-update-banner"
-      >
-        <span>{{ t("chat.sidebar.updatesAvailable", { count: conversationStore.dirtyConversationUids.length }) }}</span>
-        <button
-          type="button"
-          class="conversation-update-banner-btn"
-          @click="refreshHistoryConversations()"
-        >
-          {{ t("chat.sidebar.refreshToLatest") }}
-        </button>
-      </div>
-      <div
         ref="conversationListRef"
         class="scroll-area conversation-list"
         @scroll.passive="handleConversationListScroll"
@@ -458,8 +445,8 @@ onBeforeUnmount(() => {
               >
                 <span class="conversation-unread-dot" />
               </div>
-              <div v-else class="conversation-time-inline" :title="formatDateTime(item.updatedTime)">
-                {{ formatConversationListTime(item.updatedTime, locale) }}
+              <div v-else class="conversation-time-inline" :title="formatDateTime(item.lastUserMessageTime)">
+                {{ formatConversationListTime(item.lastUserMessageTime, locale) }}
               </div>
               <div class="conversation-menu-wrap">
                 <n-dropdown

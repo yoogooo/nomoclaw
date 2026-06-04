@@ -15,6 +15,7 @@ public record AgentConversation(
         int totalTokens,
         Instant lastTaskTerminalAt,
         Instant lastReadAt,
+        Instant lastUserMessageAt,
         Instant createdAt,
         Instant updatedAt
 ) {

@@ -33,7 +33,6 @@ export const useConversationStore = defineStore("conversation", () => {
   const conversationListCursor = ref<string | null>(null);
   const conversationListHasMore = ref(false);
   const conversationListLoading = ref(false);
-  const dirtyConversationUids = ref<string[]>([]);
   const currentConversationUid = ref<string | null>(null);
   const runningConversationUid = ref<string | null>(null);
   const messages = ref<ConversationMessage[]>([]);
@@ -82,7 +81,6 @@ export const useConversationStore = defineStore("conversation", () => {
   const streamingAssistantByParentUid = ref<Record<string, number>>({});
 
   const filteredConversations = computed(() => conversations.value);
-  const hasConversationListUpdates = computed(() => dirtyConversationUids.value.length > 0);
   const currentConversation = computed(() =>
     conversations.value.find((item) => item.conversationUid === currentConversationUid.value) || null
   );
@@ -150,7 +148,6 @@ export const useConversationStore = defineStore("conversation", () => {
       conversationListCursor,
       conversationListHasMore,
       conversationListLoading,
-      dirtyConversationUids,
       currentConversationUid,
       runningConversationUid,
       messages,
@@ -171,7 +168,6 @@ export const useConversationStore = defineStore("conversation", () => {
       skipConversationListRefresh,
       streamingAssistantByParentUid,
       filteredConversations,
-      hasConversationListUpdates,
       currentConversation,
       currentConversationTitle,
       configuredProviders,
@@ -297,8 +293,6 @@ export const useConversationStore = defineStore("conversation", () => {
     messages,
     conversationListHasMore,
     conversationListLoading,
-    hasConversationListUpdates,
-    dirtyConversationUids,
     messageHistoryHasMore,
     messageHistoryLoading,
     messageInitialLoaded,

@@ -150,7 +150,6 @@ export function createConversationMessagesModule(
       resetMessageState();
     }
     state.currentConversationUid.value = conversationUid;
-    deps.listModule().clearConversationDirty(conversationUid);
     deps.runtimeModule().restoreApprovalModeForConversation(conversationUid);
     storeDeps.saveChatLastViewState({ mode: "conversation", conversationUid });
     state.draftAttachments.value = [];
