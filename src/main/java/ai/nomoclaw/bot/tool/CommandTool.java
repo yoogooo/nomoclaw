@@ -83,15 +83,7 @@ public class CommandTool implements Tool {
                     artifacts.put("stdout", ToolTextUtils.truncateTail(stdout));
                     artifacts.put("stderr", ToolTextUtils.truncateTail(stderr));
                     artifacts.put("exitCode", exitCode);
-                    String output = """
-                            <returncode>%d</returncode>
-                            <stdout>
-                            %s
-                            </stdout>
-                            <stderr>
-                            %s
-                            </stderr>
-                            """.formatted(exitCode, ToolTextUtils.truncateTail(stdout), ToolTextUtils.truncateTail(stderr)).trim();
+                    String output = formatOutput(command, workingDir, exitCode, stdout, stderr);
                     if (exitCode == 0) {
                         return ToolResult.success(output, artifacts, metric(start, exitCode, false));
                     }
@@ -146,6 +138,36 @@ public class CommandTool implements Tool {
             head = tokens[1].toLowerCase(Locale.ROOT);
         }
         return READ_ONLY_COMMAND_HEADS.contains(head);
+    }
+
+    private String formatOutput(String command, Path workingDir, int exitCode, String stdout, String stderr) {
+        String normalizedStdout = ToolTextUtils.truncateTail(stdout).trim();
+        String normalizedStderr = ToolTextUtils.truncateTail(stderr).trim();
+        boolean hasStdout = !normalizedStdout.isBlank();
+        boolean hasStderr = !normalizedStderr.isBlank();
+
+        if (exitCode == 0 && !hasStdout && !hasStderr) {
+            return "command succeeded (exit code 0)";
+        }
+
+        StringBuilder builder = new StringBuilder();
+        builder.append("command: ").append(nullToEmpty(command)).append('\n');
+        builder.append("cwd: ").append(workingDir).append('\n');
+        builder.append("exit code: ").append(exitCode);
+        if (hasStdout) {
+            builder.append("\nstdout:\n").append(normalizedStdout);
+        }
+        if (hasStderr) {
+            builder.append("\nstderr:\n").append(normalizedStderr);
+        }
+        if (!hasStdout && !hasStderr) {
+            builder.append("\noutput: <empty>");
+        }
+        return builder.toString().trim();
+    }
+
+    private String nullToEmpty(String value) {
+        return value == null ? "" : value;
     }
 
     private ObjectNode metric(long start, int exitCode, boolean timeout) {

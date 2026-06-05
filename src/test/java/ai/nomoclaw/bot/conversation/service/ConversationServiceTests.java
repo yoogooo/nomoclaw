@@ -50,6 +50,7 @@ class ConversationServiceTests {
                 now,
                 now,
                 now,
+                now,
                 now
         );
         AgentMessage latestCompletedMessage = new AgentMessage(
@@ -99,6 +100,7 @@ class ConversationServiceTests {
                 0,
                 0,
                 0,
+                now,
                 now,
                 now,
                 now,
