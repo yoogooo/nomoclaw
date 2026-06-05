@@ -18,10 +18,18 @@ import dev.langchain4j.model.output.TokenUsage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.io.EOFException;
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
+import java.net.http.HttpTimeoutException;
+import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
+import javax.net.ssl.SSLException;
 
 @Component
 @Slf4j
@@ -65,7 +73,11 @@ public class TaskPlanner implements Planner {
         );
         logReasonStart(resolvedModel, memory, toolSpecifications, toolChoice, preparedRequest.systemPrompt());
         try {
-            ChatResponse response = resolvedModel.model().chat(request);
+            ChatResponse response = executeWithRetries(
+                    () -> resolvedModel.model().chat(request),
+                    resolvedModel,
+                    "non-stream"
+            );
             llmDebugLogger.logResponse(requestId, "task_reason", resolvedModel.providerId(), resolvedModel.modelId(),
                     promptContext, response, elapsedMillis(startNanos));
             logReasonFinish(response);
@@ -103,7 +115,11 @@ public class TaskPlanner implements Planner {
         if (!resolvedModel.supportsStreaming()) {
             log.info("[Reasoning] stream fallback disabled provider={} model={}", resolvedModel.providerId(), resolvedModel.modelId());
             try {
-                ChatResponse response = resolvedModel.model().chat(request);
+                ChatResponse response = executeWithRetries(
+                        () -> resolvedModel.model().chat(request),
+                        resolvedModel,
+                        "non-stream"
+                );
                 llmDebugLogger.logResponse(requestId, "task_reason", resolvedModel.providerId(), resolvedModel.modelId(),
                         promptContext, response, elapsedMillis(startNanos));
                 String text = response.aiMessage() == null ? "" : response.aiMessage().text();
@@ -116,48 +132,26 @@ public class TaskPlanner implements Planner {
             }
         }
 
-        StringBuilder buffer = new StringBuilder();
-        final int[] deltaCount = {0};
-        CompletableFuture<ChatResponse> completion = new CompletableFuture<>();
-        resolvedModel.streamingModel().chat(request, new StreamingChatResponseHandler() {
-            @Override
-            public void onPartialResponse(String partialResponse) {
-                if (partialResponse == null || partialResponse.isEmpty()) {
-                    return;
-                }
-                buffer.append(partialResponse);
-                deltaCount[0]++;
-                if (onDelta != null) {
-                    onDelta.accept(partialResponse);
-                }
-            }
-
-            @Override
-            public void onCompleteResponse(ChatResponse response) {
-                completion.complete(response);
-            }
-
-            @Override
-            public void onError(Throwable error) {
-                completion.completeExceptionally(error);
-            }
-        });
-
-        ChatResponse response;
         try {
-            response = completion.join();
+            StreamAttemptResult streamed = executeStreamingWithRecovery(request, resolvedModel, onDelta);
+            ChatResponse response = streamed.response();
+            if (streamed.streamed()) {
+                log.info("[Reasoning] stream completed provider={} model={} deltas={} chars={}",
+                        resolvedModel.providerId(), resolvedModel.modelId(), streamed.deltaCount(), streamed.accumulatedText().length());
+            } else {
+                log.info("[Reasoning] stream fallback to non-stream provider={} model={}",
+                        resolvedModel.providerId(), resolvedModel.modelId());
+            }
+            llmDebugLogger.logResponse(requestId, "task_reason", resolvedModel.providerId(), resolvedModel.modelId(),
+                    promptContext, response, elapsedMillis(startNanos));
+            logReasonFinish(response);
+            return new StreamReasonResult(response, streamed.accumulatedText(), streamed.streamed());
         } catch (Exception ex) {
             Throwable cause = ex.getCause() == null ? ex : ex.getCause();
             llmDebugLogger.logError(requestId, "task_reason", resolvedModel.providerId(), resolvedModel.modelId(),
                     promptContext, cause, elapsedMillis(startNanos));
             throw ex;
         }
-        log.info("[Reasoning] stream completed provider={} model={} deltas={} chars={}",
-                resolvedModel.providerId(), resolvedModel.modelId(), deltaCount[0], buffer.length());
-        llmDebugLogger.logResponse(requestId, "task_reason", resolvedModel.providerId(), resolvedModel.modelId(),
-                promptContext, response, elapsedMillis(startNanos));
-        logReasonFinish(response);
-        return new StreamReasonResult(response, buffer.toString(), true);
     }
 
     private PreparedRequest buildRequest(List<ChatMessage> memory,
@@ -308,6 +302,145 @@ public class TaskPlanner implements Planner {
         return (System.nanoTime() - startNanos) / 1_000_000L;
     }
 
+    private <T> T executeWithRetries(Supplier<T> action,
+                                     RuntimeChatModelResolver.ResolvedModel resolvedModel,
+                                     String mode) {
+        int maxAttempts = maxRetryAttempts();
+        Exception last = null;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                return action.get();
+            } catch (Exception ex) {
+                last = ex;
+                Throwable root = rootCause(ex);
+                boolean retryable = isRetryableTransportError(root);
+                if (!retryable || attempt >= maxAttempts) {
+                    throw ex;
+                }
+                log.warn("[Reasoning] {} retry provider={} model={} attempt={}/{} err={}",
+                        mode,
+                        resolvedModel.providerId(),
+                        resolvedModel.modelId(),
+                        attempt,
+                        maxAttempts,
+                        root.getMessage());
+                sleepBeforeRetry(attempt);
+            }
+        }
+        throw last == null ? new IllegalStateException("reasoning failed without exception") : new IllegalStateException(last);
+    }
+
+    private StreamAttemptResult executeStreamingWithRecovery(ChatRequest request,
+                                                             RuntimeChatModelResolver.ResolvedModel resolvedModel,
+                                                             Consumer<String> onDelta) {
+        int maxAttempts = maxRetryAttempts();
+        Exception last = null;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            StringBuilder buffer = new StringBuilder();
+            final int[] deltaCount = {0};
+            CompletableFuture<ChatResponse> completion = new CompletableFuture<>();
+            resolvedModel.streamingModel().chat(request, new StreamingChatResponseHandler() {
+                @Override
+                public void onPartialResponse(String partialResponse) {
+                    if (partialResponse == null || partialResponse.isEmpty()) {
+                        return;
+                    }
+                    buffer.append(partialResponse);
+                    deltaCount[0]++;
+                    if (onDelta != null) {
+                        onDelta.accept(partialResponse);
+                    }
+                }
+
+                @Override
+                public void onCompleteResponse(ChatResponse response) {
+                    completion.complete(response);
+                }
+
+                @Override
+                public void onError(Throwable error) {
+                    completion.completeExceptionally(error);
+                }
+            });
+
+            try {
+                ChatResponse response = completion.join();
+                return new StreamAttemptResult(response, buffer.toString(), true, deltaCount[0]);
+            } catch (CompletionException ex) {
+                Throwable root = rootCause(ex);
+                if (!isRetryableTransportError(root)) {
+                    throw ex;
+                }
+                if (buffer.length() > 0) {
+                    log.warn("[Reasoning] stream aborted after partial output provider={} model={} deltas={} err={}",
+                            resolvedModel.providerId(), resolvedModel.modelId(), deltaCount[0], root.getMessage());
+                    throw ex;
+                }
+                last = ex;
+                if (attempt >= maxAttempts) {
+                    break;
+                }
+                log.warn("[Reasoning] stream retry provider={} model={} attempt={}/{} err={}",
+                        resolvedModel.providerId(),
+                        resolvedModel.modelId(),
+                        attempt,
+                        maxAttempts,
+                        root.getMessage());
+                sleepBeforeRetry(attempt);
+            }
+        }
+
+        Throwable root = rootCause(last);
+        if (isRetryableTransportError(root)) {
+            ChatResponse response = executeWithRetries(
+                    () -> resolvedModel.model().chat(request),
+                    resolvedModel,
+                    "stream-fallback"
+            );
+            String text = response.aiMessage() == null ? "" : nullToEmpty(response.aiMessage().text());
+            return new StreamAttemptResult(response, text, false, 0);
+        }
+        if (last instanceof RuntimeException runtimeException) {
+            throw runtimeException;
+        }
+        throw new IllegalStateException(last);
+    }
+
+    private int maxRetryAttempts() {
+        Integer configured = llmProperties.getMaxRetries();
+        int retries = configured == null ? 0 : Math.max(0, configured);
+        return 1 + retries;
+    }
+
+    private boolean isRetryableTransportError(Throwable throwable) {
+        return throwable instanceof EOFException
+                || throwable instanceof SSLException
+                || throwable instanceof ConnectException
+                || throwable instanceof ClosedChannelException
+                || throwable instanceof SocketTimeoutException
+                || throwable instanceof HttpTimeoutException;
+    }
+
+    private Throwable rootCause(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current.getCause() == null || current.getCause() == current) {
+                return current;
+            }
+            current = current.getCause();
+        }
+        return throwable;
+    }
+
+    private void sleepBeforeRetry(int attempt) {
+        long delayMillis = Math.min(2_000L, 250L * attempt);
+        try {
+            Thread.sleep(delayMillis);
+        } catch (InterruptedException interruptedException) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     private List<String> extractToolNames(List<ToolSpecification> toolSpecifications) {
         if (toolSpecifications == null || toolSpecifications.isEmpty()) {
             return List.of();
@@ -316,5 +449,8 @@ public class TaskPlanner implements Planner {
                 .map(item -> item == null ? "" : item.name())
                 .filter(item -> item != null && !item.isBlank())
                 .toList();
+    }
+
+    private record StreamAttemptResult(ChatResponse response, String accumulatedText, boolean streamed, int deltaCount) {
     }
 }
