@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { ChevronRight, LoaderCircle } from "lucide-vue-next";
+import { ChevronRight } from "lucide-vue-next";
 import { NEmpty, NTag } from "naive-ui";
 import { useRouter } from "vue-router";
+import UiSpinner from "@/components/UiSpinner.vue";
 import { useCronJobsStore } from "@/stores/cronJobs";
 import { message } from "@/discrete";
 import { displayCronJobTitle, formatRelativeTime } from "@/utils/format";
@@ -182,9 +183,7 @@ function runningStatusTagType(status?: string | null) {
             @keydown.enter="openRunningExecution(item)"
             @keydown.space.prevent="openRunningExecution(item)"
           >
-            <div class="running-icon-wrap" aria-hidden="true">
-              <LoaderCircle :size="14" class="running-icon" />
-            </div>
+            <UiSpinner class="running-icon" :size="14" thickness="1.8px" />
             <div class="execution-main">
               <div class="execution-title-row">
                 <div class="execution-title">{{ item.jobTitle }}</div>
@@ -357,33 +356,17 @@ function runningStatusTagType(status?: string | null) {
   background: var(--color-text-muted);
 }
 
-.spinning-dot {
-  border: var(--size-2) solid var(--color-border-brand-light);
-  border-top-color: var(--color-brand-600);
-  background: transparent;
-  animation: spin 1s linear infinite;
-}
-
 .running-dot {
   background: var(--color-brand-600);
   box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-brand-600) 55%, transparent);
   animation: running-pulse 1.5s ease-out infinite;
 }
 
-.running-icon-wrap {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--size-16);
-  height: var(--size-16);
+.running-icon {
   color: #0f8f5c;
 }
 
-.running-icon {
-  animation: spin 1s linear infinite;
-}
-
-:root[data-theme="dark"] .running-icon-wrap {
+:root[data-theme="dark"] .running-icon {
   color: #3dffb5;
 }
 
@@ -543,15 +526,6 @@ function runningStatusTagType(status?: string | null) {
   color: var(--color-text-secondary);
   font-size: var(--text-caption-size);
   white-space: nowrap;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 @media (max-width: 520px) {

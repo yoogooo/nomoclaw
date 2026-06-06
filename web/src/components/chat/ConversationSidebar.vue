@@ -5,6 +5,7 @@ import { NButton, NDropdown, NInput, NModal, NSelect, type DropdownOption, type 
 import { Clock3, MoreHorizontal, Pin, RefreshCw } from "lucide-vue-next";
 import { useRoute } from "vue-router";
 import { cronApi } from "@/api/cronApi";
+import UiSpinner from "@/components/UiSpinner.vue";
 import { useAgentCatalogStore } from "@/stores/agentCatalog";
 import { useConversationStore } from "@/stores/conversation";
 import { message as discreteMessage } from "@/discrete";
@@ -432,9 +433,7 @@ onBeforeUnmount(() => {
                 :title="t('cron.execution.statusRunning')"
                 aria-label="running"
               >
-                <span class="conversation-running-icon-wrap" aria-hidden="true">
-                  <span class="conversation-running-icon" />
-                </span>
+                <UiSpinner class="conversation-running-spinner" :size="14" thickness="1.8px" />
               </div>
               <div
                 v-else-if="item.unread"
@@ -757,26 +756,11 @@ onBeforeUnmount(() => {
   transition: opacity 0.18s ease, visibility 0.18s ease;
 }
 
-.conversation-running-icon-wrap {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--size-16);
-  height: var(--size-16);
+.conversation-running-spinner {
   color: #0f8f5c;
 }
 
-.conversation-running-icon {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 1.8px solid color-mix(in srgb, currentColor 24%, transparent);
-  border-top-color: currentColor;
-  animation: spin 1s linear infinite;
-  box-sizing: border-box;
-}
-
-:root[data-theme="dark"] .conversation-running-icon-wrap {
+:root[data-theme="dark"] .conversation-running-spinner {
   color: #3dffb5;
 }
 
