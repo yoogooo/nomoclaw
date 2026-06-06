@@ -411,8 +411,13 @@ onBeforeUnmount(() => {
             :key="item.conversationUid"
             class="conversation-row"
             :class="{ active: conversationStore.currentConversationUid === item.conversationUid }"
+            role="button"
+            tabindex="0"
+            @click="conversationStore.selectConversation(item.conversationUid)"
+            @keydown.enter.prevent="conversationStore.selectConversation(item.conversationUid)"
+            @keydown.space.prevent="conversationStore.selectConversation(item.conversationUid)"
           >
-            <button class="conversation-main" @click="conversationStore.selectConversation(item.conversationUid)">
+            <div class="conversation-main">
               <div class="conversation-title">
                 <span v-if="item.pinned" class="conversation-pinned-icon" :title="t('chat.sidebar.pinned')">
                   <Pin :size="12" />
@@ -422,7 +427,7 @@ onBeforeUnmount(() => {
                 </span>
                 <span class="conversation-title-text">{{ item.title || t("chat.sidebar.unnamed") }}</span>
               </div>
-            </button>
+            </div>
             <div class="conversation-meta-slot">
               <div v-if="item.waitingApproval" class="conversation-status-pill waiting-approval-pill">
                 {{ t("chat.sidebar.waitingApproval") }}
@@ -446,7 +451,7 @@ onBeforeUnmount(() => {
               <div v-else class="conversation-time-inline" :title="formatDateTime(item.lastUserMessageTime)">
                 {{ formatConversationListTime(item.lastUserMessageTime, locale) }}
               </div>
-              <div class="conversation-menu-wrap">
+              <div class="conversation-menu-wrap" @click.stop>
                 <n-dropdown
                   trigger="click"
                   :options="menuOptions(Boolean(item.pinned))"
@@ -684,6 +689,7 @@ onBeforeUnmount(() => {
   border-left: var(--size-3) solid transparent;
   border-radius: 0;
   border-bottom: var(--size-1) solid color-mix(in srgb, var(--color-border-panel) 58%, transparent);
+  cursor: pointer;
   transition: background-color 0.18s ease, border-color 0.18s ease;
 }
 
@@ -697,14 +703,16 @@ onBeforeUnmount(() => {
   background: var(--color-bg-surface-soft);
 }
 
+.conversation-row:focus-visible {
+  outline: var(--size-2) solid color-mix(in srgb, var(--color-border-active) 72%, white 28%);
+  outline-offset: calc(var(--size-1) * -1);
+}
+
 .conversation-main {
   width: 100%;
   min-width: 0;
-  border: 0;
-  background: transparent;
   color: var(--color-text-primary);
   text-align: left;
-  cursor: pointer;
   transition: color 0.18s ease;
 }
 
