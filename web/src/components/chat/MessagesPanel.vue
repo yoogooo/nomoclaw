@@ -695,7 +695,6 @@ onMounted(() => {
           class="message-wrap"
           :class="{ user: message.role === 'user' }"
         >
-          <div class="message-role">{{ message.role === "user" ? "YOU" : "ASSISTANT" }}</div>
           <div class="message-bubble" :class="{ user: message.role === 'user' }">
             <div
               class="message-html"
@@ -1041,14 +1040,6 @@ onMounted(() => {
 
 .message-wrap.user {
   align-items: flex-end;
-}
-
-.message-role {
-  margin-bottom: var(--space-2);
-  font-size: var(--text-caption-size);
-  font-weight: 700;
-  letter-spacing: 0.22em;
-  color: var(--text-muted);
 }
 
 .message-bubble {
