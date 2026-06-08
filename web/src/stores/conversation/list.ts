@@ -48,6 +48,30 @@ export function createConversationListModule(
     );
   }
 
+  function reconcileLocalRunningConversationUids() {
+    const runningConversationUids = state.runningConversationUids.value;
+    const runningKeys = Object.keys(runningConversationUids);
+    if (!runningKeys.length) {
+      return;
+    }
+    const nextRunningConversationUids = { ...runningConversationUids };
+    let changed = false;
+    for (const conversationUid of runningKeys) {
+      const summary = state.conversations.value.find((item) => item.conversationUid === conversationUid);
+      if (!summary) {
+        continue;
+      }
+      if (summary.running || summary.waitingApproval) {
+        continue;
+      }
+      delete nextRunningConversationUids[conversationUid];
+      changed = true;
+    }
+    if (changed) {
+      state.runningConversationUids.value = nextRunningConversationUids;
+    }
+  }
+
   async function fetchConversationPage(params: { beforeSortKey?: string | null; asOf?: string }) {
     const requestParams = {
       agentUid: storeDeps.agentCatalogStore.selectedAgentUid || "",
@@ -91,6 +115,7 @@ export function createConversationListModule(
     const latestPage = await fetchConversationPage({});
     markConversationPageLoaded();
     patchConversationListWithLatest(latestPage.items);
+    reconcileLocalRunningConversationUids();
     storeDeps.agentCatalogStore.ensureSelection();
 
     const knownConversationUids = new Set([
@@ -111,7 +136,7 @@ export function createConversationListModule(
     if (state.currentConversationUid.value && isConversationRunningLocally(state.currentConversationUid.value)) {
       const currentSummary = state.conversations.value.find((item) => item.conversationUid === state.currentConversationUid.value)
         || latestPage.items.find((item) => item.conversationUid === state.currentConversationUid.value);
-      if (currentSummary && !currentSummary.running) {
+      if (currentSummary && !currentSummary.running && !currentSummary.waitingApproval) {
         clearConversationRunningLocally(currentSummary.conversationUid);
       }
     }

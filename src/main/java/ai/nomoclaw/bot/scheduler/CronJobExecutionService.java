@@ -238,8 +238,12 @@ public class CronJobExecutionService {
         } catch (Exception ex) {
             log.warn("[Cron] write report failed executionUid={} err={}", executionUid, ex.toString());
         }
-        notifyCompletion(job, finalContent, reportPath, executedAt, executionStatus);
         updateJobResult(job, now, summary, reportPath, executionStatus, executionUid, conversationUid, messageUid);
+        try {
+            notifyCompletion(job, finalContent, reportPath, executedAt, executionStatus);
+        } catch (Exception ex) {
+            log.warn("[Cron] notify completion failed executionUid={} err={}", executionUid, ex.toString());
+        }
     }
 
     private String toExecutionStatus(MessageStatus status) {
