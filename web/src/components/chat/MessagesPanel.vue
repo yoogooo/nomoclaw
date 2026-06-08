@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { ArrowDown, ArrowUp, Check, ChevronsDown, ChevronsUp, Copy, Sparkles } from "lucide-vue-next";
 import { NButton, NCard, NCollapse, NCollapseItem, NFlex, NTag } from "naive-ui";
 import ApprovalBanner from "./ApprovalBanner.vue";
+import MessageCopyButton from "./MessageCopyButton.vue";
 import ComposerPanel from "./composer/ComposerPanel.vue";
 import UiInstantTooltip from "@/components/UiInstantTooltip.vue";
 import UiSpinner from "@/components/UiSpinner.vue";
@@ -13,6 +14,7 @@ import { useConversationStore } from "@/stores/conversation";
 import { useConversationRunsStore } from "@/stores/conversationRuns";
 import { useAgentCatalogStore } from "@/stores/agentCatalog";
 import { useJinnangStore } from "@/stores/jinnang";
+import { copyText } from "@/utils/clipboard";
 import { formatMessageTime } from "@/utils/format";
 import { renderMarkdown } from "@/utils/markdown";
 import type { ConversationMessage, ConversationRunStep } from "@/types/api";
@@ -346,7 +348,7 @@ async function copyRunCommand(messageUid: string | undefined, step: Conversation
   if (!command) return;
   const key = runStepStateKey(messageUid, step.stepUid);
   try {
-    await window.navigator.clipboard.writeText(command);
+    await copyText(command);
     copiedRunCommandMap.value = {
       ...copiedRunCommandMap.value,
       [key]: true
@@ -425,11 +427,11 @@ function runHasActiveApproval(messageItem: ConversationMessage) {
   );
 }
 
-async function copyAssistantMessage(messageItem: ConversationMessage) {
+async function copyMessage(messageItem: ConversationMessage) {
   const content = messageItem.content || "";
   if (!content.trim()) return;
   try {
-    await window.navigator.clipboard.writeText(content);
+    await copyText(content);
     const key = messageActionKey(messageItem);
     copiedMessageMap.value = {
       ...copiedMessageMap.value,
@@ -696,12 +698,26 @@ onMounted(() => {
           class="message-wrap"
           :class="{ user: message.role === 'user' }"
         >
-          <div class="message-bubble" :class="{ user: message.role === 'user' }">
+          <div
+            class="message-bubble"
+            :class="{ user: message.role === 'user', 'has-expand-toggle': shouldShowUserMessageToggle(message) }"
+          >
             <div
               class="message-html"
               :class="{ 'is-collapsed': shouldShowUserMessageToggle(message) && !isUserMessageExpanded(message) }"
               v-html="renderMarkdown(message.content)"
             />
+            <button
+              v-if="shouldShowUserMessageToggle(message)"
+              class="message-expand-btn"
+              type="button"
+              :aria-expanded="isUserMessageExpanded(message)"
+              @click="toggleUserMessageExpanded(message)"
+            >
+              <ChevronsUp v-if="isUserMessageExpanded(message)" :size="12" />
+              <ChevronsDown v-else :size="12" />
+              <span>{{ isUserMessageExpanded(message) ? t("chat.messages.collapseMessage") : t("chat.messages.expandMessage") }}</span>
+            </button>
             <div v-if="message.attachments?.length" class="message-attachments">
               <button
                 v-for="attachment in message.attachments"
@@ -737,15 +753,6 @@ onMounted(() => {
               </n-button>
             </n-flex>
           </div>
-          <button
-            v-if="shouldShowUserMessageToggle(message)"
-            class="message-expand-btn"
-            type="button"
-            :aria-expanded="isUserMessageExpanded(message)"
-            @click="toggleUserMessageExpanded(message)"
-          >
-            {{ isUserMessageExpanded(message) ? t("chat.messages.collapseMessage") : t("chat.messages.expandMessage") }}
-          </button>
           <div v-if="message.role !== 'user'" class="message-meta">
             <div class="message-time">{{ formatMessageTime(message.createdTime) }}</div>
             <div v-if="resolveMessageTokenUsage(message)" class="message-token-inline">
@@ -767,18 +774,12 @@ onMounted(() => {
               <span class="message-token-total">{{ messageTokenUsageText(message) }}</span>
             </div>
             <div class="message-actions">
-              <UiInstantTooltip :content="t('chat.messages.copy')">
-                <button
-                  class="message-action-btn icon-only"
-                  :class="{ copied: copiedMessageMap[messageActionKey(message)] }"
-                  type="button"
-                  :aria-label="t('chat.messages.copy')"
-                  @click="copyAssistantMessage(message)"
-                >
-                  <Check v-if="copiedMessageMap[messageActionKey(message)]" :size="14" />
-                  <Copy v-else :size="14" />
-                </button>
-              </UiInstantTooltip>
+              <MessageCopyButton
+                :copied="copiedMessageMap[messageActionKey(message)]"
+                :tooltip="t('chat.messages.copy')"
+                :aria-label="t('chat.messages.copy')"
+                @click="copyMessage(message)"
+              />
               <div class="save-tip-wrap">
                 <UiInstantTooltip :content="isTipSaved(message) ? t('chat.messages.tipSaved') : t('chat.messages.saveTip')">
                   <button
@@ -804,7 +805,16 @@ onMounted(() => {
               </div>
             </div>
           </div>
-          <div v-else class="message-time user-message-time">{{ formatMessageTime(message.createdTime) }}</div>
+          <div v-else class="user-message-meta">
+            <MessageCopyButton
+              :copied="copiedMessageMap[messageActionKey(message)]"
+              :tooltip="t('chat.messages.copy')"
+              :aria-label="t('chat.messages.copy')"
+              tone="subtle"
+              @click="copyMessage(message)"
+            />
+            <div class="message-time user-message-time">{{ formatMessageTime(message.createdTime) }}</div>
+          </div>
 
           <n-card
             v-if="message.role === 'user' && message.messageUid && conversationRunsStore.runsByMessageUid[message.messageUid]"
@@ -1049,6 +1059,7 @@ onMounted(() => {
 }
 
 .message-bubble {
+  position: relative;
   max-width: 92%;
   padding: var(--space-2_5) var(--space-4);
   border-radius: var(--radius-xl) var(--radius-xl) var(--radius-xl) var(--control-radius-md);
@@ -1076,22 +1087,41 @@ onMounted(() => {
   overflow: hidden;
 }
 
+.message-bubble.has-expand-toggle {
+  padding-bottom: calc(var(--space-3) + var(--space-8));
+}
+
 .message-expand-btn {
-  margin-top: var(--space-1_5);
+  position: absolute;
+  left: var(--space-3);
+  bottom: var(--space-2_5);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: auto;
+  padding: 0;
   border: none;
   background: transparent;
-  color: var(--color-text-brand-strong);
+  color: inherit;
   font-size: var(--text-caption-size);
   line-height: 1.3;
   cursor: pointer;
-  padding: 0;
-}
-
-.message-wrap.user .message-expand-btn {
-  align-self: flex-end;
+  transition: color 0.16s ease;
 }
 
 .message-expand-btn:hover {
+  opacity: 0.88;
+}
+
+.message-expand-btn :deep(svg) {
+  flex: none;
+}
+
+.message-bubble:not(.user) .message-expand-btn {
+  color: var(--color-text-brand-strong);
+}
+
+.message-bubble:not(.user) .message-expand-btn:hover {
   color: var(--color-text-brand);
 }
 
@@ -1162,22 +1192,40 @@ onMounted(() => {
   color: var(--text-muted);
 }
 
-.user-message-time {
+.user-message-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
   width: min(var(--size-percent-message-max), var(--container-xl));
   margin-top: var(--space-1);
   padding-right: var(--space-1_5);
-  text-align: right;
   opacity: 0;
   visibility: hidden;
+  pointer-events: none;
   transform: translateY(calc(var(--size-1) * -1));
   transition: opacity 0.14s ease, transform 0.14s ease, visibility 0.14s ease;
 }
 
-.message-wrap.user:hover .user-message-time,
-.message-wrap.user:focus-within .user-message-time {
+.user-message-time {
+  margin-top: 0;
+  padding-right: 0;
+  text-align: right;
+}
+
+.message-wrap.user:hover .user-message-meta,
+.message-wrap.user:focus-within .user-message-meta {
   opacity: 1;
   visibility: visible;
+  pointer-events: auto;
   transform: translateY(0);
+}
+
+.user-message-time {
+  width: auto;
+  opacity: 1;
+  visibility: visible;
+  transform: none;
 }
 
 .message-meta {
@@ -1216,8 +1264,13 @@ onMounted(() => {
   }
 
   .user-message-time {
+    width: auto;
+  }
+
+  .user-message-meta {
     opacity: 1;
     visibility: visible;
+    pointer-events: auto;
     transform: none;
   }
 }

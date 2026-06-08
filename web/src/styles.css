@@ -1063,6 +1063,25 @@ a {
   margin: 0 0 0.6rem;
 }
 
+.message-html h1,
+.message-html h2,
+.message-html h3,
+.message-html h4,
+.message-html h5,
+.message-html h6 {
+  margin: 1rem 0 0.65rem;
+  line-height: 1.24;
+}
+
+.message-html h1:first-child,
+.message-html h2:first-child,
+.message-html h3:first-child,
+.message-html h4:first-child,
+.message-html h5:first-child,
+.message-html h6:first-child {
+  margin-top: 0.28rem;
+}
+
 .message-html ul,
 .message-html ol {
   margin: 0.2rem 0 0.6rem;
