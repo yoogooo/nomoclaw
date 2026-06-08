@@ -1,17 +1,12 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from "vue";
+import { computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { BellRing, Clock3 } from "lucide-vue-next";
-import { NButton, NForm, NFormItem, NInput, NInputNumber, NModal, NSelect, NTabPane, NTabs } from "naive-ui";
+import { NButton, NModal } from "naive-ui";
 import { useCronJobsStore } from "@/stores/cronJobs";
 import { modelApi } from "@/api/modelApi";
 import type { CronJob } from "@/types/api";
-import type { ModelConfig } from "@/types/api";
-import { getSortLocale } from "@/i18n";
-import { humanizeCronExpression } from "@/utils/format";
-
-type ExecutionType = "once" | "recurring";
-type RecurringMode = "minute" | "hour" | "day" | "week" | "month";
+import CronJobFormContent from "./CronJobFormContent.vue";
+import { useCronJobForm } from "./useCronJobForm";
 
 const props = defineProps<{
   job: CronJob | null;
@@ -32,71 +27,9 @@ const emit = defineEmits<{
     status: string;
   }): void;
 }>();
+
 const { t } = useI18n();
 const cronJobsStore = useCronJobsStore();
-
-const weekdayOptions = computed(() => [
-  { label: t("cron.weekday.monday"), short: t("cron.weekdayShort.monday"), value: "2" },
-  { label: t("cron.weekday.tuesday"), short: t("cron.weekdayShort.tuesday"), value: "3" },
-  { label: t("cron.weekday.wednesday"), short: t("cron.weekdayShort.wednesday"), value: "4" },
-  { label: t("cron.weekday.thursday"), short: t("cron.weekdayShort.thursday"), value: "5" },
-  { label: t("cron.weekday.friday"), short: t("cron.weekdayShort.friday"), value: "6" },
-  { label: t("cron.weekday.saturday"), short: t("cron.weekdayShort.saturday"), value: "7" },
-  { label: t("cron.weekday.sunday"), short: t("cron.weekdayShort.sunday"), value: "1" }
-]);
-const recurringModeOptions = computed<Array<{ value: RecurringMode; label: string }>>(() => [
-  { value: "minute", label: t("cron.recurringMode.minute") },
-  { value: "hour", label: t("cron.recurringMode.hour") },
-  { value: "day", label: t("cron.recurringMode.day") },
-  { value: "week", label: t("cron.recurringMode.week") },
-  { value: "month", label: t("cron.recurringMode.month") }
-]);
-
-const form = reactive({
-  agentUid: "",
-  title: "",
-  taskContent: "",
-  status: "ACTIVE",
-  timezone: "Asia/Shanghai",
-  modelProvider: "",
-  modelName: "",
-  executionType: "recurring" as ExecutionType,
-  recurringMode: "day" as RecurringMode,
-  time: "08:30",
-  weekdays: ["2"] as string[],
-  monthlyDay: 1,
-  monthField: "*",
-  minuteInterval: 30,
-  hourInterval: 1,
-  hourlyMinute: 0,
-  onceDate: "",
-  onceTime: "",
-  endAtLocal: ""
-});
-
-const agentOptions = computed(() =>
-  cronJobsStore.agentGroups.flatMap((group) =>
-    group.agents.map((agent) => ({
-      label: agent.displayName || agent.agentName,
-      value: agent.agentUid
-    }))
-  )
-);
-const modelConfig = ref<ModelConfig>({ providers: [] });
-const providerOptions = computed(() =>
-  modelConfig.value.providers
-    .filter((provider) => String(provider.id || "").trim())
-    .map((provider) => ({ label: provider.name || provider.id, value: provider.id }))
-);
-const modelOptions = computed(() => {
-  const provider = modelConfig.value.providers.find((item) => item.id === form.modelProvider);
-  if (!provider) {
-    return [];
-  }
-  return provider.models
-    .filter((model) => String(model.id || "").trim())
-    .map((model) => ({ label: model.name || model.id, value: model.id }));
-});
 const modalStyle = {
   width: "min(880px, calc(100vw - 32px))",
   height: "min(860px, calc(100dvh - 24px))",
@@ -111,133 +44,42 @@ const modalContentStyle = {
   overflowY: "auto"
 } as const;
 
-const scheduleExpression = computed(() => {
-  if (form.executionType === "once") {
-    const onceAt = parseDateTime(form.onceDate, form.onceTime);
-    if (!onceAt) {
-      return "";
-    }
-    return `0 ${onceAt.getMinutes()} ${onceAt.getHours()} ${onceAt.getDate()} ${onceAt.getMonth() + 1} ? ${onceAt.getFullYear()}`;
-  }
-  const [hour, minute] = parseTime(form.time);
-  switch (form.recurringMode) {
-    case "minute":
-      return `0 0/${normalizeInteger(form.minuteInterval, 1, 59)} * * * ?`;
-    case "hour":
-      return `0 ${normalizeInteger(form.hourlyMinute, 0, 59)} 0/${normalizeInteger(form.hourInterval, 1, 23)} * * ?`;
-    case "week":
-      if (!form.weekdays.length) {
-        return "";
-      }
-      return `0 ${minute} ${hour} ? ${normalizeMonthField(form.monthField)} ${normalizeWeekdaysForCron(form.weekdays).join(",")}`;
-    case "month":
-      return `0 ${minute} ${hour} ${normalizeInteger(form.monthlyDay, 1, 31)} ${normalizeMonthField(form.monthField)} ?`;
-    case "day":
-    default:
-      return `0 ${minute} ${hour} * ${normalizeMonthField(form.monthField)} ?`;
-  }
-});
-
-const scheduleSummary = computed(() => humanizeCronExpression(scheduleExpression.value));
-
-const firstRunAt = computed(() => {
-  if (form.executionType === "once") {
-    return parseDateTime(form.onceDate, form.onceTime);
-  }
-  const now = new Date();
-  switch (form.recurringMode) {
-    case "minute":
-      return computeNextMinuteRun(now, normalizeInteger(form.minuteInterval, 1, 59));
-    case "hour":
-      return computeNextHourRun(now, normalizeInteger(form.hourInterval, 1, 23), normalizeInteger(form.hourlyMinute, 0, 59));
-    case "week":
-      return computeNextWeekRun(now, form.weekdays, form.time);
-    case "month":
-      return computeNextMonthRun(now, normalizeInteger(form.monthlyDay, 1, 31), form.time, form.monthField);
-    case "day":
-    default:
-      return computeNextDayRun(now, form.time);
-  }
-});
-
-const endAtValue = computed(() => {
-  if (form.executionType !== "recurring" || !form.endAtLocal) {
-    return undefined;
-  }
-  const value = new Date(form.endAtLocal);
-  if (Number.isNaN(value.getTime())) {
-    return undefined;
-  }
-  return form.endAtLocal;
-});
-
-const scheduleError = computed(() => {
-  if (form.executionType === "once") {
-    const onceAt = parseDateTime(form.onceDate, form.onceTime);
-    if (!onceAt) {
-      return t("cron.validation.pickDateTime");
-    }
-    if (onceAt.getTime() <= Date.now()) {
-      return t("cron.validation.onceAfterNow");
-    }
-  }
-  if (form.recurringMode === "week" && !form.weekdays.length) {
-    return t("cron.validation.pickOneWeekday");
-  }
-  if (form.endAtLocal) {
-    const endAt = new Date(form.endAtLocal);
-    if (Number.isNaN(endAt.getTime())) {
-      return t("cron.validation.invalidEndAt");
-    }
-    const first = firstRunAt.value;
-    if (first && endAt.getTime() <= first.getTime()) {
-      return t("cron.validation.endAtAfterFirstRun");
-    }
-  }
-  return "";
-});
-
-const canSubmit = computed(() =>
-  !!form.agentUid
-  && !!String(form.agentUid).trim()
-  && !!form.taskContent.trim()
-  && !!form.timezone.trim()
-  && !!scheduleExpression.value
-  && !scheduleError.value
+const agentOptions = computed(() =>
+  cronJobsStore.agentGroups.flatMap((group) =>
+    group.agents.map((agent) => ({
+      label: agent.displayName || agent.agentName,
+      value: agent.agentUid
+    }))
+  )
 );
 
-const schedulePreviewRuns = computed(() => {
-  const output: Date[] = [];
-  const maxCount = 5;
-  const endAt = endAtValue.value ? new Date(endAtValue.value) : null;
-  let cursor = new Date();
-  for (let i = 0; i < maxCount; i += 1) {
-    const next = computeNextRunAfter(cursor);
-    if (!next) {
-      break;
-    }
-    if (endAt && next.getTime() > endAt.getTime()) {
-      break;
-    }
-    output.push(next);
-    cursor = next;
-  }
-  return output.map((item) => formatPreviewTime(item));
+const {
+  form,
+  weekdayOptions,
+  recurringModeOptions,
+  providerOptions,
+  modelOptions,
+  scheduleSummary,
+  scheduleExpression,
+  scheduleError,
+  schedulePreviewRuns,
+  canSubmit,
+  loadModelConfigIfNeeded,
+  initializeForEdit,
+  buildSubmitPayload,
+  toggleWeekday,
+  selectRecurringMode
+} = useCronJobForm({
+  agentOptions,
+  fallbackTimezone: "Asia/Shanghai",
+  t,
+  loadModelConfig: () => modelApi.getAvailableModelConfig()
 });
 
 watch(
   () => props.job,
   (job) => {
-    form.agentUid = job?.agentUid || "";
-    form.title = job?.title || "";
-    form.taskContent = job?.taskContent || "";
-    form.status = job?.status || "ACTIVE";
-    form.timezone = job?.timezone || "Asia/Shanghai";
-    form.modelProvider = job?.modelProvider || "";
-    form.modelName = job?.modelName || "";
-    form.endAtLocal = toLocalDateTimeInput(job?.endAt || "");
-    applyScheduleFromExpression(job?.expression || "");
-    applyDefaultModelSelection();
+    initializeForEdit(job);
   },
   { immediate: true }
 );
@@ -246,360 +88,16 @@ watch(
   () => props.show,
   async (show) => {
     if (!show) return;
-    await loadModelConfig();
-    applyDefaultModelSelection();
+    await loadModelConfigIfNeeded();
+    initializeForEdit(props.job);
   }
 );
-
-watch(
-  agentOptions,
-  (options) => {
-    if (!options.length) return;
-    if (!String(form.agentUid || "").trim()) {
-      form.agentUid = String(options[0].value);
-      return;
-    }
-    const exists = options.some((item) => String(item.value) === String(form.agentUid));
-    if (!exists) {
-      form.agentUid = String(options[0].value);
-    }
-  },
-  { immediate: true }
-);
-
-function applyScheduleFromExpression(expression: string) {
-  form.monthField = "*";
-  const normalized = (expression || "").trim().replace(/\s+/g, " ");
-  const parts = normalized.split(" ");
-  if (parts.length === 7 && /^\d+$/.test(parts[6])) {
-    form.executionType = "once";
-    form.recurringMode = "day";
-    form.onceDate = `${parts[6].padStart(4, "0")}-${String(Number(parts[4])).padStart(2, "0")}-${String(Number(parts[3])).padStart(2, "0")}`;
-    form.onceTime = `${String(Number(parts[2])).padStart(2, "0")}:${String(Number(parts[1])).padStart(2, "0")}`;
-    return;
-  }
-  form.executionType = "recurring";
-  if (parts.length !== 6) {
-    form.recurringMode = "day";
-    return;
-  }
-  const [, minute, hour, dayOfMonth, month, dayOfWeek] = parts;
-  form.monthField = normalizeMonthField(month);
-  if (/^0\/\d+$/.test(minute) && hour === "*" && dayOfMonth === "*" && dayOfWeek === "?") {
-    form.recurringMode = "minute";
-    form.minuteInterval = normalizeInteger(Number(minute.split("/")[1]), 1, 59);
-    return;
-  }
-  if (/^0\/\d+$/.test(hour) && /^\d+$/.test(minute) && dayOfMonth === "*" && dayOfWeek === "?") {
-    form.recurringMode = "hour";
-    form.hourInterval = normalizeInteger(Number(hour.split("/")[1]), 1, 23);
-    form.hourlyMinute = normalizeInteger(Number(minute), 0, 59);
-    return;
-  }
-  if (/^\d+$/.test(dayOfMonth) && dayOfWeek === "?") {
-    form.recurringMode = "month";
-    form.monthlyDay = normalizeInteger(Number(dayOfMonth), 1, 31);
-    form.time = `${String(Number(hour)).padStart(2, "0")}:${String(Number(minute)).padStart(2, "0")}`;
-    return;
-  }
-  if (dayOfMonth === "?" && dayOfWeek !== "*" && dayOfWeek !== "?") {
-    form.recurringMode = "week";
-    form.weekdays = parseWeekdays(dayOfWeek);
-    form.time = `${String(Number(hour)).padStart(2, "0")}:${String(Number(minute)).padStart(2, "0")}`;
-    return;
-  }
-  form.recurringMode = "day";
-  form.time = `${String(Number(hour)).padStart(2, "0")}:${String(Number(minute)).padStart(2, "0")}`;
-}
-
-function parseWeekdays(value: string) {
-  const result = new Set<string>();
-  value.split(",").map((item) => item.trim()).forEach((item) => {
-    if (/^[1-7]$/.test(item)) {
-      result.add(item);
-      return;
-    }
-    const range = /^([1-7])-([1-7])$/.exec(item);
-    if (!range) return;
-    const start = Number(range[1]);
-    const end = Number(range[2]);
-    if (start <= end) {
-      for (let i = start; i <= end; i += 1) {
-        result.add(String(i));
-      }
-    }
-  });
-  const normalized = normalizeWeekdaysForCron(Array.from(result));
-  return normalized.length ? normalized : ["2"];
-}
 
 function submit() {
   if (!canSubmit.value) return;
-  const selectedAgentUid = String(form.agentUid || "").trim();
-  if (!selectedAgentUid) return;
-  emit("submit", {
-    agentUid: selectedAgentUid,
-    title: form.title.trim(),
-    expression: scheduleExpression.value,
-    timezone: form.timezone.trim(),
-    endAt: form.executionType === "recurring" ? endAtValue.value : undefined,
-    modelProvider: form.modelProvider || undefined,
-    modelName: form.modelName || undefined,
-    taskContent: form.taskContent.trim(),
-    status: form.status
-  });
+  emit("submit", buildSubmitPayload(form.status));
   emit("update:show", false);
 }
-
-function parseTime(value: string) {
-  const matched = /^(\d{1,2}):(\d{2})$/.exec((value || "").trim());
-  if (!matched) {
-    return ["08", "30"];
-  }
-  const hours = Math.min(23, Math.max(0, Number(matched[1])));
-  const minutes = Math.min(59, Math.max(0, Number(matched[2])));
-  return [String(hours), String(minutes)];
-}
-
-function parseDateTime(dateText: string, timeText: string) {
-  if (!dateText || !timeText) {
-    return null;
-  }
-  const parsed = new Date(`${dateText}T${timeText}:00`);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-
-function normalizeInteger(value: number | null, min: number, max: number) {
-  const next = Number.isFinite(value) ? Number(value) : min;
-  return Math.min(max, Math.max(min, Math.round(next)));
-}
-
-function normalizeMonthField(value: string) {
-  const normalized = (value || "*").trim().toUpperCase();
-  if (normalized === "?" || normalized === "") {
-    return "*";
-  }
-  if (normalized === "*") {
-    return normalized;
-  }
-  if (/^\d{1,2}$/.test(normalized)) {
-    return String(normalizeInteger(Number(normalized), 1, 12));
-  }
-  if (/^\d{1,2}(?:,\d{1,2})+$/.test(normalized)) {
-    return Array.from(new Set(normalized.split(",").map((item) => String(normalizeInteger(Number(item), 1, 12)))))
-      .sort((left, right) => Number(left) - Number(right))
-      .join(",");
-  }
-  return "*";
-}
-
-function allowedMonthIndexes(monthField: string) {
-  const normalized = normalizeMonthField(monthField);
-  if (normalized === "*") {
-    return null;
-  }
-  return new Set(normalized.split(",").map((item) => Number(item) - 1));
-}
-
-function normalizeWeekdaysForCron(values: string[]) {
-  return Array.from(new Set(values))
-    .filter((item) => /^(?:[1-7])$/.test(item))
-    .sort((left, right) => Number(left) - Number(right));
-}
-
-function toggleWeekday(value: string) {
-  const next = new Set(form.weekdays);
-  if (next.has(value)) {
-    next.delete(value);
-  } else {
-    next.add(value);
-  }
-  form.weekdays = normalizeWeekdaysForCron(Array.from(next));
-}
-
-function selectRecurringMode(value: RecurringMode) {
-  if (form.recurringMode !== value) {
-    form.monthField = "*";
-  }
-  form.recurringMode = value;
-}
-
-function toLocalDateTimeInput(value: string) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}T${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-}
-
-function computeNextRunAfter(from: Date) {
-  if (form.executionType === "once") {
-    const onceAt = parseDateTime(form.onceDate, form.onceTime);
-    if (!onceAt || onceAt.getTime() <= from.getTime()) {
-      return null;
-    }
-    return onceAt;
-  }
-  switch (form.recurringMode) {
-    case "minute":
-      return computeNextMinuteRun(from, normalizeInteger(form.minuteInterval, 1, 59));
-    case "hour":
-      return computeNextHourRun(from, normalizeInteger(form.hourInterval, 1, 23), normalizeInteger(form.hourlyMinute, 0, 59));
-    case "week":
-      return computeNextWeekRun(from, form.weekdays, form.time);
-    case "month":
-      return computeNextMonthRun(from, normalizeInteger(form.monthlyDay, 1, 31), form.time, form.monthField);
-    case "day":
-    default:
-      return computeNextDayRun(from, form.time);
-  }
-}
-
-function computeNextMinuteRun(from: Date, intervalMinutes: number) {
-  const candidate = new Date(from);
-  candidate.setSeconds(0, 0);
-  candidate.setMinutes(candidate.getMinutes() + 1);
-  for (let i = 0; i < 24 * 60 + 5; i += 1) {
-    if (candidate.getMinutes() % intervalMinutes === 0 && candidate.getTime() > from.getTime()) {
-      return new Date(candidate);
-    }
-    candidate.setMinutes(candidate.getMinutes() + 1);
-  }
-  return null;
-}
-
-function computeNextHourRun(from: Date, hourInterval: number, minute: number) {
-  const candidate = new Date(from);
-  candidate.setSeconds(0, 0);
-  candidate.setMinutes(minute, 0, 0);
-  if (candidate.getTime() <= from.getTime()) {
-    candidate.setHours(candidate.getHours() + 1);
-    candidate.setMinutes(minute, 0, 0);
-  }
-  for (let i = 0; i < 24 * 31; i += 1) {
-    if (candidate.getHours() % hourInterval === 0 && candidate.getTime() > from.getTime()) {
-      return new Date(candidate);
-    }
-    candidate.setHours(candidate.getHours() + 1);
-    candidate.setMinutes(minute, 0, 0);
-  }
-  return null;
-}
-
-function computeNextDayRun(from: Date, time: string) {
-  const [hour, minute] = parseTime(time).map((item) => Number(item));
-  const allowedMonths = allowedMonthIndexes(form.monthField);
-  const candidate = new Date(from);
-  candidate.setHours(hour, minute, 0, 0);
-  if (candidate.getTime() <= from.getTime()) {
-    candidate.setDate(candidate.getDate() + 1);
-  }
-  if (allowedMonths) {
-    for (let i = 0; i < 370; i += 1) {
-      if (allowedMonths.has(candidate.getMonth()) && candidate.getTime() > from.getTime()) {
-        return candidate;
-      }
-      candidate.setDate(candidate.getDate() + 1);
-      candidate.setHours(hour, minute, 0, 0);
-    }
-    return null;
-  }
-  return candidate;
-}
-
-function cronWeekdayToJs(value: string) {
-  const cron = Number(value);
-  if (cron === 1) return 0;
-  if (cron >= 2 && cron <= 7) return cron - 1;
-  return 1;
-}
-
-function computeNextWeekRun(from: Date, weekdayValues: string[], time: string) {
-  const targets = new Set(weekdayValues.map(cronWeekdayToJs));
-  if (!targets.size) {
-    return null;
-  }
-  const allowedMonths = allowedMonthIndexes(form.monthField);
-  const [hour, minute] = parseTime(time).map((item) => Number(item));
-  const candidate = new Date(from);
-  candidate.setSeconds(0, 0);
-  for (let i = 0; i < 370; i += 1) {
-    const dayCandidate = new Date(candidate);
-    dayCandidate.setDate(candidate.getDate() + i);
-    dayCandidate.setHours(hour, minute, 0, 0);
-    if ((!allowedMonths || allowedMonths.has(dayCandidate.getMonth())) && targets.has(dayCandidate.getDay()) && dayCandidate.getTime() > from.getTime()) {
-      return dayCandidate;
-    }
-  }
-  return null;
-}
-
-function computeNextMonthRun(from: Date, monthlyDay: number, time: string, monthField = "*") {
-  const [hour, minute] = parseTime(time).map((item) => Number(item));
-  const allowedMonths = allowedMonthIndexes(monthField);
-  const candidate = new Date(from);
-  for (let i = 0; i < 120; i += 1) {
-    const monthDate = new Date(candidate.getFullYear(), candidate.getMonth() + i, 1, hour, minute, 0, 0);
-    if (allowedMonths && !allowedMonths.has(monthDate.getMonth())) {
-      continue;
-    }
-    const days = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
-    if (monthlyDay > days) {
-      continue;
-    }
-    monthDate.setDate(monthlyDay);
-    if (monthDate.getTime() > from.getTime()) {
-      return monthDate;
-    }
-  }
-  return null;
-}
-
-function formatPreviewTime(value: Date) {
-  return value.toLocaleString(getSortLocale(), {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false
-  });
-}
-
-async function loadModelConfig() {
-  const available = await modelApi.getAvailableModelConfig();
-  modelConfig.value = available || { providers: [] };
-}
-
-function applyDefaultModelSelection() {
-  if (!providerOptions.value.length) {
-    form.modelProvider = "";
-    form.modelName = "";
-    return;
-  }
-  if (!providerOptions.value.some((item) => item.value === form.modelProvider)) {
-    form.modelProvider = String(providerOptions.value[0].value || "");
-  }
-  const currentModels = modelOptions.value;
-  if (!currentModels.length) {
-    form.modelName = "";
-    return;
-  }
-  if (!currentModels.some((item) => item.value === form.modelName)) {
-    form.modelName = String(currentModels[0].value || "");
-  }
-}
-
-watch(
-  () => form.modelProvider,
-  () => {
-    const currentModels = modelOptions.value;
-    if (!currentModels.some((item) => item.value === form.modelName)) {
-      form.modelName = currentModels.length ? String(currentModels[0].value || "") : "";
-    }
-  }
-);
 </script>
 
 <template>
@@ -612,186 +110,23 @@ watch(
     :content-style="modalContentStyle"
     @update:show="emit('update:show', $event)"
   >
-    <n-form label-placement="top">
-      <div class="cron-form-grid">
-        <div class="cron-form-main">
-          <div class="basic-card">
-            <div class="section-title">
-              <span>{{ t("cron.form.taskInfo") }}</span>
-            </div>
-            <div class="basic-meta-grid">
-              <div class="meta-inline-row">
-                <n-form-item :label="t('cron.form.executeAgent')" class="meta-inline-item">
-                  <n-select
-                    v-model:value="form.agentUid"
-                    :placeholder="t('cron.form.executeAgentPlaceholder')"
-                    :options="agentOptions"
-                    filterable
-                  />
-                </n-form-item>
-                <n-form-item :label="t('cron.form.taskTitle')" class="meta-inline-item">
-                  <n-input
-                    v-model:value="form.title"
-                    :placeholder="t('cron.form.taskTitlePlaceholder')"
-                  />
-                </n-form-item>
-              </div>
-              <div class="model-inline-row">
-                <n-form-item :label="t('cron.form.modelProvider')" class="model-inline-item">
-                  <n-select
-                    v-model:value="form.modelProvider"
-                    :placeholder="t('cron.form.modelProviderPlaceholder')"
-                    :options="providerOptions"
-                  />
-                </n-form-item>
-                <n-form-item :label="t('cron.form.modelName')" class="model-inline-item">
-                  <n-select
-                    v-model:value="form.modelName"
-                    :placeholder="t('cron.form.modelNamePlaceholder')"
-                    :options="modelOptions"
-                  />
-                </n-form-item>
-              </div>
-            </div>
-
-            <n-form-item :label="t('cron.form.taskContent')" class="task-content-item" :show-feedback="false">
-              <n-input
-                v-model:value="form.taskContent"
-                type="textarea"
-                :placeholder="t('cron.form.taskContentPlaceholder')"
-                :autosize="{ minRows: 5, maxRows: 8 }"
-              />
-            </n-form-item>
-          </div>
-        </div>
-
-        <div class="cron-form-side">
-          <div class="schedule-card">
-            <div class="section-title">
-              <BellRing :size="16" />
-              <span>{{ t("cron.form.plan") }}</span>
-            </div>
-
-            <div class="schedule-field">
-              <div class="field-label">{{ t("cron.form.executionType") }}</div>
-              <n-tabs v-model:value="form.executionType" type="segment" animated size="small">
-                <n-tab-pane name="once" :tab="t('cron.executionType.once')" />
-                <n-tab-pane name="recurring" :tab="t('cron.executionType.recurring')" />
-              </n-tabs>
-            </div>
-
-            <div class="schedule-dynamic-block">
-              <template v-if="form.executionType === 'once'">
-                <div class="schedule-field">
-                  <label class="field-label">{{ t("cron.form.executeDateTime") }}</label>
-                  <div class="inline-fields">
-                    <input v-model="form.onceDate" class="native-date-input" type="date" />
-                    <input v-model="form.onceTime" class="native-time-input" type="time" step="60" />
-                  </div>
-                </div>
-
-              </template>
-
-              <template v-else>
-                <div class="schedule-field">
-                  <div class="field-label">{{ t("cron.form.recurringFrequency") }}</div>
-                  <div class="segmented-group segmented-group-multi">
-                    <button
-                      v-for="option in recurringModeOptions"
-                      :key="option.value"
-                      type="button"
-                      class="segmented-item"
-                      :class="{ active: form.recurringMode === option.value }"
-                      @click="selectRecurringMode(option.value)"
-                    >
-                      {{ option.label }}
-                    </button>
-                  </div>
-                </div>
-
-                <div v-if="form.recurringMode === 'minute'" class="schedule-field">
-                  <label class="field-label">{{ t("cron.form.everyMinutes") }}</label>
-                  <n-input-number v-model:value="form.minuteInterval" :min="1" :max="59" :precision="0" class="minute-input" />
-                </div>
-
-                <div v-if="form.recurringMode === 'hour'" class="schedule-field">
-                  <label class="field-label">{{ t("cron.form.everyHours") }}</label>
-                  <n-input-number v-model:value="form.hourInterval" :min="1" :max="23" :precision="0" class="minute-input" />
-                  <label class="field-label hour-sub-label">{{ t("cron.form.minuteOfHour") }}</label>
-                  <n-input-number v-model:value="form.hourlyMinute" :min="0" :max="59" :precision="0" class="minute-input" />
-                  <div class="field-hint">{{ t("cron.form.minuteOfHourHint") }}</div>
-                </div>
-
-                <div v-if="form.recurringMode === 'day' || form.recurringMode === 'week' || form.recurringMode === 'month'" class="schedule-field">
-                  <label class="field-label">{{ t("cron.form.executeTime") }}</label>
-                  <input v-model="form.time" class="native-time-input" type="time" step="60" />
-                </div>
-
-                <div v-if="form.recurringMode === 'week'" class="schedule-field">
-                  <div class="field-label">{{ t("cron.form.weekday") }}</div>
-                  <div class="weekday-grid">
-                    <button
-                      v-for="weekday in weekdayOptions"
-                      :key="weekday.value"
-                      class="weekday-pill"
-                      :class="{ active: form.weekdays.includes(weekday.value) }"
-                      type="button"
-                      @click="toggleWeekday(weekday.value)"
-                    >
-                      {{ weekday.short }}
-                    </button>
-                  </div>
-                </div>
-
-                <div v-if="form.recurringMode === 'month'" class="schedule-field">
-                  <label class="field-label">{{ t("cron.form.dayOfMonth") }}</label>
-                  <n-input-number v-model:value="form.monthlyDay" :min="1" :max="31" :precision="0" class="minute-input" />
-                </div>
-
-                <div class="schedule-field">
-                  <label class="field-label">{{ t("cron.form.endAtOptional") }}</label>
-                  <input v-model="form.endAtLocal" class="native-date-input" type="datetime-local" step="60" />
-                </div>
-              </template>
-            </div>
-
-            <div class="schedule-field">
-              <label class="field-label">{{ t("cron.form.timezone") }}</label>
-              <n-input :value="form.timezone" readonly />
-            </div>
-
-            <div v-if="scheduleError" class="field-error">{{ scheduleError }}</div>
-          </div>
-
-          <div class="preview-card">
-            <div class="preview-head">
-              <div>
-                <div class="section-title">
-                  <Clock3 :size="16" />
-                  <span>{{ t("cron.form.planPreview") }}</span>
-                </div>
-                <div class="preview-summary">{{ scheduleSummary }}</div>
-              </div>
-            </div>
-            <div class="preview-expression">{{ scheduleExpression || "-" }}</div>
-            <div v-if="form.executionType === 'recurring'" class="preview-next">
-              <div class="preview-next-title">{{ t("cron.form.nextRuns") }}</div>
-              <div v-if="schedulePreviewRuns.length" class="preview-timeline">
-                <div v-for="(item, index) in schedulePreviewRuns" :key="`${item}-${index}`" class="preview-timeline-item">
-                  <Clock3 :size="12" class="preview-timeline-icon" />
-                  <span class="preview-timeline-text">{{ item }}</span>
-                </div>
-              </div>
-              <div v-else class="preview-next-empty">{{ t("cron.form.noRunnableTime") }}</div>
-            </div>
-            <div v-else class="preview-next">
-              <div class="preview-next-title">{{ t("cron.form.executeTime") }}</div>
-              <div class="preview-once-time">{{ schedulePreviewRuns[0] || t("cron.form.noRunnableTime") }}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </n-form>
+    <CronJobFormContent
+      :form="form"
+      :agent-options="agentOptions"
+      :provider-options="providerOptions"
+      :model-options="modelOptions"
+      :weekday-options="weekdayOptions"
+      :recurring-mode-options="recurringModeOptions"
+      :schedule-summary="scheduleSummary"
+      :schedule-expression="scheduleExpression"
+      :schedule-preview-runs="schedulePreviewRuns"
+      :schedule-error="scheduleError"
+      layout="edit"
+      :show-agent-filter="true"
+      :t="t"
+      :toggle-weekday="toggleWeekday"
+      :select-recurring-mode="selectRecurringMode"
+    />
 
     <template #action>
       <div class="cron-edit-actions">
@@ -803,43 +138,9 @@ watch(
 </template>
 
 <style scoped>
-@import "./cronTaskModalShared.css";
-
 .cron-edit-actions {
   display: flex;
   justify-content: flex-end;
   gap: var(--space-3);
-}
-
-.model-inline-row {
-  grid-column: 1 / -1;
-  display: grid;
-  gap: var(--space-3);
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.meta-inline-row {
-  grid-column: 1 / -1;
-  display: grid;
-  gap: var(--space-3);
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.meta-inline-item {
-  margin-bottom: 0;
-}
-
-.model-inline-item {
-  margin-bottom: 0;
-}
-
-@media (max-width: 720px) {
-  .meta-inline-row {
-    grid-template-columns: 1fr;
-  }
-
-  .model-inline-row {
-    grid-template-columns: 1fr;
-  }
 }
 </style>

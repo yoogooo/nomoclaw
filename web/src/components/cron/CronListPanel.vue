@@ -22,21 +22,11 @@ const resultModalTitle = ref("");
 const resultModalRows = ref<Array<{ executedTime: string; status: string; summary: string }>>([]);
 
 const jobsSorted = computed(() => {
-  const order = new Map<string, number>();
-  let index = 0;
-  cronJobsStore.agentGroups.forEach((group) => {
-    group.agents.forEach((agent) => {
-      if (!order.has(agent.agentUid)) {
-        order.set(agent.agentUid, index++);
-      }
-    });
-  });
-
   return [...cronJobsStore.jobs].sort((left, right) => {
-    const leftSortIndex = order.get(left.agentUid) ?? Number.MAX_SAFE_INTEGER;
-    const rightSortIndex = order.get(right.agentUid) ?? Number.MAX_SAFE_INTEGER;
-    if (leftSortIndex !== rightSortIndex) {
-      return leftSortIndex - rightSortIndex;
+    const leftCreatedAt = left.createdTime ? new Date(left.createdTime).getTime() : 0;
+    const rightCreatedAt = right.createdTime ? new Date(right.createdTime).getTime() : 0;
+    if (leftCreatedAt !== rightCreatedAt) {
+      return rightCreatedAt - leftCreatedAt;
     }
     const labelCompare = fallbackAgentLabel(left).localeCompare(fallbackAgentLabel(right), getSortLocale());
     if (labelCompare !== 0) {
