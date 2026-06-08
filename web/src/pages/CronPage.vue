@@ -17,7 +17,10 @@ const cronJobsStore = useCronJobsStore();
 const showCreateModal = ref(false);
 const createTemplateId = ref<string | null>(null);
 const showEditModal = ref(false);
-const editingJob = ref<CronJob | null>(null);
+const editingJobUid = ref<string | null>(null);
+const editingJob = computed<CronJob | null>(() => (
+  cronJobsStore.jobs.find((job) => job.jobUid === editingJobUid.value) || null
+));
 const hasJobs = computed(() => cronJobsStore.jobs.length > 0);
 const hasRunningJobs = computed(() => {
   return cronJobsStore.runningGlobalResults.length > 0;
@@ -32,9 +35,9 @@ function openCreateModal(templateId?: string) {
 }
 
 function openEditModal(job: CronJob) {
-  editingJob.value = job;
+  editingJobUid.value = job.jobUid;
   showEditModal.value = true;
-  void cronJobsStore.selectJob(job.jobUid);
+  void cronJobsStore.refresh(job.jobUid);
 }
 
 async function refreshJobs() {
@@ -137,8 +140,8 @@ onBeforeUnmount(() => {
   <CronEditModal
     :show="showEditModal"
     :job="editingJob"
-    @update:show="showEditModal = $event"
-    @submit="editingJob && cronJobsStore.updateJob(editingJob.jobUid, $event)"
+    @update:show="showEditModal = $event; if (!$event) editingJobUid = null"
+    @submit="editingJobUid && cronJobsStore.updateJob(editingJobUid, $event)"
   />
 </template>
 
