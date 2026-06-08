@@ -6,6 +6,7 @@ import { NButton, NCard, NCollapse, NCollapseItem, NFlex, NTag } from "naive-ui"
 import ApprovalBanner from "./ApprovalBanner.vue";
 import ComposerPanel from "./composer/ComposerPanel.vue";
 import UiInstantTooltip from "@/components/UiInstantTooltip.vue";
+import UiSpinner from "@/components/UiSpinner.vue";
 import { message as discreteMessage } from "@/discrete";
 import { notification as discreteNotification } from "@/discrete";
 import { useConversationStore } from "@/stores/conversation";
@@ -791,6 +792,11 @@ onMounted(() => {
                     :aria-label="isTipSaved(message) ? t('chat.messages.tipSaved') : t('chat.messages.saveTip')"
                     @click="saveJinnang(message)"
                   >
+                    <UiSpinner
+                      v-if="savingTipMap[messageActionKey(message)]"
+                      :size="14"
+                      thickness="1.8px"
+                    />
                     <Check v-if="isTipSaved(message) && !savingTipMap[messageActionKey(message)]" :size="14" />
                     <Sparkles v-else-if="!savingTipMap[messageActionKey(message)]" :size="14" />
                   </button>
@@ -1291,23 +1297,6 @@ onMounted(() => {
 .message-action-btn.loading {
   border-color: var(--color-border-brand-hover);
   color: var(--color-text-brand-strong);
-}
-
-.message-action-btn.loading::before {
-  content: "";
-  display: inline-block;
-  width: var(--space-2_5);
-  height: var(--space-2_5);
-  margin-right: var(--space-1_5);
-  border: var(--size-1_5) solid var(--color-border-spinner);
-  border-top-color: var(--color-text-brand-strong);
-  border-radius: var(--radius-pill);
-  vertical-align: calc(var(--size-1) * -1);
-  animation: spin 0.65s linear infinite;
-}
-
-.message-action-btn.icon-only.loading::before {
-  margin-right: 0;
 }
 
 .message-action-btn.saved {
