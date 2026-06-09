@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, h, nextTick, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { ArrowDown, ArrowUp, Check, ChevronsDown, ChevronsUp, Copy, Sparkles } from "lucide-vue-next";
+import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronUp, Copy, Sparkles } from "lucide-vue-next";
 import { NButton, NCard, NCollapse, NCollapseItem, NFlex, NTag } from "naive-ui";
 import ApprovalBanner from "./ApprovalBanner.vue";
 import MessageCopyButton from "./MessageCopyButton.vue";
@@ -700,11 +700,18 @@ onMounted(() => {
         >
           <div
             class="message-bubble"
-            :class="{ user: message.role === 'user', 'has-expand-toggle': shouldShowUserMessageToggle(message) }"
+            :class="{
+              user: message.role === 'user',
+              'has-expand-toggle': shouldShowUserMessageToggle(message),
+              'is-user-collapsed': message.role === 'user' && shouldShowUserMessageToggle(message) && !isUserMessageExpanded(message)
+            }"
           >
             <div
               class="message-html"
-              :class="{ 'is-collapsed': shouldShowUserMessageToggle(message) && !isUserMessageExpanded(message) }"
+              :class="{
+                'is-collapsed': shouldShowUserMessageToggle(message) && !isUserMessageExpanded(message),
+                'is-user-collapsed': message.role === 'user' && shouldShowUserMessageToggle(message) && !isUserMessageExpanded(message)
+              }"
               v-html="renderMarkdown(message.content)"
             />
             <button
@@ -714,8 +721,8 @@ onMounted(() => {
               :aria-expanded="isUserMessageExpanded(message)"
               @click="toggleUserMessageExpanded(message)"
             >
-              <ChevronsUp v-if="isUserMessageExpanded(message)" :size="12" />
-              <ChevronsDown v-else :size="12" />
+              <ChevronUp v-if="isUserMessageExpanded(message)" :size="14" />
+              <ChevronDown v-else :size="14" />
               <span>{{ isUserMessageExpanded(message) ? t("chat.messages.collapseMessage") : t("chat.messages.expandMessage") }}</span>
             </button>
             <div v-if="message.attachments?.length" class="message-attachments">
@@ -1087,6 +1094,23 @@ onMounted(() => {
   overflow: hidden;
 }
 
+.message-bubble.user .message-html.is-user-collapsed {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 1) 0,
+    rgba(0, 0, 0, 1) 76%,
+    rgba(0, 0, 0, 0.42) 92%,
+    rgba(0, 0, 0, 0) 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 1) 0,
+    rgba(0, 0, 0, 1) 76%,
+    rgba(0, 0, 0, 0.42) 92%,
+    rgba(0, 0, 0, 0) 100%
+  );
+}
+
 .message-bubble.has-expand-toggle {
   padding-bottom: calc(var(--space-3) + var(--space-8));
 }
@@ -1103,8 +1127,8 @@ onMounted(() => {
   border: none;
   background: transparent;
   color: inherit;
-  font-size: var(--text-caption-size);
-  line-height: 1.3;
+  font-size: var(--text-body-size);
+  line-height: 1.4;
   cursor: pointer;
   transition: color 0.16s ease;
 }
