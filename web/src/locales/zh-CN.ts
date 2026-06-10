@@ -16,6 +16,7 @@ const zhCN = {
     chat: "对话控制台",
     cron: "定时任务管理",
     agents: "Agent 管理",
+    knowledge: "知识库",
     skills: "技能管理",
     channels: "Channel 管理",
     models: "模型管理",
@@ -1000,6 +1001,33 @@ const zhCN = {
       tabMcp: "MCP",
       tabTips: "锦囊",
       tabDocs: "配置文件"
+    },
+    knowledge: {
+      title: "知识库",
+      subtitle: "查看和进入已有知识库，也可以从这里创建新的知识库。",
+      kicker: "Knowledge Hub",
+      createCard: {
+        title: "新建知识库",
+        subtitle: "上传文档、整理权限与索引策略，创建一个新的知识空间。",
+        action: "新建知识库"
+      },
+      list: {
+        title: "知识库",
+        hitRate: "命中率 {value}%"
+      },
+      visibility: {
+        private: "私有",
+        team: "团队可见",
+        restricted: "指定成员"
+      },
+      status: {
+        healthy: "正常",
+        indexing: "更新中",
+        warning: "需关注"
+      },
+      units: {
+        documents: "文档"
+      }
     },
     skills: {
       title: "技能管理",

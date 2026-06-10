@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute } from "vue-router";
 import {
   Bot,
   Briefcase,
@@ -101,6 +102,14 @@ const importSkillVisible = ref(false);
 const refreshingConfig = ref(false);
 const refreshingDocs = ref(false);
 const { t } = useI18n();
+const route = useRoute();
+
+function syncDetailTabFromRoute() {
+  const routeTab = String(route.query.tab || "").trim();
+  if (isValidDetailTab(routeTab)) {
+    detailTab.value = routeTab;
+  }
+}
 
 const avatarIconOptions: AvatarIconOption[] = [
   { key: "bot", label: "Bot", icon: Bot },
@@ -297,7 +306,12 @@ onMounted(async () => {
     detailTab.value = restoredState.detailTab;
     selectedAgentUid.value = restoredState.selectedAgentUid;
   }
+  syncDetailTabFromRoute();
   await refreshAgentsConfig(false);
+});
+
+watch(() => route.query.tab, () => {
+  syncDetailTabFromRoute();
 });
 
 watch([selectedDocKey, detailTab, selectedAgentUid], () => {

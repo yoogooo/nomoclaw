@@ -3,6 +3,7 @@ import ChatPage from "@/pages/ChatPage.vue";
 import CronPage from "@/pages/CronPage.vue";
 import CronExecutionHistoryPage from "@/pages/CronExecutionHistoryPage.vue";
 import AgentsPage from "@/pages/AgentsPage.vue";
+import KnowledgePage from "@/pages/KnowledgePage.vue";
 import SkillsPage from "@/pages/SkillsPage.vue";
 import SettingsPage from "@/pages/SettingsPage.vue";
 import SettingsErrorLogsPage from "@/pages/SettingsErrorLogsPage.vue";
@@ -62,6 +63,11 @@ export const router = createRouter({
       path: "/agents",
       name: "agents",
       component: AgentsPage
+    },
+    {
+      path: "/knowledge",
+      name: "knowledge",
+      component: KnowledgePage
     },
     {
       path: "/skills",

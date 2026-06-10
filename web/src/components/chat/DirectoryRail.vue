@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
-import { Bot, Brain, CalendarClock, Ellipsis, MessageCircleMore, Moon, Settings, Sun, PlugZap, Puzzle, Workflow } from "lucide-vue-next";
+import { BookOpen, Bot, Brain, CalendarClock, Ellipsis, MessageCircleMore, Moon, Settings, Sun, PlugZap, Puzzle, Workflow } from "lucide-vue-next";
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { NPopover } from "naive-ui";
@@ -20,6 +20,7 @@ const navItems = computed(() => [
   { key: "chat", label: t("nav.chat"), icon: MessageCircleMore, to: "/" },
   { key: "cron", label: t("nav.cron"), icon: CalendarClock, to: "/cron" },
   { key: "agents", label: t("nav.agents"), icon: Bot, to: "/agents" },
+  { key: "knowledge", label: t("nav.knowledge"), icon: BookOpen, to: "/knowledge" },
   { key: "skills", label: t("nav.skills"), icon: Puzzle, to: "/skills" },
   { key: "channels", label: t("nav.channels"), icon: PlugZap, to: "/channels" },
   { key: "models", label: t("nav.models"), icon: Brain, to: "/models" },

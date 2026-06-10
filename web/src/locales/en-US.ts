@@ -16,6 +16,7 @@ const enUS = {
     chat: "Chat Console",
     cron: "Scheduled Tasks",
     agents: "Agent Management",
+    knowledge: "Knowledge Base",
     skills: "Skill Management",
     channels: "Channel Management",
     models: "Model Management",
@@ -1000,6 +1001,33 @@ const enUS = {
       tabMcp: "MCP",
       tabTips: "Tips",
       tabDocs: "Config Files"
+    },
+    knowledge: {
+      title: "Knowledge Base",
+      subtitle: "Browse existing knowledge bases or create a new one from this home page.",
+      kicker: "Knowledge Hub",
+      createCard: {
+        title: "Create Knowledge Base",
+        subtitle: "Upload documents, define permissions, and configure indexing for a new knowledge space.",
+        action: "Create Knowledge Base"
+      },
+      list: {
+        title: "Knowledge Bases",
+        hitRate: "Hit rate {value}%"
+      },
+      visibility: {
+        private: "Private",
+        team: "Team",
+        restricted: "Restricted"
+      },
+      status: {
+        healthy: "Healthy",
+        indexing: "Indexing",
+        warning: "Needs Attention"
+      },
+      units: {
+        documents: "docs"
+      }
     },
     skills: {
       title: "Skill Management",
