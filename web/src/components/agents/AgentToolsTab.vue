@@ -65,8 +65,9 @@ const groupedTools = computed(() => {
               class="tool-card ui-card-base"
             >
               <div class="tool-card-head">
-                <div class="tool-card-name ui-title-strong">{{ tool.name }}</div>
+                <div class="tool-card-name ui-title-strong" :title="tool.name">{{ tool.name }}</div>
                 <n-switch
+                  class="tool-card-switch"
                   size="small"
                   :value="tool.enabled"
                   @update:value="emit('toggle', tool.id, $event)"
@@ -84,8 +85,9 @@ const groupedTools = computed(() => {
           class="tool-card ui-card-base"
         >
           <div class="tool-card-head">
-            <div class="tool-card-name ui-title-strong">{{ tool.name }}</div>
+            <div class="tool-card-name ui-title-strong" :title="tool.name">{{ tool.name }}</div>
             <n-switch
+              class="tool-card-switch"
               size="small"
               :value="tool.enabled"
               @update:value="emit('toggle', tool.id, $event)"
@@ -153,9 +155,18 @@ const groupedTools = computed(() => {
 }
 
 .tool-card-name {
+  min-width: 0;
+  flex: 1 1 auto;
   font-size: var(--text-title-sm-size);
   font-weight: 700;
   letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-card-switch {
+  flex: 0 0 auto;
 }
 
 .tool-card-desc {
