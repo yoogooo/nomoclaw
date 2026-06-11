@@ -767,16 +767,16 @@ onMounted(() => {
                 <ArrowDown :size="12" />
                 <span>{{ resolveMessageTokenUsage(message)?.input ?? 0 }}</span>
               </span>
+              <span class="message-token-item">
+                <ArrowUp :size="12" />
+                <span>{{ resolveMessageTokenUsage(message)?.output ?? 0 }}</span>
+              </span>
               <span
                 v-if="(resolveMessageTokenUsage(message)?.cachedInput ?? 0) > 0"
                 class="message-token-item"
               >
-                <span>cache</span>
+                <span>Cache</span>
                 <span>{{ resolveMessageTokenUsage(message)?.cachedInput ?? 0 }}</span>
-              </span>
-              <span class="message-token-item">
-                <ArrowUp :size="12" />
-                <span>{{ resolveMessageTokenUsage(message)?.output ?? 0 }}</span>
               </span>
               <span class="message-token-total">{{ messageTokenUsageText(message) }}</span>
             </div>
