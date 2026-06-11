@@ -91,17 +91,17 @@ public final class PromptLoader {
                 - If the user explicitly provides a custom output path, follow the user's instruction.
                 """.trim()).append("\n\n");
 
-        builder.append("[内置工具]\n\n");
-        if (builtinToolsPrompt != null && !builtinToolsPrompt.isBlank()) {
-            builder.append(builtinToolsPrompt.trim()).append("\n\n");
-        } else {
-            builder.append("(none)\n\n");
-        }
-
-        if (mcpToolsPrompt != null && !mcpToolsPrompt.isBlank()) {
-            builder.append("[MCP 工具]\n\n");
-            builder.append(mcpToolsPrompt.trim()).append("\n\n");
-        }
+//        builder.append("[内置工具]\n\n");
+//        if (builtinToolsPrompt != null && !builtinToolsPrompt.isBlank()) {
+//            builder.append(builtinToolsPrompt.trim()).append("\n\n");
+//        } else {
+//            builder.append("(none)\n\n");
+//        }
+//
+//        if (mcpToolsPrompt != null && !mcpToolsPrompt.isBlank()) {
+//            builder.append("[MCP 工具]\n\n");
+//            builder.append(mcpToolsPrompt.trim()).append("\n\n");
+//        }
 
         if (toolkitPrompt != null && !toolkitPrompt.isBlank()) {
             builder.append(toolkitPrompt.trim()).append("\n\n");
