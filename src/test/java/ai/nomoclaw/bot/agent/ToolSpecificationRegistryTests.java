@@ -55,6 +55,42 @@ class ToolSpecificationRegistryTests {
     }
 
     @Test
+    void shouldExcludeDisabledToolsFromAgentToolSpecifications() {
+        AgentDefinitionRepository agentDefinitionRepository = mock(AgentDefinitionRepository.class);
+        ToolDefinitionRepository toolDefinitionRepository = mock(ToolDefinitionRepository.class);
+        AgentToolRelationRepository agentToolRelationRepository = mock(AgentToolRelationRepository.class);
+        McpApplicationService mcpApplicationService = mock(McpApplicationService.class);
+        when(mcpApplicationService.listActiveToolSnapshots()).thenReturn(List.of());
+
+        AgentDefinitionEntity agent = new AgentDefinitionEntity();
+        agent.setAgentUid("agent_demo");
+        agent.setAgentName("demo");
+        when(agentDefinitionRepository.findActiveByName("demo")).thenReturn(agent);
+
+        AgentToolRelationEntity enabledRelation = new AgentToolRelationEntity();
+        enabledRelation.setToolKey("CommandTool");
+        AgentToolRelationEntity disabledRelation = new AgentToolRelationEntity();
+        disabledRelation.setToolKey("BrowserTool");
+        when(agentToolRelationRepository.listActiveByAgentUid("agent_demo")).thenReturn(List.of(enabledRelation));
+
+        ToolDefinitionEntity commandTool = new ToolDefinitionEntity();
+        commandTool.setToolKey("CommandTool");
+        when(toolDefinitionRepository.listActiveByKeys(List.of("CommandTool"))).thenReturn(List.of(commandTool));
+
+        ToolSpecificationRegistry registry = new ToolSpecificationRegistry(
+                agentDefinitionRepository,
+                toolDefinitionRepository,
+                agentToolRelationRepository,
+                mcpApplicationService
+        );
+
+        List<String> toolNames = registry.listForAgent("demo").stream().map(spec -> spec.name()).toList();
+        assertEquals(List.of("CommandTool"), toolNames);
+        assertFalse(toolNames.contains("BrowserTool"));
+        assertFalse(registry.isToolAllowed("demo", "BrowserTool"));
+    }
+
+    @Test
     void shouldFallbackToAllToolsWhenAgentHasNoRelations() {
         AgentDefinitionRepository agentDefinitionRepository = mock(AgentDefinitionRepository.class);
         ToolDefinitionRepository toolDefinitionRepository = mock(ToolDefinitionRepository.class);

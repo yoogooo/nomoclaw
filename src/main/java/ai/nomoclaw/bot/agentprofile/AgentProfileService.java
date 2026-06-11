@@ -10,6 +10,7 @@ import ai.nomoclaw.bot.agentprofile.model.AgentDocDto;
 import ai.nomoclaw.bot.domain.AgentConversation;
 import ai.nomoclaw.bot.domain.AgentMessage;
 import ai.nomoclaw.bot.conversation.support.ConversationAttachmentService;
+import ai.nomoclaw.bot.mcp.McpApplicationService;
 import ai.nomoclaw.bot.orchestrator.MessageCancellationRegistry;
 import ai.nomoclaw.bot.orchestrator.PermissionAppService;
 import ai.nomoclaw.bot.orchestrator.execution.ExecutionScopeResolver;
@@ -79,6 +80,7 @@ public class AgentProfileService {
     private final AgentMcpToolRelationRepository agentMcpToolRelationRepository;
     private final AgentTipService agentTipService;
     private final AgentToolService agentToolService;
+    private final McpApplicationService mcpApplicationService;
     private final PermissionAppService permissionAppService;
     private final ExecutionScopeResolver executionScopeResolver;
     private final ConversationAttachmentService conversationAttachmentAppService;
@@ -92,6 +94,7 @@ public class AgentProfileService {
                                   AgentMcpToolRelationRepository agentMcpToolRelationRepository,
                                   AgentTipService agentTipService,
                                   AgentToolService agentToolService,
+                                  McpApplicationService mcpApplicationService,
                                   PermissionAppService permissionAppService,
                                   ExecutionScopeResolver executionScopeResolver,
                                   ConversationAttachmentService conversationAttachmentAppService,
@@ -104,6 +107,7 @@ public class AgentProfileService {
         this.agentMcpToolRelationRepository = agentMcpToolRelationRepository;
         this.agentTipService = agentTipService;
         this.agentToolService = agentToolService;
+        this.mcpApplicationService = mcpApplicationService;
         this.permissionAppService = permissionAppService;
         this.executionScopeResolver = executionScopeResolver;
         this.conversationAttachmentAppService = conversationAttachmentAppService;
@@ -211,6 +215,7 @@ public class AgentProfileService {
         member.setResponsibility("");
         member.setIsPrimary(0);
         agentToolService.initializeAgentToolRelations(agentUid, now);
+        mcpApplicationService.initializeAgentToolRelations(agentUid, now);
         initializeAgentWorkspaceDocs(agentName, displayName);
         return toAgentCatalogItem(member, agent);
     }

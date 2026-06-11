@@ -355,6 +355,25 @@ public class McpApplicationService {
         return toAgentToolDto(snapshot, serverRepository.findByUid(snapshot.getServerUid()), relation);
     }
 
+    public void initializeAgentToolRelations(String agentUid, LocalDateTime now) {
+        String normalizedAgentUid = nullToEmpty(agentUid).trim();
+        if (normalizedAgentUid.isBlank()) {
+            return;
+        }
+        for (McpToolSnapshotEntity snapshot : toolSnapshotRepository.listActive()) {
+            AgentMcpToolRelationEntity relation = new AgentMcpToolRelationEntity();
+            relation.setRelationUid(UuidUtil.newUuid());
+            relation.setAgentUid(normalizedAgentUid);
+            relation.setToolKey(snapshot.getToolKey());
+            relation.setStatus("ACTIVE");
+            relation.setSortIndex(500);
+            relation.setConfigJson("{}");
+            relation.setCreatedTime(now);
+            relation.setUpdatedTime(now);
+            agentMcpToolRelationRepository.save(relation);
+        }
+    }
+
     public ToolResult execute(String toolKey, ToolRequest request) {
         McpToolSnapshotEntity snapshot = toolSnapshotRepository.findActiveByToolKey(toolKey);
         if (snapshot == null) {
