@@ -13,7 +13,6 @@ interface KnowledgeBaseCard {
   id: string;
   name: string;
   description: string;
-  owner: string;
   visibility: KnowledgeVisibility;
   status: KnowledgeStatus;
   documents: number;
@@ -29,7 +28,6 @@ const knowledgeBases: KnowledgeBaseCard[] = [
     id: "kb_legal_contracts",
     name: "合同知识库",
     description: "覆盖采购、付款、终止、违约与模板条款，适合法务与采购问题检索。",
-    owner: "法务组",
     visibility: "restricted",
     status: "healthy",
     documents: 182,
@@ -40,7 +38,6 @@ const knowledgeBases: KnowledgeBaseCard[] = [
     id: "kb_product_faq",
     name: "产品 FAQ",
     description: "面向客服与运营的标准问答、发布说明和变更历史。",
-    owner: "运营组",
     visibility: "team",
     status: "indexing",
     documents: 96,
@@ -51,7 +48,6 @@ const knowledgeBases: KnowledgeBaseCard[] = [
     id: "kb_customer_a",
     name: "客户 A 项目库",
     description: "客户 A 的需求纪要、接口文档、验收标准与周报沉淀。",
-    owner: "客户成功",
     visibility: "private",
     status: "warning",
     documents: 41,
@@ -111,7 +107,6 @@ function createKnowledgeBase() {
               @click="openKnowledgeBase(item)"
             >
               <div class="knowledge-card-title">{{ item.name }}</div>
-              <div class="knowledge-card-owner">{{ item.owner }}</div>
               <p class="knowledge-card-copy">{{ item.description }}</p>
 
               <div class="knowledge-card-metrics">
@@ -188,12 +183,6 @@ function createKnowledgeBase() {
   color: var(--color-text-primary);
 }
 
-.knowledge-card-owner {
-  margin-top: var(--space-1_5);
-  color: var(--color-text-muted);
-  font-size: var(--text-caption-size);
-}
-
 .knowledge-create-copy,
 .knowledge-card-copy {
   margin: var(--space-3) 0 0;
@@ -221,7 +210,8 @@ function createKnowledgeBase() {
 }
 
 .knowledge-card-footer {
-  margin-top: var(--space-4);
+  margin-top: auto;
+  padding-top: var(--space-4);
   color: var(--color-text-muted);
   font-size: var(--text-caption-size);
 }
