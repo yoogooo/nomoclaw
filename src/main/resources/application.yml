@@ -58,8 +58,10 @@ agent:
       cdp-endpoint: "http://localhost:9222"
       local-bridge-domains:
         - "xiaohongshu.com"
+        - "google.com"
+        - "*.google.com"
       connect-timeout-ms: 10000
-      fallback-to-managed: true
+      fallback-to-managed: false
       consent-required: false
   retry:
     max-attempts: 2

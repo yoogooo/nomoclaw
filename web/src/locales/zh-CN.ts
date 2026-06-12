@@ -233,6 +233,13 @@ const zhCN = {
         planned: "已规划",
         preparing: "准备中"
       },
+      browserMode: {
+        connectedTitle: "已连接你的 Chrome",
+        connectedDescription: "这一步直接复用了你当前打开的 Chrome。",
+        managedTitle: "已改用内置浏览器",
+        managedDescription: "这一步没有使用你的 Chrome，而是改用应用内置的浏览器继续执行。",
+        fallbackDescription: "原本计划连接你的 Chrome，但连接失败，已改用应用内置的浏览器继续执行。"
+      },
       noExtraDetails: "无附加详情",
       commandBlockLabel: "执行命令",
       outputBlockLabel: "输出结果",

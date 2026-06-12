@@ -94,9 +94,12 @@ export function createConversationMessagesModule(
   }
 
   async function refreshLatestMessages(conversationUid: string) {
-    const page = await storeDeps.conversationApi.listMessagesPage(conversationUid, {
-      limit: MESSAGE_PAGE_SIZE
-    });
+    const [page, runs] = await Promise.all([
+      storeDeps.conversationApi.listMessagesPage(conversationUid, {
+        limit: MESSAGE_PAGE_SIZE
+      }),
+      storeDeps.conversationApi.listMessageRuns(conversationUid)
+    ]);
     if (state.currentConversationUid.value !== conversationUid) {
       return;
     }
@@ -112,6 +115,8 @@ export function createConversationMessagesModule(
       state.messageHistoryCursor.value = page.nextBeforeMessageUid || null;
     }
     reconcileRunningConversationByMessages(conversationUid, state.messages.value);
+    storeDeps.conversationRunsStore.setRuns(runs);
+    deps.runtimeModule().restoreApprovalFromRuns(runs);
   }
 
   function startDraftConversation() {

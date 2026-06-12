@@ -1,5 +1,6 @@
 package ai.nomoclaw.bot.orchestrator.view;
 
+import ai.nomoclaw.bot.config.AgentProperties;
 import ai.nomoclaw.bot.config.I18nConfig;
 import ai.nomoclaw.bot.model.ApprovalStatus;
 import ai.nomoclaw.bot.model.PlanStep;
@@ -24,7 +25,7 @@ class ExecutionFeedbackBuilderTests {
 
     private final MessageSource messageSource = new I18nConfig().messageSource();
     private final LocalizedMessages localizedMessages = new LocalizedMessages(messageSource);
-    private final ExecutionFeedbackBuilder feedbackBuilder = new ExecutionFeedbackBuilder(localizedMessages);
+    private final ExecutionFeedbackBuilder feedbackBuilder = new ExecutionFeedbackBuilder(new AgentProperties(), localizedMessages);
 
     @AfterEach
     void cleanupLocale() {

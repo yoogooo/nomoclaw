@@ -138,6 +138,8 @@ export function createConversationListModule(
         || latestPage.items.find((item) => item.conversationUid === state.currentConversationUid.value);
       if (currentSummary && !currentSummary.running && !currentSummary.waitingApproval) {
         clearConversationRunningLocally(currentSummary.conversationUid);
+        await deps.messagesModule().refreshLatestMessages(currentSummary.conversationUid);
+        await deps.messagesModule().keepCurrentConversationRead(currentSummary.conversationUid);
       }
     }
   }

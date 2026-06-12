@@ -610,7 +610,6 @@ public class BrowserTool implements Tool {
         command.add("--remote-debugging-address=127.0.0.1");
         command.add("--remote-debugging-port=" + port);
         command.add("--user-data-dir=" + userDataDir);
-        command.add("about:blank");
         ProcessBuilder pb = new ProcessBuilder(command);
         pb.redirectErrorStream(true);
         pb.redirectOutput(Redirect.DISCARD);
@@ -839,7 +838,6 @@ public class BrowserTool implements Tool {
         if (headless) {
             command.add("--headless=new");
         }
-        command.add("about:blank");
         ProcessBuilder pb = new ProcessBuilder(command);
         if (playwrightEnv != null && !playwrightEnv.isEmpty()) {
             pb.environment().putAll(playwrightEnv);
@@ -1768,9 +1766,25 @@ public class BrowserTool implements Tool {
             return existing;
         }
         pageByConversation.remove(conversationUid);
+        Page reusable = findReusablePage(context);
+        if (reusable != null) {
+            pageByConversation.put(conversationUid, reusable);
+            return reusable;
+        }
         Page page = context.newPage();
         pageByConversation.put(conversationUid, page);
         return page;
+    }
+
+    private Page findReusablePage(BrowserContext context) {
+        List<Page> pages = context.pages();
+        for (int i = pages.size() - 1; i >= 0; i--) {
+            Page candidate = pages.get(i);
+            if (isPageUsable(candidate)) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     private boolean isPageUsable(Page page) {
@@ -1965,10 +1979,10 @@ public class BrowserTool implements Tool {
         String action = request.args().path("action").asString("").trim().toLowerCase(Locale.ROOT);
         BrowserMode configured = configuredMode();
         BrowserMode current = modeByConversation.get(request.conversationUid());
+        if (current != null) {
+            return current;
+        }
         if (!"open".equals(action) && !"navigate".equals(action)) {
-            if (current != null) {
-                return current;
-            }
             return configured == BrowserMode.LOCAL_BRIDGE ? BrowserMode.LOCAL_BRIDGE : BrowserMode.MANAGED;
         }
         if (configured == BrowserMode.MANAGED) {

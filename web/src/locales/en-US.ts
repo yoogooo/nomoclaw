@@ -233,6 +233,13 @@ const enUS = {
         planned: "Planned",
         preparing: "Preparing"
       },
+      browserMode: {
+        connectedTitle: "Connected to your Chrome",
+        connectedDescription: "This step reused the Chrome instance you already had open.",
+        managedTitle: "Switched to built-in browser",
+        managedDescription: "This step did not use your Chrome and continued in the app-managed browser instead.",
+        fallbackDescription: "This step first tried to connect to your Chrome, but the connection failed and it continued in the app-managed browser instead."
+      },
       noExtraDetails: "No extra details",
       commandBlockLabel: "Command",
       outputBlockLabel: "Output",

@@ -1,7 +1,9 @@
 package ai.nomoclaw.bot.orchestrator.view;
 
+import ai.nomoclaw.bot.config.AgentProperties;
 import ai.nomoclaw.bot.model.PlanStep;
 import ai.nomoclaw.bot.model.ToolResult;
+import ai.nomoclaw.bot.policy.tool.permission.BrowserPermissionSupport;
 import ai.nomoclaw.bot.util.LocalizedMessages;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
@@ -9,6 +11,7 @@ import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
 import java.time.Instant;
+import java.util.Locale;
 
 /**
  * Builds user-facing step text and event payload fields.
@@ -19,9 +22,14 @@ import java.time.Instant;
 @Component
 public class ExecutionFeedbackBuilder {
 
+    private static final String BROWSER_MODE_LOCAL_BRIDGE = "local_bridge";
+    private static final String BROWSER_MODE_MANAGED = "managed";
+
+    private final AgentProperties agentProperties;
     private final LocalizedMessages localizedMessages;
 
-    public ExecutionFeedbackBuilder(LocalizedMessages localizedMessages) {
+    public ExecutionFeedbackBuilder(AgentProperties agentProperties, LocalizedMessages localizedMessages) {
+        this.agentProperties = agentProperties;
         this.localizedMessages = localizedMessages;
     }
 
@@ -412,7 +420,7 @@ public class ExecutionFeedbackBuilder {
         payload.put("stepIndex", step.stepIndex());
         payload.put("title", step.title());
         payload.put("toolName", step.toolName());
-        payload.set("toolArgs", step.toolArgs() == null ? JsonNodeFactory.instance.objectNode() : step.toolArgs());
+        payload.set("toolArgs", buildToolArgsPayload(step));
         payload.put("riskLevel", step.riskLevel().name());
         return payload;
     }
@@ -432,6 +440,49 @@ public class ExecutionFeedbackBuilder {
             case "running" -> i18n("agent.run.summary.running", completedSteps, totalSteps);
             default -> i18n("agent.run.summary.planned", totalSteps);
         };
+    }
+
+    private JsonNode buildToolArgsPayload(PlanStep step) {
+        ObjectNode toolArgs = step.toolArgs() != null && step.toolArgs().isObject()
+                ? (ObjectNode) step.toolArgs().deepCopy()
+                : JsonNodeFactory.instance.objectNode();
+        if (!"BrowserTool".equals(nullToEmpty(step.toolName()))) {
+            return toolArgs;
+        }
+        String plannedMode = plannedBrowserMode(toolArgs);
+        if (!plannedMode.isBlank()) {
+            toolArgs.put("_browserSelectedMode", plannedMode);
+            toolArgs.put("_browserFallback", false);
+            toolArgs.put("_browserSwitchReason", "initial");
+        }
+        return toolArgs;
+    }
+
+    private String plannedBrowserMode(JsonNode toolArgs) {
+        String configuredMode = normalizeBrowserMode(agentProperties.getBrowser().getMode());
+        if (BROWSER_MODE_MANAGED.equals(configuredMode)) {
+            return BROWSER_MODE_MANAGED;
+        }
+        if (BROWSER_MODE_LOCAL_BRIDGE.equals(configuredMode)) {
+            return BROWSER_MODE_LOCAL_BRIDGE;
+        }
+        String action = toolArgs.path("action").asString("").trim().toLowerCase(Locale.ROOT);
+        if (!"open".equals(action) && !"navigate".equals(action)) {
+            return "";
+        }
+        String host = BrowserPermissionSupport.extractHost(toolArgs.path("url").asString(""));
+        boolean localBridgeMatched = BrowserPermissionSupport.matchesDomain(
+                host,
+                agentProperties.getBrowser().getLocalBridge().getLocalBridgeDomains()
+        );
+        return localBridgeMatched ? BROWSER_MODE_LOCAL_BRIDGE : BROWSER_MODE_MANAGED;
+    }
+
+    private String normalizeBrowserMode(String rawMode) {
+        if (rawMode == null || rawMode.isBlank()) {
+            return "auto";
+        }
+        return rawMode.trim().toLowerCase(Locale.ROOT);
     }
 
     private String formatApprovalAction(String toolName, JsonNode toolArgs) {

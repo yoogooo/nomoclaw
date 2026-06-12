@@ -10,6 +10,7 @@ import ai.nomoclaw.bot.model.PlanStep;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.JsonNodeFactory;
+import tools.jackson.databind.node.ObjectNode;
 
 import java.time.Instant;
 import java.util.Comparator;
@@ -284,6 +285,7 @@ public class RunViewAssembler {
             if (node.hasNonNull("toolArgs") && node.path("toolArgs").isObject()) {
                 toolArgs = copyJson(node.path("toolArgs"));
             }
+            mergeBrowserRuntimeMetadata(node);
             if (!node.path("displayTitle").asString("").isBlank()) {
                 displayTitle = node.path("displayTitle").asString("");
             }
@@ -297,6 +299,33 @@ public class RunViewAssembler {
                 policyReasonCode = node.path("policyReasonCode").asString("");
             }
             updatedTime = eventTime;
+        }
+
+        private void mergeBrowserRuntimeMetadata(JsonNode node) {
+            if (!"BrowserTool".equals(toolName)) {
+                return;
+            }
+            JsonNode artifacts = node.path("artifacts");
+            if (artifacts == null || !artifacts.isObject()) {
+                return;
+            }
+            String selectedMode = artifacts.path("selectedMode").asString("").trim();
+            boolean fallback = artifacts.path("fallback").asBoolean(false);
+            String switchReason = artifacts.path("switchReason").asString("").trim();
+            if (selectedMode.isBlank() && switchReason.isBlank() && !fallback) {
+                return;
+            }
+            ObjectNode target = toolArgs instanceof ObjectNode objectNode
+                    ? objectNode
+                    : JsonNodeFactory.instance.objectNode();
+            if (!selectedMode.isBlank()) {
+                target.put("_browserSelectedMode", selectedMode);
+            }
+            target.put("_browserFallback", fallback);
+            if (!switchReason.isBlank()) {
+                target.put("_browserSwitchReason", switchReason);
+            }
+            toolArgs = target;
         }
 
         int roundIndex() {

@@ -146,6 +146,65 @@ function runStepTone(step: ConversationRunStep) {
   return runTone(step.status);
 }
 
+type BrowserModeMeta = {
+  isLocalBridge: boolean;
+  fallback: boolean;
+  title: string;
+  description: string;
+};
+
+function createBrowserModeMeta(selectedMode: string, fallback: boolean): BrowserModeMeta | null {
+  const normalizedMode = String(selectedMode || "").trim().toLowerCase();
+  if (!normalizedMode) {
+    return null;
+  }
+  const isLocalBridge = normalizedMode === "local_bridge";
+  return {
+    isLocalBridge,
+    fallback,
+    title: isLocalBridge
+      ? t("chat.messages.browserMode.connectedTitle")
+      : t("chat.messages.browserMode.managedTitle"),
+    description: fallback
+      ? t("chat.messages.browserMode.fallbackDescription")
+      : (isLocalBridge
+        ? t("chat.messages.browserMode.connectedDescription")
+        : t("chat.messages.browserMode.managedDescription"))
+  };
+}
+
+function browserModeMeta(messageUid: string, step: ConversationRunStep) {
+  if ((step.toolName || "") !== "BrowserTool") {
+    return null;
+  }
+  const directMeta = createBrowserModeMeta(
+    String((step.toolArgs || {})._browserSelectedMode || ""),
+    Boolean((step.toolArgs || {})._browserFallback)
+  );
+  if (directMeta) {
+    return directMeta;
+  }
+  const steps = visibleRunSteps(messageUid);
+  const currentIndex = steps.findIndex((item) => item.stepUid === step.stepUid);
+  if (currentIndex <= 0) {
+    return null;
+  }
+  for (let index = currentIndex - 1; index >= 0; index -= 1) {
+    const previous = steps[index];
+    if ((previous.toolName || "") !== "BrowserTool") {
+      continue;
+    }
+    const inheritedMeta = createBrowserModeMeta(
+      String((previous.toolArgs || {})._browserSelectedMode || ""),
+      Boolean((previous.toolArgs || {})._browserFallback)
+    );
+    if (inheritedMeta) {
+      return inheritedMeta;
+    }
+  }
+  return null;
+}
+
 function runDisplayStatus(messageUid: string) {
   const run = conversationRunsStore.runsByMessageUid[messageUid];
   if (!run) return "planned";
@@ -845,10 +904,23 @@ onMounted(() => {
                     :name="step.stepUid"
                   >
                     <template #header-extra>
-                      <n-tag v-if="!isReasoningStep(step)" size="small" :type="runStepTone(step)">{{ runStatusText(step.status) }}</n-tag>
+                      <div v-if="!isReasoningStep(step)" class="run-step-header-tags">
+                        <n-tag size="small" :type="runStepTone(step)">{{ runStatusText(step.status) }}</n-tag>
+                      </div>
                     </template>
                     <template v-if="getRunStepRenderData(step).isCommand">
                       <div class="run-command-blocks">
+                        <section
+                          v-if="browserModeMeta(message.messageUid, step)"
+                          class="run-browser-mode-note"
+                          :class="{
+                            'is-local-bridge': browserModeMeta(message.messageUid, step)?.isLocalBridge,
+                            'is-fallback': browserModeMeta(message.messageUid, step)?.fallback
+                          }"
+                        >
+                          <div class="run-browser-mode-title">{{ browserModeMeta(message.messageUid, step)?.title }}</div>
+                          <div class="run-browser-mode-description">{{ browserModeMeta(message.messageUid, step)?.description }}</div>
+                        </section>
                         <section class="run-command-section">
                           <div class="run-code-head">
                             <span class="run-code-label">{{ t("chat.messages.commandBlockLabel") }}</span>
@@ -899,11 +971,23 @@ onMounted(() => {
                         </section>
                       </div>
                     </template>
-                    <div
-                      v-else
-                      class="run-details message-html"
-                      v-html="renderMarkdown(runStepDetailsMarkdown(step))"
-                    />
+                    <template v-else>
+                      <section
+                        v-if="browserModeMeta(message.messageUid, step)"
+                        class="run-browser-mode-note"
+                        :class="{
+                          'is-local-bridge': browserModeMeta(message.messageUid, step)?.isLocalBridge,
+                          'is-fallback': browserModeMeta(message.messageUid, step)?.fallback
+                        }"
+                      >
+                        <div class="run-browser-mode-title">{{ browserModeMeta(message.messageUid, step)?.title }}</div>
+                        <div class="run-browser-mode-description">{{ browserModeMeta(message.messageUid, step)?.description }}</div>
+                      </section>
+                      <div
+                        class="run-details message-html"
+                        v-html="renderMarkdown(runStepDetailsMarkdown(step))"
+                      />
+                    </template>
                   </n-collapse-item>
                 </n-collapse>
               </n-collapse-item>
@@ -1427,6 +1511,44 @@ onMounted(() => {
 .run-summary {
   margin-top: var(--space-1_5);
   line-height: 1.7;
+}
+
+.run-step-header-tags {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-1_5);
+}
+
+.run-browser-mode-note {
+  display: grid;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+  padding: var(--space-3);
+  border: var(--size-1) solid var(--color-border-soft);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-bg-surface-soft) 78%, transparent);
+}
+
+.run-browser-mode-note.is-local-bridge {
+  border-color: color-mix(in srgb, var(--color-success) 40%, var(--color-border-soft));
+}
+
+.run-browser-mode-note.is-fallback {
+  border-color: color-mix(in srgb, var(--color-warning) 42%, var(--color-border-soft));
+}
+
+.run-browser-mode-title {
+  font-size: var(--text-caption-size);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.run-browser-mode-description {
+  font-size: var(--text-body-size);
+  line-height: 1.6;
+  color: var(--color-text-secondary);
 }
 
 .canceled-assistant-message {
