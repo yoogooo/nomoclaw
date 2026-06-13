@@ -10,6 +10,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Locale;
 
@@ -266,6 +268,16 @@ public class ExecutionFeedbackBuilder {
                 if (!path.isBlank()) {
                     yield i18n("agent.step.success.browser.saved", path);
                 }
+                String url = result.artifacts() == null ? "" : result.artifacts().path("url").asString("").trim();
+                if (!url.isBlank()) {
+                    String action = step.toolArgs() == null ? "" : step.toolArgs().path("action").asString("").trim().toLowerCase(Locale.ROOT);
+                    String actionText = switch (action) {
+                        case "navigate" -> "navigated";
+                        case "open" -> "opened";
+                        default -> hasMeaningfulText(result.output()) ? result.output().trim() : i18n("agent.step.success.browser");
+                    };
+                    yield actionText + " [" + escapeMarkdownLinkText(decodeUrlForDisplay(url)) + "](" + url + ")";
+                }
                 yield hasMeaningfulText(result.output()) ? i18n("agent.step.success.browser.withOutput", abbreviate(result.output(), 120)) : i18n("agent.step.success.browser");
             }
             case "ReadFileTool", "ListFileTool", "CreateFileTool", "EditFileTool" -> {
@@ -454,6 +466,7 @@ public class ExecutionFeedbackBuilder {
             toolArgs.put("_browserSelectedMode", plannedMode);
             toolArgs.put("_browserFallback", false);
             toolArgs.put("_browserSwitchReason", "initial");
+            toolArgs.put("_browserModeTentative", true);
         }
         return toolArgs;
     }
@@ -483,6 +496,21 @@ public class ExecutionFeedbackBuilder {
             return "auto";
         }
         return rawMode.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String decodeUrlForDisplay(String url) {
+        try {
+            return URLDecoder.decode(url, StandardCharsets.UTF_8);
+        } catch (Exception ignored) {
+            return url;
+        }
+    }
+
+    private String escapeMarkdownLinkText(String text) {
+        return nullToEmpty(text)
+                .replace("\\", "\\\\")
+                .replace("[", "\\[")
+                .replace("]", "\\]");
     }
 
     private String formatApprovalAction(String toolName, JsonNode toolArgs) {

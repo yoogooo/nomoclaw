@@ -234,6 +234,10 @@ const enUS = {
         preparing: "Preparing"
       },
       browserMode: {
+        plannedConnectedTitle: "Preparing to use your Chrome",
+        plannedConnectedDescription: "This step will try to reuse the Chrome instance you already have open.",
+        plannedManagedTitle: "Preparing to use app-managed browser",
+        plannedManagedDescription: "This step will continue in the browser managed by the app.",
         connectedTitle: "Connected to your Chrome",
         connectedDescription: "This step reused the Chrome instance you already had open.",
         managedTitle: "Switched to built-in browser",

@@ -234,6 +234,10 @@ const zhCN = {
         preparing: "准备中"
       },
       browserMode: {
+        plannedConnectedTitle: "准备连接你的 Chrome",
+        plannedConnectedDescription: "这一步将优先复用你当前打开的 Chrome。",
+        plannedManagedTitle: "准备使用应用自管浏览器",
+        plannedManagedDescription: "这一步将使用应用自管的浏览器继续执行。",
         connectedTitle: "已连接你的 Chrome",
         connectedDescription: "这一步直接复用了你当前打开的 Chrome。",
         managedTitle: "已改用内置浏览器",

@@ -325,6 +325,7 @@ public class RunViewAssembler {
             if (!switchReason.isBlank()) {
                 target.put("_browserSwitchReason", switchReason);
             }
+            target.put("_browserModeTentative", false);
             toolArgs = target;
         }
 

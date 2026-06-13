@@ -149,11 +149,34 @@ function runStepTone(step: ConversationRunStep) {
 type BrowserModeMeta = {
   isLocalBridge: boolean;
   fallback: boolean;
+  tentative: boolean;
   title: string;
   description: string;
 };
 
-function createBrowserModeMeta(selectedMode: string, fallback: boolean): BrowserModeMeta | null {
+type BrowserModeState = {
+  selectedMode: string;
+  fallback: boolean;
+  tentative: boolean;
+};
+
+function readBrowserModeState(step: ConversationRunStep): BrowserModeState | null {
+  if ((step.toolName || "") !== "BrowserTool") {
+    return null;
+  }
+  const toolArgs = step.toolArgs || {};
+  const selectedMode = String(toolArgs._browserSelectedMode || "").trim().toLowerCase();
+  if (!selectedMode) {
+    return null;
+  }
+  return {
+    selectedMode,
+    fallback: Boolean(toolArgs._browserFallback),
+    tentative: Boolean(toolArgs._browserModeTentative)
+  };
+}
+
+function createBrowserModeMeta(selectedMode: string, fallback: boolean, tentative: boolean): BrowserModeMeta | null {
   const normalizedMode = String(selectedMode || "").trim().toLowerCase();
   if (!normalizedMode) {
     return null;
@@ -162,14 +185,23 @@ function createBrowserModeMeta(selectedMode: string, fallback: boolean): Browser
   return {
     isLocalBridge,
     fallback,
-    title: isLocalBridge
-      ? t("chat.messages.browserMode.connectedTitle")
-      : t("chat.messages.browserMode.managedTitle"),
+    tentative,
+    title: tentative
+      ? (isLocalBridge
+        ? t("chat.messages.browserMode.plannedConnectedTitle")
+        : t("chat.messages.browserMode.plannedManagedTitle"))
+      : (isLocalBridge
+        ? t("chat.messages.browserMode.connectedTitle")
+        : t("chat.messages.browserMode.managedTitle")),
     description: fallback
       ? t("chat.messages.browserMode.fallbackDescription")
-      : (isLocalBridge
-        ? t("chat.messages.browserMode.connectedDescription")
-        : t("chat.messages.browserMode.managedDescription"))
+      : (tentative
+        ? (isLocalBridge
+          ? t("chat.messages.browserMode.plannedConnectedDescription")
+          : t("chat.messages.browserMode.plannedManagedDescription"))
+        : (isLocalBridge
+          ? t("chat.messages.browserMode.connectedDescription")
+          : t("chat.messages.browserMode.managedDescription")))
   };
 }
 
@@ -177,30 +209,23 @@ function browserModeMeta(messageUid: string, step: ConversationRunStep) {
   if ((step.toolName || "") !== "BrowserTool") {
     return null;
   }
-  const directMeta = createBrowserModeMeta(
-    String((step.toolArgs || {})._browserSelectedMode || ""),
-    Boolean((step.toolArgs || {})._browserFallback)
-  );
-  if (directMeta) {
-    return directMeta;
+  const directState = readBrowserModeState(step);
+  if (directState && !directState.tentative) {
+    return createBrowserModeMeta(directState.selectedMode, directState.fallback, false);
   }
   const steps = visibleRunSteps(messageUid);
   const currentIndex = steps.findIndex((item) => item.stepUid === step.stepUid);
-  if (currentIndex <= 0) {
-    return null;
+  if (currentIndex > 0) {
+    for (let index = currentIndex - 1; index >= 0; index -= 1) {
+      const previousState = readBrowserModeState(steps[index]);
+      if (!previousState || previousState.tentative) {
+        continue;
+      }
+      return createBrowserModeMeta(previousState.selectedMode, previousState.fallback, false);
+    }
   }
-  for (let index = currentIndex - 1; index >= 0; index -= 1) {
-    const previous = steps[index];
-    if ((previous.toolName || "") !== "BrowserTool") {
-      continue;
-    }
-    const inheritedMeta = createBrowserModeMeta(
-      String((previous.toolArgs || {})._browserSelectedMode || ""),
-      Boolean((previous.toolArgs || {})._browserFallback)
-    );
-    if (inheritedMeta) {
-      return inheritedMeta;
-    }
+  if (directState) {
+    return createBrowserModeMeta(directState.selectedMode, directState.fallback, true);
   }
   return null;
 }
