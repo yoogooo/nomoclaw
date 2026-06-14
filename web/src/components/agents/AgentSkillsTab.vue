@@ -60,12 +60,12 @@ const { t } = useI18n();
         class="ui-card-base ui-card-padding-md skill-card"
         @click="emit('open', skill.id)"
       >
-        <div class="ui-card-head-between">
-          <div class="skill-card-head-main">
-            <div class="skill-card-name ui-title-strong">{{ skill.name }}</div>
+        <div class="ui-card-title-row">
+          <div class="ui-card-title-main skill-card-head-main">
+            <div class="skill-card-name ui-card-title-text">{{ skill.name }}</div>
           </div>
           <n-tag
-            class="skill-card-status-tag"
+            class="skill-card-status-tag ui-status-pill"
             size="small"
             round
             :type="skill.enabled ? 'success' : 'default'"
@@ -110,9 +110,7 @@ const { t } = useI18n();
 }
 
 .skill-card-head-main {
-  min-width: 0;
   padding-right: var(--space-8);
-  flex: 1;
 }
 
 .skill-card-name {

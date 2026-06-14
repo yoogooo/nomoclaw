@@ -938,7 +938,7 @@ const zhCN = {
       pendingCodexLogin: "待登录 Codex"
     },
     actions: {
-      editConfig: "编辑配置",
+      editConfig: "编辑",
       loadLocalModels: "加载本地模型",
       addModel: "新增模型",
       testConnection: "测试连接",

@@ -575,9 +575,13 @@ onMounted(() => {
               @click="openEditor(item.key)"
             >
               <template #header>
-                <div class="ui-card-head-between">
-                  <span>{{ item.title }}</span>
-                  <n-tag :type="item.enabled ? 'success' : 'warning'" round>{{ item.enabled ? t("common.enabled") : t("common.disabled") }}</n-tag>
+                <div class="ui-card-title-row">
+                  <div class="ui-card-title-main">
+                    <div class="ui-card-title-text">{{ item.title }}</div>
+                  </div>
+                  <n-tag class="ui-status-pill" :type="item.enabled ? 'success' : 'warning'" round>
+                    {{ item.enabled ? t("common.enabled") : t("common.disabled") }}
+                  </n-tag>
                 </div>
               </template>
               <div class="card-subtitle">{{ item.subtitle }}</div>
@@ -1022,6 +1026,10 @@ onMounted(() => {
   cursor: pointer;
   min-height: 220px;
   border-radius: var(--radius-xl);
+}
+
+.channel-card :deep(.n-card-header__main) {
+  min-width: 0;
 }
 
 .card-subtitle {

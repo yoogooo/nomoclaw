@@ -409,6 +409,50 @@ a {
   gap: var(--space-3);
 }
 
+.ui-card-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.ui-card-title-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.ui-card-title-text {
+  min-width: 0;
+  font-size: var(--text-title-sm-size);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--color-text-body-alt);
+  overflow-wrap: anywhere;
+}
+
+.ui-card-title-meta {
+  margin-top: var(--space-1_5);
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.n-tag.ui-status-pill {
+  flex: 0 0 auto;
+  max-width: 68%;
+  border-radius: var(--radius-pill);
+  font-weight: 700;
+}
+
+.n-tag.ui-status-pill .n-tag__content {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .ui-copy-muted-block {
   color: var(--color-text-muted);
 }

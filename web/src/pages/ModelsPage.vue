@@ -376,12 +376,12 @@ onMounted(() => {
               @click="openEditor(provider.id)"
             >
               <template #header>
-                <div class="ui-card-head-between-top">
-                  <div>
-                    <div class="provider-name">{{ provider.name }}</div>
-                    <div class="provider-protocol">{{ provider.protocol }}</div>
+                <div class="ui-card-title-row">
+                  <div class="ui-card-title-main">
+                    <div class="provider-name ui-card-title-text">{{ provider.name }}</div>
+                    <div class="provider-protocol ui-card-title-meta">{{ provider.protocol }}</div>
                   </div>
-                  <n-tag :type="provider.statusType" round>{{ provider.statusText }}</n-tag>
+                  <n-tag class="ui-status-pill" :type="provider.statusType" round>{{ provider.statusText }}</n-tag>
                 </div>
               </template>
 
@@ -570,20 +570,6 @@ onMounted(() => {
   min-width: 0;
 }
 
-.provider-name {
-  font-size: var(--text-title-sm-size);
-  font-weight: 600;
-  overflow-wrap: anywhere;
-}
-
-.provider-protocol {
-  margin-top: var(--space-1_5);
-  color: var(--color-text-muted);
-  font-size: var(--text-caption-size);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
 .provider-meta {
   display: flex;
   justify-content: space-between;
@@ -607,19 +593,6 @@ onMounted(() => {
 
 .provider-card-footer {
   margin-top: var(--space-5);
-}
-
-.provider-card :deep(.n-tag) {
-  flex: 0 0 auto;
-  max-width: 68%;
-}
-
-.provider-card :deep(.n-tag__content) {
-  display: block;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .models-toolbar {

@@ -938,7 +938,7 @@ const enUS = {
       pendingCodexLogin: "Codex login required"
     },
     actions: {
-      editConfig: "Edit Config",
+      editConfig: "Edit",
       loadLocalModels: "Load Local Models",
       addModel: "Add Model",
       testConnection: "Test Connection",
