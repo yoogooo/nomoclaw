@@ -10,6 +10,7 @@ import UiInstantTooltip from "@/components/UiInstantTooltip.vue";
 import UiSpinner from "@/components/UiSpinner.vue";
 import { message as discreteMessage } from "@/discrete";
 import { notification as discreteNotification } from "@/discrete";
+import { getSortLocale } from "@/i18n";
 import { useConversationStore } from "@/stores/conversation";
 import { useConversationRunsStore } from "@/stores/conversationRuns";
 import { useAgentCatalogStore } from "@/stores/agentCatalog";
@@ -287,9 +288,37 @@ function runStepStateKey(messageUid: string | undefined, stepUid: string) {
   return `${messageUid || "unknown"}:${stepUid}`;
 }
 
+function formatCurrentTimeToolDetails(step: ConversationRunStep, details: string) {
+  if ((step.toolName || "") !== "CurrentTimeTool") {
+    return details;
+  }
+  const match = details.match(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) UTC \(([^)]+)\)$/);
+  if (!match) {
+    return details;
+  }
+  const [, datePart, timePart] = match;
+  const utcDate = new Date(`${datePart}T${timePart}Z`);
+  if (Number.isNaN(utcDate.getTime())) {
+    return details;
+  }
+  const locale = getSortLocale();
+  const localDate = utcDate.toLocaleDateString("sv-SE");
+  const localTime = utcDate.toLocaleTimeString(locale, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  });
+  const localWeekday = utcDate.toLocaleDateString(locale, { weekday: "long" });
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "Local";
+  return `${localDate} ${localTime} ${timezone} (${localWeekday})`;
+}
+
 function getRunStepRenderData(step: ConversationRunStep): RunStepRenderData {
-  const details = (step.displayDetails || step.displaySummary || "").trim();
-  const cacheKey = `${step.stepUid}|${step.displayTitle}|${step.displayDetails}|${step.displaySummary}`;
+  const locale = getSortLocale();
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "Local";
+  const details = formatCurrentTimeToolDetails(step, (step.displayDetails || step.displaySummary || "").trim());
+  const cacheKey = `${step.stepUid}|${step.displayTitle}|${step.displayDetails}|${step.displaySummary}|${locale}|${timezone}`;
   const cached = runStepRenderCache.get(step.stepUid);
   if (cached && cached.cacheKey === cacheKey) {
     return cached;
