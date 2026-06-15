@@ -17,7 +17,7 @@ import { useJinnangStore } from "@/stores/jinnang";
 import { copyText } from "@/utils/clipboard";
 import { formatMessageTime } from "@/utils/format";
 import { renderMarkdown } from "@/utils/markdown";
-import type { ConversationMessage, ConversationRunStep } from "@/types/api";
+import type { ConversationAttachment, ConversationMessage, ConversationRunStep, MessageFileLink } from "@/types/api";
 
 type RunStepRenderData = {
   cacheKey: string;
@@ -591,6 +591,177 @@ function isImageAttachment(contentType?: string, mimeGroup?: string) {
   return mimeGroup === "image" || Boolean(contentType?.startsWith("image/"));
 }
 
+function basenameFromPathLike(value: string) {
+  const normalized = (value || "").trim().replace(/\\/g, "/");
+  if (!normalized) return "";
+  const segments = normalized.split("/");
+  return decodeURIComponent(segments[segments.length - 1] || "").trim();
+}
+
+function attachmentMatchKeys(attachment: ConversationAttachment) {
+  const keys = new Set<string>();
+  const name = (attachment.name || "").trim();
+  const fileName = basenameFromPathLike(attachment.fileUrl || "");
+  if (name) keys.add(name.toLowerCase());
+  if (fileName) keys.add(fileName.toLowerCase());
+  return keys;
+}
+
+function extractReferencedFileNames(text: string) {
+  const matches = new Set<string>();
+  const content = (text || "").trim();
+  if (!content) return matches;
+  const pathPattern = /(?:\/|[A-Za-z]:\\)[^\s"'”]+?\.(?:png|jpe?g|gif|webp|bmp|svg)/gi;
+  for (const match of content.matchAll(pathPattern)) {
+    const fileName = basenameFromPathLike(match[0] || "");
+    if (fileName) matches.add(fileName.toLowerCase());
+  }
+  return matches;
+}
+
+function isImageFileLink(fileLink: MessageFileLink) {
+  return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test((fileLink.path || fileLink.name || "").trim());
+}
+
+function fileLinkMatchKeys(fileLink: MessageFileLink) {
+  const keys = new Set<string>();
+  const name = (fileLink.name || "").trim();
+  const fileName = basenameFromPathLike(fileLink.path || "");
+  if (name) keys.add(name.toLowerCase());
+  if (fileName) keys.add(fileName.toLowerCase());
+  return keys;
+}
+
+function previewFileUrl(path: string) {
+  return `/api/files/content?path=${encodeURIComponent(path)}`;
+}
+
+function messageDisplayAttachments(messageItem: ConversationMessage) {
+  const attachments = messageItem.attachments || [];
+  if (!attachments.length || !messageItem.parentMessageUid) {
+    return attachments;
+  }
+  const run = conversationRunsStore.runsByMessageUid[messageItem.parentMessageUid];
+  if (!run?.steps?.length) {
+    return attachments;
+  }
+  const consumedNames = new Set<string>();
+  for (const step of run.steps) {
+    const stepNames = extractReferencedFileNames(`${step.displaySummary || ""}\n${step.displayDetails || ""}`);
+    for (const fileName of stepNames) {
+      consumedNames.add(fileName);
+    }
+  }
+  if (!consumedNames.size) {
+    return attachments;
+  }
+  return attachments.filter((attachment) => {
+    if (!isImageAttachment(attachment.contentType, attachment.mimeGroup)) {
+      return true;
+    }
+    const keys = attachmentMatchKeys(attachment);
+    for (const key of keys) {
+      if (consumedNames.has(key)) {
+        return false;
+      }
+    }
+    return true;
+  });
+}
+
+function messageDisplayFileLinks(messageItem: ConversationMessage) {
+  const fileLinks = messageItem.fileLinks || [];
+  if (!fileLinks.length || !messageItem.parentMessageUid) {
+    return fileLinks;
+  }
+  const run = conversationRunsStore.runsByMessageUid[messageItem.parentMessageUid];
+  if (!run?.steps?.length) {
+    return fileLinks;
+  }
+  const consumedNames = new Set<string>();
+  for (const step of run.steps) {
+    const stepNames = extractReferencedFileNames(`${step.displaySummary || ""}\n${step.displayDetails || ""}`);
+    for (const fileName of stepNames) {
+      consumedNames.add(fileName);
+    }
+  }
+  if (!consumedNames.size) {
+    return fileLinks;
+  }
+  return fileLinks.filter((fileLink) => {
+    if (!isImageFileLink(fileLink)) {
+      return true;
+    }
+    const keys = fileLinkMatchKeys(fileLink);
+    for (const key of keys) {
+      if (consumedNames.has(key)) {
+        return false;
+      }
+    }
+    return true;
+  });
+}
+
+function inlineStepAttachments(messageUid: string | undefined, step: ConversationRunStep) {
+  const userMessageUid = (messageUid || "").trim();
+  if (!userMessageUid) {
+    return [];
+  }
+  const referencedNames = extractReferencedFileNames(`${step.displaySummary || ""}\n${step.displayDetails || ""}`);
+  if (!referencedNames.size) {
+    return [];
+  }
+  const relatedMessages = conversationStore.messages.filter((messageItem) =>
+    messageItem.parentMessageUid === userMessageUid && messageItem.role !== "user"
+  );
+  const matched = new Map<string, ConversationAttachment>();
+  for (const messageItem of relatedMessages) {
+    for (const attachment of messageItem.attachments || []) {
+      if (!isImageAttachment(attachment.contentType, attachment.mimeGroup)) {
+        continue;
+      }
+      const keys = attachmentMatchKeys(attachment);
+      for (const key of keys) {
+        if (referencedNames.has(key)) {
+          matched.set(attachment.attachmentUid || attachment.fileUrl, attachment);
+          break;
+        }
+      }
+    }
+  }
+  return [...matched.values()];
+}
+
+function inlineStepFileLinks(messageUid: string | undefined, step: ConversationRunStep) {
+  const userMessageUid = (messageUid || "").trim();
+  if (!userMessageUid) {
+    return [];
+  }
+  const referencedNames = extractReferencedFileNames(`${step.displaySummary || ""}\n${step.displayDetails || ""}`);
+  if (!referencedNames.size) {
+    return [];
+  }
+  const relatedMessages = conversationStore.messages.filter((messageItem) =>
+    messageItem.parentMessageUid === userMessageUid && messageItem.role !== "user"
+  );
+  const matched = new Map<string, MessageFileLink>();
+  for (const messageItem of relatedMessages) {
+    for (const fileLink of messageItem.fileLinks || []) {
+      if (!isImageFileLink(fileLink)) {
+        continue;
+      }
+      const keys = fileLinkMatchKeys(fileLink);
+      for (const key of keys) {
+        if (referencedNames.has(key)) {
+          matched.set(fileLink.path, fileLink);
+          break;
+        }
+      }
+    }
+  }
+  return [...matched.values()];
+}
+
 function openAttachment(fileUrl: string) {
   window.open(fileUrl, "_blank", "noopener,noreferrer");
 }
@@ -809,9 +980,9 @@ onMounted(() => {
               <ChevronDown v-else :size="14" />
               <span>{{ isUserMessageExpanded(message) ? t("chat.messages.collapseMessage") : t("chat.messages.expandMessage") }}</span>
             </button>
-            <div v-if="message.attachments?.length" class="message-attachments">
+            <div v-if="messageDisplayAttachments(message).length" class="message-attachments">
               <button
-                v-for="attachment in message.attachments"
+                v-for="attachment in messageDisplayAttachments(message)"
                 :key="attachment.fileUrl"
                 type="button"
                 class="message-attachment-card"
@@ -832,9 +1003,9 @@ onMounted(() => {
                 </div>
               </button>
             </div>
-            <n-flex v-if="message.fileLinks?.length" wrap :size="8" class="message-file-links">
+            <n-flex v-if="messageDisplayFileLinks(message).length" wrap :size="8" class="message-file-links">
               <n-button
-                v-for="fileLink in message.fileLinks"
+                v-for="fileLink in messageDisplayFileLinks(message)"
                 :key="fileLink.path"
                 size="small"
                 secondary
@@ -1012,6 +1183,44 @@ onMounted(() => {
                         class="run-details message-html"
                         v-html="renderMarkdown(runStepDetailsMarkdown(step))"
                       />
+                      <div v-if="inlineStepAttachments(message.messageUid, step).length || inlineStepFileLinks(message.messageUid, step).length" class="message-attachments run-step-inline-attachments">
+                        <button
+                          v-for="attachment in inlineStepAttachments(message.messageUid, step)"
+                          :key="attachment.fileUrl"
+                          type="button"
+                          class="message-attachment-card"
+                          @click="openAttachment(attachment.fileUrl)"
+                        >
+                          <img
+                            :src="attachment.fileUrl"
+                            :alt="attachment.name"
+                            class="message-attachment-image"
+                          />
+                          <div class="message-attachment-meta">
+                            <div class="message-attachment-name">{{ attachment.name }}</div>
+                            <div class="message-attachment-subtitle">
+                              {{ attachment.mimeGroup }} · {{ formatAttachmentSize(attachment.sizeBytes) }}
+                            </div>
+                          </div>
+                        </button>
+                        <button
+                          v-for="fileLink in inlineStepFileLinks(message.messageUid, step)"
+                          :key="fileLink.path"
+                          type="button"
+                          class="message-attachment-card"
+                          @click="conversationStore.openFile(fileLink.path)"
+                        >
+                          <img
+                            :src="previewFileUrl(fileLink.path)"
+                            :alt="fileLink.name"
+                            class="message-attachment-image"
+                          />
+                          <div class="message-attachment-meta">
+                            <div class="message-attachment-name">{{ fileLink.name }}</div>
+                            <div class="message-attachment-subtitle">image · local file</div>
+                          </div>
+                        </button>
+                      </div>
                     </template>
                   </n-collapse-item>
                 </n-collapse>
@@ -1263,6 +1472,10 @@ onMounted(() => {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: var(--space-3);
   margin-top: var(--space-3);
+}
+
+.run-step-inline-attachments {
+  margin-top: var(--space-4);
 }
 
 .message-attachment-card {

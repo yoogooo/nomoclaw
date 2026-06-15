@@ -47,6 +47,25 @@ public class SystemAppService {
         facade.openFile(path);
     }
 
+    public Path resolvePreviewFile(String path) {
+        if (isBlank(path)) {
+            throw new IllegalArgumentException("path must not be blank");
+        }
+        Path resolved = Path.of(path).toAbsolutePath().normalize();
+        Path nomoclawRoot = NomoClawPaths.root().toAbsolutePath().normalize();
+        if (!resolved.startsWith(nomoclawRoot)) {
+            throw new IllegalArgumentException("path is outside allowed root");
+        }
+        if (!Files.exists(resolved) || !Files.isRegularFile(resolved)) {
+            throw new IllegalArgumentException("file not found");
+        }
+        String contentType = probeContentType(resolved);
+        if (!contentType.startsWith("image/")) {
+            throw new IllegalArgumentException("file is not previewable image");
+        }
+        return resolved;
+    }
+
     public synchronized ChannelConfigDto getChannelConfig() {
         ObjectNode root = readRootConfig();
         ObjectNode channelsNode = normalizeChannelsNode(root);
@@ -157,6 +176,14 @@ public class SystemAppService {
                     throw new IllegalArgumentException("weixin enabled bot requires botToken or botTokenFile: " + bot.botId());
                 }
             }
+        }
+    }
+
+    private String probeContentType(Path path) {
+        try {
+            return fallback(Files.probeContentType(path), "application/octet-stream").toLowerCase(Locale.ROOT);
+        } catch (IOException ex) {
+            return "application/octet-stream";
         }
     }
 

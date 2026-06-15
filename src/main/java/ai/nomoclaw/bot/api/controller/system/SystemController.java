@@ -17,6 +17,10 @@ import ai.nomoclaw.bot.orchestrator.SystemAppService;
 import ai.nomoclaw.bot.scheduler.CronChannelTargetDirectoryService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,6 +29,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 /**
  * System configuration and model configuration endpoints.
@@ -133,5 +140,24 @@ public class SystemController {
         log.info("[AgentAPI] openFile path={}", request.path());
         systemAppService.openFile(request.path());
         return new SimpleResponse("opened");
+    }
+
+    @GetMapping("/files/content")
+    public ResponseEntity<Resource> readFileContent(@RequestParam String path) {
+        log.info("[AgentAPI] readFileContent path={}", path);
+        Path filePath = systemAppService.resolvePreviewFile(path);
+        FileSystemResource resource = new FileSystemResource(filePath);
+        MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
+        try {
+            String detected = Files.probeContentType(filePath);
+            if (detected != null && !detected.isBlank()) {
+                mediaType = MediaType.parseMediaType(detected);
+            }
+        } catch (Exception ex) {
+            log.debug("[AgentAPI] probeContentType failed for {}", filePath, ex);
+        }
+        return ResponseEntity.ok()
+                .contentType(mediaType)
+                .body(resource);
     }
 }
