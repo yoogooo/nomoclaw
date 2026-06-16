@@ -568,7 +568,7 @@ const zhCN = {
       statusFailed: "失败",
       statusCanceled: "已取消",
       viewExecutionDetail: "查看运行详情",
-      viewLog: "查看日志",
+      viewLog: "查看",
       viewAllCompleted: "查看全部",
       noRunningTasks: "当前没有执行中的任务。",
       noCompletedTasks: "当前没有已完成的执行记录。",

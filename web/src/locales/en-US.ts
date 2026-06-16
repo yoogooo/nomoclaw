@@ -568,7 +568,7 @@ const enUS = {
       statusFailed: "Failed",
       statusCanceled: "Canceled",
       viewExecutionDetail: "View Execution Details",
-      viewLog: "View Log",
+      viewLog: "View",
       viewAllCompleted: "View all",
       noRunningTasks: "No running tasks at the moment.",
       noCompletedTasks: "No completed execution records yet.",
