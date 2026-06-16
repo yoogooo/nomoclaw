@@ -147,88 +147,18 @@ function runStepTone(step: ConversationRunStep) {
   return runTone(step.status);
 }
 
-type BrowserModeMeta = {
-  isLocalBridge: boolean;
-  fallback: boolean;
-  tentative: boolean;
-  title: string;
-  description: string;
-};
-
-type BrowserModeState = {
-  selectedMode: string;
-  fallback: boolean;
-  tentative: boolean;
-};
-
-function readBrowserModeState(step: ConversationRunStep): BrowserModeState | null {
+function browserModeBadgeText(step: ConversationRunStep) {
   if ((step.toolName || "") !== "BrowserTool") {
-    return null;
+    return "";
   }
   const toolArgs = step.toolArgs || {};
   const selectedMode = String(toolArgs._browserSelectedMode || "").trim().toLowerCase();
   if (!selectedMode) {
-    return null;
+    return "";
   }
-  return {
-    selectedMode,
-    fallback: Boolean(toolArgs._browserFallback),
-    tentative: Boolean(toolArgs._browserModeTentative)
-  };
-}
-
-function createBrowserModeMeta(selectedMode: string, fallback: boolean, tentative: boolean): BrowserModeMeta | null {
-  const normalizedMode = String(selectedMode || "").trim().toLowerCase();
-  if (!normalizedMode) {
-    return null;
-  }
-  const isLocalBridge = normalizedMode === "local_bridge";
-  return {
-    isLocalBridge,
-    fallback,
-    tentative,
-    title: tentative
-      ? (isLocalBridge
-        ? t("chat.messages.browserMode.plannedConnectedTitle")
-        : t("chat.messages.browserMode.plannedManagedTitle"))
-      : (isLocalBridge
-        ? t("chat.messages.browserMode.connectedTitle")
-        : t("chat.messages.browserMode.managedTitle")),
-    description: fallback
-      ? t("chat.messages.browserMode.fallbackDescription")
-      : (tentative
-        ? (isLocalBridge
-          ? t("chat.messages.browserMode.plannedConnectedDescription")
-          : t("chat.messages.browserMode.plannedManagedDescription"))
-        : (isLocalBridge
-          ? t("chat.messages.browserMode.connectedDescription")
-          : t("chat.messages.browserMode.managedDescription")))
-  };
-}
-
-function browserModeMeta(messageUid: string, step: ConversationRunStep) {
-  if ((step.toolName || "") !== "BrowserTool") {
-    return null;
-  }
-  const directState = readBrowserModeState(step);
-  if (directState && !directState.tentative) {
-    return createBrowserModeMeta(directState.selectedMode, directState.fallback, false);
-  }
-  const steps = visibleRunSteps(messageUid);
-  const currentIndex = steps.findIndex((item) => item.stepUid === step.stepUid);
-  if (currentIndex > 0) {
-    for (let index = currentIndex - 1; index >= 0; index -= 1) {
-      const previousState = readBrowserModeState(steps[index]);
-      if (!previousState || previousState.tentative) {
-        continue;
-      }
-      return createBrowserModeMeta(previousState.selectedMode, previousState.fallback, false);
-    }
-  }
-  if (directState) {
-    return createBrowserModeMeta(directState.selectedMode, directState.fallback, true);
-  }
-  return null;
+  return selectedMode === "local_bridge"
+    ? t("chat.messages.browserModeBadge.chrome")
+    : t("chat.messages.browserModeBadge.agentManaged");
 }
 
 function runDisplayStatus(messageUid: string) {
@@ -1135,17 +1065,11 @@ onMounted(() => {
                     </template>
                     <template v-if="getRunStepRenderData(step).isCommand">
                       <div class="run-command-blocks">
-                        <section
-                          v-if="browserModeMeta(message.messageUid, step)"
-                          class="run-browser-mode-note"
-                          :class="{
-                            'is-local-bridge': browserModeMeta(message.messageUid, step)?.isLocalBridge,
-                            'is-fallback': browserModeMeta(message.messageUid, step)?.fallback
-                          }"
-                        >
-                          <div class="run-browser-mode-title">{{ browserModeMeta(message.messageUid, step)?.title }}</div>
-                          <div class="run-browser-mode-description">{{ browserModeMeta(message.messageUid, step)?.description }}</div>
-                        </section>
+                        <div v-if="browserModeBadgeText(step)" class="run-step-browser-mode">
+                          <n-tag size="small" :bordered="false" class="run-browser-mode-badge">
+                            {{ browserModeBadgeText(step) }}
+                          </n-tag>
+                        </div>
                         <section class="run-command-section">
                           <div class="run-code-head">
                             <span class="run-code-label">{{ t("chat.messages.commandBlockLabel") }}</span>
@@ -1197,17 +1121,11 @@ onMounted(() => {
                       </div>
                     </template>
                     <template v-else>
-                      <section
-                        v-if="browserModeMeta(message.messageUid, step)"
-                        class="run-browser-mode-note"
-                        :class="{
-                          'is-local-bridge': browserModeMeta(message.messageUid, step)?.isLocalBridge,
-                          'is-fallback': browserModeMeta(message.messageUid, step)?.fallback
-                        }"
-                      >
-                        <div class="run-browser-mode-title">{{ browserModeMeta(message.messageUid, step)?.title }}</div>
-                        <div class="run-browser-mode-description">{{ browserModeMeta(message.messageUid, step)?.description }}</div>
-                      </section>
+                      <div v-if="browserModeBadgeText(step)" class="run-step-browser-mode">
+                        <n-tag size="small" :bordered="false" class="run-browser-mode-badge run-browser-mode-badge-inline">
+                          {{ browserModeBadgeText(step) }}
+                        </n-tag>
+                      </div>
                       <div
                         class="run-details message-html"
                         v-html="renderMarkdown(runStepDetailsMarkdown(step))"
@@ -1788,34 +1706,20 @@ onMounted(() => {
   gap: var(--space-1_5);
 }
 
-.run-browser-mode-note {
-  display: grid;
-  gap: var(--space-1);
+.run-step-browser-mode {
   margin-bottom: var(--space-3);
-  padding: var(--space-3);
-  border: var(--size-1) solid var(--color-border-soft);
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--color-bg-surface-soft) 78%, transparent);
 }
 
-.run-browser-mode-note.is-local-bridge {
-  border-color: color-mix(in srgb, var(--color-success) 40%, var(--color-border-soft));
-}
-
-.run-browser-mode-note.is-fallback {
-  border-color: color-mix(in srgb, var(--color-warning) 42%, var(--color-border-soft));
-}
-
-.run-browser-mode-title {
-  font-size: var(--text-caption-size);
-  font-weight: 700;
-  color: var(--color-text-primary);
-}
-
-.run-browser-mode-description {
-  font-size: var(--text-body-size);
-  line-height: 1.6;
+.run-browser-mode-badge {
+  background: color-mix(in srgb, var(--color-bg-surface-soft) 88%, transparent);
   color: var(--color-text-secondary);
+}
+
+.run-browser-mode-badge-inline {
+  flex-shrink: 0;
+  border: var(--size-1) solid color-mix(in srgb, var(--color-border-soft) 82%, transparent);
+  background: color-mix(in srgb, var(--color-bg-card) 72%, var(--color-bg-surface-soft));
+  color: var(--color-text-muted);
 }
 
 .canceled-assistant-message {

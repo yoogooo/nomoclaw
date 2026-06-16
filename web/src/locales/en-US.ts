@@ -233,16 +233,9 @@ const enUS = {
         planned: "Planned",
         preparing: "Preparing"
       },
-      browserMode: {
-        plannedConnectedTitle: "Preparing to use your Chrome",
-        plannedConnectedDescription: "This step will try to reuse the Chrome instance you already have open.",
-        plannedManagedTitle: "Preparing to use app-managed browser",
-        plannedManagedDescription: "This step will continue in the browser managed by the app.",
-        connectedTitle: "Connected to your Chrome",
-        connectedDescription: "This step reused the Chrome instance you already had open.",
-        managedTitle: "Switched to built-in browser",
-        managedDescription: "This step did not use your Chrome and continued in the app-managed browser instead.",
-        fallbackDescription: "This step first tried to connect to your Chrome, but the connection failed and it continued in the app-managed browser instead."
+      browserModeBadge: {
+        chrome: "Chrome",
+        agentManaged: "Agent built-in browser"
       },
       noExtraDetails: "No extra details",
       commandBlockLabel: "Command",
