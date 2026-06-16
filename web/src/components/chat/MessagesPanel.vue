@@ -248,7 +248,8 @@ function getRunStepRenderData(step: ConversationRunStep): RunStepRenderData {
   const locale = getSortLocale();
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "Local";
   const details = formatCurrentTimeToolDetails(step, (step.displayDetails || step.displaySummary || "").trim());
-  const cacheKey = `${step.stepUid}|${step.displayTitle}|${step.displayDetails}|${step.displaySummary}|${locale}|${timezone}`;
+  const commandArg = String((step.toolArgs || {}).command || "").trim();
+  const cacheKey = `${step.stepUid}|${step.displayTitle}|${step.displayDetails}|${step.displaySummary}|${commandArg}|${locale}|${timezone}`;
   const cached = runStepRenderCache.get(step.stepUid);
   if (cached && cached.cacheKey === cacheKey) {
     return cached;
@@ -278,7 +279,7 @@ function getRunStepRenderData(step: ConversationRunStep): RunStepRenderData {
     return plainData;
   }
 
-  const command = extractCommand(details, step.displayTitle || "");
+  const command = extractCommand(details, step.displayTitle || "", step.toolArgs);
   let output = extractCommandOutput(details, command);
   if (!output) {
     output = details;
@@ -298,12 +299,23 @@ function runStepDetailsMarkdown(step: ConversationRunStep) {
   return getRunStepRenderData(step).details || t("chat.messages.noExtraDetails");
 }
 
+function runStepTitle(step: ConversationRunStep) {
+  if (getRunStepRenderData(step).isCommand) {
+    return t("chat.runtime.stepTitle.commandRun");
+  }
+  return step.displayTitle || t("chat.runtime.processingStep");
+}
+
 function isCommandStep(details: string, title: string) {
   const content = `${title}\n${details}`;
   return /执行命令|本地命令|命令执行|command/i.test(content);
 }
 
-function extractCommand(details: string, title: string) {
+function extractCommand(details: string, title: string, toolArgs?: Record<string, any>) {
+  const fromArgs = String((toolArgs || {}).command || "").trim();
+  if (fromArgs) {
+    return fromArgs;
+  }
   const text = `${details}\n${title}`;
   const quoted = text.match(/(?:执行命令[:：]\s*|本地命令已执行完成[:：]\s*|命令执行失败[:：]\s*)[“"]([\s\S]*?)[”"]/);
   if (quoted?.[1]) {
@@ -1055,7 +1067,7 @@ onMounted(() => {
                   <n-collapse-item
                     v-for="(step, stepPosition) in visibleRunSteps(message.messageUid)"
                     :key="step.stepUid"
-                    :title="`${stepPosition + 1}. ${step.displayTitle}`"
+                    :title="`${stepPosition + 1}. ${runStepTitle(step)}`"
                     :name="step.stepUid"
                   >
                     <template #header-extra>
@@ -1070,7 +1082,7 @@ onMounted(() => {
                             {{ browserModeBadgeText(step) }}
                           </n-tag>
                         </div>
-                        <section class="run-command-section">
+                        <section v-if="getRunStepRenderData(step).command" class="run-command-section">
                           <div class="run-code-head">
                             <span class="run-code-label">{{ t("chat.messages.commandBlockLabel") }}</span>
                             <UiInstantTooltip :content="t('chat.messages.copyCommand')">
