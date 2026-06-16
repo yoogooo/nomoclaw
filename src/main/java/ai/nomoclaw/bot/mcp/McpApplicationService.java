@@ -213,6 +213,8 @@ public class McpApplicationService {
                     () -> {
                     },
                     () -> {
+                    },
+                    (ignoredOperationId, ignoredReason) -> {
                     }
             );
             transport.start(handler);
