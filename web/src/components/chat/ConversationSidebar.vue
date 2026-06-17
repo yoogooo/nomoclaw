@@ -381,22 +381,23 @@ onBeforeUnmount(() => {
             <RefreshCw :size="14" :class="{ spinning: refreshAnimating }" />
           </button>
         </div>
-        <div class="conversation-header-actions">
-          <button class="create-conversation-button ui-control-btn" @click="createConversationAndFocusInput()">
-            {{ t("chat.sidebar.createConversation") }}
-          </button>
+        <div class="conversation-header-toolbar">
+          <div class="agent-select-wrap">
+            <n-select
+              :value="selectedAgentUid"
+              :options="agentOptions"
+              filterable
+              size="small"
+              :placeholder="t('chat.sidebar.agentSelectorPlaceholder')"
+              @update:value="handleAgentChange"
+            />
+          </div>
+          <div class="conversation-header-actions">
+            <button class="create-conversation-button ui-control-btn" @click="createConversationAndFocusInput()">
+              {{ t("chat.sidebar.createConversation") }}
+            </button>
+          </div>
         </div>
-      </div>
-      <div class="agent-select-wrap">
-        <div class="agent-select-label">{{ t("chat.sidebar.agentSelector") }}</div>
-        <n-select
-          :value="selectedAgentUid"
-          :options="agentOptions"
-          filterable
-          size="small"
-          :placeholder="t('chat.sidebar.agentSelectorPlaceholder')"
-          @update:value="handleAgentChange"
-        />
       </div>
     </div>
     <div class="panel-body conversation-panel">
@@ -508,6 +509,13 @@ onBeforeUnmount(() => {
   min-height: 0;
 }
 
+.conversation-header {
+  padding-top: var(--space-2);
+  padding-right: var(--space-4) !important;
+  padding-bottom: 0;
+  padding-left: var(--space-4) !important;
+}
+
 .conversation-shell .conversation-panel {
   display: flex;
   min-height: 0;
@@ -574,7 +582,7 @@ onBeforeUnmount(() => {
 
 .conversation-header-top {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   justify-content: flex-start;
   flex-direction: column;
   gap: var(--space-3);
@@ -588,26 +596,25 @@ onBeforeUnmount(() => {
   gap: var(--space-2);
 }
 
+.conversation-header-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+}
+
 .conversation-header-actions {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  width: 100%;
-  justify-content: flex-start;
+  width: auto;
+  justify-content: flex-end;
   min-width: 0;
 }
 
 .agent-select-wrap {
-  margin-top: var(--space-3_5);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.agent-select-label {
-  font-size: var(--text-caption-size);
-  color: var(--color-text-secondary);
-  font-weight: 600;
+  min-width: 0;
 }
 
 .refresh-conversation-button {
@@ -640,12 +647,13 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   flex: none;
+  height: 28px;
   white-space: nowrap;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
-  padding: var(--space-1_5) var(--space-3);
+  padding: 0 var(--space-3);
   border-color: var(--color-border-strong);
   background: var(--color-bg-surface-soft);
   color: var(--color-text-secondary);
@@ -659,6 +667,20 @@ onBeforeUnmount(() => {
   border-color: var(--color-border-active);
   background: var(--color-bg-soft-hover);
   color: var(--color-text-primary);
+}
+
+@media (max-width: 900px) {
+  .conversation-header-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .conversation-header-actions {
+    width: 100%;
+  }
+
+  .create-conversation-button {
+    width: 100%;
+  }
 }
 
 .conversation-list {
@@ -943,6 +965,12 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 1120px) {
+  .conversation-header {
+    padding-top: var(--space-1_5);
+    padding-right: var(--space-3) !important;
+    padding-left: var(--space-3) !important;
+  }
+
   .conversation-header-actions {
     justify-content: flex-start;
   }
