@@ -36,21 +36,56 @@ public class DingTalkChannelMessageSender implements ChannelMessageSender {
 
     @Override
     public void send(OutboundMessage message) {
-        String formattedText = MarkdownToReadableTextFormatter.format(message.text());
+        String title = DingTalkMarkdownFormatter.extractTitle(message.text());
+        String markdownText = DingTalkMarkdownFormatter.formatMarkdown(message.text());
+        String plainText = DingTalkMarkdownFormatter.formatPlainText(message.text());
         String target = message.address().target();
         if (target == null || target.isBlank()) {
             log.warn("[DingTalkSender] empty target");
             return;
         }
         try {
-            BotReplier.fromWebhook(target).replyText(formattedText);
+            BotReplier.fromWebhook(target).replyMarkdown(title, markdownText);
         } catch (Exception ex) {
-            log.warn("[DingTalkSender] bot replier failed, fallback webhook target={}", target, ex);
-            postWebhook(target, formattedText);
+            log.warn("[DingTalkSender] markdown send failed, fallback webhook target={}", target, ex);
+            if (!postMarkdownWebhook(target, title, markdownText)) {
+                postTextWebhook(target, plainText);
+            }
         }
     }
 
-    private void postWebhook(String target, String text) {
+    private boolean postMarkdownWebhook(String target, String title, String text) {
+        if (!target.startsWith("http://") && !target.startsWith("https://")) {
+            log.warn("[DingTalkSender] unsupported target={}", target);
+            return false;
+        }
+        try {
+            String payload = objectMapper.writeValueAsString(Map.of(
+                    "msgtype", "markdown",
+                    "markdown", Map.of(
+                            "title", title,
+                            "text", text
+                    )
+            ));
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(target))
+                    .timeout(Duration.ofSeconds(15))
+                    .header("Content-Type", "application/json; charset=utf-8")
+                    .POST(HttpRequest.BodyPublishers.ofString(payload, StandardCharsets.UTF_8))
+                    .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            if (response.statusCode() >= 400) {
+                log.warn("[DingTalkSender] markdown webhook send failed status={} body={}", response.statusCode(), response.body());
+                return false;
+            }
+            return true;
+        } catch (Exception ex) {
+            log.error("[DingTalkSender] markdown webhook send error target={}", target, ex);
+            return false;
+        }
+    }
+
+    private void postTextWebhook(String target, String text) {
         if (!target.startsWith("http://") && !target.startsWith("https://")) {
             log.warn("[DingTalkSender] unsupported target={}", target);
             return;
@@ -68,10 +103,10 @@ public class DingTalkChannelMessageSender implements ChannelMessageSender {
                     .build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (response.statusCode() >= 400) {
-                log.warn("[DingTalkSender] webhook send failed status={} body={}", response.statusCode(), response.body());
+                log.warn("[DingTalkSender] text webhook send failed status={} body={}", response.statusCode(), response.body());
             }
         } catch (Exception ex) {
-            log.error("[DingTalkSender] webhook send error target={}", target, ex);
+            log.error("[DingTalkSender] text webhook send error target={}", target, ex);
         }
     }
 }

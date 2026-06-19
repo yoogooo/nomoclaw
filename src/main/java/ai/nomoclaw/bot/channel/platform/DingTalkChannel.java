@@ -4,6 +4,7 @@ import ai.nomoclaw.bot.channel.core.ChannelOrchestratorService;
 import ai.nomoclaw.bot.channel.model.ChannelPolicy;
 import ai.nomoclaw.bot.channel.model.ChannelType;
 import ai.nomoclaw.bot.channel.model.OutboundMessage;
+import ai.nomoclaw.bot.channel.platform.sender.DingTalkMarkdownFormatter;
 import ai.nomoclaw.bot.channel.spi.Channel;
 import ai.nomoclaw.bot.channel.config.AgentChannelsProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -38,8 +39,11 @@ public class DingTalkChannel extends AbstractWebhookChannel implements Channel {
     protected String buildPayload(String text) {
         try {
             return objectMapper.writeValueAsString(Map.of(
-                    "msgtype", "text",
-                    "text", Map.of("content", text)
+                    "msgtype", "markdown",
+                    "markdown", Map.of(
+                            "title", DingTalkMarkdownFormatter.extractTitle(text),
+                            "text", DingTalkMarkdownFormatter.formatMarkdown(text)
+                    )
             ));
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException(exception);
@@ -59,7 +63,10 @@ public class DingTalkChannel extends AbstractWebhookChannel implements Channel {
             return;
         }
         try {
-            BotReplier.fromWebhook(target).replyText(message.text());
+            BotReplier.fromWebhook(target).replyMarkdown(
+                    DingTalkMarkdownFormatter.extractTitle(message.text()),
+                    DingTalkMarkdownFormatter.formatMarkdown(message.text())
+            );
         } catch (Exception ex) {
             log.error("[DingTalkChannel] send via stream sdk failed target={}", target, ex);
             super.send(message);
