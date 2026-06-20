@@ -66,6 +66,9 @@ public record UpdateChannelConfigRequest(
             boolean isDefault,
             boolean requireMention,
             List<String> allowList,
+            String agentUid,
+            String defaultModelProvider,
+            String defaultModelName,
             String appId,
             String appSecret,
             boolean processingAckReactionEnabled,
@@ -83,6 +86,9 @@ public record UpdateChannelConfigRequest(
             boolean isDefault,
             boolean requireMention,
             List<String> allowList,
+            String agentUid,
+            String defaultModelProvider,
+            String defaultModelName,
             String clientId,
             String clientSecret,
             String robotCode
@@ -96,6 +102,9 @@ public record UpdateChannelConfigRequest(
             boolean isDefault,
             boolean requireMention,
             List<String> allowList,
+            String agentUid,
+            String defaultModelProvider,
+            String defaultModelName,
             String token,
             String botUserId,
             boolean acceptBotMessages
@@ -109,6 +118,9 @@ public record UpdateChannelConfigRequest(
             boolean isDefault,
             boolean requireMention,
             List<String> allowList,
+            String agentUid,
+            String defaultModelProvider,
+            String defaultModelName,
             String token,
             String botUsername
     ) {
@@ -121,6 +133,9 @@ public record UpdateChannelConfigRequest(
             boolean isDefault,
             boolean requireMention,
             List<String> allowList,
+            String agentUid,
+            String defaultModelProvider,
+            String defaultModelName,
             String appId,
             String clientSecret,
             String botUserId,
@@ -136,6 +151,9 @@ public record UpdateChannelConfigRequest(
             boolean isDefault,
             boolean requireMention,
             List<String> allowList,
+            String agentUid,
+            String defaultModelProvider,
+            String defaultModelName,
             String wecomBotId,
             String secret
     ) {
@@ -148,6 +166,9 @@ public record UpdateChannelConfigRequest(
             boolean isDefault,
             boolean requireMention,
             List<String> allowList,
+            String agentUid,
+            String defaultModelProvider,
+            String defaultModelName,
             String botToken,
             String botTokenFile,
             String baseUrl

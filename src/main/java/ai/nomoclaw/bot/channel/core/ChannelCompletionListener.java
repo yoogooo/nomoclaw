@@ -42,6 +42,9 @@ public class ChannelCompletionListener {
         metadata.put("conversationUid", context.conversationUid());
         metadata.put("messageUid", event.messageUid());
         metadata.put("status", event.status().name());
+        if (context.botId() != null && !context.botId().isBlank()) {
+            metadata.put("botId", context.botId());
+        }
         try {
             channelMessageRouter.send(context.channel(), context.replyTarget(), reply, Map.copyOf(metadata));
             pendingReplyContextStore.remove(event.messageUid());

@@ -1,6 +1,7 @@
 package ai.nomoclaw.bot.agent.channel;
 
 import ai.nomoclaw.bot.channel.config.AgentChannelsProperties;
+import ai.nomoclaw.bot.channel.config.ChannelBotRouteResolver;
 import ai.nomoclaw.bot.channel.core.ChannelOrchestratorService;
 import ai.nomoclaw.bot.channel.core.ChannelPendingReplyContextStore;
 import ai.nomoclaw.bot.channel.model.ChannelSessionKey;
@@ -12,10 +13,16 @@ import ai.nomoclaw.bot.conversation.model.MessageFileLinkDto;
 import ai.nomoclaw.bot.channel.repository.ChannelInboundDedupRepository;
 import ai.nomoclaw.bot.channel.spi.ChannelMessageRouter;
 import ai.nomoclaw.bot.channel.spi.ChannelSessionRepository;
+import ai.nomoclaw.bot.domain.AgentConversation;
 import ai.nomoclaw.bot.model.MessageStatus;
 import ai.nomoclaw.bot.modelconfig.ModelConfigAppService;
 import ai.nomoclaw.bot.modelconfig.model.ModelConfigDto;
 import ai.nomoclaw.bot.orchestrator.AgentApplicationService;
+import ai.nomoclaw.bot.orchestrator.execution.ExecutionScopeResolver;
+import ai.nomoclaw.bot.orchestrator.execution.RuntimeModelSelection;
+import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
+import ai.nomoclaw.bot.store.repository.AgentDefinitionRepository;
+import ai.nomoclaw.bot.system.model.ChannelConfigDto;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -37,7 +44,12 @@ class ChannelOrchestratorServiceTests {
         AgentChannelsProperties channelProperties = new AgentChannelsProperties();
         ChannelPendingReplyContextStore pendingReplyContextStore = new ChannelPendingReplyContextStore();
         TestModelConfigAppService modelConfigAppService = new TestModelConfigAppService();
-        modelConfigAppService.availableModelConfig = availableConfig("deepseek", "deepseek-v4-flash");
+        modelConfigAppService.availableModelConfig = availableConfig("dashscope", "qwen3.6-plus");
+        TestChannelBotRouteResolver routeResolver = new TestChannelBotRouteResolver();
+        routeResolver.defaultBotId = "dingtalk-default";
+        routeResolver.route = new ChannelBotRouteResolver.BotRouteConfig("dingtalk-default", true, true, "agent_dingtalk", "dashscope", "qwen3.6-plus");
+        TestExecutionScopeResolver executionScopeResolver = new TestExecutionScopeResolver();
+        TestAgentDefinitionRepository agentDefinitionRepository = new TestAgentDefinitionRepository();
         ChannelOrchestratorService service = new ChannelOrchestratorService(
                 agentApplicationService,
                 channelSessionRepository,
@@ -45,7 +57,10 @@ class ChannelOrchestratorServiceTests {
                 channelMessageRouter,
                 channelProperties,
                 pendingReplyContextStore,
-                modelConfigAppService
+                modelConfigAppService,
+                routeResolver,
+                executionScopeResolver,
+                agentDefinitionRepository
         );
         InboundEnvelope envelope = envelope("/new");
         channelSessionRepository.upsert(new ChannelSessionRepository.ChannelSessionRecord(
@@ -59,16 +74,19 @@ class ChannelOrchestratorServiceTests {
         service.processInbound(envelope);
 
         Assertions.assertTrue(dedupRepository.saved);
-        Assertions.assertEquals("agent_general_assistant", agentApplicationService.lastCreateConversation.agentUid);
-        Assertions.assertEquals("conv-new", channelSessionRepository.find(envelope.toSessionKey()).orElseThrow().conversationUid());
+        Assertions.assertEquals("agent_dingtalk", agentApplicationService.lastCreateConversation.agentUid);
+        ChannelSessionRepository.ChannelSessionRecord session = channelSessionRepository.find(envelope.toSessionKey()).orElseThrow();
+        Assertions.assertEquals("conv-new", session.conversationUid());
+        Assertions.assertEquals("dingtalk-default", session.routeMetadata().get("botId"));
         Assertions.assertEquals("conv-new", channelMessageRouter.lastMetadata.get("conversationUid"));
         Assertions.assertEquals("new_conversation", channelMessageRouter.lastMetadata.get("phase"));
-        Assertions.assertEquals("已开启新对话，默认模型为 deepseek/deepseek-v4-flash。", channelMessageRouter.lastText);
+        Assertions.assertEquals("dingtalk-default", channelMessageRouter.lastMetadata.get("botId"));
+        Assertions.assertEquals("已开启新对话，默认模型为 dashscope/qwen3.6-plus。", channelMessageRouter.lastText);
         Assertions.assertNull(agentApplicationService.lastSubmit);
     }
 
     @Test
-    void shouldSubmitFirstMessageToDefaultDeepseekModelWhenUsingNewConversationCommandWithText() {
+    void shouldSubmitFirstMessageToBotOverrideModelWhenUsingNewConversationCommandWithText() {
         TestAgentApplicationService agentApplicationService = new TestAgentApplicationService();
         InMemoryChannelSessionRepository channelSessionRepository = new InMemoryChannelSessionRepository();
         TestChannelInboundDedupRepository dedupRepository = new TestChannelInboundDedupRepository();
@@ -78,7 +96,12 @@ class ChannelOrchestratorServiceTests {
         ChannelPendingReplyContextStore pendingReplyContextStore = new ChannelPendingReplyContextStore();
         pendingReplyContextStore.startCleanupLoop();
         TestModelConfigAppService modelConfigAppService = new TestModelConfigAppService();
-        modelConfigAppService.availableModelConfig = availableConfig("deepseek", "deepseek-v4-flash");
+        modelConfigAppService.availableModelConfig = availableConfig("dashscope", "qwen3.6-plus");
+        TestChannelBotRouteResolver routeResolver = new TestChannelBotRouteResolver();
+        routeResolver.defaultBotId = "bot-1";
+        routeResolver.route = new ChannelBotRouteResolver.BotRouteConfig("bot-1", true, true, "agent_sales", "dashscope", "qwen3.6-plus");
+        TestExecutionScopeResolver executionScopeResolver = new TestExecutionScopeResolver();
+        TestAgentDefinitionRepository agentDefinitionRepository = new TestAgentDefinitionRepository();
         ChannelOrchestratorService service = new ChannelOrchestratorService(
                 agentApplicationService,
                 channelSessionRepository,
@@ -86,7 +109,10 @@ class ChannelOrchestratorServiceTests {
                 channelMessageRouter,
                 channelProperties,
                 pendingReplyContextStore,
-                modelConfigAppService
+                modelConfigAppService,
+                routeResolver,
+                executionScopeResolver,
+                agentDefinitionRepository
         );
         InboundEnvelope envelope = envelope("/new 帮我总结一下今天的站会");
         agentApplicationService.nextConversationUid = "conv-new";
@@ -99,12 +125,12 @@ class ChannelOrchestratorServiceTests {
 
         Assertions.assertTrue(dedupRepository.saved);
         Assertions.assertNotNull(agentApplicationService.lastSubmit);
-        Assertions.assertEquals("agent_general_assistant", agentApplicationService.lastCreateConversation.agentUid);
+        Assertions.assertEquals("agent_sales", agentApplicationService.lastCreateConversation.agentUid);
         Assertions.assertEquals("conv-new", agentApplicationService.lastSubmit.conversationUid);
         Assertions.assertEquals("帮我总结一下今天的站会", agentApplicationService.lastSubmit.message);
         Assertions.assertEquals(List.of(), agentApplicationService.lastSubmit.fileUrls);
-        Assertions.assertEquals("deepseek", agentApplicationService.lastSubmit.modelProvider);
-        Assertions.assertEquals("deepseek-v4-flash", agentApplicationService.lastSubmit.modelName);
+        Assertions.assertEquals("dashscope", agentApplicationService.lastSubmit.modelProvider);
+        Assertions.assertEquals("qwen3.6-plus", agentApplicationService.lastSubmit.modelName);
         Assertions.assertEquals("default", agentApplicationService.lastSubmit.approvalMode);
         Assertions.assertEquals("feishu", agentApplicationService.lastSubmit.channel);
         Assertions.assertNotNull(agentApplicationService.lastSubmit.beforeExecuteHook);
@@ -112,7 +138,7 @@ class ChannelOrchestratorServiceTests {
     }
 
     @Test
-    void shouldFallbackToPreviousConversationModelWhenDeepseekFlashIsUnavailable() {
+    void shouldFallbackToAgentDefaultModelWhenBotModelIsNotConfigured() {
         TestAgentApplicationService agentApplicationService = new TestAgentApplicationService();
         InMemoryChannelSessionRepository channelSessionRepository = new InMemoryChannelSessionRepository();
         TestChannelInboundDedupRepository dedupRepository = new TestChannelInboundDedupRepository();
@@ -123,6 +149,12 @@ class ChannelOrchestratorServiceTests {
         pendingReplyContextStore.startCleanupLoop();
         TestModelConfigAppService modelConfigAppService = new TestModelConfigAppService();
         modelConfigAppService.availableModelConfig = availableConfig("openai", "gpt-4o");
+        TestChannelBotRouteResolver routeResolver = new TestChannelBotRouteResolver();
+        routeResolver.defaultBotId = "bot-2";
+        routeResolver.route = new ChannelBotRouteResolver.BotRouteConfig("bot-2", true, true, "agent_writer", "", "");
+        TestExecutionScopeResolver executionScopeResolver = new TestExecutionScopeResolver();
+        TestAgentDefinitionRepository agentDefinitionRepository = new TestAgentDefinitionRepository();
+        agentDefinitionRepository.agent = agent("agent_writer", "openai", "gpt-4o");
         ChannelOrchestratorService service = new ChannelOrchestratorService(
                 agentApplicationService,
                 channelSessionRepository,
@@ -130,7 +162,55 @@ class ChannelOrchestratorServiceTests {
                 channelMessageRouter,
                 channelProperties,
                 pendingReplyContextStore,
-                modelConfigAppService
+                modelConfigAppService,
+                routeResolver,
+                executionScopeResolver,
+                agentDefinitionRepository
+        );
+        InboundEnvelope envelope = envelope("/new 写一个项目周报");
+        agentApplicationService.nextConversationUid = "conv-new";
+
+        try {
+            service.processInbound(envelope);
+        } finally {
+            pendingReplyContextStore.destroy();
+        }
+
+        Assertions.assertNotNull(agentApplicationService.lastSubmit);
+        Assertions.assertEquals("agent_writer", agentApplicationService.lastCreateConversation.agentUid);
+        Assertions.assertEquals("openai", agentApplicationService.lastSubmit.modelProvider);
+        Assertions.assertEquals("gpt-4o", agentApplicationService.lastSubmit.modelName);
+    }
+
+    @Test
+    void shouldFallbackToPreviousConversationModelWhenAgentDefaultIsUnavailable() {
+        TestAgentApplicationService agentApplicationService = new TestAgentApplicationService();
+        InMemoryChannelSessionRepository channelSessionRepository = new InMemoryChannelSessionRepository();
+        TestChannelInboundDedupRepository dedupRepository = new TestChannelInboundDedupRepository();
+        RecordingChannelMessageRouter channelMessageRouter = new RecordingChannelMessageRouter();
+        AgentChannelsProperties channelProperties = new AgentChannelsProperties();
+        channelProperties.setProcessingAckEnabled(false);
+        ChannelPendingReplyContextStore pendingReplyContextStore = new ChannelPendingReplyContextStore();
+        pendingReplyContextStore.startCleanupLoop();
+        TestModelConfigAppService modelConfigAppService = new TestModelConfigAppService();
+        modelConfigAppService.availableModelConfig = availableConfig("openai", "gpt-4o");
+        TestChannelBotRouteResolver routeResolver = new TestChannelBotRouteResolver();
+        routeResolver.defaultBotId = "bot-3";
+        routeResolver.route = new ChannelBotRouteResolver.BotRouteConfig("bot-3", true, true, "agent_writer", "", "");
+        TestExecutionScopeResolver executionScopeResolver = new TestExecutionScopeResolver();
+        TestAgentDefinitionRepository agentDefinitionRepository = new TestAgentDefinitionRepository();
+        agentDefinitionRepository.agent = agent("agent_writer", "deepseek", "deepseek-v4-flash");
+        ChannelOrchestratorService service = new ChannelOrchestratorService(
+                agentApplicationService,
+                channelSessionRepository,
+                dedupRepository,
+                channelMessageRouter,
+                channelProperties,
+                pendingReplyContextStore,
+                modelConfigAppService,
+                routeResolver,
+                executionScopeResolver,
+                agentDefinitionRepository
         );
         InboundEnvelope envelope = envelope("/new 写一个发布公告");
         channelSessionRepository.upsert(new ChannelSessionRepository.ChannelSessionRecord(
@@ -152,7 +232,7 @@ class ChannelOrchestratorServiceTests {
         }
 
         Assertions.assertNotNull(agentApplicationService.lastSubmit);
-        Assertions.assertEquals("agent_general_assistant", agentApplicationService.lastCreateConversation.agentUid);
+        Assertions.assertEquals("agent_writer", agentApplicationService.lastCreateConversation.agentUid);
         Assertions.assertEquals("openai", agentApplicationService.lastSubmit.modelProvider);
         Assertions.assertEquals("gpt-4o", agentApplicationService.lastSubmit.modelName);
     }
@@ -222,6 +302,14 @@ class ChannelOrchestratorServiceTests {
         ));
     }
 
+    private AgentDefinitionEntity agent(String agentUid, String provider, String modelName) {
+        AgentDefinitionEntity entity = new AgentDefinitionEntity();
+        entity.setAgentUid(agentUid);
+        entity.setModelProviderId(provider);
+        entity.setModelId(modelName);
+        return entity;
+    }
+
     private static final class TestAgentApplicationService extends AgentApplicationService {
 
         private String nextConversationUid = "";
@@ -285,6 +373,49 @@ class ChannelOrchestratorServiceTests {
         @Override
         public ModelConfigDto getAvailableModelConfig() {
             return availableModelConfig;
+        }
+    }
+
+    private static final class TestChannelBotRouteResolver extends ChannelBotRouteResolver {
+
+        private String defaultBotId = "";
+        private BotRouteConfig route = new BotRouteConfig("default", true, true, ChannelConfigDto.DEFAULT_AGENT_UID, "", "");
+
+        @Override
+        public BotRouteConfig resolve(ChannelType channelType, String botId) {
+            return route;
+        }
+
+        @Override
+        public String resolveDefaultBotId(ChannelType channelType) {
+            return defaultBotId;
+        }
+    }
+
+    private static final class TestExecutionScopeResolver extends ExecutionScopeResolver {
+
+        private TestExecutionScopeResolver() {
+            super(null, null, null, null, null);
+        }
+
+        @Override
+        public RuntimeModelSelection resolveForMessageSubmission(AgentConversation conversation,
+                                                                 String requestedProvider,
+                                                                 String requestedModel) {
+            if (!String(requestedProvider).trim().isBlank() && !String(requestedModel).trim().isBlank()) {
+                return new RuntimeModelSelection(requestedProvider.trim(), requestedModel.trim());
+            }
+            return new RuntimeModelSelection("fallback", "fallback-model");
+        }
+    }
+
+    private static final class TestAgentDefinitionRepository extends AgentDefinitionRepository {
+
+        private AgentDefinitionEntity agent;
+
+        @Override
+        public AgentDefinitionEntity findByUid(String agentUid) {
+            return agent != null && agentUid.equals(agent.getAgentUid()) ? agent : null;
         }
     }
 

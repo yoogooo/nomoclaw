@@ -81,6 +81,9 @@ public final class SystemApiMapper {
                                                 bot.isDefault(),
                                                 bot.requireMention(),
                                                 bot.allowList(),
+                                                bot.agentUid(),
+                                                bot.defaultModelProvider(),
+                                                bot.defaultModelName(),
                                                 bot.appId(),
                                                 bot.appSecret(),
                                                 bot.processingAckReactionEnabled(),
@@ -101,6 +104,9 @@ public final class SystemApiMapper {
                                                 bot.isDefault(),
                                                 bot.requireMention(),
                                                 bot.allowList(),
+                                                bot.agentUid(),
+                                                bot.defaultModelProvider(),
+                                                bot.defaultModelName(),
                                                 bot.clientId(),
                                                 bot.clientSecret(),
                                                 bot.robotCode()
@@ -117,6 +123,9 @@ public final class SystemApiMapper {
                                                 bot.isDefault(),
                                                 bot.requireMention(),
                                                 bot.allowList(),
+                                                bot.agentUid(),
+                                                bot.defaultModelProvider(),
+                                                bot.defaultModelName(),
                                                 bot.token(),
                                                 bot.botUserId(),
                                                 bot.acceptBotMessages()
@@ -133,6 +142,9 @@ public final class SystemApiMapper {
                                                 bot.isDefault(),
                                                 bot.requireMention(),
                                                 bot.allowList(),
+                                                bot.agentUid(),
+                                                bot.defaultModelProvider(),
+                                                bot.defaultModelName(),
                                                 bot.token(),
                                                 bot.botUsername()
                                         ))
@@ -148,6 +160,9 @@ public final class SystemApiMapper {
                                                 bot.isDefault(),
                                                 bot.requireMention(),
                                                 bot.allowList(),
+                                                bot.agentUid(),
+                                                bot.defaultModelProvider(),
+                                                bot.defaultModelName(),
                                                 bot.appId(),
                                                 bot.clientSecret(),
                                                 bot.botUserId(),
@@ -166,6 +181,9 @@ public final class SystemApiMapper {
                                                 bot.isDefault(),
                                                 bot.requireMention(),
                                                 bot.allowList(),
+                                                bot.agentUid(),
+                                                bot.defaultModelProvider(),
+                                                bot.defaultModelName(),
                                                 bot.wecomBotId(),
                                                 bot.secret()
                                         ))
@@ -181,6 +199,9 @@ public final class SystemApiMapper {
                                                 bot.isDefault(),
                                                 bot.requireMention(),
                                                 bot.allowList(),
+                                                bot.agentUid(),
+                                                bot.defaultModelProvider(),
+                                                bot.defaultModelName(),
                                                 bot.botToken(),
                                                 bot.botTokenFile(),
                                                 bot.baseUrl()
@@ -311,6 +332,9 @@ public final class SystemApiMapper {
                                                 bot.isDefault(),
                                                 bot.requireMention(),
                                                 bot.allowList(),
+                                                bot.agentUid(),
+                                                bot.defaultModelProvider(),
+                                                bot.defaultModelName(),
                                                 bot.appId(),
                                                 bot.appSecret(),
                                                 bot.processingAckReactionEnabled(),
@@ -333,6 +357,9 @@ public final class SystemApiMapper {
                                                 bot.isDefault(),
                                                 bot.requireMention(),
                                                 bot.allowList(),
+                                                bot.agentUid(),
+                                                bot.defaultModelProvider(),
+                                                bot.defaultModelName(),
                                                 bot.clientId(),
                                                 bot.clientSecret(),
                                                 bot.robotCode()
@@ -351,6 +378,9 @@ public final class SystemApiMapper {
                                                 bot.isDefault(),
                                                 bot.requireMention(),
                                                 bot.allowList(),
+                                                bot.agentUid(),
+                                                bot.defaultModelProvider(),
+                                                bot.defaultModelName(),
                                                 bot.token(),
                                                 bot.botUserId(),
                                                 bot.acceptBotMessages()
@@ -369,6 +399,9 @@ public final class SystemApiMapper {
                                                 bot.isDefault(),
                                                 bot.requireMention(),
                                                 bot.allowList(),
+                                                bot.agentUid(),
+                                                bot.defaultModelProvider(),
+                                                bot.defaultModelName(),
                                                 bot.token(),
                                                 bot.botUsername()
                                         ))
@@ -386,6 +419,9 @@ public final class SystemApiMapper {
                                                 bot.isDefault(),
                                                 bot.requireMention(),
                                                 bot.allowList(),
+                                                bot.agentUid(),
+                                                bot.defaultModelProvider(),
+                                                bot.defaultModelName(),
                                                 bot.appId(),
                                                 bot.clientSecret(),
                                                 bot.botUserId(),
@@ -406,6 +442,9 @@ public final class SystemApiMapper {
                                                 bot.isDefault(),
                                                 bot.requireMention(),
                                                 bot.allowList(),
+                                                bot.agentUid(),
+                                                bot.defaultModelProvider(),
+                                                bot.defaultModelName(),
                                                 bot.wecomBotId(),
                                                 bot.secret()
                                         ))
@@ -423,6 +462,9 @@ public final class SystemApiMapper {
                                                 bot.isDefault(),
                                                 bot.requireMention(),
                                                 bot.allowList(),
+                                                bot.agentUid(),
+                                                bot.defaultModelProvider(),
+                                                bot.defaultModelName(),
                                                 bot.botToken(),
                                                 bot.botTokenFile(),
                                                 bot.baseUrl()

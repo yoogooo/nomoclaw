@@ -1,16 +1,26 @@
 package ai.nomoclaw.bot.channel.core;
 
 import ai.nomoclaw.bot.channel.config.AgentChannelsProperties;
+import ai.nomoclaw.bot.channel.config.ChannelBotRouteResolver;
+import ai.nomoclaw.bot.channel.model.ChannelType;
 import ai.nomoclaw.bot.channel.model.InboundEnvelope;
-import ai.nomoclaw.bot.conversation.model.ConversationMessageDto;
 import ai.nomoclaw.bot.channel.repository.ChannelInboundDedupRepository;
 import ai.nomoclaw.bot.channel.spi.ChannelMessageRouter;
 import ai.nomoclaw.bot.channel.spi.ChannelSessionRepository;
+import ai.nomoclaw.bot.conversation.model.ConversationMessageDto;
+import ai.nomoclaw.bot.domain.AgentConversation;
 import ai.nomoclaw.bot.modelconfig.ModelConfigAppService;
 import ai.nomoclaw.bot.modelconfig.model.ModelConfigDto;
 import ai.nomoclaw.bot.orchestrator.AgentApplicationService;
+import ai.nomoclaw.bot.orchestrator.execution.ExecutionScopeResolver;
+import ai.nomoclaw.bot.orchestrator.execution.RuntimeModelSelection;
+import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
+import ai.nomoclaw.bot.store.repository.AgentDefinitionRepository;
+import ai.nomoclaw.bot.system.model.ChannelConfigDto;
+import ai.nomoclaw.bot.util.JsonUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.JsonNode;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -20,10 +30,7 @@ import java.util.Map;
 @Slf4j
 public class ChannelOrchestratorService {
 
-    private static final String DEFAULT_AGENT_UID = "agent_general_assistant";
     private static final String NEW_CONVERSATION_COMMAND = "/new";
-    private static final String IM_DEFAULT_MODEL_PROVIDER = "deepseek";
-    private static final String IM_DEFAULT_MODEL_NAME = "deepseek-v4-flash";
 
     private final AgentApplicationService agentApplicationService;
     private final ChannelSessionRepository channelSessionRepository;
@@ -32,6 +39,9 @@ public class ChannelOrchestratorService {
     private final AgentChannelsProperties channelProperties;
     private final ChannelPendingReplyContextStore pendingReplyContextStore;
     private final ModelConfigAppService modelConfigAppService;
+    private final ChannelBotRouteResolver channelBotRouteResolver;
+    private final ExecutionScopeResolver executionScopeResolver;
+    private final AgentDefinitionRepository agentDefinitionRepository;
 
     public ChannelOrchestratorService(AgentApplicationService agentApplicationService,
                                       ChannelSessionRepository channelSessionRepository,
@@ -39,7 +49,10 @@ public class ChannelOrchestratorService {
                                       ChannelMessageRouter channelMessageRouter,
                                       AgentChannelsProperties channelProperties,
                                       ChannelPendingReplyContextStore pendingReplyContextStore,
-                                      ModelConfigAppService modelConfigAppService) {
+                                      ModelConfigAppService modelConfigAppService,
+                                      ChannelBotRouteResolver channelBotRouteResolver,
+                                      ExecutionScopeResolver executionScopeResolver,
+                                      AgentDefinitionRepository agentDefinitionRepository) {
         this.agentApplicationService = agentApplicationService;
         this.channelSessionRepository = channelSessionRepository;
         this.dedupRepository = dedupRepository;
@@ -47,6 +60,9 @@ public class ChannelOrchestratorService {
         this.channelProperties = channelProperties;
         this.pendingReplyContextStore = pendingReplyContextStore;
         this.modelConfigAppService = modelConfigAppService;
+        this.channelBotRouteResolver = channelBotRouteResolver;
+        this.executionScopeResolver = executionScopeResolver;
+        this.agentDefinitionRepository = agentDefinitionRepository;
     }
 
     public void processInbound(InboundEnvelope envelope) {
@@ -55,54 +71,77 @@ public class ChannelOrchestratorService {
             return;
         }
         dedupRepository.save(envelope);
+        InboundEnvelope normalizedEnvelope = withRouteMetadata(envelope);
         String newConversationMessage = extractNewConversationMessage(envelope.text());
         if (newConversationMessage != null) {
-            handleNewConversationCommand(envelope, newConversationMessage);
+            handleNewConversationCommand(normalizedEnvelope, newConversationMessage);
             return;
         }
-        ChannelSessionRepository.ChannelSessionRecord session = channelSessionRepository.find(envelope.toSessionKey())
+        ChannelSessionRepository.ChannelSessionRecord session = channelSessionRepository.find(normalizedEnvelope.toSessionKey())
                 .orElseGet(() -> {
-                    String conversationUid = agentApplicationService.createConversation("", DEFAULT_AGENT_UID, envelope.channel().value());
+                    ChannelBotRouteResolver.BotRouteConfig route = resolveBotRoute(normalizedEnvelope.channel(), normalizedEnvelope.metadata());
+                    String conversationUid = agentApplicationService.createConversation("", route.agentUid(), normalizedEnvelope.channel().value());
                     ChannelSessionRepository.ChannelSessionRecord created = new ChannelSessionRepository.ChannelSessionRecord(
-                            envelope.toSessionKey(),
+                            normalizedEnvelope.toSessionKey(),
                             conversationUid,
-                            envelope.replyTarget(),
-                            envelope.metadata()
+                            normalizedEnvelope.replyTarget(),
+                            normalizedEnvelope.metadata()
                     );
                     return channelSessionRepository.upsert(created);
                 });
-        if (!envelope.replyTarget().isBlank() && !envelope.replyTarget().equals(session.replyTarget())) {
+        Map<String, String> routeMetadata = mergeMetadata(session.routeMetadata(), normalizedEnvelope.metadata());
+        if ((!normalizedEnvelope.replyTarget().isBlank() && !normalizedEnvelope.replyTarget().equals(session.replyTarget()))
+                || !routeMetadata.equals(session.routeMetadata())) {
             session = channelSessionRepository.upsert(new ChannelSessionRepository.ChannelSessionRecord(
                     session.key(),
                     session.conversationUid(),
-                    envelope.replyTarget(),
-                    mergeMetadata(session.routeMetadata(), envelope.metadata())
+                    normalizedEnvelope.replyTarget().isBlank() ? session.replyTarget() : normalizedEnvelope.replyTarget(),
+                    routeMetadata
             ));
         }
-        sendProcessingAck(envelope, session);
+        sendProcessingAck(normalizedEnvelope, session);
         String conversationUid = session.conversationUid();
         String replyTarget = session.replyTarget();
+        String botId = botIdFromMetadata(session.routeMetadata());
+        ChannelBotRouteResolver.BotRouteConfig route = resolveBotRoute(normalizedEnvelope.channel(), session.routeMetadata());
+        RuntimeModelChoice requestedModel = resolveRequestedMessageModel(route);
         if (replyTarget == null || replyTarget.isBlank()) {
-            agentApplicationService.submitMessage(conversationUid, envelope.text(), envelope.channel().value());
+            if (requestedModel != null) {
+                agentApplicationService.submitMessage(
+                        conversationUid,
+                        normalizedEnvelope.text(),
+                        List.of(),
+                        requestedModel.modelProvider(),
+                        requestedModel.modelName(),
+                        "default",
+                        normalizedEnvelope.channel().value(),
+                        null
+                );
+                return;
+            }
+            agentApplicationService.submitMessage(conversationUid, normalizedEnvelope.text(), normalizedEnvelope.channel().value());
             return;
         }
         agentApplicationService.submitMessage(
                 conversationUid,
-                envelope.text(),
-                envelope.channel().value(),
+                normalizedEnvelope.text(),
+                List.of(),
+                requestedModel == null ? "" : requestedModel.modelProvider(),
+                requestedModel == null ? "" : requestedModel.modelName(),
+                "default",
+                normalizedEnvelope.channel().value(),
                 messageUid -> pendingReplyContextStore.put(
                         messageUid,
-                        envelope.channel(),
+                        normalizedEnvelope.channel(),
                         replyTarget,
-                        conversationUid
+                        conversationUid,
+                        botId
                 )
         );
     }
 
     private void handleNewConversationCommand(InboundEnvelope envelope, String firstMessage) {
         ChannelSessionRepository.ChannelSessionRecord existingSession = channelSessionRepository.find(envelope.toSessionKey()).orElse(null);
-        String conversationUid = agentApplicationService.createConversation("", DEFAULT_AGENT_UID, envelope.channel().value());
-        RuntimeModelChoice runtimeModel = resolveNewConversationModel(existingSession);
         String replyTarget = envelope.replyTarget().isBlank()
                 ? existingSession == null ? "" : existingSession.replyTarget()
                 : envelope.replyTarget();
@@ -110,6 +149,9 @@ public class ChannelOrchestratorService {
                 existingSession == null ? Map.of() : existingSession.routeMetadata(),
                 envelope.metadata()
         );
+        ChannelBotRouteResolver.BotRouteConfig route = resolveBotRoute(envelope.channel(), routeMetadata);
+        String conversationUid = agentApplicationService.createConversation("", route.agentUid(), envelope.channel().value());
+        RuntimeModelChoice runtimeModel = resolveNewConversationModel(envelope.channel().value(), route, existingSession);
         ChannelSessionRepository.ChannelSessionRecord session = channelSessionRepository.upsert(
                 new ChannelSessionRepository.ChannelSessionRecord(
                         envelope.toSessionKey(),
@@ -148,7 +190,8 @@ public class ChannelOrchestratorService {
                         messageUid,
                         envelope.channel(),
                         replyTarget,
-                        conversationUid
+                        conversationUid,
+                        botIdFromMetadata(routeMetadata)
                 )
         );
     }
@@ -165,11 +208,7 @@ public class ChannelOrchestratorService {
                     envelope.channel(),
                     session.replyTarget(),
                     channelProperties.getProcessingAckText(),
-                    Map.of(
-                            "conversationUid", session.conversationUid(),
-                            "phase", "processing_ack",
-                            "externalMessageId", envelope.externalMessageId()
-                    )
+                    ackMetadata(session, envelope, "processing_ack")
             );
         } catch (Exception ex) {
             log.warn("[Channel] send processing ack failed channel={} sessionKey={}",
@@ -187,12 +226,8 @@ public class ChannelOrchestratorService {
             channelMessageRouter.send(
                     envelope.channel(),
                     session.replyTarget(),
-                    "已开启新对话，默认模型为 " + runtimeModel.modelProvider() + "/" + runtimeModel.modelName() + "。",
-                    Map.of(
-                            "conversationUid", session.conversationUid(),
-                            "phase", "new_conversation",
-                            "externalMessageId", envelope.externalMessageId()
-                    )
+                    buildNewConversationAckText(runtimeModel),
+                    ackMetadata(session, envelope, "new_conversation")
             );
         } catch (Exception ex) {
             log.warn("[Channel] send new conversation ack failed channel={} sessionKey={}",
@@ -200,15 +235,64 @@ public class ChannelOrchestratorService {
         }
     }
 
-    private RuntimeModelChoice resolveNewConversationModel(ChannelSessionRepository.ChannelSessionRecord existingSession) {
-        if (isModelConfigured(IM_DEFAULT_MODEL_PROVIDER, IM_DEFAULT_MODEL_NAME)) {
-            return new RuntimeModelChoice(IM_DEFAULT_MODEL_PROVIDER, IM_DEFAULT_MODEL_NAME);
+    private RuntimeModelChoice resolveNewConversationModel(String channel,
+                                                           ChannelBotRouteResolver.BotRouteConfig route,
+                                                           ChannelSessionRepository.ChannelSessionRecord existingSession) {
+        RuntimeModelChoice requested = null;
+        if (hasExplicitBotModel(route) && isModelConfigured(route.defaultModelProvider(), route.defaultModelName())) {
+            requested = new RuntimeModelChoice(route.defaultModelProvider(), route.defaultModelName());
+        } else {
+            RuntimeModelChoice agentDefault = resolveAgentDefaultModel(route.agentUid());
+            if (agentDefault != null && isModelConfigured(agentDefault.modelProvider(), agentDefault.modelName())) {
+                requested = agentDefault;
+            }
         }
-        RuntimeModelChoice previous = resolvePreviousConversationModel(existingSession);
-        if (previous != null) {
-            return previous;
+        if (requested == null) {
+            RuntimeModelChoice previous = resolvePreviousConversationModel(existingSession);
+            if (previous != null) {
+                requested = previous;
+            }
         }
-        return new RuntimeModelChoice("", "");
+        AgentConversation conversation = new AgentConversation(
+                "",
+                "",
+                route.agentUid(),
+                channel,
+                "",
+                false,
+                0,
+                0,
+                0,
+                0,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+        RuntimeModelSelection resolved = executionScopeResolver.resolveForMessageSubmission(
+                conversation,
+                requested == null ? "" : requested.modelProvider(),
+                requested == null ? "" : requested.modelName()
+        );
+        return new RuntimeModelChoice(resolved.modelProvider(), resolved.modelName());
+    }
+
+    private RuntimeModelChoice resolveAgentDefaultModel(String agentUid) {
+        String normalizedAgentUid = trim(agentUid);
+        if (normalizedAgentUid.isBlank()) {
+            normalizedAgentUid = ChannelConfigDto.DEFAULT_AGENT_UID;
+        }
+        AgentDefinitionEntity agent = agentDefinitionRepository.findByUid(normalizedAgentUid);
+        if (agent == null) {
+            return null;
+        }
+        String provider = trim(agent.getModelProviderId());
+        String modelName = resolveAgentPrimaryModelId(agent);
+        if (provider.isBlank() || modelName.isBlank()) {
+            return null;
+        }
+        return new RuntimeModelChoice(provider, modelName);
     }
 
     private RuntimeModelChoice resolvePreviousConversationModel(ChannelSessionRepository.ChannelSessionRecord existingSession) {
@@ -272,6 +356,34 @@ public class ChannelOrchestratorService {
         return value == null ? "" : value.trim();
     }
 
+    private InboundEnvelope withRouteMetadata(InboundEnvelope envelope) {
+        Map<String, String> metadata = mergeMetadata(envelope.metadata(), resolveDefaultRouteMetadata(envelope));
+        return new InboundEnvelope(
+                envelope.channel(),
+                envelope.tenantId(),
+                envelope.externalMessageId(),
+                envelope.sessionKey(),
+                envelope.senderId(),
+                envelope.text(),
+                envelope.mentioned(),
+                envelope.replyTarget(),
+                envelope.receivedAt(),
+                metadata
+        );
+    }
+
+    private Map<String, String> resolveDefaultRouteMetadata(InboundEnvelope envelope) {
+        String botId = botIdFromMetadata(envelope.metadata());
+        if (!botId.isBlank()) {
+            return Map.of("botId", botId);
+        }
+        String resolvedBotId = channelBotRouteResolver.resolveDefaultBotId(envelope.channel());
+        if (resolvedBotId.isBlank()) {
+            return Map.of();
+        }
+        return Map.of("botId", resolvedBotId);
+    }
+
     private Map<String, String> mergeMetadata(Map<String, String> existing, Map<String, String> incoming) {
         Map<String, String> merged = new LinkedHashMap<>();
         if (existing != null) {
@@ -281,6 +393,73 @@ public class ChannelOrchestratorService {
             merged.putAll(incoming);
         }
         return Map.copyOf(merged);
+    }
+
+    private Map<String, String> ackMetadata(ChannelSessionRepository.ChannelSessionRecord session,
+                                            InboundEnvelope envelope,
+                                            String phase) {
+        LinkedHashMap<String, String> metadata = new LinkedHashMap<>();
+        metadata.put("conversationUid", session.conversationUid());
+        metadata.put("phase", phase);
+        metadata.put("externalMessageId", envelope.externalMessageId());
+        String botId = botIdFromMetadata(session.routeMetadata());
+        if (!botId.isBlank()) {
+            metadata.put("botId", botId);
+        }
+        return Map.copyOf(metadata);
+    }
+
+    private ChannelBotRouteResolver.BotRouteConfig resolveBotRoute(ChannelType channel, Map<String, String> metadata) {
+        return channelBotRouteResolver.resolve(channel, botIdFromMetadata(metadata));
+    }
+
+    private boolean hasExplicitBotModel(ChannelBotRouteResolver.BotRouteConfig route) {
+        return !trim(route.defaultModelProvider()).isBlank() && !trim(route.defaultModelName()).isBlank();
+    }
+
+    private RuntimeModelChoice resolveRequestedMessageModel(ChannelBotRouteResolver.BotRouteConfig route) {
+        if (!hasExplicitBotModel(route) || !isModelConfigured(route.defaultModelProvider(), route.defaultModelName())) {
+            return null;
+        }
+        return new RuntimeModelChoice(route.defaultModelProvider(), route.defaultModelName());
+    }
+
+    private String botIdFromMetadata(Map<String, String> metadata) {
+        if (metadata == null) {
+            return "";
+        }
+        return trim(metadata.get("botId"));
+    }
+
+    private String buildNewConversationAckText(RuntimeModelChoice runtimeModel) {
+        if (runtimeModel == null || runtimeModel.modelProvider().isBlank() || runtimeModel.modelName().isBlank()) {
+            return "已开启新对话，默认模型将按当前 Agent 配置自动选择。";
+        }
+        return "已开启新对话，默认模型为 " + runtimeModel.modelProvider() + "/" + runtimeModel.modelName() + "。";
+    }
+
+    private String resolveAgentPrimaryModelId(AgentDefinitionEntity agent) {
+        if (agent == null) {
+            return "";
+        }
+        String extConfig = trim(agent.getExtConfig());
+        if (!extConfig.isBlank()) {
+            try {
+                JsonNode node = JsonUtil.fromJson(extConfig, JsonNode.class);
+                JsonNode modelIdsNode = node == null ? null : node.path("modelIds");
+                if (modelIdsNode != null && modelIdsNode.isArray()) {
+                    for (JsonNode item : modelIdsNode) {
+                        String modelId = item == null ? "" : trim(item.asString(""));
+                        if (!modelId.isBlank()) {
+                            return modelId;
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+                // Ignore malformed extConfig and fall back to the primary model field.
+            }
+        }
+        return trim(agent.getModelId());
     }
 
     private record RuntimeModelChoice(String modelProvider, String modelName) {

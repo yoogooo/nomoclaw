@@ -41,7 +41,7 @@ public class ChannelPendingReplyContextStore {
         }
     }
 
-    public void put(String messageUid, ChannelType channel, String replyTarget, String conversationUid) {
+    public void put(String messageUid, ChannelType channel, String replyTarget, String conversationUid, String botId) {
         if (messageUid == null || messageUid.isBlank()) {
             return;
         }
@@ -50,6 +50,7 @@ public class ChannelPendingReplyContextStore {
                 channel,
                 replyTarget == null ? "" : replyTarget.trim(),
                 conversationUid == null ? "" : conversationUid.trim(),
+                botId == null ? "" : botId.trim(),
                 Instant.now()
         ));
     }
@@ -72,6 +73,7 @@ public class ChannelPendingReplyContextStore {
             ChannelType channel,
             String replyTarget,
             String conversationUid,
+            String botId,
             Instant createdAt
     ) {
     }

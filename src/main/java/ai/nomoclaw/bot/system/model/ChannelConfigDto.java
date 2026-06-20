@@ -6,6 +6,8 @@ public record ChannelConfigDto(
         Channels channels
 ) {
 
+    public static final String DEFAULT_AGENT_UID = "agent_general_assistant";
+
     public static ChannelConfigDto defaults() {
         return new ChannelConfigDto(
                 new Channels(
@@ -49,6 +51,9 @@ public record ChannelConfigDto(
                 true,
                 true,
                 List.of(),
+                DEFAULT_AGENT_UID,
+                "",
+                "",
                 "",
                 "",
                 true,
@@ -67,6 +72,9 @@ public record ChannelConfigDto(
                 true,
                 true,
                 List.of(),
+                DEFAULT_AGENT_UID,
+                "",
+                "",
                 "",
                 "",
                 ""
@@ -81,6 +89,9 @@ public record ChannelConfigDto(
                 true,
                 true,
                 List.of(),
+                DEFAULT_AGENT_UID,
+                "",
+                "",
                 "",
                 "",
                 false
@@ -95,6 +106,9 @@ public record ChannelConfigDto(
                 true,
                 true,
                 List.of(),
+                DEFAULT_AGENT_UID,
+                "",
+                "",
                 "",
                 ""
         );
@@ -108,6 +122,9 @@ public record ChannelConfigDto(
                 true,
                 true,
                 List.of(),
+                DEFAULT_AGENT_UID,
+                "",
+                "",
                 "",
                 "",
                 "",
@@ -124,6 +141,9 @@ public record ChannelConfigDto(
                 true,
                 true,
                 List.of(),
+                DEFAULT_AGENT_UID,
+                "",
+                "",
                 "",
                 ""
         );
@@ -137,6 +157,9 @@ public record ChannelConfigDto(
                 true,
                 true,
                 List.of(),
+                DEFAULT_AGENT_UID,
+                "",
+                "",
                 "",
                 "",
                 ""
@@ -203,6 +226,9 @@ public record ChannelConfigDto(
             boolean isDefault,
             boolean requireMention,
             List<String> allowList,
+            String agentUid,
+            String defaultModelProvider,
+            String defaultModelName,
             String appId,
             String appSecret,
             boolean processingAckReactionEnabled,
@@ -220,6 +246,9 @@ public record ChannelConfigDto(
             boolean isDefault,
             boolean requireMention,
             List<String> allowList,
+            String agentUid,
+            String defaultModelProvider,
+            String defaultModelName,
             String clientId,
             String clientSecret,
             String robotCode
@@ -233,6 +262,9 @@ public record ChannelConfigDto(
             boolean isDefault,
             boolean requireMention,
             List<String> allowList,
+            String agentUid,
+            String defaultModelProvider,
+            String defaultModelName,
             String token,
             String botUserId,
             boolean acceptBotMessages
@@ -246,6 +278,9 @@ public record ChannelConfigDto(
             boolean isDefault,
             boolean requireMention,
             List<String> allowList,
+            String agentUid,
+            String defaultModelProvider,
+            String defaultModelName,
             String token,
             String botUsername
     ) {
@@ -258,6 +293,9 @@ public record ChannelConfigDto(
             boolean isDefault,
             boolean requireMention,
             List<String> allowList,
+            String agentUid,
+            String defaultModelProvider,
+            String defaultModelName,
             String appId,
             String clientSecret,
             String botUserId,
@@ -273,6 +311,9 @@ public record ChannelConfigDto(
             boolean isDefault,
             boolean requireMention,
             List<String> allowList,
+            String agentUid,
+            String defaultModelProvider,
+            String defaultModelName,
             String wecomBotId,
             String secret
     ) {
@@ -285,6 +326,9 @@ public record ChannelConfigDto(
             boolean isDefault,
             boolean requireMention,
             List<String> allowList,
+            String agentUid,
+            String defaultModelProvider,
+            String defaultModelName,
             String botToken,
             String botTokenFile,
             String baseUrl

@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { NButton, NCard, NDrawer, NDrawerContent, NForm, NFormItem, NInput, NSwitch, NTag } from "naive-ui";
+import { NButton, NCard, NDrawer, NDrawerContent, NForm, NFormItem, NInput, NSelect, NSwitch, NTag } from "naive-ui";
 import { CircleHelp } from "lucide-vue-next";
 import DirectoryRail from "@/components/chat/DirectoryRail.vue";
 import AppPageHeader from "@/components/layout/AppPageHeader.vue";
 import UiInstantTooltip from "@/components/UiInstantTooltip.vue";
 import { channelApi } from "@/api/channelApi";
+import { modelApi } from "@/api/modelApi";
 import { message } from "@/discrete";
+import { useAgentCatalogStore } from "@/stores/agentCatalog";
 import type {
+  AgentCatalogAgent,
   ChannelConfig,
   ChannelDingTalkBotConfig,
   ChannelDiscordBotConfig,
@@ -16,16 +19,24 @@ import type {
   ChannelQqBotConfig,
   ChannelTelegramBotConfig,
   ChannelWeComBotConfig,
-  ChannelWeixinBotConfig
+  ChannelWeixinBotConfig,
+  ModelConfig
 } from "@/types/api";
 
 type ChannelKey = "feishu" | "dingtalk" | "discord" | "telegram" | "qq" | "wecom" | "weixin";
+type RoutedBotConfig = {
+  agentUid: string;
+  defaultModelProvider: string;
+  defaultModelName: string;
+};
 const { t } = useI18n();
+const agentCatalogStore = useAgentCatalogStore();
 
 const loading = ref(false);
 const saving = ref(false);
 const showEditor = ref(false);
 const editingKey = ref<ChannelKey>("feishu");
+const modelConfig = ref<ModelConfig>({ providers: [] });
 const config = reactive<ChannelConfig>(createEmptyConfig());
 const draft = reactive<ChannelConfig>(createEmptyConfig());
 const allowListText = reactive<Record<string, string>>({});
@@ -98,6 +109,21 @@ const editingTelegramBots = computed(() => draft.channels.telegram.bots);
 const editingQqBots = computed(() => draft.channels.qq.bots);
 const editingWeComBots = computed(() => draft.channels.wecom.bots);
 const editingWeixinBots = computed(() => draft.channels.weixin.bots);
+const agentOptions = computed(() =>
+  agentCatalogStore.allAgents.map((agent) => ({
+    label: resolveAgentLabel(agent),
+    value: agent.agentUid
+  }))
+);
+const providerOptions = computed(() => [
+  { label: t("channels.editor.inheritAgentModel"), value: "" },
+  ...modelConfig.value.providers
+    .filter((provider) => provider.models.length > 0)
+    .map((provider) => ({
+      label: provider.name || provider.id,
+      value: provider.id
+    }))
+]);
 
 function createDefaultFeishuBot(): ChannelFeishuBotConfig {
   return {
@@ -107,6 +133,9 @@ function createDefaultFeishuBot(): ChannelFeishuBotConfig {
     isDefault: false,
     requireMention: true,
     allowList: [],
+    agentUid: "agent_general_assistant",
+    defaultModelProvider: "",
+    defaultModelName: "",
     appId: "",
     appSecret: "",
     processingAckReactionEnabled: true,
@@ -125,6 +154,9 @@ function createDefaultDingTalkBot(): ChannelDingTalkBotConfig {
     isDefault: false,
     requireMention: true,
     allowList: [],
+    agentUid: "agent_general_assistant",
+    defaultModelProvider: "",
+    defaultModelName: "",
     clientId: "",
     clientSecret: "",
     robotCode: ""
@@ -139,6 +171,9 @@ function createDefaultDiscordBot(): ChannelDiscordBotConfig {
     isDefault: false,
     requireMention: true,
     allowList: [],
+    agentUid: "agent_general_assistant",
+    defaultModelProvider: "",
+    defaultModelName: "",
     token: "",
     botUserId: "",
     acceptBotMessages: false
@@ -153,6 +188,9 @@ function createDefaultTelegramBot(): ChannelTelegramBotConfig {
     isDefault: false,
     requireMention: true,
     allowList: [],
+    agentUid: "agent_general_assistant",
+    defaultModelProvider: "",
+    defaultModelName: "",
     token: "",
     botUsername: ""
   };
@@ -166,6 +204,9 @@ function createDefaultQqBot(): ChannelQqBotConfig {
     isDefault: false,
     requireMention: true,
     allowList: [],
+    agentUid: "agent_general_assistant",
+    defaultModelProvider: "",
+    defaultModelName: "",
     appId: "",
     clientSecret: "",
     botUserId: "",
@@ -182,6 +223,9 @@ function createDefaultWeComBot(): ChannelWeComBotConfig {
     isDefault: false,
     requireMention: true,
     allowList: [],
+    agentUid: "agent_general_assistant",
+    defaultModelProvider: "",
+    defaultModelName: "",
     wecomBotId: "",
     secret: ""
   };
@@ -195,6 +239,9 @@ function createDefaultWeixinBot(): ChannelWeixinBotConfig {
     isDefault: false,
     requireMention: true,
     allowList: [],
+    agentUid: "agent_general_assistant",
+    defaultModelProvider: "",
+    defaultModelName: "",
     botToken: "",
     botTokenFile: "",
     baseUrl: "https://ilinkai.weixin.qq.com"
@@ -217,6 +264,61 @@ function createEmptyConfig(): ChannelConfig {
 
 function cloneConfig(source: ChannelConfig): ChannelConfig {
   return JSON.parse(JSON.stringify(source)) as ChannelConfig;
+}
+
+function resolveAgentLabel(agent: AgentCatalogAgent & { agentGroupUid?: string }) {
+  return agent.displayName || agent.agentName || agent.agentUid;
+}
+
+function normalizeBotRouting(bot: RoutedBotConfig) {
+  bot.agentUid = String(bot.agentUid || "").trim() || "agent_general_assistant";
+  bot.defaultModelProvider = String(bot.defaultModelProvider || "").trim();
+  bot.defaultModelName = String(bot.defaultModelName || "").trim();
+  if (!bot.defaultModelProvider) {
+    bot.defaultModelName = "";
+  }
+}
+
+function normalizeConfigRouting(target: ChannelConfig) {
+  [
+    ...(target.channels.feishu.bots || []),
+    ...(target.channels.dingtalk.bots || []),
+    ...(target.channels.discord.bots || []),
+    ...(target.channels.telegram.bots || []),
+    ...(target.channels.qq.bots || []),
+    ...(target.channels.wecom.bots || []),
+    ...(target.channels.weixin.bots || [])
+  ].forEach((bot) => normalizeBotRouting(bot));
+}
+
+function modelOptionsForBot(bot: RoutedBotConfig) {
+  const provider = modelConfig.value.providers.find((item) => item.id === bot.defaultModelProvider);
+  if (!provider) {
+    return [{ label: t("channels.editor.inheritAgentModel"), value: "" }];
+  }
+  return [
+    { label: t("channels.editor.inheritAgentModel"), value: "" },
+    ...provider.models.map((model) => ({
+      label: model.name || model.id,
+      value: model.id
+    }))
+  ];
+}
+
+function updateBotModelProvider(bot: RoutedBotConfig, value: string) {
+  bot.defaultModelProvider = String(value || "");
+  if (!bot.defaultModelProvider) {
+    bot.defaultModelName = "";
+    return;
+  }
+  const provider = modelConfig.value.providers.find((item) => item.id === bot.defaultModelProvider);
+  if (!provider?.models.some((model) => model.id === bot.defaultModelName)) {
+    bot.defaultModelName = "";
+  }
+}
+
+function updateBotModelName(bot: RoutedBotConfig, value: string) {
+  bot.defaultModelName = String(value || "");
 }
 
 function syncAllowListText() {
@@ -283,6 +385,7 @@ async function loadConfig() {
   loading.value = true;
   try {
     const data = await channelApi.getChannelConfig();
+    normalizeConfigRouting(data);
     config.channels.feishu = { enabled: data.channels.feishu.enabled, bots: data.channels.feishu.bots || [] };
     config.channels.dingtalk = { enabled: data.channels.dingtalk.enabled, bots: data.channels.dingtalk.bots || [] };
     config.channels.discord = { enabled: data.channels.discord.enabled, bots: data.channels.discord.bots || [] };
@@ -513,6 +616,7 @@ function normalizeDraftBeforeSave() {
     bot.allowList = normalizeAllowList(allowListText[`weixin:${bot.botId}`] || "");
     bot.baseUrl = bot.baseUrl.trim() || "https://ilinkai.weixin.qq.com";
   });
+  normalizeConfigRouting(draft);
   ensureSingleDefault("feishu");
   ensureSingleDefault("dingtalk");
   ensureSingleDefault("discord");
@@ -547,7 +651,13 @@ async function saveEditor() {
 }
 
 onMounted(() => {
-  void loadConfig();
+  void Promise.all([
+    loadConfig(),
+    agentCatalogStore.loadCatalog(),
+    modelApi.getAvailableModelConfig().then((data) => {
+      modelConfig.value = data;
+    })
+  ]);
 });
 </script>
 
@@ -631,6 +741,15 @@ onMounted(() => {
             <n-form-item :label="t('channels.editor.botName')">
               <n-input v-model:value="bot.displayName" />
             </n-form-item>
+            <n-form-item :label="t('channels.editor.agent')">
+              <n-select v-model:value="bot.agentUid" :options="agentOptions" />
+            </n-form-item>
+            <n-form-item :label="t('channels.editor.modelProvider')">
+              <n-select :value="bot.defaultModelProvider" :options="providerOptions" @update:value="updateBotModelProvider(bot, String($event || ''))" />
+            </n-form-item>
+            <n-form-item :label="t('channels.editor.modelName')">
+              <n-select :value="bot.defaultModelName" :options="modelOptionsForBot(bot)" :disabled="!bot.defaultModelProvider" @update:value="updateBotModelName(bot, String($event || ''))" />
+            </n-form-item>
             <n-form-item :label="t('channels.editor.feishuAppId')">
               <n-input v-model:value="bot.appId" />
             </n-form-item>
@@ -658,6 +777,7 @@ onMounted(() => {
               {{ t("channels.editor.openIdMissing") }}
             </n-tag>
           </div>
+          <div class="bot-route-hint">{{ t("channels.editor.botRouteHint") }}</div>
         </div>
       </n-form>
 
@@ -692,6 +812,15 @@ onMounted(() => {
             <n-form-item :label="t('channels.editor.botName')">
               <n-input v-model:value="bot.displayName" />
             </n-form-item>
+            <n-form-item :label="t('channels.editor.agent')">
+              <n-select v-model:value="bot.agentUid" :options="agentOptions" />
+            </n-form-item>
+            <n-form-item :label="t('channels.editor.modelProvider')">
+              <n-select :value="bot.defaultModelProvider" :options="providerOptions" @update:value="updateBotModelProvider(bot, String($event || ''))" />
+            </n-form-item>
+            <n-form-item :label="t('channels.editor.modelName')">
+              <n-select :value="bot.defaultModelName" :options="modelOptionsForBot(bot)" :disabled="!bot.defaultModelProvider" @update:value="updateBotModelName(bot, String($event || ''))" />
+            </n-form-item>
             <n-form-item :label="t('channels.editor.dingtalkClientId')">
               <n-input v-model:value="bot.clientId" />
             </n-form-item>
@@ -713,6 +842,7 @@ onMounted(() => {
             </template>
             <n-input v-model:value="allowListText[`dingtalk:${bot.botId}`]" />
           </n-form-item>
+          <div class="bot-route-hint">{{ t("channels.editor.botRouteHint") }}</div>
         </div>
       </n-form>
 
@@ -747,6 +877,15 @@ onMounted(() => {
             <n-form-item :label="t('channels.editor.botName')">
               <n-input v-model:value="bot.displayName" />
             </n-form-item>
+            <n-form-item :label="t('channels.editor.agent')">
+              <n-select v-model:value="bot.agentUid" :options="agentOptions" />
+            </n-form-item>
+            <n-form-item :label="t('channels.editor.modelProvider')">
+              <n-select :value="bot.defaultModelProvider" :options="providerOptions" @update:value="updateBotModelProvider(bot, String($event || ''))" />
+            </n-form-item>
+            <n-form-item :label="t('channels.editor.modelName')">
+              <n-select :value="bot.defaultModelName" :options="modelOptionsForBot(bot)" :disabled="!bot.defaultModelProvider" @update:value="updateBotModelName(bot, String($event || ''))" />
+            </n-form-item>
             <n-form-item>
               <template #label>
                 <span class="field-label-with-tip">
@@ -777,6 +916,7 @@ onMounted(() => {
             <span class="meta-label">{{ t("channels.editor.acceptBotMessages") }}</span>
             <n-switch v-model:value="bot.acceptBotMessages" />
           </div>
+          <div class="bot-route-hint">{{ t("channels.editor.botRouteHint") }}</div>
         </div>
       </n-form>
 
@@ -811,6 +951,15 @@ onMounted(() => {
             <n-form-item :label="t('channels.editor.botName')">
               <n-input v-model:value="bot.displayName" />
             </n-form-item>
+            <n-form-item :label="t('channels.editor.agent')">
+              <n-select v-model:value="bot.agentUid" :options="agentOptions" />
+            </n-form-item>
+            <n-form-item :label="t('channels.editor.modelProvider')">
+              <n-select :value="bot.defaultModelProvider" :options="providerOptions" @update:value="updateBotModelProvider(bot, String($event || ''))" />
+            </n-form-item>
+            <n-form-item :label="t('channels.editor.modelName')">
+              <n-select :value="bot.defaultModelName" :options="modelOptionsForBot(bot)" :disabled="!bot.defaultModelProvider" @update:value="updateBotModelName(bot, String($event || ''))" />
+            </n-form-item>
             <n-form-item :label="t('channels.editor.telegramUsername')">
               <n-input v-model:value="bot.botUsername" />
             </n-form-item>
@@ -829,6 +978,7 @@ onMounted(() => {
             </template>
             <n-input v-model:value="allowListText[`telegram:${bot.botId}`]" />
           </n-form-item>
+          <div class="bot-route-hint">{{ t("channels.editor.botRouteHint") }}</div>
         </div>
       </n-form>
 
@@ -863,6 +1013,15 @@ onMounted(() => {
             <n-form-item :label="t('channels.editor.botName')">
               <n-input v-model:value="bot.displayName" />
             </n-form-item>
+            <n-form-item :label="t('channels.editor.agent')">
+              <n-select v-model:value="bot.agentUid" :options="agentOptions" />
+            </n-form-item>
+            <n-form-item :label="t('channels.editor.modelProvider')">
+              <n-select :value="bot.defaultModelProvider" :options="providerOptions" @update:value="updateBotModelProvider(bot, String($event || ''))" />
+            </n-form-item>
+            <n-form-item :label="t('channels.editor.modelName')">
+              <n-select :value="bot.defaultModelName" :options="modelOptionsForBot(bot)" :disabled="!bot.defaultModelProvider" @update:value="updateBotModelName(bot, String($event || ''))" />
+            </n-form-item>
             <n-form-item :label="t('channels.editor.qqAppId')">
               <n-input v-model:value="bot.appId" />
             </n-form-item>
@@ -888,6 +1047,7 @@ onMounted(() => {
             <span class="meta-label">{{ t("channels.editor.qqSandbox") }}</span>
             <n-switch v-model:value="bot.sandbox" />
           </div>
+          <div class="bot-route-hint">{{ t("channels.editor.botRouteHint") }}</div>
         </div>
       </n-form>
 
@@ -922,6 +1082,15 @@ onMounted(() => {
             <n-form-item :label="t('channels.editor.botName')">
               <n-input v-model:value="bot.displayName" />
             </n-form-item>
+            <n-form-item :label="t('channels.editor.agent')">
+              <n-select v-model:value="bot.agentUid" :options="agentOptions" />
+            </n-form-item>
+            <n-form-item :label="t('channels.editor.modelProvider')">
+              <n-select :value="bot.defaultModelProvider" :options="providerOptions" @update:value="updateBotModelProvider(bot, String($event || ''))" />
+            </n-form-item>
+            <n-form-item :label="t('channels.editor.modelName')">
+              <n-select :value="bot.defaultModelName" :options="modelOptionsForBot(bot)" :disabled="!bot.defaultModelProvider" @update:value="updateBotModelName(bot, String($event || ''))" />
+            </n-form-item>
             <n-form-item :label="t('channels.editor.wecomBotId')">
               <n-input v-model:value="bot.wecomBotId" />
             </n-form-item>
@@ -940,6 +1109,7 @@ onMounted(() => {
             </template>
             <n-input v-model:value="allowListText[`wecom:${bot.botId}`]" />
           </n-form-item>
+          <div class="bot-route-hint">{{ t("channels.editor.botRouteHint") }}</div>
         </div>
       </n-form>
 
@@ -974,6 +1144,15 @@ onMounted(() => {
             <n-form-item :label="t('channels.editor.botName')">
               <n-input v-model:value="bot.displayName" />
             </n-form-item>
+            <n-form-item :label="t('channels.editor.agent')">
+              <n-select v-model:value="bot.agentUid" :options="agentOptions" />
+            </n-form-item>
+            <n-form-item :label="t('channels.editor.modelProvider')">
+              <n-select :value="bot.defaultModelProvider" :options="providerOptions" @update:value="updateBotModelProvider(bot, String($event || ''))" />
+            </n-form-item>
+            <n-form-item :label="t('channels.editor.modelName')">
+              <n-select :value="bot.defaultModelName" :options="modelOptionsForBot(bot)" :disabled="!bot.defaultModelProvider" @update:value="updateBotModelName(bot, String($event || ''))" />
+            </n-form-item>
             <n-form-item :label="t('channels.editor.weixinBotToken')">
               <n-input v-model:value="bot.botToken" type="password" show-password-on="click" />
             </n-form-item>
@@ -995,6 +1174,7 @@ onMounted(() => {
             </template>
             <n-input v-model:value="allowListText[`weixin:${bot.botId}`]" />
           </n-form-item>
+          <div class="bot-route-hint">{{ t("channels.editor.botRouteHint") }}</div>
         </div>
       </n-form>
 
@@ -1136,6 +1316,13 @@ onMounted(() => {
   align-items: center;
   gap: var(--space-2);
   margin-top: var(--space-2);
+}
+
+.bot-route-hint {
+  margin-top: var(--space-2);
+  color: var(--color-text-tertiary);
+  font-size: var(--text-caption-size);
+  line-height: 1.5;
 }
 
 .field-label-with-tip {

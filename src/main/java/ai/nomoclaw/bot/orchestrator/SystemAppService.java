@@ -230,6 +230,9 @@ public class SystemAppService {
                             bot.isDefault(),
                             bot.requireMention(),
                             normalizeList(bot.allowList()),
+                            normalizeAgentUid(bot.agentUid()),
+                            trim(bot.defaultModelProvider()),
+                            trim(bot.defaultModelName()),
                             trim(bot.appId()),
                             trim(bot.appSecret()),
                             bot.processingAckReactionEnabled(),
@@ -257,6 +260,9 @@ public class SystemAppService {
                             bot.isDefault(),
                             bot.requireMention(),
                             normalizeList(bot.allowList()),
+                            normalizeAgentUid(bot.agentUid()),
+                            trim(bot.defaultModelProvider()),
+                            trim(bot.defaultModelName()),
                             trim(bot.clientId()),
                             trim(bot.clientSecret()),
                             trim(bot.robotCode())
@@ -280,6 +286,9 @@ public class SystemAppService {
                             bot.isDefault(),
                             bot.requireMention(),
                             normalizeList(bot.allowList()),
+                            normalizeAgentUid(bot.agentUid()),
+                            trim(bot.defaultModelProvider()),
+                            trim(bot.defaultModelName()),
                             trim(bot.token()),
                             trim(bot.botUserId()),
                             bot.acceptBotMessages()
@@ -303,6 +312,9 @@ public class SystemAppService {
                             bot.isDefault(),
                             bot.requireMention(),
                             normalizeList(bot.allowList()),
+                            normalizeAgentUid(bot.agentUid()),
+                            trim(bot.defaultModelProvider()),
+                            trim(bot.defaultModelName()),
                             trim(bot.token()),
                             normalizeTelegramUsername(bot.botUsername())
                     );
@@ -325,6 +337,9 @@ public class SystemAppService {
                             bot.isDefault(),
                             bot.requireMention(),
                             normalizeList(bot.allowList()),
+                            normalizeAgentUid(bot.agentUid()),
+                            trim(bot.defaultModelProvider()),
+                            trim(bot.defaultModelName()),
                             trim(bot.appId()),
                             trim(bot.clientSecret()),
                             trim(bot.botUserId()),
@@ -350,6 +365,9 @@ public class SystemAppService {
                             bot.isDefault(),
                             bot.requireMention(),
                             normalizeList(bot.allowList()),
+                            normalizeAgentUid(bot.agentUid()),
+                            trim(bot.defaultModelProvider()),
+                            trim(bot.defaultModelName()),
                             trim(bot.wecomBotId()),
                             trim(bot.secret())
                     );
@@ -372,6 +390,9 @@ public class SystemAppService {
                             bot.isDefault(),
                             bot.requireMention(),
                             normalizeList(bot.allowList()),
+                            normalizeAgentUid(bot.agentUid()),
+                            trim(bot.defaultModelProvider()),
+                            trim(bot.defaultModelName()),
                             trim(bot.botToken()),
                             trim(bot.botTokenFile()),
                             fallback(trim(bot.baseUrl()), "https://ilinkai.weixin.qq.com")
@@ -398,6 +419,9 @@ public class SystemAppService {
                         bot.botId().equals(defaultBotId),
                         bot.requireMention(),
                         bot.allowList(),
+                        bot.agentUid(),
+                        bot.defaultModelProvider(),
+                        bot.defaultModelName(),
                         bot.appId(),
                         bot.appSecret(),
                         bot.processingAckReactionEnabled(),
@@ -426,6 +450,9 @@ public class SystemAppService {
                         bot.botId().equals(defaultBotId),
                         bot.requireMention(),
                         bot.allowList(),
+                        bot.agentUid(),
+                        bot.defaultModelProvider(),
+                        bot.defaultModelName(),
                         bot.clientId(),
                         bot.clientSecret(),
                         bot.robotCode()
@@ -450,6 +477,9 @@ public class SystemAppService {
                         bot.botId().equals(defaultBotId),
                         bot.requireMention(),
                         bot.allowList(),
+                        bot.agentUid(),
+                        bot.defaultModelProvider(),
+                        bot.defaultModelName(),
                         bot.token(),
                         bot.botUserId(),
                         bot.acceptBotMessages()
@@ -474,6 +504,9 @@ public class SystemAppService {
                         bot.botId().equals(defaultBotId),
                         bot.requireMention(),
                         bot.allowList(),
+                        bot.agentUid(),
+                        bot.defaultModelProvider(),
+                        bot.defaultModelName(),
                         bot.token(),
                         bot.botUsername()
                 ))
@@ -497,6 +530,9 @@ public class SystemAppService {
                         bot.botId().equals(defaultBotId),
                         bot.requireMention(),
                         bot.allowList(),
+                        bot.agentUid(),
+                        bot.defaultModelProvider(),
+                        bot.defaultModelName(),
                         bot.appId(),
                         bot.clientSecret(),
                         bot.botUserId(),
@@ -523,6 +559,9 @@ public class SystemAppService {
                         bot.botId().equals(defaultBotId),
                         bot.requireMention(),
                         bot.allowList(),
+                        bot.agentUid(),
+                        bot.defaultModelProvider(),
+                        bot.defaultModelName(),
                         bot.wecomBotId(),
                         bot.secret()
                 ))
@@ -546,6 +585,9 @@ public class SystemAppService {
                         bot.botId().equals(defaultBotId),
                         bot.requireMention(),
                         bot.allowList(),
+                        bot.agentUid(),
+                        bot.defaultModelProvider(),
+                        bot.defaultModelName(),
                         bot.botToken(),
                         bot.botTokenFile(),
                         bot.baseUrl()
@@ -595,6 +637,11 @@ public class SystemAppService {
                 .toList();
     }
 
+    private String normalizeAgentUid(String agentUid) {
+        String normalized = trim(agentUid);
+        return normalized.isBlank() ? ChannelConfigDto.DEFAULT_AGENT_UID : normalized;
+    }
+
     private ObjectNode normalizeChannelsNode(ObjectNode root) {
         ObjectNode channels = root.path("channels") instanceof ObjectNode node ? node : MAPPER.createObjectNode();
         root.set("channels", channels);
@@ -624,6 +671,9 @@ public class SystemAppService {
             migrated.put("isDefault", true);
             migrated.put("requireMention", feishu.path("requireMention").asBoolean(true));
             migrated.set("allowList", feishu.path("allowList").isArray() ? feishu.path("allowList") : MAPPER.createArrayNode());
+            migrated.put("agentUid", ChannelConfigDto.DEFAULT_AGENT_UID);
+            migrated.put("defaultModelProvider", "");
+            migrated.put("defaultModelName", "");
             migrated.put("appId", trim(feishu.path("appId").asString("")));
             migrated.put("appSecret", trim(feishu.path("appSecret").asString("")));
             migrated.put("processingAckReactionEnabled", feishu.path("processingAckReactionEnabled").asBoolean(true));
@@ -665,6 +715,9 @@ public class SystemAppService {
                     bot.isDefault(),
                     bot.requireMention(),
                     bot.allowList(),
+                    bot.agentUid(),
+                    bot.defaultModelProvider(),
+                    bot.defaultModelName(),
                     bot.appId(),
                     bot.appSecret(),
                     bot.processingAckReactionEnabled(),
@@ -684,6 +737,9 @@ public class SystemAppService {
                     bot.isDefault(),
                     bot.requireMention(),
                     bot.allowList(),
+                    bot.agentUid(),
+                    bot.defaultModelProvider(),
+                    bot.defaultModelName(),
                     bot.appId(),
                     bot.appSecret(),
                     bot.processingAckReactionEnabled(),
@@ -702,6 +758,9 @@ public class SystemAppService {
                 bot.isDefault(),
                 bot.requireMention(),
                 bot.allowList(),
+                bot.agentUid(),
+                bot.defaultModelProvider(),
+                bot.defaultModelName(),
                 bot.appId(),
                 bot.appSecret(),
                 bot.processingAckReactionEnabled(),
@@ -745,6 +804,9 @@ public class SystemAppService {
             migrated.put("isDefault", true);
             migrated.put("requireMention", dingtalk.path("requireMention").asBoolean(true));
             migrated.set("allowList", dingtalk.path("allowList").isArray() ? dingtalk.path("allowList") : MAPPER.createArrayNode());
+            migrated.put("agentUid", ChannelConfigDto.DEFAULT_AGENT_UID);
+            migrated.put("defaultModelProvider", "");
+            migrated.put("defaultModelName", "");
             migrated.put("clientId", trim(dingtalk.path("clientId").asString("")));
             migrated.put("clientSecret", trim(dingtalk.path("clientSecret").asString("")));
             migrated.put("robotCode", trim(dingtalk.path("robotCode").asString("")));
@@ -772,6 +834,9 @@ public class SystemAppService {
             migrated.put("isDefault", true);
             migrated.put("requireMention", discord.path("requireMention").asBoolean(true));
             migrated.set("allowList", discord.path("allowList").isArray() ? discord.path("allowList") : MAPPER.createArrayNode());
+            migrated.put("agentUid", ChannelConfigDto.DEFAULT_AGENT_UID);
+            migrated.put("defaultModelProvider", "");
+            migrated.put("defaultModelName", "");
             migrated.put("token", trim(discord.path("token").asString("")));
             migrated.put("botUserId", trim(discord.path("botUserId").asString("")));
             migrated.put("acceptBotMessages", discord.path("acceptBotMessages").asBoolean(false));
@@ -799,6 +864,9 @@ public class SystemAppService {
             migrated.put("isDefault", true);
             migrated.put("requireMention", telegram.path("requireMention").asBoolean(true));
             migrated.set("allowList", telegram.path("allowList").isArray() ? telegram.path("allowList") : MAPPER.createArrayNode());
+            migrated.put("agentUid", ChannelConfigDto.DEFAULT_AGENT_UID);
+            migrated.put("defaultModelProvider", "");
+            migrated.put("defaultModelName", "");
             migrated.put("token", trim(telegram.path("token").asString("")));
             migrated.put("botUsername", normalizeTelegramUsername(telegram.path("botUsername").asString("")));
             bots.add(migrated);
@@ -825,6 +893,9 @@ public class SystemAppService {
             migrated.put("isDefault", true);
             migrated.put("requireMention", qq.path("requireMention").asBoolean(true));
             migrated.set("allowList", qq.path("allowList").isArray() ? qq.path("allowList") : MAPPER.createArrayNode());
+            migrated.put("agentUid", ChannelConfigDto.DEFAULT_AGENT_UID);
+            migrated.put("defaultModelProvider", "");
+            migrated.put("defaultModelName", "");
             migrated.put("appId", trim(qq.path("appId").asString("")));
             migrated.put("clientSecret", trim(qq.path("clientSecret").asString(qq.path("token").asString(""))));
             migrated.put("botUserId", trim(qq.path("botUserId").asString("")));
@@ -854,6 +925,9 @@ public class SystemAppService {
             migrated.put("isDefault", true);
             migrated.put("requireMention", wecom.path("requireMention").asBoolean(true));
             migrated.set("allowList", wecom.path("allowList").isArray() ? wecom.path("allowList") : MAPPER.createArrayNode());
+            migrated.put("agentUid", ChannelConfigDto.DEFAULT_AGENT_UID);
+            migrated.put("defaultModelProvider", "");
+            migrated.put("defaultModelName", "");
             migrated.put("wecomBotId", trim(wecom.path("wecomBotId").asString(wecom.path("botId").asString(""))));
             migrated.put("secret", trim(wecom.path("secret").asString("")));
             bots.add(migrated);
@@ -880,6 +954,9 @@ public class SystemAppService {
             migrated.put("isDefault", true);
             migrated.put("requireMention", weixin.path("requireMention").asBoolean(true));
             migrated.set("allowList", weixin.path("allowList").isArray() ? weixin.path("allowList") : MAPPER.createArrayNode());
+            migrated.put("agentUid", ChannelConfigDto.DEFAULT_AGENT_UID);
+            migrated.put("defaultModelProvider", "");
+            migrated.put("defaultModelName", "");
             migrated.put("botToken", trim(weixin.path("botToken").asString("")));
             migrated.put("botTokenFile", trim(weixin.path("botTokenFile").asString("")));
             migrated.put("baseUrl", fallback(trim(weixin.path("baseUrl").asString("")), "https://ilinkai.weixin.qq.com"));

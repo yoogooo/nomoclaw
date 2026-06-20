@@ -223,6 +223,9 @@ export interface ChannelFeishuBotConfig {
   isDefault: boolean;
   requireMention: boolean;
   allowList: string[];
+  agentUid: string;
+  defaultModelProvider: string;
+  defaultModelName: string;
   appId: string;
   appSecret: string;
   processingAckReactionEnabled: boolean;
@@ -239,6 +242,9 @@ export interface ChannelDingTalkBotConfig {
   isDefault: boolean;
   requireMention: boolean;
   allowList: string[];
+  agentUid: string;
+  defaultModelProvider: string;
+  defaultModelName: string;
   clientId: string;
   clientSecret: string;
   robotCode: string;
@@ -251,6 +257,9 @@ export interface ChannelDiscordBotConfig {
   isDefault: boolean;
   requireMention: boolean;
   allowList: string[];
+  agentUid: string;
+  defaultModelProvider: string;
+  defaultModelName: string;
   token: string;
   botUserId: string;
   acceptBotMessages: boolean;
@@ -263,6 +272,9 @@ export interface ChannelTelegramBotConfig {
   isDefault: boolean;
   requireMention: boolean;
   allowList: string[];
+  agentUid: string;
+  defaultModelProvider: string;
+  defaultModelName: string;
   token: string;
   botUsername: string;
 }
@@ -274,6 +286,9 @@ export interface ChannelQqBotConfig {
   isDefault: boolean;
   requireMention: boolean;
   allowList: string[];
+  agentUid: string;
+  defaultModelProvider: string;
+  defaultModelName: string;
   appId: string;
   clientSecret: string;
   botUserId: string;
@@ -288,6 +303,9 @@ export interface ChannelWeComBotConfig {
   isDefault: boolean;
   requireMention: boolean;
   allowList: string[];
+  agentUid: string;
+  defaultModelProvider: string;
+  defaultModelName: string;
   wecomBotId: string;
   secret: string;
 }
@@ -299,6 +317,9 @@ export interface ChannelWeixinBotConfig {
   isDefault: boolean;
   requireMention: boolean;
   allowList: string[];
+  agentUid: string;
+  defaultModelProvider: string;
+  defaultModelName: string;
   botToken: string;
   botTokenFile: string;
   baseUrl: string;

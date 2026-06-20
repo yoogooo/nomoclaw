@@ -99,6 +99,9 @@ public class ChannelConfigEnvironmentPostProcessor implements ApplicationContext
             defaultBot.put("isDefault", true);
             defaultBot.put("requireMention", feishu.path("requireMention").asBoolean(true));
             defaultBot.set("allowList", feishu.path("allowList").isArray() ? feishu.path("allowList") : MAPPER.createArrayNode());
+            defaultBot.put("agentUid", "agent_general_assistant");
+            defaultBot.put("defaultModelProvider", "");
+            defaultBot.put("defaultModelName", "");
             defaultBot.put("appId", trim(feishu.path("appId").asString("")));
             defaultBot.put("appSecret", trim(feishu.path("appSecret").asString("")));
             defaultBot.put("processingAckReactionEnabled", feishu.path("processingAckReactionEnabled").asBoolean(true));
@@ -127,6 +130,9 @@ public class ChannelConfigEnvironmentPostProcessor implements ApplicationContext
             defaultBot.put("isDefault", true);
             defaultBot.put("requireMention", dingtalk.path("requireMention").asBoolean(true));
             defaultBot.set("allowList", dingtalk.path("allowList").isArray() ? dingtalk.path("allowList") : MAPPER.createArrayNode());
+            defaultBot.put("agentUid", "agent_general_assistant");
+            defaultBot.put("defaultModelProvider", "");
+            defaultBot.put("defaultModelName", "");
             defaultBot.put("clientId", trim(dingtalk.path("clientId").asString("")));
             defaultBot.put("clientSecret", trim(dingtalk.path("clientSecret").asString("")));
             defaultBot.put("robotCode", trim(dingtalk.path("robotCode").asString("")));
@@ -154,6 +160,9 @@ public class ChannelConfigEnvironmentPostProcessor implements ApplicationContext
             defaultBot.put("isDefault", true);
             defaultBot.put("requireMention", discord.path("requireMention").asBoolean(true));
             defaultBot.set("allowList", discord.path("allowList").isArray() ? discord.path("allowList") : MAPPER.createArrayNode());
+            defaultBot.put("agentUid", "agent_general_assistant");
+            defaultBot.put("defaultModelProvider", "");
+            defaultBot.put("defaultModelName", "");
             defaultBot.put("token", trim(discord.path("token").asString("")));
             defaultBot.put("botUserId", trim(discord.path("botUserId").asString("")));
             defaultBot.put("acceptBotMessages", discord.path("acceptBotMessages").asBoolean(false));
@@ -181,6 +190,9 @@ public class ChannelConfigEnvironmentPostProcessor implements ApplicationContext
             defaultBot.put("isDefault", true);
             defaultBot.put("requireMention", telegram.path("requireMention").asBoolean(true));
             defaultBot.set("allowList", telegram.path("allowList").isArray() ? telegram.path("allowList") : MAPPER.createArrayNode());
+            defaultBot.put("agentUid", "agent_general_assistant");
+            defaultBot.put("defaultModelProvider", "");
+            defaultBot.put("defaultModelName", "");
             defaultBot.put("token", trim(telegram.path("token").asString("")));
             defaultBot.put("botUsername", normalizeUsername(telegram.path("botUsername").asString("")));
             bots.add(defaultBot);
@@ -207,6 +219,9 @@ public class ChannelConfigEnvironmentPostProcessor implements ApplicationContext
             defaultBot.put("isDefault", true);
             defaultBot.put("requireMention", qq.path("requireMention").asBoolean(true));
             defaultBot.set("allowList", qq.path("allowList").isArray() ? qq.path("allowList") : MAPPER.createArrayNode());
+            defaultBot.put("agentUid", "agent_general_assistant");
+            defaultBot.put("defaultModelProvider", "");
+            defaultBot.put("defaultModelName", "");
             defaultBot.put("appId", trim(qq.path("appId").asString("")));
             defaultBot.put("clientSecret", trim(qq.path("clientSecret").asString(qq.path("token").asString(""))));
             defaultBot.put("botUserId", trim(qq.path("botUserId").asString("")));
@@ -236,6 +251,9 @@ public class ChannelConfigEnvironmentPostProcessor implements ApplicationContext
             defaultBot.put("isDefault", true);
             defaultBot.put("requireMention", wecom.path("requireMention").asBoolean(true));
             defaultBot.set("allowList", wecom.path("allowList").isArray() ? wecom.path("allowList") : MAPPER.createArrayNode());
+            defaultBot.put("agentUid", "agent_general_assistant");
+            defaultBot.put("defaultModelProvider", "");
+            defaultBot.put("defaultModelName", "");
             defaultBot.put("wecomBotId", trim(wecom.path("wecomBotId").asString(wecom.path("botId").asString(""))));
             defaultBot.put("secret", trim(wecom.path("secret").asString("")));
             bots.add(defaultBot);
@@ -262,6 +280,9 @@ public class ChannelConfigEnvironmentPostProcessor implements ApplicationContext
             defaultBot.put("isDefault", true);
             defaultBot.put("requireMention", weixin.path("requireMention").asBoolean(true));
             defaultBot.set("allowList", weixin.path("allowList").isArray() ? weixin.path("allowList") : MAPPER.createArrayNode());
+            defaultBot.put("agentUid", "agent_general_assistant");
+            defaultBot.put("defaultModelProvider", "");
+            defaultBot.put("defaultModelName", "");
             defaultBot.put("botToken", trim(weixin.path("botToken").asString("")));
             defaultBot.put("botTokenFile", trim(weixin.path("botTokenFile").asString("")));
             defaultBot.put("baseUrl", fallback(trim(weixin.path("baseUrl").asString("")), "https://ilinkai.weixin.qq.com"));
