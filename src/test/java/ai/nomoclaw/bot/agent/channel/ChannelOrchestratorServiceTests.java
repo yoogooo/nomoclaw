@@ -402,8 +402,10 @@ class ChannelOrchestratorServiceTests {
         public RuntimeModelSelection resolveForMessageSubmission(AgentConversation conversation,
                                                                  String requestedProvider,
                                                                  String requestedModel) {
-            if (!String(requestedProvider).trim().isBlank() && !String(requestedModel).trim().isBlank()) {
-                return new RuntimeModelSelection(requestedProvider.trim(), requestedModel.trim());
+            String normalizedProvider = requestedProvider == null ? "" : requestedProvider.trim();
+            String normalizedModel = requestedModel == null ? "" : requestedModel.trim();
+            if (!normalizedProvider.isBlank() && !normalizedModel.isBlank()) {
+                return new RuntimeModelSelection(normalizedProvider, normalizedModel);
             }
             return new RuntimeModelSelection("fallback", "fallback-model");
         }

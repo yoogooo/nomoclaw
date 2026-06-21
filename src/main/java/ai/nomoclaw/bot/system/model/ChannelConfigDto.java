@@ -60,7 +60,8 @@ public record ChannelConfigDto(
                 "OK",
                 "",
                 "",
-                ""
+                "",
+                false
         );
     }
 
@@ -235,7 +236,8 @@ public record ChannelConfigDto(
             String processingAckReactionType,
             String defaultTarget,
             String defaultTargetDisplayName,
-            String targetResolvedAt
+            String targetResolvedAt,
+            boolean markdownEnabled
     ) {
     }
 

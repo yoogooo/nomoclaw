@@ -239,7 +239,8 @@ public class SystemAppService {
                             fallback(trim(bot.processingAckReactionType()), "OK"),
                             trim(bot.defaultTarget()),
                             trim(bot.defaultTargetDisplayName()),
-                            trim(bot.targetResolvedAt())
+                            trim(bot.targetResolvedAt()),
+                            bot.markdownEnabled()
                     );
                 })
                 .toList();
@@ -428,7 +429,8 @@ public class SystemAppService {
                         bot.processingAckReactionType(),
                         bot.defaultTarget(),
                         bot.defaultTargetDisplayName(),
-                        bot.targetResolvedAt()
+                        bot.targetResolvedAt(),
+                        bot.markdownEnabled()
                 ))
                 .toList();
     }
@@ -724,7 +726,8 @@ public class SystemAppService {
                     bot.processingAckReactionType(),
                     "",
                     "",
-                    ""
+                    "",
+                    bot.markdownEnabled()
             );
         }
         FeishuBotTargetResolverService.ResolveResult result = feishuBotTargetResolverService.resolve(appId, appSecret);
@@ -746,7 +749,8 @@ public class SystemAppService {
                     bot.processingAckReactionType(),
                     trim(bot.defaultTarget()),
                     trim(bot.defaultTargetDisplayName()),
-                    trim(bot.targetResolvedAt())
+                    trim(bot.targetResolvedAt()),
+                    bot.markdownEnabled()
             );
         }
         log.info("[ChannelConfig] feishu bot target resolved botId={} target={}",
@@ -767,7 +771,8 @@ public class SystemAppService {
                 bot.processingAckReactionType(),
                 result.defaultTarget(),
                 result.defaultTargetDisplayName(),
-                result.resolvedAt()
+                result.resolvedAt(),
+                bot.markdownEnabled()
         );
     }
 

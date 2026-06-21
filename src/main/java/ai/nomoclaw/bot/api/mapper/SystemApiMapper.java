@@ -90,7 +90,8 @@ public final class SystemApiMapper {
                                                 bot.processingAckReactionType(),
                                                 bot.defaultTarget(),
                                                 bot.defaultTargetDisplayName(),
-                                                bot.targetResolvedAt()
+                                                bot.targetResolvedAt(),
+                                                bot.markdownEnabled()
                                         ))
                                         .toList()
                         ),
@@ -341,7 +342,8 @@ public final class SystemApiMapper {
                                                 bot.processingAckReactionType(),
                                                 bot.defaultTarget(),
                                                 bot.defaultTargetDisplayName(),
-                                                bot.targetResolvedAt()
+                                                bot.targetResolvedAt(),
+                                                bot.markdownEnabled()
                                         ))
                                         .toList()
                         ),

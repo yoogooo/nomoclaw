@@ -63,7 +63,6 @@ public class FeishuChannelMessageSender implements ChannelMessageSender {
         if (trySendProcessingAckReaction(message)) {
             return;
         }
-        String formattedText = MarkdownToReadableTextFormatter.format(message.text());
         String kind = message.address().kind();
         String target = message.address().target();
         if (target == null || target.isBlank()) {
@@ -76,10 +75,6 @@ public class FeishuChannelMessageSender implements ChannelMessageSender {
             case "user_id" -> "user_id";
             default -> null;
         };
-        if (receiveType == null) {
-            postWebhook(target, formattedText);
-            return;
-        }
         try {
             String requestedBotId = trim(message.metadata().get("botId"));
             ChannelBotCredentialResolver.FeishuBotCredential credential = botCredentialResolver.resolveFeishu(requestedBotId);
@@ -90,12 +85,22 @@ public class FeishuChannelMessageSender implements ChannelMessageSender {
                 log.warn("[FeishuSender] no available bot credential botId={}", requestedBotId);
                 return;
             }
+            if (receiveType == null) {
+                postWebhook(target, message.text(), credential.markdownEnabled());
+                return;
+            }
+            String formattedText = MarkdownToReadableTextFormatter.format(message.text());
             String token = tenantAccessToken(credential);
-            String content = objectMapper.writeValueAsString(Map.of("text", formattedText));
-            String body = objectMapper.writeValueAsString(Map.of(
+            String body = credential.markdownEnabled()
+                    ? objectMapper.writeValueAsString(Map.of(
+                    "receive_id", target,
+                    "msg_type", "post",
+                    "content", objectMapper.writeValueAsString(FeishuMarkdownFormatter.formatPost(message.text()))
+            ))
+                    : objectMapper.writeValueAsString(Map.of(
                     "receive_id", target,
                     "msg_type", "text",
-                    "content", content
+                    "content", objectMapper.writeValueAsString(Map.of("text", formattedText))
             ));
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create("https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=" + receiveType))
@@ -145,15 +150,20 @@ public class FeishuChannelMessageSender implements ChannelMessageSender {
         }
     }
 
-    private void postWebhook(String target, String text) {
+    private void postWebhook(String target, String text, boolean markdownEnabled) {
         if (!target.startsWith("http://") && !target.startsWith("https://")) {
             log.warn("[FeishuSender] unsupported target={}", target);
             return;
         }
         try {
-            String payload = objectMapper.writeValueAsString(Map.of(
+            String payload = markdownEnabled
+                    ? objectMapper.writeValueAsString(Map.of(
+                    "msg_type", "post",
+                    "content", Map.of("post", FeishuMarkdownFormatter.formatPost(text))
+            ))
+                    : objectMapper.writeValueAsString(Map.of(
                     "msg_type", "text",
-                    "content", Map.of("text", text)
+                    "content", Map.of("text", MarkdownToReadableTextFormatter.format(text))
             ));
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(target))
@@ -191,7 +201,8 @@ public class FeishuChannelMessageSender implements ChannelMessageSender {
                 processingAckReactionType,
                 "",
                 "",
-                ""
+                "",
+                false
         );
     }
 

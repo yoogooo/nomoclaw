@@ -75,7 +75,8 @@ public record ChannelConfigResponse(
             String processingAckReactionType,
             String defaultTarget,
             String defaultTargetDisplayName,
-            String targetResolvedAt
+            String targetResolvedAt,
+            boolean markdownEnabled
     ) {
     }
 

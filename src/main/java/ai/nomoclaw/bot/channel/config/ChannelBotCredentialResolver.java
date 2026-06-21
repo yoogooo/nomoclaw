@@ -224,7 +224,8 @@ public class ChannelBotCredentialResolver {
                         fallback(trim(bot.path("processingAckReactionType").asString("")), "OK"),
                         trim(bot.path("defaultTarget").asString("")),
                         trim(bot.path("defaultTargetDisplayName").asString("")),
-                        trim(bot.path("targetResolvedAt").asString(""))
+                        trim(bot.path("targetResolvedAt").asString("")),
+                        bot.path("markdownEnabled").asBoolean(false)
                 ));
             }
         } else {
@@ -241,7 +242,8 @@ public class ChannelBotCredentialResolver {
                     fallback(trim(feishu.path("processingAckReactionType").asString("")), "OK"),
                     "",
                     "",
-                    ""
+                    "",
+                    feishu.path("markdownEnabled").asBoolean(false)
             ));
         }
         return List.copyOf(bots);
@@ -605,7 +607,8 @@ public class ChannelBotCredentialResolver {
             String processingAckReactionType,
             String defaultTarget,
             String defaultTargetDisplayName,
-            String targetResolvedAt
+            String targetResolvedAt,
+            boolean markdownEnabled
     ) {
     }
 
