@@ -25,12 +25,11 @@ import tools.jackson.databind.JsonNode;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 @Service
 @Slf4j
 public class ChannelOrchestratorService {
-
-    private static final String NEW_CONVERSATION_COMMAND = "/new";
 
     private final AgentApplicationService agentApplicationService;
     private final ChannelSessionRepository channelSessionRepository;
@@ -42,6 +41,7 @@ public class ChannelOrchestratorService {
     private final ChannelBotRouteResolver channelBotRouteResolver;
     private final ExecutionScopeResolver executionScopeResolver;
     private final AgentDefinitionRepository agentDefinitionRepository;
+    private final List<ChannelCommandHandler> commandHandlers;
 
     public ChannelOrchestratorService(AgentApplicationService agentApplicationService,
                                       ChannelSessionRepository channelSessionRepository,
@@ -63,6 +63,7 @@ public class ChannelOrchestratorService {
         this.channelBotRouteResolver = channelBotRouteResolver;
         this.executionScopeResolver = executionScopeResolver;
         this.agentDefinitionRepository = agentDefinitionRepository;
+        this.commandHandlers = List.of(new NewConversationCommandHandler());
     }
 
     public void processInbound(InboundEnvelope envelope) {
@@ -72,9 +73,9 @@ public class ChannelOrchestratorService {
         }
         dedupRepository.save(envelope);
         InboundEnvelope normalizedEnvelope = withRouteMetadata(envelope);
-        String newConversationMessage = extractNewConversationMessage(envelope.text());
-        if (newConversationMessage != null) {
-            handleNewConversationCommand(normalizedEnvelope, newConversationMessage);
+        ChannelCommand command = resolveCommand(normalizedEnvelope.text());
+        if (command != null) {
+            command.execute(normalizedEnvelope);
             return;
         }
         ChannelSessionRepository.ChannelSessionRecord session = channelSessionRepository.find(normalizedEnvelope.toSessionKey())
@@ -337,19 +338,14 @@ public class ChannelOrchestratorService {
         return false;
     }
 
-    private String extractNewConversationMessage(String text) {
-        String normalized = text == null ? "" : text.trim();
-        if (NEW_CONVERSATION_COMMAND.equals(normalized)) {
-            return "";
+    private ChannelCommand resolveCommand(String text) {
+        for (ChannelCommandHandler commandHandler : commandHandlers) {
+            ChannelCommand command = commandHandler.parse(text);
+            if (command != null) {
+                return command;
+            }
         }
-        if (!normalized.startsWith(NEW_CONVERSATION_COMMAND) || normalized.length() <= NEW_CONVERSATION_COMMAND.length()) {
-            return null;
-        }
-        char separator = normalized.charAt(NEW_CONVERSATION_COMMAND.length());
-        if (!Character.isWhitespace(separator)) {
-            return null;
-        }
-        return normalized.substring(NEW_CONVERSATION_COMMAND.length() + 1).trim();
+        return null;
     }
 
     private String trim(String value) {
@@ -463,5 +459,45 @@ public class ChannelOrchestratorService {
     }
 
     private record RuntimeModelChoice(String modelProvider, String modelName) {
+    }
+
+    private interface ChannelCommandHandler {
+
+        ChannelCommand parse(String text);
+    }
+
+    private static final class ChannelCommand {
+
+        private final Consumer<InboundEnvelope> executor;
+
+        private ChannelCommand(Consumer<InboundEnvelope> executor) {
+            this.executor = executor;
+        }
+
+        private void execute(InboundEnvelope envelope) {
+            executor.accept(envelope);
+        }
+    }
+
+    private final class NewConversationCommandHandler implements ChannelCommandHandler {
+
+        private static final String COMMAND = "/new";
+
+        @Override
+        public ChannelCommand parse(String text) {
+            String normalized = trim(text);
+            if (COMMAND.equals(normalized)) {
+                return new ChannelCommand(envelope -> handleNewConversationCommand(envelope, ""));
+            }
+            if (!normalized.startsWith(COMMAND) || normalized.length() <= COMMAND.length()) {
+                return null;
+            }
+            char separator = normalized.charAt(COMMAND.length());
+            if (!Character.isWhitespace(separator)) {
+                return null;
+            }
+            String firstMessage = normalized.substring(COMMAND.length() + 1).trim();
+            return new ChannelCommand(envelope -> handleNewConversationCommand(envelope, firstMessage));
+        }
     }
 }
