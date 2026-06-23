@@ -6,8 +6,10 @@ import ai.nomoclaw.bot.channel.model.ChannelMessageCompletedEvent;
 import ai.nomoclaw.bot.config.AgentProperties;
 import ai.nomoclaw.bot.conversation.model.ApprovalDecisionDto;
 import ai.nomoclaw.bot.conversation.model.ConversationMessageDto;
+import ai.nomoclaw.bot.conversation.model.ConversationMessageAnchorDto;
 import ai.nomoclaw.bot.conversation.model.ConversationMessagePageDto;
 import ai.nomoclaw.bot.conversation.model.ConversationMessageRunDto;
+import ai.nomoclaw.bot.conversation.model.ConversationSearchPageDto;
 import ai.nomoclaw.bot.conversation.model.ConversationSummaryDto;
 import ai.nomoclaw.bot.conversation.model.ConversationSummaryPageDto;
 import ai.nomoclaw.bot.domain.AgentConversation;
@@ -160,12 +162,20 @@ public class AgentApplicationService {
         return conversationService.listConversationPage(agentUid, limit, beforeSortKey, asOf);
     }
 
+    public ConversationSearchPageDto searchConversationPage(String agentUid, String keyword, Integer limit, String beforeSortKey) {
+        return conversationService.searchConversationPage(agentUid, keyword, limit, beforeSortKey);
+    }
+
     public List<ConversationMessageDto> listMessages(String conversationUid) {
         return conversationService.listMessages(conversationUid);
     }
 
     public ConversationMessagePageDto listMessagePage(String conversationUid, Integer limit, String beforeMessageUid) {
         return conversationService.listMessagePage(conversationUid, limit, beforeMessageUid);
+    }
+
+    public ConversationMessageAnchorDto loadMessageAnchor(String conversationUid, String keyword, Integer beforeLimit, Integer afterLimit) {
+        return conversationService.loadMessageAnchor(conversationUid, keyword, beforeLimit, afterLimit);
     }
 
     public List<ConversationMessageRunDto> listMessageRuns(String conversationUid) {

@@ -20,7 +20,7 @@ import { createConversationListModule } from "./list";
 import { createConversationMessagesModule } from "./messages";
 import { createConversationRuntimeModule } from "./runtime";
 import type { ConversationStoreContext, ConversationComposerModule, ConversationEventsModule, ConversationListModule, ConversationMessagesModule, ConversationRuntimeModule } from "./types";
-import type { ApprovalMode, ConversationAttachment, ConversationMessage, ConversationSummary, ModelConfig, ModelProviderOption } from "@/types/api";
+import type { ApprovalMode, ConversationAttachment, ConversationMessage, ConversationSearchResult, ConversationSummary, ModelConfig, ModelProviderOption } from "@/types/api";
 
 export const useConversationStore = defineStore("conversation", () => {
   const agentCatalogStore = useAgentCatalogStore();
@@ -33,6 +33,14 @@ export const useConversationStore = defineStore("conversation", () => {
   const conversationListCursor = ref<string | null>(null);
   const conversationListHasMore = ref(false);
   const conversationListLoading = ref(false);
+  const searchDialogVisible = ref(false);
+  const searchKeyword = ref("");
+  const searchResults = ref<ConversationSearchResult[]>([]);
+  const searchCursor = ref<string | null>(null);
+  const searchHasMore = ref(false);
+  const searchLoading = ref(false);
+  const searchSelectedIndex = ref(0);
+  const anchorMessageUid = ref("");
   const currentConversationUid = ref<string | null>(null);
   const runningConversationUids = ref<Record<string, true>>({});
   const messages = ref<ConversationMessage[]>([]);
@@ -148,6 +156,14 @@ export const useConversationStore = defineStore("conversation", () => {
       conversationListCursor,
       conversationListHasMore,
       conversationListLoading,
+      searchDialogVisible,
+      searchKeyword,
+      searchResults,
+      searchCursor,
+      searchHasMore,
+      searchLoading,
+      searchSelectedIndex,
+      anchorMessageUid,
       currentConversationUid,
       runningConversationUids,
       messages,
@@ -203,9 +219,11 @@ export const useConversationStore = defineStore("conversation", () => {
       conversationSummaryPollTimer: null,
       conversationSummaryPolling: false,
       conversationPageRequests: new Map(),
+      conversationSearchRequests: new Map(),
       lastConversationPageLoadedAt: 0,
       lastConversationPageAgentUid: "",
       conversationPageLoadedOnce: false,
+      searchRequestToken: 0,
       recentEventIds: [],
       recentEventIdSet: new Set()
     }
@@ -257,6 +275,25 @@ export const useConversationStore = defineStore("conversation", () => {
     await listModule.refreshConversations(conversationUid, true, true);
   }
 
+  function openConversationSearch() {
+    searchDialogVisible.value = true;
+  }
+
+  function closeConversationSearch() {
+    searchDialogVisible.value = false;
+    searchKeyword.value = "";
+    searchResults.value = [];
+    searchCursor.value = null;
+    searchHasMore.value = false;
+    searchLoading.value = false;
+    searchSelectedIndex.value = 0;
+  }
+
+  async function openConversationSearchResult(result: ConversationSearchResult) {
+    await messagesModule.selectConversationBySearch(result.conversationUid, searchKeyword.value);
+    closeConversationSearch();
+  }
+
   async function deleteConversation(conversationUid: string) {
     await conversationApi.deleteConversation(conversationUid);
     if (conversationUid === currentConversationUid.value) {
@@ -289,6 +326,14 @@ export const useConversationStore = defineStore("conversation", () => {
     currentConversationUid,
     currentConversation,
     currentConversationTitle,
+    searchDialogVisible,
+    searchKeyword,
+    searchResults,
+    searchCursor,
+    searchHasMore,
+    searchLoading,
+    searchSelectedIndex,
+    anchorMessageUid,
     runningConversationUids,
     messages,
     conversationListHasMore,
@@ -318,6 +363,8 @@ export const useConversationStore = defineStore("conversation", () => {
     loadModelConfig: composerModule.loadModelConfig,
     refreshConversations: listModule.refreshConversations,
     loadMoreConversations: listModule.loadMoreConversations,
+    searchConversationHistory: listModule.searchConversationHistory,
+    loadMoreSearchResults: listModule.loadMoreSearchResults,
     startDraftConversation: messagesModule.startDraftConversation,
     selectConversation: messagesModule.selectConversation,
     applyAgentSelection: messagesModule.applyAgentSelection,
@@ -333,6 +380,9 @@ export const useConversationStore = defineStore("conversation", () => {
     openFile: messagesModule.openFile,
     renameConversation,
     updateConversationPin,
+    openConversationSearch,
+    closeConversationSearch,
+    openConversationSearchResult,
     confirmDeleteConversation
   };
 });

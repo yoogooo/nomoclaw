@@ -3,8 +3,10 @@ package ai.nomoclaw.bot.conversation.app;
 import ai.nomoclaw.bot.orchestrator.AgentApplicationService;
 
 import ai.nomoclaw.bot.conversation.model.ConversationMessageDto;
+import ai.nomoclaw.bot.conversation.model.ConversationMessageAnchorDto;
 import ai.nomoclaw.bot.conversation.model.ConversationMessagePageDto;
 import ai.nomoclaw.bot.conversation.model.ConversationMessageRunDto;
+import ai.nomoclaw.bot.conversation.model.ConversationSearchPageDto;
 import ai.nomoclaw.bot.conversation.model.ConversationSummaryDto;
 import ai.nomoclaw.bot.conversation.model.ConversationSummaryPageDto;
 import org.springframework.stereotype.Service;
@@ -32,12 +34,20 @@ public class ConversationAppService {
         return facade.listConversationPage(agentUid, limit, beforeSortKey, asOf);
     }
 
+    public ConversationSearchPageDto searchConversationPage(String agentUid, String keyword, Integer limit, String beforeSortKey) {
+        return facade.searchConversationPage(agentUid, keyword, limit, beforeSortKey);
+    }
+
     public List<ConversationMessageDto> listMessages(String conversationUid) {
         return facade.listMessages(conversationUid);
     }
 
     public ConversationMessagePageDto listMessagePage(String conversationUid, Integer limit, String beforeMessageUid) {
         return facade.listMessagePage(conversationUid, limit, beforeMessageUid);
+    }
+
+    public ConversationMessageAnchorDto loadMessageAnchor(String conversationUid, String keyword, Integer beforeLimit, Integer afterLimit) {
+        return facade.loadMessageAnchor(conversationUid, keyword, beforeLimit, afterLimit);
     }
 
     public List<ConversationMessageRunDto> listMessageRuns(String conversationUid) {

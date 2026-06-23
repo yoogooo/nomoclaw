@@ -3,6 +3,8 @@ package ai.nomoclaw.bot.store;
 import ai.nomoclaw.bot.domain.AgentConversation;
 import ai.nomoclaw.bot.domain.AgentMessage;
 import ai.nomoclaw.bot.store.query.ConversationPageQuery;
+import ai.nomoclaw.bot.store.query.ConversationSearchQuery;
+import ai.nomoclaw.bot.store.query.ConversationSearchRow;
 import ai.nomoclaw.bot.store.query.MessagePageQuery;
 import ai.nomoclaw.bot.store.query.PageSlice;
 import ai.nomoclaw.bot.model.AgentEvent;
@@ -26,6 +28,8 @@ public interface AgentStore {
     List<AgentConversation> listConversations();
 
     PageSlice<AgentConversation> listConversationPage(ConversationPageQuery query);
+
+    PageSlice<ConversationSearchRow> searchConversationPage(ConversationSearchQuery query);
 
     Optional<AgentConversation> findConversation(String conversationUid);
 
@@ -62,6 +66,12 @@ public interface AgentStore {
     Optional<Long> findMessageSortId(String messageUid);
 
     List<AgentMessage> listMessagesByConversation(String conversationUid);
+
+    Optional<AgentMessage> findLatestMatchingMessage(String conversationUid, String keywordPattern);
+
+    List<AgentMessage> listMessagesBeforeOrAt(String conversationUid, long messageSortId, int limit);
+
+    List<AgentMessage> listMessagesAfter(String conversationUid, long messageSortId, int limit);
 
     PageSlice<AgentMessage> listMessagePage(MessagePageQuery query);
 

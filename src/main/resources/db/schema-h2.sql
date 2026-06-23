@@ -250,6 +250,7 @@ CREATE TABLE IF NOT EXISTS agent_conversation (
     UNIQUE (conversation_uid),
     INDEX idx_agent_conversation_group_uid (agent_group_uid),
     INDEX idx_agent_conversation_agent_pin_last_user_time (agent_uid, pinned, last_user_message_time, id),
+    INDEX idx_agent_conversation_agent_time_id (agent_uid, last_user_message_time, id),
     INDEX idx_agent_conversation_pin_last_user_time (pinned, last_user_message_time, id)
 );
 
@@ -319,6 +320,7 @@ CREATE TABLE IF NOT EXISTS agent_message (
     PRIMARY KEY (id),
     UNIQUE (message_uid),
     INDEX idx_agent_message_session_time (conversation_uid, created_time),
+    INDEX idx_agent_message_conversation_id (conversation_uid, id),
     INDEX idx_agent_message_parent (parent_message_uid),
     INDEX idx_agent_message_session_status (conversation_uid, status),
     INDEX idx_agent_message_created_time (created_time)

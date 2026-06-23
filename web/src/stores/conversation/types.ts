@@ -15,10 +15,13 @@ import type {
   ApprovalMode,
   AgentEvent,
   ConversationAttachment,
+  ConversationSearchResult,
   ConversationMessage,
+  ConversationMessageAnchor,
   ConversationMessageRun,
   ConversationRunStep,
   ConversationSummary,
+  ConversationSearchPage,
   ConversationSummaryPage,
   ModelConfig,
   ModelProviderOption,
@@ -62,6 +65,14 @@ export interface ConversationStoreStateRefs {
   conversationListCursor: Ref<string | null>;
   conversationListHasMore: Ref<boolean>;
   conversationListLoading: Ref<boolean>;
+  searchDialogVisible: Ref<boolean>;
+  searchKeyword: Ref<string>;
+  searchResults: Ref<ConversationSearchResult[]>;
+  searchCursor: Ref<string | null>;
+  searchHasMore: Ref<boolean>;
+  searchLoading: Ref<boolean>;
+  searchSelectedIndex: Ref<number>;
+  anchorMessageUid: Ref<string>;
   currentConversationUid: Ref<string | null>;
   runningConversationUids: Ref<Record<string, true>>;
   messages: Ref<ConversationMessage[]>;
@@ -100,9 +111,11 @@ export interface ConversationStoreInternals {
   conversationSummaryPollTimer: number | null;
   conversationSummaryPolling: boolean;
   conversationPageRequests: Map<string, Promise<ConversationSummaryPage>>;
+  conversationSearchRequests: Map<string, Promise<ConversationSearchPage>>;
   lastConversationPageLoadedAt: number;
   lastConversationPageAgentUid: string;
   conversationPageLoadedOnce: boolean;
+  searchRequestToken: number;
   recentEventIds: string[];
   recentEventIdSet: Set<string>;
 }
@@ -137,6 +150,8 @@ export interface ConversationListModule {
   scheduleConversationSummaryPolling: () => void;
   loadConversationSummaries: (force?: boolean) => Promise<void>;
   loadMoreConversations: () => Promise<void>;
+  searchConversationHistory: (reset?: boolean) => Promise<void>;
+  loadMoreSearchResults: () => Promise<void>;
   refreshConversations: (
     preferredConversationUid?: string | null,
     withLoading?: boolean,
@@ -153,6 +168,7 @@ export interface ConversationListModule {
 export interface ConversationMessagesModule {
   startDraftConversation: () => void;
   selectConversation: (conversationUid: string) => Promise<void>;
+  selectConversationBySearch: (conversationUid: string, keyword: string) => Promise<void>;
   loadOlderMessages: () => Promise<void>;
   refreshLatestMessages: (conversationUid: string) => Promise<void>;
   applyAgentSelection: () => Promise<void>;

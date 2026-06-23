@@ -1,17 +1,23 @@
 package ai.nomoclaw.bot.api.mapper;
 
 import ai.nomoclaw.bot.api.dto.conversation.response.ConversationAttachmentResponse;
+import ai.nomoclaw.bot.api.dto.conversation.response.ConversationMessageAnchorResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.ConversationMessageResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.ConversationMessagePageResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.ConversationMessageRunResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.ConversationRunStepResponse;
+import ai.nomoclaw.bot.api.dto.conversation.response.ConversationSearchPageResponse;
+import ai.nomoclaw.bot.api.dto.conversation.response.ConversationSearchResultResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.ConversationSummaryResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.ConversationSummaryPageResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.MessageFileLinkResponse;
 import ai.nomoclaw.bot.conversation.model.ConversationAttachmentDto;
+import ai.nomoclaw.bot.conversation.model.ConversationMessageAnchorDto;
 import ai.nomoclaw.bot.conversation.model.ConversationMessageDto;
 import ai.nomoclaw.bot.conversation.model.ConversationMessagePageDto;
 import ai.nomoclaw.bot.conversation.model.ConversationMessageRunDto;
+import ai.nomoclaw.bot.conversation.model.ConversationSearchPageDto;
+import ai.nomoclaw.bot.conversation.model.ConversationSearchResultDto;
 import ai.nomoclaw.bot.conversation.model.ConversationRunStepDto;
 import ai.nomoclaw.bot.conversation.model.ConversationSummaryDto;
 import ai.nomoclaw.bot.conversation.model.ConversationSummaryPageDto;
@@ -57,6 +63,25 @@ public final class ConversationApiMapper {
         );
     }
 
+    public static ConversationSearchPageResponse toConversationSearchPage(ConversationSearchPageDto dto) {
+        return new ConversationSearchPageResponse(
+                dto.items().stream().map(ConversationApiMapper::toConversationSearchResult).toList(),
+                dto.hasMore(),
+                dto.nextBeforeSortKey()
+        );
+    }
+
+    public static ConversationSearchResultResponse toConversationSearchResult(ConversationSearchResultDto dto) {
+        return new ConversationSearchResultResponse(
+                dto.conversationUid(),
+                dto.agentGroupUid(),
+                dto.agentUid(),
+                dto.title(),
+                dto.previewText(),
+                dto.resultTime()
+        );
+    }
+
     public static List<ConversationMessageResponse> toConversationMessages(List<ConversationMessageDto> dtos) {
         return dtos.stream().map(ConversationApiMapper::toConversationMessage).toList();
     }
@@ -85,6 +110,15 @@ public final class ConversationApiMapper {
                 toConversationMessages(dto.items()),
                 dto.hasMore(),
                 dto.nextBeforeMessageUid()
+        );
+    }
+
+    public static ConversationMessageAnchorResponse toConversationMessageAnchor(ConversationMessageAnchorDto dto) {
+        return new ConversationMessageAnchorResponse(
+                toConversationMessages(dto.items()),
+                dto.hasMoreBefore(),
+                dto.nextBeforeMessageUid(),
+                dto.anchorMessageUid()
         );
     }
 

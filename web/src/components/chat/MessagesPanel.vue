@@ -71,9 +71,12 @@ const latestMessageUid = computed(() => {
   const items = conversationStore.messages;
   return (items.length ? items[items.length - 1].messageUid : "") || "";
 });
+const effectiveFocusMessageUid = computed(() =>
+  String(props.focusMessageUid || conversationStore.anchorMessageUid || "").trim()
+);
 const displayedMessages = computed(() => {
   const allMessages = conversationStore.messages;
-  const focusMessageUid = (props.focusMessageUid || "").trim();
+  const focusMessageUid = effectiveFocusMessageUid.value;
   if (!focusMessageUid) {
     return allMessages;
   }
@@ -846,6 +849,17 @@ async function loadOlderMessagesAndPreserveViewport() {
   nextElement.scrollTop = previousScrollTop + Math.max(0, heightDelta);
 }
 
+function scrollToFocusedMessage() {
+  const focusedMessageUid = effectiveFocusMessageUid.value;
+  if (!focusedMessageUid) {
+    return;
+  }
+  window.requestAnimationFrame(() => {
+    const element = messageListRef.value?.querySelector(`[data-message-uid="${focusedMessageUid}"]`) as HTMLElement | null;
+    element?.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+  });
+}
+
 function handleMessageListScroll(event: Event) {
   const element = event.target as HTMLElement | null;
   if (!element) {
@@ -870,11 +884,27 @@ watch(
 watch(
   () => conversationStore.messages,
   () => {
+    if (effectiveFocusMessageUid.value) {
+      shouldScrollToBottomOnNextRender.value = false;
+      scrollToFocusedMessage();
+      return;
+    }
     if (!shouldScrollToBottomOnNextRender.value) return;
     void scrollToConversationBottom();
     shouldScrollToBottomOnNextRender.value = false;
   },
   { deep: false }
+);
+
+watch(
+  () => effectiveFocusMessageUid.value,
+  () => {
+    if (!effectiveFocusMessageUid.value) {
+      return;
+    }
+    shouldScrollToBottomOnNextRender.value = false;
+    scrollToFocusedMessage();
+  }
 );
 
 onMounted(() => {
@@ -922,7 +952,8 @@ onMounted(() => {
           v-for="message in displayedMessages"
           :key="`${message.createdTime}-${message.messageUid || message.content}`"
           class="message-wrap"
-          :class="{ user: message.role === 'user' }"
+          :class="{ user: message.role === 'user', 'message-wrap-focused': effectiveFocusMessageUid === (message.messageUid || '') }"
+          :data-message-uid="message.messageUid || ''"
         >
           <div
             class="message-bubble"
@@ -1340,6 +1371,10 @@ onMounted(() => {
 
 .message-wrap.user {
   align-items: flex-end;
+}
+
+.message-wrap-focused .message-bubble {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.14), 0 16px 40px rgba(0, 0, 0, 0.18);
 }
 
 .message-bubble {

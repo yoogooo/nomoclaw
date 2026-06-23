@@ -60,6 +60,42 @@ public class AgentMessageRepository extends CrudRepository<AgentMessageMapper, A
                 .list();
     }
 
+    public AgentMessageEntity findLatestMatchingMessage(String conversationUid, String keywordPattern) {
+        if (conversationUid == null || conversationUid.isBlank() || keywordPattern == null || keywordPattern.isBlank()) {
+            return null;
+        }
+        return lambdaQuery()
+                .eq(AgentMessageEntity::getConversationUid, conversationUid)
+                .apply("LOWER(content) LIKE {0}", keywordPattern)
+                .orderByDesc(AgentMessageEntity::getId)
+                .last("LIMIT 1")
+                .one();
+    }
+
+    public List<AgentMessageEntity> listBeforeOrAt(String conversationUid, Long messageSortId, int limit) {
+        if (conversationUid == null || conversationUid.isBlank() || messageSortId == null) {
+            return List.of();
+        }
+        return lambdaQuery()
+                .eq(AgentMessageEntity::getConversationUid, conversationUid)
+                .le(AgentMessageEntity::getId, messageSortId)
+                .orderByDesc(AgentMessageEntity::getId)
+                .last("LIMIT " + limit)
+                .list();
+    }
+
+    public List<AgentMessageEntity> listAfter(String conversationUid, Long messageSortId, int limit) {
+        if (conversationUid == null || conversationUid.isBlank() || messageSortId == null) {
+            return List.of();
+        }
+        return lambdaQuery()
+                .eq(AgentMessageEntity::getConversationUid, conversationUid)
+                .gt(AgentMessageEntity::getId, messageSortId)
+                .orderByAsc(AgentMessageEntity::getId)
+                .last("LIMIT " + limit)
+                .list();
+    }
+
     public void deleteByConversationUid(String conversationUid) {
         lambdaUpdate()
                 .eq(AgentMessageEntity::getConversationUid, conversationUid)

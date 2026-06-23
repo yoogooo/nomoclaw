@@ -9,8 +9,10 @@ import ai.nomoclaw.bot.api.dto.conversation.request.UpdateConversationPinnedRequ
 import ai.nomoclaw.bot.api.dto.conversation.request.UpdateConversationTitleRequest;
 import ai.nomoclaw.bot.api.dto.conversation.response.ApprovalDecisionResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.ConversationMessageResponse;
+import ai.nomoclaw.bot.api.dto.conversation.response.ConversationMessageAnchorResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.ConversationMessagePageResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.ConversationMessageRunResponse;
+import ai.nomoclaw.bot.api.dto.conversation.response.ConversationSearchPageResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.ConversationSummaryResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.ConversationSummaryPageResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.CreateConversationResponse;
@@ -95,6 +97,18 @@ public class ConversationController {
         );
     }
 
+    @GetMapping("/conversations/search")
+    public ConversationSearchPageResponse searchConversationPage(@RequestParam(value = "agentUid", required = false) String agentUid,
+                                                                 @RequestParam("keyword") String keyword,
+                                                                 @RequestParam(value = "limit", required = false) Integer limit,
+                                                                 @RequestParam(value = "beforeSortKey", required = false) String beforeSortKey) {
+        log.info("[AgentAPI] searchConversationPage agentUid={} keyword={} limit={} beforeSortKey={}",
+                agentUid, keyword, limit, beforeSortKey);
+        return ConversationApiMapper.toConversationSearchPage(
+                conversationAppService.searchConversationPage(agentUid, keyword, limit, beforeSortKey)
+        );
+    }
+
     @DeleteMapping("/conversations/{conversationUid}")
     public SimpleResponse deleteConversation(@PathVariable String conversationUid) {
         log.info("[AgentAPI] deleteConversation conversationUid={}", conversationUid);
@@ -139,6 +153,18 @@ public class ConversationController {
                 conversationUid, limit, beforeMessageUid);
         return ConversationApiMapper.toConversationMessagePage(
                 conversationAppService.listMessagePage(conversationUid, limit, beforeMessageUid)
+        );
+    }
+
+    @GetMapping("/conversations/{conversationUid}/messages/anchor")
+    public ConversationMessageAnchorResponse loadMessageAnchor(@PathVariable String conversationUid,
+                                                               @RequestParam("keyword") String keyword,
+                                                               @RequestParam(value = "beforeLimit", required = false) Integer beforeLimit,
+                                                               @RequestParam(value = "afterLimit", required = false) Integer afterLimit) {
+        log.info("[AgentAPI] loadMessageAnchor conversationUid={} keyword={} beforeLimit={} afterLimit={}",
+                conversationUid, keyword, beforeLimit, afterLimit);
+        return ConversationApiMapper.toConversationMessageAnchor(
+                conversationAppService.loadMessageAnchor(conversationUid, keyword, beforeLimit, afterLimit)
         );
     }
 

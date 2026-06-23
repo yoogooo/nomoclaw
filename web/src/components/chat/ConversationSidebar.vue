@@ -2,9 +2,10 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { NButton, NDropdown, NInput, NModal, NSelect, type DropdownOption, type InputInst, type SelectOption } from "naive-ui";
-import { Clock3, MoreHorizontal, Pin, RefreshCw } from "lucide-vue-next";
+import { Clock3, MoreHorizontal, Pin, RefreshCw, Search } from "lucide-vue-next";
 import { useRoute } from "vue-router";
 import { cronApi } from "@/api/cronApi";
+import ConversationSearchModal from "@/components/chat/ConversationSearchModal.vue";
 import UiSpinner from "@/components/UiSpinner.vue";
 import { useAgentCatalogStore } from "@/stores/agentCatalog";
 import { useConversationStore } from "@/stores/conversation";
@@ -372,14 +373,23 @@ onBeforeUnmount(() => {
       <div class="conversation-header-top">
         <div class="conversation-header-title-row">
           <div class="panel-title">{{ t("chat.sidebar.history") }}</div>
-          <button
-            class="refresh-conversation-button ui-pill-btn"
-            :title="t('chat.sidebar.refreshHistoryTooltip')"
-            :disabled="refreshingHistory"
-            @click="refreshHistoryConversations()"
-          >
-            <RefreshCw :size="14" :class="{ spinning: refreshAnimating }" />
-          </button>
+          <div class="conversation-header-title-actions">
+            <button
+              class="refresh-conversation-button ui-pill-btn"
+              :title="t('chat.sidebar.searchHistory')"
+              @click="conversationStore.openConversationSearch()"
+            >
+              <Search :size="14" />
+            </button>
+            <button
+              class="refresh-conversation-button ui-pill-btn"
+              :title="t('chat.sidebar.refreshHistoryTooltip')"
+              :disabled="refreshingHistory"
+              @click="refreshHistoryConversations()"
+            >
+              <RefreshCw :size="14" :class="{ spinning: refreshAnimating }" />
+            </button>
+          </div>
         </div>
         <div class="conversation-header-toolbar">
           <div class="agent-select-wrap">
@@ -501,6 +511,7 @@ onBeforeUnmount(() => {
         </div>
       </template>
     </n-modal>
+    <ConversationSearchModal />
   </aside>
 </template>
 
@@ -594,6 +605,14 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   width: 100%;
   gap: var(--space-2);
+}
+
+.conversation-header-title-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-left: auto;
 }
 
 .conversation-header-toolbar {

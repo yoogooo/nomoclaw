@@ -465,6 +465,21 @@ export interface ConversationSummaryPage {
   asOf: string;
 }
 
+export interface ConversationSearchResult {
+  conversationUid: string;
+  agentGroupUid: string;
+  agentUid: string;
+  title: string;
+  previewText: string;
+  resultTime: string;
+}
+
+export interface ConversationSearchPage {
+  items: ConversationSearchResult[];
+  hasMore: boolean;
+  nextBeforeSortKey?: string | null;
+}
+
 export interface MessageFileLink {
   name: string;
   path: string;
@@ -491,6 +506,13 @@ export interface ConversationMessagePage {
   items: ConversationMessage[];
   hasMore: boolean;
   nextBeforeMessageUid?: string | null;
+}
+
+export interface ConversationMessageAnchor {
+  items: ConversationMessage[];
+  hasMoreBefore: boolean;
+  nextBeforeMessageUid?: string | null;
+  anchorMessageUid?: string | null;
 }
 
 export interface ConversationAttachment {

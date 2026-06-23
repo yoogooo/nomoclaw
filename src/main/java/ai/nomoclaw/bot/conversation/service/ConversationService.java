@@ -2,9 +2,12 @@ package ai.nomoclaw.bot.conversation.service;
 
 import ai.nomoclaw.bot.config.AgentProperties;
 import ai.nomoclaw.bot.conversation.model.ConversationAttachmentDto;
+import ai.nomoclaw.bot.conversation.model.ConversationMessageAnchorDto;
 import ai.nomoclaw.bot.conversation.model.ConversationMessageDto;
 import ai.nomoclaw.bot.conversation.model.ConversationMessagePageDto;
 import ai.nomoclaw.bot.conversation.model.ConversationMessageRunDto;
+import ai.nomoclaw.bot.conversation.model.ConversationSearchPageDto;
+import ai.nomoclaw.bot.conversation.model.ConversationSearchResultDto;
 import ai.nomoclaw.bot.conversation.model.ConversationSummaryDto;
 import ai.nomoclaw.bot.conversation.model.ConversationSummaryPageDto;
 import ai.nomoclaw.bot.conversation.model.MessageFileLinkDto;
@@ -21,6 +24,8 @@ import ai.nomoclaw.bot.orchestrator.execution.RuntimeModelSelection;
 import ai.nomoclaw.bot.orchestrator.view.RunViewAssembler;
 import ai.nomoclaw.bot.store.AgentStore;
 import ai.nomoclaw.bot.store.query.ConversationPageQuery;
+import ai.nomoclaw.bot.store.query.ConversationSearchQuery;
+import ai.nomoclaw.bot.store.query.ConversationSearchRow;
 import ai.nomoclaw.bot.store.query.MessagePageQuery;
 import ai.nomoclaw.bot.store.query.PageSlice;
 import ai.nomoclaw.bot.util.UuidUtil;
@@ -34,6 +39,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
@@ -57,6 +64,8 @@ public class ConversationService {
     private static final String DEFAULT_AGENT_UID = "agent_general_assistant";
     private static final int DEFAULT_PAGE_LIMIT = 20;
     private static final int MAX_PAGE_LIMIT = 50;
+    private static final int DEFAULT_SEARCH_LIMIT = 50;
+    private static final int MAX_MESSAGE_ANCHOR_LIMIT = 100;
 
     private final AgentStore store;
     private final AgentProperties properties;
@@ -131,6 +140,27 @@ public class ConversationService {
         return new ConversationSummaryPageDto(items, page.hasMore(), nextBeforeSortKey, snapshotTime);
     }
 
+    public ConversationSearchPageDto searchConversationPage(String agentUid, String keyword, Integer limit, String beforeSortKey) {
+        String normalizedKeyword = normalizeKeyword(keyword);
+        int normalizedLimit = normalizeSearchLimit(limit);
+        SearchSortCursor cursor = parseSearchSortCursor(beforeSortKey);
+        PageSlice<ConversationSearchRow> page = store.searchConversationPage(new ConversationSearchQuery(
+                normalizeOptionalAgentUid(agentUid),
+                "%" + normalizedKeyword.toLowerCase(Locale.ROOT) + "%",
+                normalizedLimit,
+                cursor == null ? null : cursor.resultTime(),
+                cursor == null ? null : cursor.conversationId()
+        ));
+        List<ConversationSearchResultDto> items = page.items().stream()
+                .map(this::toConversationSearchResult)
+                .toList();
+        String nextBeforeSortKey = null;
+        if (page.hasMore() && !page.items().isEmpty()) {
+            nextBeforeSortKey = encodeSearchSortCursor(page.items().get(page.items().size() - 1));
+        }
+        return new ConversationSearchPageDto(items, page.hasMore(), nextBeforeSortKey);
+    }
+
     private boolean isRunning(AgentMessage latestUserMessage) {
         if (latestUserMessage == null) {
             return false;
@@ -173,6 +203,43 @@ public class ConversationService {
                 toConversationMessages(ascendingMessages),
                 page.hasMore(),
                 nextBeforeMessageUid
+        );
+    }
+
+    public ConversationMessageAnchorDto loadMessageAnchor(String conversationUid, String keyword, Integer beforeLimit, Integer afterLimit) {
+        store.findConversation(conversationUid)
+                .orElseThrow(() -> new IllegalArgumentException("conversation not found: " + conversationUid));
+        String normalizedKeyword = normalizeKeyword(keyword);
+        AgentMessage anchorMessage = store.findLatestMatchingMessage(
+                        conversationUid,
+                        "%" + normalizedKeyword.toLowerCase(Locale.ROOT) + "%"
+                )
+                .orElse(null);
+        if (anchorMessage == null) {
+            return new ConversationMessageAnchorDto(List.of(), false, null, null);
+        }
+        Long anchorId = store.findMessageSortId(anchorMessage.messageUid())
+                .orElseThrow(() -> new IllegalArgumentException("message not found: " + anchorMessage.messageUid()));
+        int normalizedBeforeLimit = normalizeAnchorLimit(beforeLimit, 30);
+        int normalizedAfterLimit = normalizeAnchorLimit(afterLimit, 20);
+        List<AgentMessage> beforeOrAt = store.listMessagesBeforeOrAt(conversationUid, anchorId, normalizedBeforeLimit + 2);
+        boolean hasMoreBefore = beforeOrAt.size() > normalizedBeforeLimit + 1;
+        if (hasMoreBefore) {
+            beforeOrAt = beforeOrAt.subList(0, normalizedBeforeLimit + 1);
+        }
+        List<AgentMessage> ascendingBeforeOrAt = new ArrayList<>(beforeOrAt);
+        Collections.reverse(ascendingBeforeOrAt);
+        List<AgentMessage> after = store.listMessagesAfter(conversationUid, anchorId, normalizedAfterLimit);
+        List<AgentMessage> merged = new ArrayList<>(ascendingBeforeOrAt);
+        merged.addAll(after);
+        String nextBeforeMessageUid = hasMoreBefore && !ascendingBeforeOrAt.isEmpty()
+                ? ascendingBeforeOrAt.get(0).messageUid()
+                : null;
+        return new ConversationMessageAnchorDto(
+                toConversationMessages(merged),
+                hasMoreBefore,
+                nextBeforeMessageUid,
+                anchorMessage.messageUid()
         );
     }
 
@@ -416,6 +483,17 @@ public class ConversationService {
         return normalized.substring(0, 24) + "...";
     }
 
+    private ConversationSearchResultDto toConversationSearchResult(ConversationSearchRow row) {
+        return new ConversationSearchResultDto(
+                row.getConversationUid(),
+                row.getAgentGroupUid(),
+                row.getAgentUid(),
+                emptyToNull(row.getTitle()) == null ? "未命名对话" : row.getTitle(),
+                summarizePreview(row.getPreviewText(), row.getTitle()),
+                toInstant(row.getResultTime())
+        );
+    }
+
     private String normalizeAgentGroupUid(String agentGroupUid) {
         return agentGroupUid == null || agentGroupUid.isBlank() ? "" : agentGroupUid.trim();
     }
@@ -429,6 +507,28 @@ public class ConversationService {
             return DEFAULT_PAGE_LIMIT;
         }
         return Math.min(limit, MAX_PAGE_LIMIT);
+    }
+
+    private int normalizeSearchLimit(Integer limit) {
+        if (limit == null || limit <= 0) {
+            return DEFAULT_SEARCH_LIMIT;
+        }
+        return Math.min(limit, MAX_PAGE_LIMIT);
+    }
+
+    private int normalizeAnchorLimit(Integer limit, int defaultLimit) {
+        if (limit == null || limit <= 0) {
+            return defaultLimit;
+        }
+        return Math.min(limit, MAX_MESSAGE_ANCHOR_LIMIT);
+    }
+
+    private String normalizeKeyword(String keyword) {
+        String normalized = keyword == null ? "" : keyword.trim();
+        if (normalized.isBlank()) {
+            throw new IllegalArgumentException("keyword must not be blank");
+        }
+        return normalized;
     }
 
     private Instant parseAsOf(String asOf) {
@@ -473,12 +573,52 @@ public class ConversationService {
         }
     }
 
+    private String encodeSearchSortCursor(ConversationSearchRow row) {
+        String raw = toInstant(row.getResultTime()).toEpochMilli()
+                + "|"
+                + row.getConversationId();
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private SearchSortCursor parseSearchSortCursor(String cursor) {
+        if (cursor == null || cursor.isBlank()) {
+            return null;
+        }
+        try {
+            String decoded = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
+            String[] parts = decoded.split("\\|");
+            if (parts.length != 2) {
+                throw new IllegalArgumentException("invalid beforeSortKey");
+            }
+            return new SearchSortCursor(
+                    Instant.ofEpochMilli(Long.parseLong(parts[0])),
+                    Long.parseLong(parts[1])
+            );
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("invalid beforeSortKey", ex);
+        }
+    }
+
     private String summarize(String text) {
         if (text == null) {
             return "";
         }
         int limit = 2000;
         return text.length() <= limit ? text : text.substring(0, limit) + "...";
+    }
+
+    private String summarizePreview(String previewText, String title) {
+        String raw = previewText == null ? "" : previewText;
+        String normalized = raw.replaceAll("\\s+", " ").trim();
+        if (normalized.isBlank()) {
+            return "";
+        }
+        int limit = 120;
+        return normalized.length() <= limit ? normalized : normalized.substring(0, limit) + "...";
+    }
+
+    private Instant toInstant(LocalDateTime value) {
+        return value.atZone(ZoneId.systemDefault()).toInstant();
     }
 
     private Locale resolveRequestLocale() {
@@ -530,6 +670,12 @@ public class ConversationService {
             Integer pinned,
             Instant lastUserMessageTime,
             Long id
+    ) {
+    }
+
+    private record SearchSortCursor(
+            Instant resultTime,
+            Long conversationId
     ) {
     }
 }

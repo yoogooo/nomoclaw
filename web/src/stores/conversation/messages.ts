@@ -46,6 +46,7 @@ export function createConversationMessagesModule(
     state.messageHistoryHasMore.value = false;
     state.messageHistoryLoading.value = false;
     state.messageInitialLoaded.value = false;
+    state.anchorMessageUid.value = "";
   }
 
   async function loadMessages(conversationUid: string) {
@@ -151,6 +152,7 @@ export function createConversationMessagesModule(
     if (state.currentConversationUid.value !== conversationUid) {
       resetMessageState();
     }
+    state.anchorMessageUid.value = "";
     state.currentConversationUid.value = conversationUid;
     deps.runtimeModule().restoreApprovalModeForConversation(conversationUid);
     storeDeps.saveChatLastViewState({ mode: "conversation", conversationUid });
@@ -173,6 +175,51 @@ export function createConversationMessagesModule(
     deps.subscribeEvents();
   }
 
+  async function selectConversationBySearch(conversationUid: string, keyword: string) {
+    if (state.currentConversationUid.value !== conversationUid) {
+      resetMessageState();
+    }
+    state.anchorMessageUid.value = "";
+    state.currentConversationUid.value = conversationUid;
+    deps.runtimeModule().restoreApprovalModeForConversation(conversationUid);
+    storeDeps.saveChatLastViewState({ mode: "conversation", conversationUid });
+    state.draftAttachments.value = [];
+    deps.runtimeModule().resetRuntimePanels();
+    const [anchor, runs] = await Promise.all([
+      storeDeps.conversationApi.getMessagesAroundAnchor(conversationUid, {
+        keyword,
+        beforeLimit: 30,
+        afterLimit: 20
+      }),
+      storeDeps.conversationApi.listMessageRuns(conversationUid)
+    ]);
+    if (state.currentConversationUid.value !== conversationUid) {
+      return;
+    }
+    if (!anchor.anchorMessageUid) {
+      await selectConversation(conversationUid);
+      return;
+    }
+    state.messages.value = dedupeMessages(anchor.items);
+    state.messageHistoryCursor.value = anchor.nextBeforeMessageUid || null;
+    state.messageHistoryHasMore.value = Boolean(anchor.hasMoreBefore);
+    state.messageHistoryLoading.value = false;
+    state.messageInitialLoaded.value = true;
+    state.anchorMessageUid.value = anchor.anchorMessageUid || "";
+    reconcileRunningConversationByMessages(conversationUid, state.messages.value);
+    storeDeps.conversationRunsStore.setRuns(runs);
+    deps.runtimeModule().restoreApprovalFromRuns(runs);
+    const currentSummary = state.conversations.value.find((item) => item.conversationUid === conversationUid);
+    if (currentSummary?.unread) {
+      void storeDeps.conversationApi.markConversationRead(conversationUid).catch(() => {
+        // best effort: next refresh will reconcile unread state
+      });
+      markConversationReadLocally(conversationUid);
+    }
+    deps.syncRuntimeModelSelection();
+    deps.subscribeEvents();
+  }
+
   async function applyAgentSelection() {
     await deps.listModule().refreshConversations(state.currentConversationUid.value, true, true);
     if (!state.filteredConversations.value.length) {
@@ -189,6 +236,7 @@ export function createConversationMessagesModule(
   return {
     startDraftConversation,
     selectConversation,
+    selectConversationBySearch,
     loadOlderMessages,
     refreshLatestMessages,
     applyAgentSelection,

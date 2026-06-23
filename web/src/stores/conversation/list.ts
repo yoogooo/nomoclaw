@@ -1,8 +1,9 @@
-import { buildConversationPageRequestKey, dedupeConversations, reuseStableConversationSummaries } from "./helpers";
+import { buildConversationPageRequestKey, buildConversationSearchRequestKey, dedupeConversations, reuseStableConversationSummaries } from "./helpers";
 import type { ConversationMessagesModule, ConversationRuntimeModule, ConversationStoreContext, ConversationListModule } from "./types";
 
 const CONVERSATION_PAGE_SIZE = 20;
 const CONVERSATION_PAGE_FRESH_MS = 1000;
+const CONVERSATION_SEARCH_PAGE_SIZE = 50;
 
 export function createConversationListModule(
   ctx: ConversationStoreContext,
@@ -91,6 +92,28 @@ export function createConversationListModule(
         }
       });
     internals.conversationPageRequests.set(requestKey, request);
+    return request;
+  }
+
+  async function fetchConversationSearchPage(params: { keyword: string; beforeSortKey?: string | null }) {
+    const requestParams = {
+      agentUid: storeDeps.agentCatalogStore.selectedAgentUid || "",
+      keyword: params.keyword,
+      limit: CONVERSATION_SEARCH_PAGE_SIZE,
+      beforeSortKey: params.beforeSortKey || undefined
+    };
+    const requestKey = buildConversationSearchRequestKey(requestParams);
+    const inFlight = internals.conversationSearchRequests.get(requestKey);
+    if (inFlight) {
+      return inFlight;
+    }
+    const request = storeDeps.conversationApi.searchConversations(requestParams)
+      .finally(() => {
+        if (internals.conversationSearchRequests.get(requestKey) === request) {
+          internals.conversationSearchRequests.delete(requestKey);
+        }
+      });
+    internals.conversationSearchRequests.set(requestKey, request);
     return request;
   }
 
@@ -198,6 +221,52 @@ export function createConversationListModule(
     } finally {
       state.conversationListLoading.value = false;
     }
+  }
+
+  async function searchConversationHistory(reset = true) {
+    const keyword = state.searchKeyword.value.trim();
+    if (!keyword) {
+      state.searchResults.value = [];
+      state.searchCursor.value = null;
+      state.searchHasMore.value = false;
+      state.searchSelectedIndex.value = 0;
+      return;
+    }
+    if (state.searchLoading.value) {
+      return;
+    }
+    state.searchLoading.value = true;
+    const requestToken = ++internals.searchRequestToken;
+    try {
+      const page = await fetchConversationSearchPage({
+        keyword,
+        beforeSortKey: reset ? null : state.searchCursor.value
+      });
+      if (requestToken !== internals.searchRequestToken || keyword !== state.searchKeyword.value.trim()) {
+        return;
+      }
+      state.searchResults.value = reset
+        ? page.items
+        : [...state.searchResults.value, ...page.items];
+      state.searchCursor.value = page.nextBeforeSortKey || null;
+      state.searchHasMore.value = Boolean(page.hasMore);
+      if (reset) {
+        state.searchSelectedIndex.value = 0;
+      } else if (state.searchSelectedIndex.value >= state.searchResults.value.length) {
+        state.searchSelectedIndex.value = Math.max(0, state.searchResults.value.length - 1);
+      }
+    } finally {
+      if (requestToken === internals.searchRequestToken) {
+        state.searchLoading.value = false;
+      }
+    }
+  }
+
+  async function loadMoreSearchResults() {
+    if (state.searchLoading.value || !state.searchHasMore.value) {
+      return;
+    }
+    await searchConversationHistory(false);
   }
 
   function patchConversationSummaryLocally(conversationUid: string, patch: Record<string, any>) {
@@ -326,6 +395,8 @@ export function createConversationListModule(
     scheduleConversationSummaryPolling,
     loadConversationSummaries,
     loadMoreConversations,
+    searchConversationHistory,
+    loadMoreSearchResults,
     refreshConversations,
     init,
     patchConversationSummaryLocally,

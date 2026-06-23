@@ -84,3 +84,17 @@ export function buildConversationPageRequestKey(params: {
     asOf: params.asOf || ""
   });
 }
+
+export function buildConversationSearchRequestKey(params: {
+  agentUid: string;
+  keyword: string;
+  limit: number;
+  beforeSortKey?: string;
+}) {
+  return JSON.stringify({
+    agentUid: params.agentUid,
+    keyword: params.keyword,
+    limit: params.limit,
+    beforeSortKey: params.beforeSortKey || ""
+  });
+}

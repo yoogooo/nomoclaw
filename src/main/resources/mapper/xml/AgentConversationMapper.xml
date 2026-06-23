@@ -18,4 +18,49 @@
         ORDER BY c.pinned DESC, c.last_user_message_time DESC, c.id DESC
         LIMIT #{limit}
     </select>
+
+    <select id="searchConversationPage" resultType="ai.nomoclaw.bot.store.query.ConversationSearchRow">
+        SELECT
+            c.id AS conversationId,
+            c.conversation_uid AS conversationUid,
+            c.agent_group_uid AS agentGroupUid,
+            c.agent_uid AS agentUid,
+            c.title AS title,
+            COALESCE(latest_match.match_content, '') AS previewText,
+            latest_match.match_created_time AS resultTime
+        FROM agent_conversation c
+        INNER JOIN (
+            SELECT m.conversation_uid,
+                   m.content AS match_content,
+                   m.created_time AS match_created_time,
+                   m.id AS match_id
+            FROM agent_message m
+            INNER JOIN (
+                SELECT conversation_uid, MAX(id) AS max_id
+                FROM agent_message
+                WHERE LOWER(content) LIKE #{keywordPattern}
+                GROUP BY conversation_uid
+            ) latest
+                ON latest.conversation_uid = m.conversation_uid
+               AND latest.max_id = m.id
+        ) latest_match
+            ON latest_match.conversation_uid = c.conversation_uid
+        WHERE
+            <if test="agentUid != null and agentUid != ''">
+                c.agent_uid = #{agentUid}
+                AND
+            </if>
+            latest_match.match_id IS NOT NULL
+        <if test="beforeResultTime != null and beforeConversationId != null">
+            AND (
+                latest_match.match_created_time &lt; #{beforeResultTime}
+                OR (
+                    latest_match.match_created_time = #{beforeResultTime}
+                    AND c.id &lt; #{beforeConversationId}
+                )
+            )
+        </if>
+        ORDER BY latest_match.match_created_time DESC, c.id DESC
+        LIMIT #{limit}
+    </select>
 </mapper>

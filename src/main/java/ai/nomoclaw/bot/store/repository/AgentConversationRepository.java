@@ -3,6 +3,7 @@ package ai.nomoclaw.bot.store.repository;
 import com.baomidou.mybatisplus.extension.repository.CrudRepository;
 import ai.nomoclaw.bot.store.entity.AgentConversationEntity;
 import ai.nomoclaw.bot.store.mapper.AgentConversationMapper;
+import ai.nomoclaw.bot.store.query.ConversationSearchRow;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -67,6 +68,20 @@ public class AgentConversationRepository extends CrudRepository<AgentConversatio
                 beforePinned,
                 beforeLastUserMessageTime,
                 beforeId,
+                limit
+        );
+    }
+
+    public List<ConversationSearchRow> searchConversationPage(String agentUid,
+                                                              String keywordPattern,
+                                                              LocalDateTime beforeResultTime,
+                                                              Long beforeConversationId,
+                                                              int limit) {
+        return getBaseMapper().searchConversationPage(
+                agentUid,
+                keywordPattern,
+                beforeResultTime,
+                beforeConversationId,
                 limit
         );
     }

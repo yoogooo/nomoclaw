@@ -10,8 +10,10 @@ import type {
   AgentMcpTool,
   CreateSkillPayload,
   ConversationMessage,
+  ConversationMessageAnchor,
   ConversationMessagePage,
   ConversationMessageRun,
+  ConversationSearchPage,
   ConversationSummaryPage,
   ConversationSummary,
   ApprovalDecisionResponse,
@@ -51,6 +53,19 @@ export const conversationApi = {
     if (params.beforeSortKey) query.set("beforeSortKey", params.beforeSortKey);
     if (params.asOf) query.set("asOf", params.asOf);
     return requestJson<ConversationSummaryPage>(`/api/conversations/page?${query.toString()}`);
+  },
+  searchConversations(params: {
+    agentUid?: string;
+    keyword: string;
+    limit?: number;
+    beforeSortKey?: string;
+  }) {
+    const query = new URLSearchParams();
+    if (params.agentUid) query.set("agentUid", params.agentUid);
+    if (params.keyword) query.set("keyword", params.keyword);
+    if (params.limit) query.set("limit", String(params.limit));
+    if (params.beforeSortKey) query.set("beforeSortKey", params.beforeSortKey);
+    return requestJson<ConversationSearchPage>(`/api/conversations/search?${query.toString()}`);
   },
   deleteConversation(conversationUid: string) {
     return requestJson<SimpleResponse>(`/api/conversations/${conversationUid}`, {
@@ -259,6 +274,17 @@ export const conversationApi = {
     if (params.limit) query.set("limit", String(params.limit));
     if (params.beforeMessageUid) query.set("beforeMessageUid", params.beforeMessageUid);
     return requestJson<ConversationMessagePage>(`/api/conversations/${conversationUid}/messages/page?${query.toString()}`);
+  },
+  getMessagesAroundAnchor(conversationUid: string, params: {
+    keyword: string;
+    beforeLimit?: number;
+    afterLimit?: number;
+  }) {
+    const query = new URLSearchParams();
+    query.set("keyword", params.keyword);
+    if (params.beforeLimit) query.set("beforeLimit", String(params.beforeLimit));
+    if (params.afterLimit) query.set("afterLimit", String(params.afterLimit));
+    return requestJson<ConversationMessageAnchor>(`/api/conversations/${conversationUid}/messages/anchor?${query.toString()}`);
   },
   listMessageRuns(conversationUid: string) {
     return requestJson<ConversationMessageRun[]>(`/api/conversations/${conversationUid}/message-runs`);

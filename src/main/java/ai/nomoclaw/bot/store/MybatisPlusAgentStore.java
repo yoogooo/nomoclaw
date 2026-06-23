@@ -11,6 +11,8 @@ import ai.nomoclaw.bot.model.PlanStep;
 import ai.nomoclaw.bot.model.RiskLevel;
 import ai.nomoclaw.bot.model.StepStatus;
 import ai.nomoclaw.bot.store.query.ConversationPageQuery;
+import ai.nomoclaw.bot.store.query.ConversationSearchQuery;
+import ai.nomoclaw.bot.store.query.ConversationSearchRow;
 import ai.nomoclaw.bot.store.query.MessagePageQuery;
 import ai.nomoclaw.bot.store.query.PageSlice;
 import ai.nomoclaw.bot.store.entity.AgentEventEntity;
@@ -106,6 +108,22 @@ public class MybatisPlusAgentStore implements AgentStore {
                 entities.stream().map(this::toDomain).toList(),
                 hasMore
         );
+    }
+
+    @Override
+    public PageSlice<ConversationSearchRow> searchConversationPage(ConversationSearchQuery query) {
+        List<ConversationSearchRow> rows = conversationRepository.searchConversationPage(
+                query.agentUid(),
+                query.keywordPattern(),
+                query.beforeResultTime() == null ? null : toLocalDateTime(query.beforeResultTime()),
+                query.beforeConversationId(),
+                query.limit() + 1
+        );
+        boolean hasMore = rows.size() > query.limit();
+        if (hasMore) {
+            rows = rows.subList(0, query.limit());
+        }
+        return new PageSlice<>(rows, hasMore);
     }
 
     @Override
@@ -230,6 +248,28 @@ public class MybatisPlusAgentStore implements AgentStore {
     @Override
     public List<AgentMessage> listMessagesByConversation(String conversationUid) {
         return messageRepository.listByConversation(conversationUid)
+                .stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
+    public Optional<AgentMessage> findLatestMatchingMessage(String conversationUid, String keywordPattern) {
+        return Optional.ofNullable(messageRepository.findLatestMatchingMessage(conversationUid, keywordPattern))
+                .map(this::toDomain);
+    }
+
+    @Override
+    public List<AgentMessage> listMessagesBeforeOrAt(String conversationUid, long messageSortId, int limit) {
+        return messageRepository.listBeforeOrAt(conversationUid, messageSortId, limit)
+                .stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<AgentMessage> listMessagesAfter(String conversationUid, long messageSortId, int limit) {
+        return messageRepository.listAfter(conversationUid, messageSortId, limit)
                 .stream()
                 .map(this::toDomain)
                 .toList();
