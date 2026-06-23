@@ -9,8 +9,10 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.NotDirectoryException;
 import java.time.Instant;
 
 @Component
@@ -34,6 +36,12 @@ public class ListFileTool implements Tool {
             }
 
             Path path = PathResolver.resolveInAgentWorkspace(pathRaw, request);
+            if (!Files.exists(path)) {
+                return ToolResult.failure("INVALID_ARGS", "directory does not exist: " + path, metric(start, 0));
+            }
+            if (!Files.isDirectory(path)) {
+                return ToolResult.failure("INVALID_ARGS", "path is not a directory: " + path, metric(start, 0));
+            }
             ObjectNode artifacts = JsonNodeFactory.instance.objectNode();
             ArrayNode items = JsonNodeFactory.instance.arrayNode();
             try (var stream = Files.list(path)) {
@@ -42,6 +50,12 @@ public class ListFileTool implements Tool {
             artifacts.set("items", items);
             artifacts.put("path", path.toAbsolutePath().toString());
             return ToolResult.success(ToolTextUtils.truncateHead(JsonUtil.toJson(items)), artifacts, metric(start, items.size()));
+        } catch (NoSuchFileException ex) {
+            log.warn("[Tool][list-file] missing directory stepUid={} err={}", request.stepUid(), ex.getMessage());
+            return ToolResult.failure("INVALID_ARGS", "directory does not exist: " + ex.getFile(), metric(start, 0));
+        } catch (NotDirectoryException ex) {
+            log.warn("[Tool][list-file] not directory stepUid={} err={}", request.stepUid(), ex.getMessage());
+            return ToolResult.failure("INVALID_ARGS", "path is not a directory: " + ex.getFile(), metric(start, 0));
         } catch (Exception ex) {
             log.warn("[Tool][list-file] failed stepUid={} err={}", request.stepUid(), ex.getMessage());
             return ToolResult.failure("FILE_ERROR", ex.getMessage(), metric(start, 0));

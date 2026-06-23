@@ -7,7 +7,9 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
+import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
@@ -33,6 +35,12 @@ public class ReadFileTool implements Tool {
             }
 
             Path path = PathResolver.resolveInAgentWorkspace(pathRaw, request);
+            if (!Files.exists(path)) {
+                return ToolResult.failure("INVALID_ARGS", "file does not exist: " + path, metric(start, 0));
+            }
+            if (!Files.isRegularFile(path)) {
+                return ToolResult.failure("INVALID_ARGS", "path is not a file: " + path, metric(start, 0));
+            }
             String content = Files.readString(path);
             int startLine = Math.max(1, request.args().path("startLine").asInt(1));
             int endLine = request.args().has("endLine")
@@ -50,6 +58,12 @@ public class ReadFileTool implements Tool {
             artifacts.put("startLine", startLine);
             artifacts.put("endLine", actualEnd);
             return ToolResult.success(ToolTextUtils.truncateHead(builder.toString().trim()), artifacts, metric(start, content.length()));
+        } catch (NoSuchFileException ex) {
+            log.warn("[Tool][read-file] missing file stepUid={} err={}", request.stepUid(), ex.getMessage());
+            return ToolResult.failure("INVALID_ARGS", "file does not exist: " + ex.getFile(), metric(start, 0));
+        } catch (AccessDeniedException ex) {
+            log.warn("[Tool][read-file] access denied stepUid={} err={}", request.stepUid(), ex.getMessage());
+            return ToolResult.failure("FILE_ERROR", "file is not readable: " + ex.getFile(), metric(start, 0));
         } catch (Exception ex) {
             log.warn("[Tool][read-file] failed stepUid={} err={}", request.stepUid(), ex.getMessage());
             return ToolResult.failure("FILE_ERROR", ex.getMessage(), metric(start, 0));

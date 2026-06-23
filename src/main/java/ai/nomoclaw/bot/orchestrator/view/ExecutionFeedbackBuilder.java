@@ -360,6 +360,9 @@ public class ExecutionFeedbackBuilder {
         if (!hasMeaningfulText(message)) {
             message = i18n("agent.step.failure.default");
         }
+        if (hasMeaningfulText(result.errorCode())) {
+            message = "[" + result.errorCode() + "] " + message;
+        }
         if ("WebSearchTool".equals(nullToEmpty(step.toolName()))) {
             return abbreviate(message, 1600);
         }

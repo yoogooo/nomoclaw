@@ -70,6 +70,30 @@ class FileToolsTests {
     }
 
     @Test
+    void listShouldExplainMissingDirectory() {
+        Path workspace = tempDir.resolve("workspace-missing-list");
+        ListFileTool listTool = new ListFileTool();
+        ObjectNode args = JsonNodeFactory.instance.objectNode();
+        args.put("path", "missing-dir");
+        ToolResult result = listTool.execute(request(workspace, args));
+        assertFalse(result.success());
+        assertEquals("INVALID_ARGS", result.errorCode());
+        assertTrue(result.errorMessage().contains("directory does not exist:"));
+    }
+
+    @Test
+    void readShouldExplainMissingFile() {
+        Path workspace = tempDir.resolve("workspace-missing-read");
+        ReadFileTool readTool = new ReadFileTool();
+        ObjectNode args = JsonNodeFactory.instance.objectNode();
+        args.put("path", "missing.txt");
+        ToolResult result = readTool.execute(request(workspace, args));
+        assertFalse(result.success());
+        assertEquals("INVALID_ARGS", result.errorCode());
+        assertTrue(result.errorMessage().contains("file does not exist:"));
+    }
+
+    @Test
     void createShouldRejectInvalidMode() {
         Path workspace = tempDir.resolve("workspace-invalid");
         CreateFileTool createTool = new CreateFileTool();
