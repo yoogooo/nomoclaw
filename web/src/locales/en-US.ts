@@ -635,7 +635,8 @@ const enUS = {
     batchDeletePartial: "{success} tasks deleted, {failed} failed"
   },
   http: {
-    networkError: "Cannot reach backend service (it may not be started). Start the service and try again.",
+    serviceNotStarted: "The service is not started. Please start the service first.",
+    networkError: "The service is not started. Please start the service first.",
     withReason: "{base} Reason: {reason}",
     400: "The request could not be processed. Please try again.",
     invalidPageSize: "Invalid page size. Please choose 10, 20, or 50.",

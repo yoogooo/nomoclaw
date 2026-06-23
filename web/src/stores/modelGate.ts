@@ -5,6 +5,9 @@ import { HttpRequestError } from "@/utils/http";
 
 const MODEL_GATE_DISMISSED_KEY = "ui:model-gate-dismissed";
 type ModelReadinessCheckErrorKind = "none" | "network" | "backendUnavailable" | "serverError" | "unknown";
+interface RefreshModelReadinessOptions {
+  suppressErrorToast?: boolean;
+}
 
 function resolveDismissedState() {
   if (typeof window === "undefined") {
@@ -32,12 +35,14 @@ export const useModelGateStore = defineStore("model-gate", () => {
     ready.value && !checking.value && !isModelReady.value && !checkError.value && !dismissed.value
   );
 
-  async function refreshModelReadiness() {
+  async function refreshModelReadiness(options: RefreshModelReadinessOptions = {}) {
     checking.value = true;
     checkError.value = "";
     checkErrorKind.value = "none";
     try {
-      const config = await modelApi.getAvailableModelConfig();
+      const config = await modelApi.getAvailableModelConfig({
+        suppressErrorToast: options.suppressErrorToast
+      });
       isModelReady.value = config.providers.some((provider) =>
         provider.models.some((model) => Boolean(model.id?.trim()))
       );

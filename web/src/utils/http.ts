@@ -34,7 +34,7 @@ export async function requestJson<T>(
   try {
     response = await fetch(input, withLocaleHeader(init));
   } catch (error) {
-    const errorMessage = tr("http.networkError");
+    const errorMessage = tr("http.serviceNotStarted");
     if (!suppressErrorToast) {
       showErrorToastDedup(errorMessage);
     }
@@ -138,6 +138,9 @@ function normalizeErrorMessage(text: string): string {
 function buildUserFriendlyMessage(status: number, reason: string): string {
   const normalizedReason = translateBackendReason(reason?.trim() || "");
   const withReason = (base: string) => (normalizedReason ? tr("http.withReason", { base, reason: normalizedReason }) : base);
+  if (status >= 500 && isBackendUnavailableReason(reason)) {
+    return tr("http.serviceNotStarted");
+  }
   if (status === 400) {
     return normalizedReason || tr("http.400");
   }
@@ -169,6 +172,16 @@ function buildUserFriendlyMessage(status: number, reason: string): string {
     return withReason(tr("http.500"));
   }
   return withReason(tr("http.default", { status }));
+}
+
+function isBackendUnavailableReason(reason: string): boolean {
+  const normalized = String(reason || "").trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+  return normalized.includes("econnrefused")
+    || normalized.includes("connect refused")
+    || normalized.includes("proxy error");
 }
 
 function translateBackendReason(reason: string): string {

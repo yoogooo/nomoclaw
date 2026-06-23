@@ -31,15 +31,28 @@ export function createConversationComposerModule(
     return provider.models.some((model: any) => model.id === modelName);
   }
 
-  function promptModelSetupGuide() {
+  async function promptModelSetupGuide() {
     storeDeps.modelGateStore.resetPrompt();
-    if (!storeDeps.modelGateStore.checking) {
-      void storeDeps.modelGateStore.refreshModelReadiness();
+    if (storeDeps.modelGateStore.checking) {
+      return;
     }
+    await storeDeps.modelGateStore.refreshModelReadiness({
+      suppressErrorToast: true
+    });
   }
 
-  function guideToModelSetup() {
-    promptModelSetupGuide();
+  async function guideToModelSetup() {
+    await promptModelSetupGuide();
+    if (storeDeps.modelGateStore.checkErrorKind !== "none") {
+      const errorKey = (
+        storeDeps.modelGateStore.checkErrorKind === "network"
+        || storeDeps.modelGateStore.checkErrorKind === "backendUnavailable"
+      )
+        ? "http.serviceNotStarted"
+        : "http.500";
+      storeDeps.message.error(storeDeps.tr(errorKey));
+      return;
+    }
     storeDeps.message.warning(storeDeps.tr("modelGate.status.missingModel"));
   }
 
@@ -134,7 +147,7 @@ export function createConversationComposerModule(
       return;
     }
     if (!state.hasAnyConfiguredModel.value) {
-      guideToModelSetup();
+      await guideToModelSetup();
       return;
     }
     try {
@@ -181,7 +194,7 @@ export function createConversationComposerModule(
     }
     if (!state.selectedModelProvider.value || !state.selectedModelName.value) {
       if (!state.hasAnyConfiguredModel.value) {
-        guideToModelSetup();
+        await guideToModelSetup();
         return;
       }
       storeDeps.message.error(storeDeps.tr("toast.chooseModelFirst"));
@@ -194,7 +207,7 @@ export function createConversationComposerModule(
     const effectiveModelName = hasConfiguredModel(lockedProvider, lockedModelName) ? lockedModelName : state.selectedModelName.value;
     if (!effectiveProvider || !effectiveModelName) {
       if (!state.hasAnyConfiguredModel.value) {
-        guideToModelSetup();
+        await guideToModelSetup();
         return;
       }
       storeDeps.message.error(storeDeps.tr("toast.chooseModelFirst"));

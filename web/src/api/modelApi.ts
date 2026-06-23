@@ -1,12 +1,13 @@
 import type { ModelCatalogStatus, ModelConfig, ModelProviderTestResult, TestModelProviderRequest } from "@/types/api";
 import { requestJson } from "@/utils/http";
+import type { RequestJsonOptions } from "@/utils/http";
 
 export const modelApi = {
   getModelConfig() {
     return requestJson<ModelConfig>("/api/system/models");
   },
-  getAvailableModelConfig() {
-    return requestJson<ModelConfig>("/api/system/models/available");
+  getAvailableModelConfig(options?: RequestJsonOptions) {
+    return requestJson<ModelConfig>("/api/system/models/available", undefined, options);
   },
   updateModelConfig(payload: ModelConfig) {
     return requestJson<ModelConfig>("/api/system/models", {

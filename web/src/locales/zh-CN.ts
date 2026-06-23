@@ -635,7 +635,8 @@ const zhCN = {
     batchDeletePartial: "成功删除 {success} 个任务，失败 {failed} 个"
   },
   http: {
-    networkError: "无法连接后端服务（可能未启动）。请先启动服务后重试。",
+    serviceNotStarted: "当前服务未启动，请先启动服务。",
+    networkError: "当前服务未启动，请先启动服务。",
     withReason: "{base} 原因：{reason}",
     400: "请求未能处理，请稍后重试。",
     invalidPageSize: "分页大小无效，请选择 10、20 或 50。",

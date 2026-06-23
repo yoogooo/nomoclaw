@@ -190,7 +190,7 @@ export interface ConversationComposerModule {
   loadModelConfig: () => Promise<void>;
   syncRuntimeModelSelection: (sourceMessages?: ConversationMessage[]) => void;
   hasConfiguredModel: (modelProvider: string, modelName: string) => boolean;
-  guideToModelSetup: () => void;
+  guideToModelSetup: () => Promise<void>;
   changeRuntimeModel: (value: string) => Promise<void>;
   uploadFiles: (fileList: FileList | File[]) => Promise<void>;
   removeDraftAttachment: (fileUrl: string) => void;
