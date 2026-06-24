@@ -100,8 +100,8 @@ function buildDarkThemeOverrides(): GlobalThemeOverrides {
       errorColor: themeTokens.semantic.dark.error,
       bodyColor: themeTokens.semantic.dark.bgPage,
       cardColor: themeTokens.semantic.dark.bgSurface,
-      modalColor: themeTokens.semantic.dark.bgSurface,
-      popoverColor: themeTokens.semantic.dark.bgSurface,
+      modalColor: themeTokens.semantic.dark.overlayBase,
+      popoverColor: themeTokens.semantic.dark.overlayElevated,
       borderColor: themeTokens.semantic.dark.border,
       textColorBase: themeTokens.semantic.dark.textPrimary,
       textColor1: themeTokens.semantic.dark.textPrimary,
@@ -145,9 +145,9 @@ function buildDarkThemeOverrides(): GlobalThemeOverrides {
       ...notificationOverrides("dark")
     },
     Tooltip: {
-      color: "rgba(62, 66, 76, 0.98)",
+      color: themeTokens.semantic.dark.overlayElevated,
       textColor: "#F7F8FA",
-      boxShadow: "0 12px 28px rgba(0, 0, 0, 0.42), inset 0 0 0 1px rgba(255, 255, 255, 0.14)"
+      boxShadow: `${themeTokens.semantic.dark.overlayShadowFloating}, inset 0 0 0 1px ${themeTokens.semantic.dark.overlayBorder}`
     },
     Tag: {
       borderRadius: themeTokens.radius.base

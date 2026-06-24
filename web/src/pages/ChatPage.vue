@@ -264,7 +264,7 @@ watch(
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(8, 12, 17, 0.58);
+  background: var(--color-bg-overlay-mask);
   backdrop-filter: blur(3px);
 }
 
@@ -272,9 +272,9 @@ watch(
   width: min(620px, calc(100vw - 36px));
   padding: 18px 20px 16px;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(10, 13, 20, 0.9);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.38);
+  border: 1px solid var(--color-border-overlay-strong);
+  background: var(--color-bg-overlay-panel);
+  box-shadow: var(--color-shadow-overlay);
 }
 
 .browser-runtime-overlay__spinner {
@@ -332,7 +332,7 @@ watch(
   width: 100%;
   height: 10px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--color-bg-overlay-control);
   overflow: hidden;
 }
 

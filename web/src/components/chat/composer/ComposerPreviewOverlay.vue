@@ -33,7 +33,7 @@ const { t } = useI18n();
   align-items: center;
   justify-content: center;
   padding: var(--space-6);
-  background: color-mix(in srgb, black 58%, transparent);
+  background: var(--color-bg-overlay-mask);
 }
 
 .composer-preview-dialog {
@@ -42,8 +42,9 @@ const { t } = useI18n();
   max-height: 84vh;
   border-radius: var(--radius-xl);
   overflow: hidden;
-  background: color-mix(in srgb, var(--color-bg-surface) 94%, black);
-  border: var(--size-1) solid color-mix(in srgb, var(--color-border-soft) 70%, transparent);
+  background: var(--color-bg-overlay-panel);
+  border: var(--size-1) solid var(--color-border-overlay-strong);
+  box-shadow: var(--color-shadow-overlay);
 }
 
 .composer-preview-image {
@@ -62,11 +63,16 @@ const { t } = useI18n();
   height: var(--size-28);
   border: 0;
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--color-bg-overlay-strong) 85%, black);
+  background: var(--color-bg-overlay-control);
+  border: var(--size-1) solid var(--color-border-overlay);
   color: var(--color-text-inverse);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+}
+
+.composer-preview-close:hover {
+  background: var(--color-bg-overlay-control-hover);
 }
 </style>

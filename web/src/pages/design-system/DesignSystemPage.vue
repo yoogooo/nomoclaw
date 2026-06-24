@@ -27,10 +27,9 @@ import {
   NTabs,
   NTag,
   createDiscreteApi,
-  darkTheme,
-  type GlobalThemeOverrides
+  darkTheme
 } from "naive-ui";
-import { themeOverrides } from "@/theme";
+import { resolveThemeOverrides } from "@/theme";
 import { themeTokens } from "@/themeTokens";
 import { useUiPreferencesStore } from "@/stores/uiPreferences";
 
@@ -74,6 +73,7 @@ const pageSubtitle = computed(() =>
 );
 const currentButtonTokens = computed(() => (isDarkMode.value ? themeTokens.component.button.dark : themeTokens.component.button.light));
 const currentInputTokens = computed(() => (isDarkMode.value ? themeTokens.component.input.dark : themeTokens.component.input.light));
+const currentThemeOverrides = computed(() => resolveThemeOverrides(isDarkMode.value ? "dark" : "light"));
 const buttonStateVars = computed(() => ({ "--btn-focus-ring": currentButtonTokens.value.focusRing }));
 const buttonToneRows = [
   { label: "Primary", type: "primary" as const },
@@ -91,46 +91,6 @@ const inputStateVars = computed(() => ({
   "--input-focus-bg": currentInputTokens.value.colorFocus,
   "--input-focus-border": currentInputTokens.value.borderFocus
 }));
-
-const darkThemeOverrides: GlobalThemeOverrides = {
-  common: {
-    primaryColor: themeTokens.semantic.dark.primary,
-    primaryColorHover: themeTokens.semantic.dark.primaryHover,
-    primaryColorPressed: themeTokens.semantic.dark.primaryPressed,
-    primaryColorSuppl: themeTokens.semantic.dark.primary,
-    infoColor: themeTokens.semantic.dark.info,
-    successColor: themeTokens.semantic.dark.success,
-    warningColor: themeTokens.semantic.dark.warning,
-    errorColor: themeTokens.semantic.dark.error,
-    bodyColor: themeTokens.semantic.dark.bgPage,
-    cardColor: themeTokens.semantic.dark.bgSurface,
-    modalColor: themeTokens.semantic.dark.bgSurface,
-    popoverColor: themeTokens.semantic.dark.bgSurface,
-    borderColor: themeTokens.semantic.dark.border,
-    textColorBase: themeTokens.semantic.dark.textPrimary,
-    textColor1: themeTokens.semantic.dark.textPrimary,
-    textColor2: themeTokens.semantic.dark.textSecondary,
-    textColor3: themeTokens.semantic.dark.textTertiary,
-    borderRadius: themeTokens.radius.base,
-    fontFamily: themeTokens.font.sans,
-    fontFamilyMono: themeTokens.font.mono
-  },
-  Card: {
-    color: themeTokens.semantic.dark.bgSurface,
-    colorEmbedded: themeTokens.semantic.dark.bgSurfaceSoft
-  },
-  Input: {
-    color: themeTokens.component.input.dark.color,
-    colorFocus: themeTokens.component.input.dark.colorFocus,
-    colorFocusError: themeTokens.component.input.dark.colorFocusError,
-    textColor: themeTokens.component.input.dark.textColor,
-    border: themeTokens.component.input.dark.border,
-    borderHover: themeTokens.component.input.dark.borderHover,
-    borderFocus: themeTokens.component.input.dark.borderFocus,
-    borderError: themeTokens.component.input.dark.borderError,
-    borderFocusError: themeTokens.component.input.dark.borderFocusError
-  }
-};
 
 const colorGroups: ColorComparisonGroup[] = [
   {
@@ -262,7 +222,7 @@ function switchTheme(mode: "light" | "dark") {
 </script>
 
 <template>
-  <n-config-provider :theme="isDarkMode ? darkTheme : undefined" :theme-overrides="isDarkMode ? darkThemeOverrides : themeOverrides">
+  <n-config-provider :theme="isDarkMode ? darkTheme : undefined" :theme-overrides="currentThemeOverrides">
     <div class="design-spec-shell" :class="{ 'dark-shell': isDarkMode }">
       <div class="design-spec-page page-card" :class="{ 'dark-page': isDarkMode }" :style="modeVars">
         <div class="page-title">{{ pageTitle }}</div>

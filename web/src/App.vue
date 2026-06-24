@@ -83,7 +83,7 @@ function dismissModelGate() {
   display: grid;
   place-items: center;
   padding: var(--space-6);
-  background: var(--color-overlay-dark-85);
+  background: var(--color-bg-overlay-mask);
   backdrop-filter: blur(var(--size-2));
 }
 
@@ -91,9 +91,9 @@ function dismissModelGate() {
   width: min(var(--container-sm), calc(100vw - var(--size-80) - var(--size-48)));
   padding: var(--space-6);
   border-radius: var(--radius-xl);
-  border: var(--size-1) solid var(--color-border-strong);
-  background: var(--color-bg-surface);
-  box-shadow: var(--shadow-card-hover);
+  border: var(--size-1) solid var(--color-border-overlay-strong);
+  background: var(--color-bg-overlay-panel);
+  box-shadow: var(--color-shadow-overlay);
 }
 
 .model-gate-title {
@@ -139,8 +139,12 @@ function dismissModelGate() {
 }
 
 .model-gate-btn-secondary {
-  background: var(--color-button-neutral-bg-light);
-  color: var(--color-button-neutral-text-light);
+  background: var(--color-bg-overlay-control);
+  color: var(--color-text-secondary);
+}
+
+.model-gate-btn-secondary:hover {
+  background: var(--color-bg-overlay-control-hover);
 }
 
 @media (max-width: 1120px) {

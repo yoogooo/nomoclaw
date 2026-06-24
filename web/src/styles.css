@@ -1403,6 +1403,63 @@ a {
   border-radius: 0 !important;
 }
 
+:root[data-theme="dark"] .n-modal-mask,
+:root[data-theme="dark"] .n-drawer-mask,
+:root[data-theme="dark"] .n-image-preview-overlay {
+  background: var(--color-bg-overlay-mask) !important;
+}
+
+:root[data-theme="dark"] .n-card.n-modal,
+:root[data-theme="dark"] .n-dialog {
+  border: var(--size-1) solid var(--color-border-overlay-strong) !important;
+  background: var(--color-bg-overlay-panel) !important;
+  box-shadow: var(--color-shadow-overlay) !important;
+}
+
+:root[data-theme="dark"] .n-card.n-modal .n-card-header,
+:root[data-theme="dark"] .n-card.n-modal .n-card__content,
+:root[data-theme="dark"] .n-card.n-modal .n-card__footer,
+:root[data-theme="dark"] .n-dialog .n-dialog__content,
+:root[data-theme="dark"] .n-dialog .n-dialog__action {
+  background: transparent !important;
+}
+
+:root[data-theme="dark"] .n-dialog {
+  box-shadow:
+    var(--color-shadow-overlay),
+    inset 0 0 0 var(--size-1) var(--color-border-overlay) !important;
+}
+
+:root[data-theme="dark"] .n-drawer-content,
+:root[data-theme="dark"] .n-drawer-header,
+:root[data-theme="dark"] .n-drawer-body,
+:root[data-theme="dark"] .n-drawer-footer {
+  background: var(--color-bg-overlay-sidepanel) !important;
+}
+
+:root[data-theme="dark"] .n-drawer-content {
+  border-left: var(--size-1) solid var(--color-border-overlay-strong) !important;
+  box-shadow: var(--color-shadow-overlay) !important;
+}
+
+:root[data-theme="dark"] .n-drawer-header,
+:root[data-theme="dark"] .n-drawer-footer {
+  border-color: var(--color-border-overlay) !important;
+}
+
+:root[data-theme="dark"] .n-popover,
+:root[data-theme="dark"] .n-base-select-menu,
+:root[data-theme="dark"] .n-popselect-menu {
+  border: var(--size-1) solid var(--color-border-overlay-strong) !important;
+  background: var(--color-bg-overlay-floating) !important;
+  box-shadow: var(--color-shadow-overlay-floating) !important;
+}
+
+:root[data-theme="dark"] .n-popover .n-popover-arrow::before,
+:root[data-theme="dark"] .n-popover .n-popover-arrow::after {
+  background: var(--color-bg-overlay-floating) !important;
+}
+
 @media (max-width: 1480px) {
   .grid-chat {
     grid-template-columns: var(--layout-directory-rail-width) var(--size-260) minmax(0, 1fr);
