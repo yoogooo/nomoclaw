@@ -15,7 +15,8 @@ import { formatDateTime } from "@/utils/format";
 const { t } = useI18n();
 const router = useRouter();
 
-const loading = ref(false);
+const tableLoading = ref(false);
+const filterSubmitting = ref(false);
 const page = ref(1);
 const pageSize = ref(10);
 const total = ref(0);
@@ -169,7 +170,7 @@ async function loadAgents() {
 }
 
 async function loadHistory() {
-  loading.value = true;
+  tableLoading.value = true;
   try {
     const effectiveRange = dateQuick.value === "custom"
       ? dateRange.value
@@ -187,7 +188,7 @@ async function loadHistory() {
     items.value = response.items;
     total.value = response.total;
   } finally {
-    loading.value = false;
+    tableLoading.value = false;
   }
 }
 
@@ -196,8 +197,13 @@ async function refresh() {
 }
 
 async function applyFilters() {
-  page.value = 1;
-  await loadHistory();
+  filterSubmitting.value = true;
+  try {
+    page.value = 1;
+    await loadHistory();
+  } finally {
+    filterSubmitting.value = false;
+  }
 }
 
 async function handlePageSizeChange(nextPageSize: number) {
@@ -275,7 +281,7 @@ watch([agentUid, status, dateQuick, dateRange], () => {
                 size="small"
                 class="history-filter-item history-filter-date"
               />
-              <n-button type="primary" size="small" :loading="loading" class="history-filter-item history-filter-action" @click="applyFilters">
+              <n-button type="primary" size="small" :loading="filterSubmitting" class="history-filter-item history-filter-action" @click="applyFilters">
                 <template #icon>
                   <n-icon :component="Search" :size="14" />
                 </template>
@@ -286,10 +292,10 @@ watch([agentUid, status, dateQuick, dateRange], () => {
 
           <section class="panel history-table-panel">
             <div class="panel-body history-table-body">
-              <n-empty v-if="!loading && !items.length" :description="t('cron.history.empty')" class="history-empty-state" />
+              <n-empty v-if="!tableLoading && !items.length" :description="t('cron.history.empty')" class="history-empty-state" />
               <n-data-table
                 v-else
-                :loading="loading"
+                :loading="tableLoading"
                 :columns="columns"
                 :data="items"
                 :bordered="false"
