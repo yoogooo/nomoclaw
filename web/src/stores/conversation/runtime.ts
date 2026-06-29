@@ -262,7 +262,7 @@ export function createConversationRuntimeModule(ctx: ConversationStoreContext): 
       const existing = state.messages.value[existingIndex];
       state.messages.value[existingIndex] = {
         ...existing,
-        content: done && accumulatedText !== undefined ? accumulatedText : `${existing.content || ""}${textDelta}`,
+        content: accumulatedText !== undefined ? accumulatedText : `${existing.content || ""}${textDelta}`,
         status: done ? "COMPLETED" : "RUNNING"
       };
       return;

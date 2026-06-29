@@ -70,7 +70,7 @@ export function createConversationEventsModule(
       const textDelta = String(event.payload.textDelta || "");
       const done = Boolean(event.payload.done);
       const accumulatedText = event.payload.accumulatedText === undefined ? undefined : String(event.payload.accumulatedText || "");
-      if (!textDelta && !done) return;
+      if (!textDelta && !done && accumulatedText === undefined) return;
       runtimeModule.upsertStreamingAssistantDelta(event.messageUid, textDelta, event.timestamp, accumulatedText, done);
       return;
     }

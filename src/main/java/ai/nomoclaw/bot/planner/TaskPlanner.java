@@ -94,7 +94,8 @@ public class TaskPlanner implements Planner {
                                            List<ToolSpecification> toolSpecifications,
                                            ToolChoice toolChoice,
                                            PromptLoader.PromptContext promptContext,
-                                           Consumer<String> onDelta) {
+                                           Consumer<String> onDelta,
+                                           Runnable onRetryReset) {
         PreparedRequest preparedRequest = buildRequest(memory, toolSpecifications, toolChoice, promptContext);
         ChatRequest request = preparedRequest.request();
         RuntimeChatModelResolver.ResolvedModel resolvedModel = runtimeChatModelResolver.resolve(promptContext);
@@ -133,7 +134,7 @@ public class TaskPlanner implements Planner {
         }
 
         try {
-            StreamAttemptResult streamed = executeStreamingWithRecovery(request, resolvedModel, onDelta);
+            StreamAttemptResult streamed = executeStreamingWithRecovery(request, resolvedModel, onDelta, onRetryReset);
             ChatResponse response = streamed.response();
             if (streamed.streamed()) {
                 log.info("[Reasoning] stream completed provider={} model={} deltas={} chars={}",
@@ -332,7 +333,8 @@ public class TaskPlanner implements Planner {
 
     private StreamAttemptResult executeStreamingWithRecovery(ChatRequest request,
                                                              RuntimeChatModelResolver.ResolvedModel resolvedModel,
-                                                             Consumer<String> onDelta) {
+                                                             Consumer<String> onDelta,
+                                                             Runnable onRetryReset) {
         int maxAttempts = maxRetryAttempts();
         Exception last = null;
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -372,9 +374,15 @@ public class TaskPlanner implements Planner {
                     throw ex;
                 }
                 if (buffer.length() > 0) {
-                    log.warn("[Reasoning] stream aborted after partial output provider={} model={} deltas={} err={}",
-                            resolvedModel.providerId(), resolvedModel.modelId(), deltaCount[0], root.getMessage());
-                    throw ex;
+                    log.warn("[Reasoning] stream aborted after partial output provider={} model={} deltas={} attempt={}/{} err={}",
+                            resolvedModel.providerId(), resolvedModel.modelId(), deltaCount[0], attempt, maxAttempts, root.getMessage());
+                    runRetryReset(onRetryReset);
+                    last = ex;
+                    if (attempt >= maxAttempts) {
+                        break;
+                    }
+                    sleepBeforeRetry(attempt);
+                    continue;
                 }
                 last = ex;
                 if (attempt >= maxAttempts) {
@@ -404,6 +412,13 @@ public class TaskPlanner implements Planner {
             throw runtimeException;
         }
         throw new IllegalStateException(last);
+    }
+
+    private void runRetryReset(Runnable onRetryReset) {
+        if (onRetryReset == null) {
+            return;
+        }
+        onRetryReset.run();
     }
 
     private int maxRetryAttempts() {

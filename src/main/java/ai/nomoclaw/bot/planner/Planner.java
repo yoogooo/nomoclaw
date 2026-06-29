@@ -26,7 +26,8 @@ public interface Planner {
                                     List<ToolSpecification> toolSpecifications,
                                     ToolChoice toolChoice,
                                     PromptLoader.PromptContext promptContext,
-                                    Consumer<String> onDelta);
+                                    Consumer<String> onDelta,
+                                    Runnable onRetryReset);
 
     SummaryResult summarize(List<ChatMessage> memory,
                             String stopReason,

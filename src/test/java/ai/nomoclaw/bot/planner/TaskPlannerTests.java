@@ -17,7 +17,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.net.ssl.SSLHandshakeException;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -129,10 +131,78 @@ class TaskPlannerTests {
                 List.of(),
                 ToolChoice.AUTO,
                 promptContext,
+                null,
                 null
         ));
 
         assertEquals("fallback answer", result.accumulatedText());
         assertEquals(false, result.streamed());
+    }
+
+    @Test
+    void reasonStreamShouldResetAndRetryWhenHandshakeFailsAfterPartialOutput() {
+        LlmProperties llmProperties = new LlmProperties();
+        llmProperties.setSystemPrompt("test system prompt");
+        llmProperties.setMaxRetries(1);
+
+        RuntimeChatModelResolver runtimeChatModelResolver = mock(RuntimeChatModelResolver.class);
+        SkillPromptLoader skillPromptLoader = mock(SkillPromptLoader.class);
+        LlmDebugLogger llmDebugLogger = mock(LlmDebugLogger.class);
+        when(skillPromptLoader.buildAgentSkillPrompt(any())).thenReturn("");
+
+        ChatModel chatModel = mock(ChatModel.class);
+        StreamingChatModel streamingChatModel = mock(StreamingChatModel.class);
+        ChatResponse chatResponse = mock(ChatResponse.class);
+        AiMessage aiMessage = mock(AiMessage.class);
+        when(aiMessage.text()).thenReturn("retry success");
+        when(chatResponse.aiMessage()).thenReturn(aiMessage);
+
+        AtomicInteger attempts = new AtomicInteger();
+        doAnswer(invocation -> {
+            StreamingChatResponseHandler handler = invocation.getArgument(1);
+            if (attempts.incrementAndGet() == 1) {
+                handler.onPartialResponse("partial");
+                handler.onError(new SSLHandshakeException("Remote host terminated the handshake"));
+                return null;
+            }
+            handler.onPartialResponse("retry success");
+            handler.onCompleteResponse(chatResponse);
+            return null;
+        }).when(streamingChatModel).chat(any(ChatRequest.class), any(StreamingChatResponseHandler.class));
+
+        RuntimeChatModelResolver.ResolvedModel resolvedModel = new RuntimeChatModelResolver.ResolvedModel(
+                "dashscope",
+                "deepseek-v4-flash",
+                chatModel,
+                streamingChatModel
+        );
+        when(runtimeChatModelResolver.resolve(any())).thenReturn(resolvedModel);
+
+        TaskPlanner taskPlanner = new TaskPlanner(llmProperties, runtimeChatModelResolver, skillPromptLoader, llmDebugLogger);
+        List<ChatMessage> memory = List.of(UserMessage.from("请继续"));
+        PromptLoader.PromptContext promptContext = PromptLoader.PromptContext.forAgent(
+                "session-1",
+                "message-1",
+                "web",
+                "",
+                "general_assistant",
+                tempDir
+        );
+        List<String> deltas = new ArrayList<>();
+        AtomicInteger resets = new AtomicInteger();
+
+        Planner.StreamReasonResult result = assertDoesNotThrow(() -> taskPlanner.reasonStream(
+                memory,
+                List.of(),
+                ToolChoice.AUTO,
+                promptContext,
+                deltas::add,
+                resets::incrementAndGet
+        ));
+
+        assertEquals(List.of("partial", "retry success"), deltas);
+        assertEquals(1, resets.get());
+        assertEquals("retry success", result.accumulatedText());
+        assertEquals(true, result.streamed());
     }
 }

@@ -516,6 +516,14 @@ public class AgentApplicationService {
                     String accumulatedText = streamedText.toString();
                     runtimeStateStore.appendDelta(message.messageUid(), textDelta);
                     publishMessageDelta(message, roundIndex, textDelta, accumulatedText, false);
+                },
+                () -> {
+                    streamedText.setLength(0);
+                    runtimeStateStore.clearBufferedAnswer(message.messageUid());
+                    if (cancellationRegistry.isCanceled(message.messageUid())) {
+                        return;
+                    }
+                    publishMessageDelta(message, roundIndex, "", "", false);
                 }
         );
         ChatResponse response = streamedResult.response();
