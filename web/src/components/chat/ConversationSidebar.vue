@@ -33,6 +33,7 @@ const cronTaskByConversationUid = ref<Record<string, string>>({});
 const runningConversationUids = ref<Record<string, true>>({});
 const conversationListRef = ref<HTMLElement | null>(null);
 const lastAutoScrolledConversationUid = ref("");
+const autoLoadMoreSuspended = ref(false);
 let cronBindingsPollTimer: number | null = null;
 
 const agentOptions = computed<AgentSelectOption[]>(() =>
@@ -293,12 +294,35 @@ async function fillConversationViewportIfNeeded() {
   while (
     conversationStore.conversationListHasMore
     && !conversationStore.conversationListLoading
+    && !autoLoadMoreSuspended.value
     && element.scrollHeight <= element.clientHeight
     && guard < 20
   ) {
     guard += 1;
-    await conversationStore.loadMoreConversations();
+    const loaded = await requestMoreConversations("auto");
+    if (!loaded) {
+      break;
+    }
     await nextTick();
+  }
+}
+
+async function requestMoreConversations(trigger: "auto" | "manual") {
+  if (conversationStore.conversationListLoading || !conversationStore.conversationListHasMore) {
+    return false;
+  }
+  if (trigger === "auto" && autoLoadMoreSuspended.value) {
+    return false;
+  }
+  try {
+    await conversationStore.loadMoreConversations();
+    autoLoadMoreSuspended.value = false;
+    return true;
+  } catch {
+    if (trigger === "auto") {
+      autoLoadMoreSuspended.value = true;
+    }
+    return false;
   }
 }
 
@@ -347,8 +371,11 @@ function handleConversationListScroll(event: Event) {
     return;
   }
   const remaining = element.scrollHeight - element.scrollTop - element.clientHeight;
+  if (remaining > 200) {
+    autoLoadMoreSuspended.value = false;
+  }
   if (remaining <= 120) {
-    void conversationStore.loadMoreConversations();
+    void requestMoreConversations("auto");
   }
 }
 
@@ -487,7 +514,7 @@ onBeforeUnmount(() => {
           <button
             type="button"
             class="conversation-list-load-more-btn"
-            @click="conversationStore.loadMoreConversations()"
+            @click="requestMoreConversations('manual')"
           >
             {{ t("chat.sidebar.loadMore") }}
           </button>

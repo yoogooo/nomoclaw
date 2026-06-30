@@ -1,13 +1,19 @@
 package ai.nomoclaw.bot.agent;
 
 import ai.nomoclaw.bot.config.AgentProperties;
+import ai.nomoclaw.bot.model.ToolRequest;
+import ai.nomoclaw.bot.model.ToolResult;
 import ai.nomoclaw.bot.orchestrator.MessageCancellationRegistry;
 import ai.nomoclaw.bot.tool.BrowserTool;
 import ai.nomoclaw.bot.workspace.NomoClawPaths;
+import com.microsoft.playwright.Page;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.Mockito;
+import tools.jackson.databind.node.JsonNodeFactory;
+import tools.jackson.databind.node.ObjectNode;
 
 import java.lang.reflect.Method;
 import java.util.Map;
@@ -97,6 +103,47 @@ class BrowserToolRuntimePathTests {
         assertThat(staleDir).doesNotExist();
         assertThat(freshDir).isDirectory();
         assertThat(unrelatedDir).isDirectory();
+    }
+
+    @Test
+    void waitForShouldRejectBlankSelector() throws Exception {
+        BrowserTool tool = new BrowserTool(new AgentProperties(), new MessageCancellationRegistry());
+        ToolRequest request = toolRequest("wait_for", "");
+        Page page = Mockito.mock(Page.class);
+        Object managedMode = browserMode("MANAGED");
+
+        ToolResult result = (ToolResult) invoke(tool, "executeAction", request, page, 0L, "profile", managedMode);
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.errorCode()).isEqualTo("INVALID_ARGS");
+        assertThat(result.errorMessage()).isEqualTo("selector is required for wait_for");
+        Mockito.verifyNoInteractions(page);
+    }
+
+    private ToolRequest toolRequest(String action, String selector) {
+        ObjectNode args = JsonNodeFactory.instance.objectNode();
+        args.put("action", action);
+        args.put("selector", selector);
+        return new ToolRequest(
+                "conversation-1",
+                "message-1",
+                "step-1",
+                "agent-1",
+                "agent",
+                tempDir,
+                tempDir.resolve("tmp"),
+                tempDir.resolve("report"),
+                args,
+                5_000L,
+                null
+        );
+    }
+
+    private Object browserMode(String name) throws Exception {
+        Class<?> browserModeClass = Class.forName("ai.nomoclaw.bot.tool.BrowserTool$BrowserMode");
+        @SuppressWarnings({"rawtypes", "unchecked"})
+        Object value = Enum.valueOf((Class<? extends Enum>) browserModeClass.asSubclass(Enum.class), name);
+        return value;
     }
 
     private Object invoke(BrowserTool tool, String methodName, Object... args) throws Exception {

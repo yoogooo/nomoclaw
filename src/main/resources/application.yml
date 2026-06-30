@@ -90,7 +90,7 @@ nomoclaw:
 llm:
   provider: dashscope
   timeout: 180s
-  max-retries: 1
+  max-retries: 2
   debug:
     enabled: true
     file-path: "logs/llm-debug.jsonl"

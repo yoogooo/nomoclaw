@@ -260,6 +260,9 @@ public class BrowserTool implements Tool {
                     ObjectNode artifacts = textArtifacts("loadState", stateValue);
                     yield ToolResult.success("waited for load state " + stateValue, artifacts, metric(start));
                 }
+                if (normalized.isBlank()) {
+                    yield ToolResult.failure("INVALID_ARGS", "selector is required for wait_for", metric(start));
+                }
                 page.locator(selector).first().waitFor();
                 yield ToolResult.success("waited for " + selector, textArtifacts("selector", selector), metric(start));
             }
