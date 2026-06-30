@@ -111,7 +111,7 @@ async function applyConversationRouteContext() {
       const targetAgent = agentCatalogStore.allAgents.find((item) => item.agentUid === targetAgentUid);
       if (targetAgent && targetAgent.agentUid !== agentCatalogStore.selectedAgentUid) {
         agentCatalogStore.selectAgent(targetAgent.agentGroupUid, targetAgent.agentUid);
-        await conversationStore.refreshConversations(targetConversationUid);
+        await conversationStore.refreshConversations(targetConversationUid, true, true);
         refreshedForTargetAgent = true;
         if (token !== applyRouteToken) return;
       }
@@ -129,7 +129,7 @@ async function applyConversationRouteContext() {
       (item) => item.conversationUid === targetConversationUid
     );
     if (!initializedConversationList && !refreshedForTargetAgent && !targetConversationLoaded) {
-      await conversationStore.refreshConversations(targetConversationUid);
+      await conversationStore.refreshConversations(targetConversationUid, true, true);
     }
   } finally {
     if (token === applyRouteToken) {
