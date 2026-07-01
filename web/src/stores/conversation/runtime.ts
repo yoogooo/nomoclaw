@@ -353,14 +353,20 @@ export function createConversationRuntimeModule(ctx: ConversationStoreContext): 
   function handleReasoningEvent(event: AgentEvent) {
     if (!event.messageUid) return;
     const roundIndex = Number(event.payload.roundIndex || 1);
+    const status = String(event.payload.status || "").trim() || "completed";
+    const displayTitle = String(event.payload.displayTitle || "").trim() || deps.tr("chat.runtime.stepTitle.reasoning");
+    const displaySummary = String(event.payload.displaySummary || "").trim() || deps.tr("chat.runtime.reasoningSummary");
+    const displayDetails = String(
+      event.payload.displayDetails ?? event.payload.content ?? ""
+    );
     deps.conversationRunsStore.updateRunStep(event.messageUid, `reasoning-${event.messageUid}-${roundIndex}`, {
       roundIndex,
       stepIndex: 0,
-      status: "completed",
+      status,
       toolName: "Reasoning",
-      displayTitle: deps.tr("chat.runtime.stepTitle.reasoning"),
-      displaySummary: deps.tr("chat.runtime.reasoningSummary"),
-      displayDetails: String(event.payload.content || ""),
+      displayTitle,
+      displaySummary,
+      displayDetails,
       updatedTime: new Date().toISOString()
     });
   }

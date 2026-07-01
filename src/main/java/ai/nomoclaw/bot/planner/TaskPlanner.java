@@ -95,7 +95,8 @@ public class TaskPlanner implements Planner {
                                            ToolChoice toolChoice,
                                            PromptLoader.PromptContext promptContext,
                                            Consumer<String> onDelta,
-                                           Runnable onRetryReset) {
+                                           Runnable onRetryReset,
+                                           Consumer<RetryNotice> onRetry) {
         PreparedRequest preparedRequest = buildRequest(memory, toolSpecifications, toolChoice, promptContext);
         ChatRequest request = preparedRequest.request();
         RuntimeChatModelResolver.ResolvedModel resolvedModel = runtimeChatModelResolver.resolve(promptContext);
@@ -134,7 +135,7 @@ public class TaskPlanner implements Planner {
         }
 
         try {
-            StreamAttemptResult streamed = executeStreamingWithRecovery(request, resolvedModel, onDelta, onRetryReset);
+            StreamAttemptResult streamed = executeStreamingWithRecovery(request, resolvedModel, onDelta, onRetryReset, onRetry);
             ChatResponse response = streamed.response();
             if (streamed.streamed()) {
                 log.info("[Reasoning] stream completed provider={} model={} deltas={} chars={}",
@@ -334,7 +335,8 @@ public class TaskPlanner implements Planner {
     private StreamAttemptResult executeStreamingWithRecovery(ChatRequest request,
                                                              RuntimeChatModelResolver.ResolvedModel resolvedModel,
                                                              Consumer<String> onDelta,
-                                                             Runnable onRetryReset) {
+                                                             Runnable onRetryReset,
+                                                             Consumer<RetryNotice> onRetry) {
         int maxAttempts = maxRetryAttempts();
         Exception last = null;
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -381,6 +383,7 @@ public class TaskPlanner implements Planner {
                     if (attempt >= maxAttempts) {
                         break;
                     }
+                    publishRetryNotice(onRetry, attempt, maxAttempts - 1, root);
                     sleepBeforeRetry(attempt);
                     continue;
                 }
@@ -394,6 +397,7 @@ public class TaskPlanner implements Planner {
                         attempt,
                         maxAttempts,
                         root.getMessage());
+                publishRetryNotice(onRetry, attempt, maxAttempts - 1, root);
                 sleepBeforeRetry(attempt);
             }
         }
@@ -419,6 +423,17 @@ public class TaskPlanner implements Planner {
             return;
         }
         onRetryReset.run();
+    }
+
+    private void publishRetryNotice(Consumer<RetryNotice> onRetry,
+                                    int retryIndex,
+                                    int maxRetries,
+                                    Throwable throwable) {
+        if (onRetry == null) {
+            return;
+        }
+        String reason = throwable == null || throwable.getMessage() == null ? "" : throwable.getMessage().trim();
+        onRetry.accept(new RetryNotice(retryIndex, maxRetries, reason));
     }
 
     private int maxRetryAttempts() {

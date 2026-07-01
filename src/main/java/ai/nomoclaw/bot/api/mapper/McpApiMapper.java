@@ -1,6 +1,8 @@
 package ai.nomoclaw.bot.api.mapper;
 
+import ai.nomoclaw.bot.api.dto.mcp.request.CreateCodexMcpServerRequest;
 import ai.nomoclaw.bot.api.dto.mcp.request.SaveMcpServerRequest;
+import ai.nomoclaw.bot.mcp.CreateCodexMcpServerParam;
 import ai.nomoclaw.bot.api.dto.mcp.response.McpServerResponse;
 import ai.nomoclaw.bot.api.dto.mcp.response.McpToolResponse;
 import ai.nomoclaw.bot.mcp.McpServerDto;
@@ -29,6 +31,17 @@ public final class McpApiMapper {
                 request.args(),
                 request.env(),
                 request.cwd()
+        );
+    }
+
+    public static CreateCodexMcpServerParam toParam(CreateCodexMcpServerRequest request) {
+        return new CreateCodexMcpServerParam(
+                request == null ? null : request.serverName(),
+                request == null ? null : request.timeoutSeconds(),
+                request == null ? null : request.autoStart(),
+                request == null ? null : request.command(),
+                request == null ? null : request.cwd(),
+                request == null ? null : request.env()
         );
     }
 

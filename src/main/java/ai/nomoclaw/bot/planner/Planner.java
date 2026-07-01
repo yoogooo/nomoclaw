@@ -17,6 +17,9 @@ public interface Planner {
     record StreamReasonResult(ChatResponse response, String accumulatedText, boolean streamed) {
     }
 
+    record RetryNotice(int retryIndex, int maxRetries, String reason) {
+    }
+
     ChatResponse reason(List<ChatMessage> memory,
                         List<ToolSpecification> toolSpecifications,
                         ToolChoice toolChoice,
@@ -27,7 +30,8 @@ public interface Planner {
                                     ToolChoice toolChoice,
                                     PromptLoader.PromptContext promptContext,
                                     Consumer<String> onDelta,
-                                    Runnable onRetryReset);
+                                    Runnable onRetryReset,
+                                    Consumer<RetryNotice> onRetry);
 
     SummaryResult summarize(List<ChatMessage> memory,
                             String stopReason,

@@ -150,6 +150,23 @@ function runStepTone(step: ConversationRunStep) {
   return runTone(step.status);
 }
 
+function isReasoningRetryStep(step: ConversationRunStep) {
+  if (!isReasoningStep(step) || step.status !== "running") {
+    return false;
+  }
+  const summary = String(step.displaySummary || "").trim();
+  const details = String(step.displayDetails || "").trim();
+  return /网络重试|reconnect|reconnecting|retry/i.test(`${summary}\n${details}`);
+}
+
+function reasoningRetryTitle(step: ConversationRunStep) {
+  return String(step.displaySummary || step.displayTitle || "").trim() || t("chat.runtime.stepTitle.reasoning");
+}
+
+function reasoningRetryDetails(step: ConversationRunStep) {
+  return String(step.displayDetails || "").trim();
+}
+
 function browserModeBadgeText(step: ConversationRunStep) {
   if ((step.toolName || "") !== "BrowserTool") {
     return "";
@@ -1098,15 +1115,33 @@ onMounted(() => {
                   <n-collapse-item
                     v-for="(step, stepPosition) in visibleRunSteps(message.messageUid)"
                     :key="step.stepUid"
-                    :title="`${stepPosition + 1}. ${runStepTitle(step)}`"
                     :name="step.stepUid"
                   >
+                    <template #header>
+                      <div
+                        v-if="isReasoningRetryStep(step)"
+                        class="run-retry-notice"
+                      >
+                        <div class="run-retry-notice-title">{{ reasoningRetryTitle(step) }}</div>
+                        <div v-if="reasoningRetryDetails(step)" class="run-retry-notice-details">
+                          {{ reasoningRetryDetails(step) }}
+                        </div>
+                      </div>
+                      <div v-else class="run-step-header-title">
+                        {{ `${stepPosition + 1}. ${runStepTitle(step)}` }}
+                      </div>
+                    </template>
                     <template #header-extra>
-                      <div v-if="!isReasoningStep(step)" class="run-step-header-tags">
+                      <div v-if="!isReasoningStep(step) && !isReasoningRetryStep(step)" class="run-step-header-tags">
                         <n-tag size="small" :type="runStepTone(step)">{{ runStatusText(step.status) }}</n-tag>
                       </div>
                     </template>
-                    <template v-if="getRunStepRenderData(step).isCommand">
+                    <template v-if="isReasoningRetryStep(step)">
+                      <div class="run-retry-notice-body">
+                        <span class="run-retry-notice-body-label">{{ t("chat.runtime.stepTitle.reasoning") }}</span>
+                      </div>
+                    </template>
+                    <template v-else-if="getRunStepRenderData(step).isCommand">
                       <div class="run-command-blocks">
                         <div v-if="browserModeBadgeText(step)" class="run-step-browser-mode">
                           <n-tag size="small" :bordered="false" class="run-browser-mode-badge">
@@ -1751,6 +1786,44 @@ onMounted(() => {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--space-1_5);
+}
+
+.run-step-header-title {
+  min-width: 0;
+}
+
+.run-retry-notice {
+  display: grid;
+  gap: var(--space-1_5);
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-1) 0;
+}
+
+.run-retry-notice-title {
+  color: var(--color-text-primary);
+  font-size: var(--text-body-size);
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.run-retry-notice-details {
+  color: var(--color-text-secondary);
+  font-size: var(--text-body-size);
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.run-retry-notice-body {
+  padding-top: var(--space-1);
+}
+
+.run-retry-notice-body-label {
+  color: var(--color-text-subtle);
+  font-size: var(--text-caption-size);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .run-step-browser-mode {

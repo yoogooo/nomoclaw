@@ -1,11 +1,12 @@
 package ai.nomoclaw.bot.api.controller.mcp;
 
 import ai.nomoclaw.bot.api.dto.common.response.SimpleResponse;
+import ai.nomoclaw.bot.api.dto.mcp.request.CreateCodexMcpServerRequest;
 import ai.nomoclaw.bot.api.dto.mcp.request.SaveMcpServerRequest;
 import ai.nomoclaw.bot.api.dto.mcp.request.UpdateMcpServerStatusRequest;
+import ai.nomoclaw.bot.api.mapper.McpApiMapper;
 import ai.nomoclaw.bot.api.dto.mcp.response.McpServerResponse;
 import ai.nomoclaw.bot.api.dto.mcp.response.McpToolResponse;
-import ai.nomoclaw.bot.api.mapper.McpApiMapper;
 import ai.nomoclaw.bot.mcp.McpApplicationService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
@@ -45,6 +46,13 @@ public class McpController {
     public McpServerResponse createMcpServer(@Valid @RequestBody SaveMcpServerRequest request) {
         log.info("[AgentAPI] createMcpServer serverName={} transport={}", request.serverName(), request.transport());
         return McpApiMapper.toMcpServer(mcpApplicationService.createServer(McpApiMapper.toParam(request)));
+    }
+
+    @PostMapping("/mcp/servers/presets/codex")
+    public McpServerResponse createCodexMcpServer(@Valid @RequestBody(required = false) CreateCodexMcpServerRequest request) {
+        String serverName = request == null ? null : request.serverName();
+        log.info("[AgentAPI] createCodexMcpServer serverName={}", serverName);
+        return McpApiMapper.toMcpServer(mcpApplicationService.createCodexServer(McpApiMapper.toParam(request)));
     }
 
     @PutMapping("/mcp/servers/{serverUid}")

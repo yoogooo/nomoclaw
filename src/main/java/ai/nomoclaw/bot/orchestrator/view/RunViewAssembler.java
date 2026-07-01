@@ -66,11 +66,17 @@ public class RunViewAssembler {
                 RunStepAccumulator accumulator = stepMap.computeIfAbsent(virtualStepUid, ignored -> RunStepAccumulator.empty(virtualStepUid));
                 accumulator.roundIndex = roundIndex;
                 accumulator.stepIndex = 0;
-                accumulator.status = "completed";
+                accumulator.status = event.payload() == null ? "completed" : event.payload().path("status").asText("completed");
                 accumulator.toolName = "Reasoning";
-                accumulator.displayTitle = "思考过程 / Reasoning";
-                accumulator.displaySummary = "模型思考摘要";
-                accumulator.displayDetails = event.payload() == null ? "" : event.payload().path("content").asText("");
+                accumulator.displayTitle = event.payload() == null
+                        ? "思考过程 / Reasoning"
+                        : event.payload().path("displayTitle").asText("思考过程 / Reasoning");
+                accumulator.displaySummary = event.payload() == null
+                        ? "模型思考摘要"
+                        : event.payload().path("displaySummary").asText("模型思考摘要");
+                accumulator.displayDetails = event.payload() == null
+                        ? ""
+                        : event.payload().path("displayDetails").asText(event.payload().path("content").asText(""));
                 accumulator.updatedTime = event.timestamp();
                 continue;
             }

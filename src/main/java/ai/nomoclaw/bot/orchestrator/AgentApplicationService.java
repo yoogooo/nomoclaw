@@ -524,6 +524,12 @@ public class AgentApplicationService {
                         return;
                     }
                     publishMessageDelta(message, roundIndex, "", "", false);
+                },
+                retryNotice -> {
+                    if (retryNotice == null || cancellationRegistry.isCanceled(message.messageUid())) {
+                        return;
+                    }
+                    publishReasoningRetry(message, roundIndex, retryNotice);
                 }
         );
         ChatResponse response = streamedResult.response();
@@ -857,6 +863,19 @@ public class AgentApplicationService {
         payload.put("content", abbreviate(reasoning, 32 * 1024));
         payload.put("chars", reasoning.length());
         publishEvent(AgentEventType.MESSAGE_REASONING, message.conversationUid(), message.messageUid(), null, payload);
+    }
+
+    private void publishReasoningRetry(AgentMessage message, int roundIndex, Planner.RetryNotice retryNotice) {
+        ObjectNode payload = basePayload("message reasoning retry");
+        payload.put("roundIndex", roundIndex);
+        payload.put("status", "running");
+        payload.put("displayTitle", "思考过程 / Reasoning");
+        payload.put("displaySummary", "网络重试 " + retryNotice.retryIndex() + "/" + retryNotice.maxRetries());
+        String reason = nullToEmpty(retryNotice.reason()).trim();
+        payload.put("displayDetails", reason.isBlank()
+                ? "模型服务连接不稳定，正在重新发起请求。"
+                : "模型服务连接不稳定，正在重新发起请求。\n原因: " + abbreviate(reason, 300));
+        publishTransientEvent(AgentEventType.MESSAGE_REASONING, message.conversationUid(), message.messageUid(), null, payload);
     }
 
     private void publishEvent(AgentEventType type, String conversationUid, String messageUid, String stepUid, ObjectNode payload) {

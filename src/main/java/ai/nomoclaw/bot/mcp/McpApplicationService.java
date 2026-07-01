@@ -47,6 +47,10 @@ import java.util.stream.Collectors;
 @Service
 @Slf4j
 public class McpApplicationService {
+    private static final String CODEX_SERVER_NAME = "codex";
+    private static final String CODEX_COMMAND = "codex";
+    private static final int CODEX_TIMEOUT_SECONDS = 3600;
+    private static final List<String> CODEX_MCP_SERVER_ARGS = List.of("mcp-server");
 
     private final McpServerDefinitionRepository serverRepository;
     private final McpToolSnapshotRepository toolSnapshotRepository;
@@ -94,6 +98,23 @@ public class McpApplicationService {
         server.setCreatedTime(now);
         serverRepository.save(server);
         return toDto(server, 0);
+    }
+
+    @Transactional
+    public McpServerDto createCodexServer(CreateCodexMcpServerParam command) {
+        SaveMcpServerParam saveCommand = new SaveMcpServerParam(
+                defaultIfBlank(command == null ? null : command.serverName(), CODEX_SERVER_NAME),
+                "STDIO",
+                command == null || command.timeoutSeconds() == null ? CODEX_TIMEOUT_SECONDS : command.timeoutSeconds(),
+                command == null ? Boolean.TRUE : command.autoStart(),
+                "",
+                Map.of(),
+                defaultIfBlank(command == null ? null : command.command(), CODEX_COMMAND),
+                CODEX_MCP_SERVER_ARGS,
+                command == null ? Map.of() : command.env(),
+                command == null ? "" : command.cwd()
+        );
+        return createServer(saveCommand);
     }
 
     @Transactional
@@ -564,6 +585,11 @@ public class McpApplicationService {
             throw new IllegalArgumentException("serverName is required");
         }
         return normalized.length() <= 100 ? normalized : normalized.substring(0, 100);
+    }
+
+    private String defaultIfBlank(String value, String fallback) {
+        String normalized = nullToEmpty(value).trim();
+        return normalized.isBlank() ? fallback : normalized;
     }
 
     private void ensureServerNameAvailable(String serverName, Long currentId) {
