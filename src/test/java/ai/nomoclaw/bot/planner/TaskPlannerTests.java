@@ -132,6 +132,7 @@ class TaskPlannerTests {
                 ToolChoice.AUTO,
                 promptContext,
                 null,
+                null,
                 null
         ));
 
@@ -197,7 +198,8 @@ class TaskPlannerTests {
                 ToolChoice.AUTO,
                 promptContext,
                 deltas::add,
-                resets::incrementAndGet
+                resets::incrementAndGet,
+                null
         ));
 
         assertEquals(List.of("partial", "retry success"), deltas);
