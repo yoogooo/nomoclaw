@@ -148,6 +148,7 @@ export interface ConversationStoreContext {
 export interface ConversationListModule {
   stopConversationSummaryPolling: () => void;
   scheduleConversationSummaryPolling: () => void;
+  refreshConversationSummariesSilently: (force?: boolean) => Promise<void>;
   loadConversationSummaries: (force?: boolean) => Promise<void>;
   loadMoreConversations: () => Promise<void>;
   searchConversationHistory: (reset?: boolean) => Promise<void>;

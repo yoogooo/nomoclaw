@@ -361,6 +361,7 @@ export const useConversationStore = defineStore("conversation", () => {
     guideToModelSetup: composerModule.guideToModelSetup,
     init: listModule.init,
     loadModelConfig: composerModule.loadModelConfig,
+    refreshConversationSummariesSilently: listModule.refreshConversationSummariesSilently,
     refreshConversations: listModule.refreshConversations,
     loadMoreConversations: listModule.loadMoreConversations,
     searchConversationHistory: listModule.searchConversationHistory,

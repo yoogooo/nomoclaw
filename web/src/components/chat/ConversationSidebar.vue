@@ -35,6 +35,8 @@ const conversationListRef = ref<HTMLElement | null>(null);
 const lastAutoScrolledConversationUid = ref("");
 const autoLoadMoreSuspended = ref(false);
 let cronBindingsPollTimer: number | null = null;
+let historyAutoRefreshTimer: number | null = null;
+const HISTORY_AUTO_REFRESH_MS = 15000;
 
 const agentOptions = computed<AgentSelectOption[]>(() =>
   [...agentCatalogStore.allAgents]
@@ -205,6 +207,41 @@ function stopCronBindingsPolling() {
   }
 }
 
+function stopHistoryAutoRefresh() {
+  if (historyAutoRefreshTimer !== null) {
+    window.clearTimeout(historyAutoRefreshTimer);
+    historyAutoRefreshTimer = null;
+  }
+}
+
+function canRunHistoryAutoRefresh() {
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    return false;
+  }
+  if (document.visibilityState !== "visible") {
+    return false;
+  }
+  return Boolean(agentCatalogStore.selectedAgentUid);
+}
+
+function scheduleHistoryAutoRefresh(immediate = false) {
+  stopHistoryAutoRefresh();
+  if (!canRunHistoryAutoRefresh()) {
+    return;
+  }
+  historyAutoRefreshTimer = window.setTimeout(async () => {
+    try {
+      await conversationStore.refreshConversationSummariesSilently(true);
+      await refreshCronConversationBindings();
+      await fillConversationViewportIfNeeded();
+    } catch {
+      // best effort
+    } finally {
+      scheduleHistoryAutoRefresh();
+    }
+  }, immediate ? 0 : HISTORY_AUTO_REFRESH_MS);
+}
+
 function scheduleCronBindingsPolling() {
   stopCronBindingsPolling();
   if (typeof window === "undefined" || !Object.keys(runningConversationUids.value).length) {
@@ -228,6 +265,7 @@ watch(
 
 onBeforeUnmount(() => {
   stopCronBindingsPolling();
+  stopHistoryAutoRefresh();
 });
 
 watch(
@@ -383,14 +421,33 @@ function handleWindowResize() {
   void fillConversationViewportIfNeeded();
 }
 
+function handleDocumentVisibilityChange() {
+  if (typeof document !== "undefined" && document.visibilityState === "visible") {
+    scheduleHistoryAutoRefresh(true);
+    return;
+  }
+  stopHistoryAutoRefresh();
+}
+
 onMounted(() => {
   window.addEventListener("resize", handleWindowResize);
+  document.addEventListener("visibilitychange", handleDocumentVisibilityChange);
   void fillConversationViewportIfNeeded();
+  scheduleHistoryAutoRefresh();
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener("resize", handleWindowResize);
+  document.removeEventListener("visibilitychange", handleDocumentVisibilityChange);
 });
+
+watch(
+  () => agentCatalogStore.selectedAgentUid,
+  () => {
+    scheduleHistoryAutoRefresh(true);
+  },
+  { immediate: true }
+);
 
 </script>
 

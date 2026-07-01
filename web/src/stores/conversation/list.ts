@@ -183,6 +183,21 @@ export function createConversationListModule(
     }
   }
 
+  async function refreshConversationSummariesSilently(force = false) {
+    if (internals.conversationSummaryPolling) {
+      return;
+    }
+    if (canReuseFreshConversationPage(force)) {
+      return;
+    }
+    internals.conversationSummaryPolling = true;
+    try {
+      await syncConversationSummaries();
+    } finally {
+      internals.conversationSummaryPolling = false;
+    }
+  }
+
   async function loadConversationSummaries(force = false) {
     if (canReuseFreshConversationPage(force)) {
       scheduleConversationSummaryPolling();
@@ -393,6 +408,7 @@ export function createConversationListModule(
   return {
     stopConversationSummaryPolling,
     scheduleConversationSummaryPolling,
+    refreshConversationSummariesSilently,
     loadConversationSummaries,
     loadMoreConversations,
     searchConversationHistory,
