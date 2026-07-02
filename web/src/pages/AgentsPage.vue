@@ -135,6 +135,13 @@ const avatarIconOptions: AvatarIconOption[] = [
 const DEFAULT_AVATAR_ICON = "bot";
 const DEFAULT_AVATAR_COLOR: string = themeTokens.component.agent.avatarColors[0];
 const avatarColorOptions: string[] = [...themeTokens.component.agent.avatarColors];
+const agentTypeOptions = computed(() => [
+  { value: "chat", label: t("agents.types.chat") },
+  { value: "coding", label: t("agents.types.coding") },
+  { value: "codex", label: t("agents.types.codex") },
+  { value: "research", label: t("agents.types.research") },
+  { value: "ops", label: t("agents.types.ops") }
+]);
 
 const management = useAgentsManagement({
   avatarIconOptions,
@@ -378,13 +385,16 @@ watch([selectedAgentUid, detailTab], ([agentUid, tab]) => {
                     :basic-form="management.basicForm"
                     :avatar-icon-options="avatarIconOptions"
                     :avatar-color-options="avatarColorOptions"
+                    :agent-type-options="agentTypeOptions"
                     @save="management.saveBasicInfo(selectedAgent)"
                     @remove="onRemoveAgent"
                     @update:display-name="management.basicForm.displayName = $event"
+                    @update:agent-type="management.basicForm.agentType = $event"
                     @update:description="management.basicForm.description = $event"
                     @update:avatar="management.basicForm.avatar = $event"
                     @update:avatar-color="management.basicForm.avatarColor = $event"
                     @update:workspace="management.basicForm.workspace = $event"
+                    @update:codex-workdir="management.basicForm.codexWorkdir = $event"
                   />
                 </n-tab-pane>
 
@@ -470,14 +480,17 @@ watch([selectedAgentUid, detailTab], ([agentUid, tab]) => {
     :form="management.createForm"
     :avatar-icon-options="avatarIconOptions"
     :avatar-color-options="avatarColorOptions"
+    :agent-type-options="agentTypeOptions"
     @update:show="showEditor = $event"
     @save="onSaveAgent"
     @update:display-name="management.createForm.displayName = $event"
     @update:agent-name="management.createForm.agentName = $event"
+    @update:agent-type="management.createForm.agentType = $event"
     @update:description="management.createForm.description = $event"
     @update:avatar="management.createForm.avatar = $event"
     @update:avatar-color="management.createForm.avatarColor = $event"
     @update:workspace="management.createForm.workspace = $event"
+    @update:codex-workdir="management.createForm.codexWorkdir = $event"
   />
 </template>
 

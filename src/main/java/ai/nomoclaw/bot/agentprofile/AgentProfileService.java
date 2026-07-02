@@ -59,12 +59,20 @@ public class AgentProfileService {
 
     private static final String DEFAULT_AGENT_PROMPT_RESOURCE_ROOT = "prompts/agents/default";
     private static final String DEFAULT_AGENT_UID = "agent_general_assistant";
+    private static final String DEFAULT_AGENT_TYPE = "chat";
+    private static final String AGENT_TYPE_CODEX = "codex";
     private static final String VIRTUAL_AGENT_GROUP_UID = "group_short_drama";
     private static final String VIRTUAL_AGENT_GROUP_NAME = "all_agents";
     private static final String VIRTUAL_AGENT_GROUP_DISPLAY_NAME = "All Agent";
     private static final Map<String, String> AGENT_DOC_FILES = new LinkedHashMap<>();
+    private static final LinkedHashSet<String> SUPPORTED_AGENT_TYPES = new LinkedHashSet<>();
 
     static {
+        SUPPORTED_AGENT_TYPES.add("coding");
+        SUPPORTED_AGENT_TYPES.add(AGENT_TYPE_CODEX);
+        SUPPORTED_AGENT_TYPES.add("research");
+        SUPPORTED_AGENT_TYPES.add("ops");
+        SUPPORTED_AGENT_TYPES.add(DEFAULT_AGENT_TYPE);
         AGENT_DOC_FILES.put("soul", "SOUL.md");
         AGENT_DOC_FILES.put("agent", "AGENT.md");
         AGENT_DOC_FILES.put("memory", "MEMORY.md");
@@ -174,6 +182,7 @@ public class AgentProfileService {
         if (avatarColor.isBlank()) {
             avatarColor = "#2F6FED";
         }
+        String agentType = normalizeAgentType(request.agentType());
 
         LocalDateTime now = LocalDateTime.now();
         String agentUid = "agent_" + UuidUtil.newUuid().replace("-", "");
@@ -185,6 +194,7 @@ public class AgentProfileService {
         agent.setDescription(request.description() == null ? "" : request.description().trim());
         agent.setCapabilityTags("[]");
         agent.setPromptProfile("");
+        agent.setAgentType(agentType);
         agent.setModelProviderId(request.modelProvider().trim());
         agent.setModelId(modelIds.get(0));
         agent.setSortIndex(nextAgentSortIndex());
@@ -193,6 +203,7 @@ public class AgentProfileService {
         ObjectNode extConfig = JsonNodeFactory.instance.objectNode();
         extConfig.put("avatarColor", avatarColor);
         extConfig.set("modelIds", JsonUtil.fromJson(JsonUtil.toJson(modelIds), JsonNode.class));
+        writeCodexWorkdir(extConfig, agentType, request.codexWorkdir());
         AgentWorkspaceConfig workspaceConfig = resolveWorkspaceConfigForMutation(
                 agentName,
                 "",
@@ -243,18 +254,21 @@ public class AgentProfileService {
         if (avatarColor.isBlank()) {
             avatarColor = "#2F6FED";
         }
+        String agentType = normalizeAgentType(request.agentType());
         List<String> modelIds = sanitizeModelIds(request.modelName(), request.modelNames());
         executionScopeResolver.validateModelSelection(request.modelProvider(), modelIds);
 
         agent.setDisplayName(displayName);
         agent.setDescription(request.description() == null ? "" : request.description().trim());
         agent.setAvatar(avatar);
+        agent.setAgentType(agentType);
         agent.setModelProviderId(request.modelProvider().trim());
         agent.setModelId(modelIds.get(0));
         agent.setUpdatedTime(LocalDateTime.now());
         ObjectNode extConfig = readExtConfigObject(agent.getExtConfig());
         extConfig.put("avatarColor", avatarColor);
         extConfig.set("modelIds", JsonUtil.fromJson(JsonUtil.toJson(modelIds), JsonNode.class));
+        writeCodexWorkdir(extConfig, agentType, request.codexWorkdir());
         AgentWorkspaceConfig workspaceConfig = resolveWorkspaceConfigForMutation(
                 agent.getAgentName(),
                 agent.getWorkspace(),
@@ -368,6 +382,7 @@ public class AgentProfileService {
                 agent.getAgentUid(),
                 agent.getAgentName(),
                 agent.getDisplayName(),
+                readAgentType(agent),
                 agent.getAvatar(),
                 avatarColor,
                 agent.getDescription(),
@@ -375,6 +390,7 @@ public class AgentProfileService {
                 nullToEmpty(agent.getModelId()),
                 modelIds,
                 workspaceConfig.workspaceDir().toString(),
+                readCodexWorkdir(agent.getExtConfig()),
                 workspaceConfig.reportDir().toString(),
                 workspaceConfig.tmpDir().toString(),
                 agent.getSortIndex() == null ? 0 : agent.getSortIndex(),
@@ -417,6 +433,41 @@ public class AgentProfileService {
         ObjectNode node = readExtConfigObject(extConfigRaw);
         String color = node.path("avatarColor").asString("");
         return color == null || color.isBlank() ? "#2F6FED" : color;
+    }
+
+    private String readAgentType(AgentDefinitionEntity agent) {
+        if (agent == null) {
+            return DEFAULT_AGENT_TYPE;
+        }
+        return normalizeAgentType(agent.getAgentType());
+    }
+
+    private String normalizeAgentType(String rawValue) {
+        String normalized = rawValue == null ? "" : rawValue.trim().toLowerCase();
+        if (normalized.isBlank()) {
+            return DEFAULT_AGENT_TYPE;
+        }
+        if (!SUPPORTED_AGENT_TYPES.contains(normalized)) {
+            throw new IllegalArgumentException("unsupported agentType: " + rawValue);
+        }
+        return normalized;
+    }
+
+    private void writeCodexWorkdir(ObjectNode extConfig, String agentType, String codexWorkdirRaw) {
+        if (AGENT_TYPE_CODEX.equals(agentType)) {
+            Path codexWorkdir = parseAbsolutePathOrDefault(codexWorkdirRaw, null, "codexWorkdir");
+            if (codexWorkdir != null) {
+                extConfig.put("codexWorkdir", codexWorkdir.toString());
+                return;
+            }
+        }
+        extConfig.remove("codexWorkdir");
+    }
+
+    private String readCodexWorkdir(String extConfigRaw) {
+        ObjectNode node = readExtConfigObject(extConfigRaw);
+        String workdir = node.path("codexWorkdir").asString("");
+        return workdir == null ? "" : workdir.trim();
     }
 
     private List<String> sanitizeModelIds(String modelName, List<String> modelNames) {
@@ -475,7 +526,7 @@ public class AgentProfileService {
 
     private Path parseAbsolutePathOrDefault(String rawValue, Path fallback, String fieldName) {
         if (rawValue == null || rawValue.trim().isBlank()) {
-            return fallback.toAbsolutePath().normalize();
+            return fallback == null ? null : fallback.toAbsolutePath().normalize();
         }
         String trimmed = rawValue.trim();
         try {

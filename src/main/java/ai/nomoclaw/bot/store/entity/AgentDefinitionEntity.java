@@ -19,6 +19,7 @@ public class AgentDefinitionEntity {
     private String description;
     private String capabilityTags;
     private String promptProfile;
+    private String agentType;
     @TableField("model_provider_id")
     private String modelProviderId;
     @TableField("model_id")
@@ -93,6 +94,14 @@ public class AgentDefinitionEntity {
 
     public void setPromptProfile(String promptProfile) {
         this.promptProfile = promptProfile;
+    }
+
+    public String getAgentType() {
+        return agentType;
+    }
+
+    public void setAgentType(String agentType) {
+        this.agentType = agentType;
     }
 
     public String getModelProviderId() {

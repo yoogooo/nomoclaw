@@ -13,6 +13,7 @@ import type {
 } from "@/components/agents/agentManagementTypes";
 import type { AgentDocFile, ImportedSkillResponse, ModelConfig } from "@/types/api";
 import {
+  normalizeAgentType,
   defaultDocs,
   mapApiMcpTool,
   mapApiSkill,
@@ -44,10 +45,12 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
   const createForm = reactive({
     displayName: "",
     agentName: "",
+    agentType: "chat",
     description: "",
     avatar: options.defaultAvatarIcon,
     avatarColor: options.defaultAvatarColor,
-    workspace: ""
+    workspace: "",
+    codexWorkdir: ""
   });
 
   const tipForm = reactive({
@@ -66,10 +69,12 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
 
   const basicForm = reactive<BasicFormModel>({
     displayName: "",
+    agentType: "chat",
     description: "",
     avatar: options.defaultAvatarIcon,
     avatarColor: options.defaultAvatarColor,
-    workspace: ""
+    workspace: "",
+    codexWorkdir: ""
   });
 
   const domainOptions = computed(() => ({
@@ -93,10 +98,12 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
   function resetCreateForm() {
     createForm.displayName = "";
     createForm.agentName = "";
+    createForm.agentType = "chat";
     createForm.description = "";
     createForm.avatar = options.defaultAvatarIcon;
     createForm.avatarColor = options.defaultAvatarColor;
     createForm.workspace = "";
+    createForm.codexWorkdir = "";
   }
 
   function ensureSelectedAgent(selectedAgentUid: string) {
@@ -127,18 +134,22 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
   function syncBasicFormFromSelection(selectedAgent: ManagedAgent | null) {
     if (!selectedAgent) {
       basicForm.displayName = "";
+      basicForm.agentType = "chat";
       basicForm.description = "";
       basicForm.avatar = options.defaultAvatarIcon;
       basicForm.avatarColor = options.defaultAvatarColor;
       basicForm.workspace = "";
+      basicForm.codexWorkdir = "";
       return;
     }
     const defaultPaths = resolveDefaultWorkspacePaths(agentsRootDir.value, selectedAgent.agentName);
     basicForm.displayName = selectedAgent.displayName || "";
+    basicForm.agentType = normalizeAgentType(selectedAgent.agentType);
     basicForm.description = selectedAgent.description || "";
     basicForm.avatar = normalizeAvatarIcon(selectedAgent.avatar, domainOptions.value);
     basicForm.avatarColor = normalizeAvatarColor(selectedAgent.avatarColor, domainOptions.value);
     basicForm.workspace = (selectedAgent.workspace || defaultPaths.workspace || "").trim();
+    basicForm.codexWorkdir = (selectedAgent.codexWorkdir || "").trim();
   }
 
   async function reloadAgentsFromCatalog() {
@@ -220,13 +231,15 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
     const payload = {
       displayName,
       agentName,
+      agentType: normalizeAgentType(createForm.agentType),
       description: createForm.description.trim(),
       avatar: normalizeAvatarIcon(createForm.avatar, domainOptions.value),
       avatarColor: normalizeAvatarColor(createForm.avatarColor, domainOptions.value),
       modelProvider: fallbackModel.modelProvider,
       modelName: fallbackModel.modelName,
       modelNames: [...fallbackModel.modelNames],
-      workspace: createForm.workspace.trim() || defaultPaths.workspace
+      workspace: createForm.workspace.trim() || defaultPaths.workspace,
+      codexWorkdir: createForm.agentType === "codex" ? createForm.codexWorkdir.trim() : ""
     };
     const created = await conversationApi.createAgent(payload);
     await reloadAgentsFromCatalog();
@@ -483,13 +496,15 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
     const defaultPaths = resolveDefaultWorkspacePaths(agentsRootDir.value, selectedAgent.agentName);
     const payload = {
       displayName,
+      agentType: normalizeAgentType(basicForm.agentType),
       description: basicForm.description.trim(),
       avatar: normalizeAvatarIcon(basicForm.avatar, domainOptions.value),
       avatarColor: normalizeAvatarColor(basicForm.avatarColor, domainOptions.value),
       modelProvider,
       modelName,
       modelNames,
-      workspace: basicForm.workspace.trim() || defaultPaths.workspace
+      workspace: basicForm.workspace.trim() || defaultPaths.workspace,
+      codexWorkdir: basicForm.agentType === "codex" ? basicForm.codexWorkdir.trim() : ""
     };
     const workspace = payload.workspace;
     const reportDir = `${workspace.replace(/[\\/]+$/, "")}/report`;
@@ -498,6 +513,7 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
     updateAgent(selectedAgent.agentUid, (agent) => ({
       ...agent,
       displayName: updated.displayName || agent.displayName,
+      agentType: normalizeAgentType(updated.agentType || payload.agentType),
       description: updated.description || "",
       avatar: normalizeAvatarIcon(updated.avatar || payload.avatar, domainOptions.value),
       avatarColor: normalizeAvatarColor(updated.avatarColor || payload.avatarColor, domainOptions.value),
@@ -505,6 +521,7 @@ export function useAgentsManagement(options: UseAgentsManagementOptions) {
       modelName: updated.modelName || payload.modelName,
       modelNames: updated.modelNames && updated.modelNames.length ? updated.modelNames : payload.modelNames,
       workspace: updated.workspace || workspace,
+      codexWorkdir: (updated.codexWorkdir || payload.codexWorkdir || "").trim(),
       reportDir: updated.reportDir || reportDir,
       tmpDir: updated.tmpDir || tmpDir
     }));

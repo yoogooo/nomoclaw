@@ -727,8 +727,10 @@ const enUS = {
       displayName: "Display Name",
       agentName: "Agent Identifier",
       agentNameHint: "Immutable after creation. Only letters, numbers, underscore, and hyphen are allowed.",
+      agentType: "Agent Type",
       description: "Description",
       workspaceDir: "Workspace Directory",
+      codexWorkdir: "Codex Working Directory",
       reportDir: "Report Directory",
       tmpDir: "Temp Directory",
       iconSelect: "Icon",
@@ -741,9 +743,17 @@ const enUS = {
       displayNamePlaceholder: "e.g. Default Assistant",
       agentNamePlaceholder: "e.g. default_agent",
       workspaceDirPlaceholder: "Default: <agentsRoot>/<agentName>/workspace",
+      codexWorkdirPlaceholder: "e.g. /Users/name/project",
       reportDirPlaceholder: "Default: <workspace>/report",
       tmpDirPlaceholder: "Default: <workspace>/tmp",
       submit: "Create Agent"
+    },
+    types: {
+      chat: "Chat",
+      coding: "Coding",
+      codex: "Codex",
+      research: "Research",
+      ops: "Ops"
     },
     skills: {
       description: "Imported skills can be enabled in this Agent's system prompt as needed.",

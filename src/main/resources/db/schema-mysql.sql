@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS agent_definition (
     description VARCHAR(512) NOT NULL DEFAULT '' COMMENT 'Agent 描述',
     capability_tags JSON NOT NULL COMMENT '能力标签JSON数组，例如 [\"browser\",\"file\",\"command\"]',
     prompt_profile VARCHAR(128) NOT NULL DEFAULT '' COMMENT '提示词画像或角色标识',
+    agent_type VARCHAR(32) NOT NULL DEFAULT 'chat' COMMENT 'Agent 业务类型：chat / coding / codex / research / ops',
     model_provider_id VARCHAR(64) NOT NULL DEFAULT '' COMMENT '默认模型提供方ID',
     model_id VARCHAR(128) NOT NULL DEFAULT '' COMMENT '默认模型ID',
     sort_index INT NOT NULL DEFAULT 0 COMMENT '排序值，越小越靠前',
@@ -522,16 +523,16 @@ CREATE TABLE IF NOT EXISTS agent_cron_job_execution (
 
 INSERT INTO agent_definition (
     agent_uid, agent_name, display_name, avatar, description, capability_tags, prompt_profile,
-    model_provider_id, model_id, sort_index, is_group_entry, status, workspace, ext_config, created_time, updated_time
+    agent_type, model_provider_id, model_id, sort_index, is_group_entry, status, workspace, ext_config, created_time, updated_time
 ) VALUES
     ('agent_general_assistant', 'default_agent', '默认助手', '🤝', '负责综合规划、协调执行与最终总结。', JSON_ARRAY('planning', 'coordination', 'delivery'),
-     'generalist', '', '', 10, 0, 'ACTIVE', '', JSON_OBJECT(), NOW(3), NOW(3)),
+     'generalist', 'chat', '', '', 10, 0, 'ACTIVE', '', JSON_OBJECT(), NOW(3), NOW(3)),
     ('agent_test_expert', 'test_expert', '测试专家', '🧪', '负责测试设计、缺陷定位与质量把关。', JSON_ARRAY('testing', 'qa', 'review'),
-     'qa-specialist', '', '', 20, 0, 'ACTIVE', '', JSON_OBJECT(), NOW(3), NOW(3)),
+     'qa-specialist', 'coding', '', '', 20, 0, 'ACTIVE', '', JSON_OBJECT(), NOW(3), NOW(3)),
     ('agent_public_opinion', 'public_opinion_monitor', '舆情监测', '📡', '负责舆情跟踪、热点观察与风险提示。', JSON_ARRAY('monitoring', 'trend', 'risk'),
-     'opinion-specialist', '', '', 30, 0, 'ACTIVE', '', JSON_OBJECT(), NOW(3), NOW(3)),
+     'opinion-specialist', 'research', '', '', 30, 0, 'ACTIVE', '', JSON_OBJECT(), NOW(3), NOW(3)),
     ('agent_marketing_assistant', 'marketing_assistant', '营销助理', '📣', '负责传播文案、活动建议与投放辅助。', JSON_ARRAY('marketing', 'campaign', 'copywriting'),
-     'marketing-specialist', '', '', 40, 0, 'ACTIVE', '', JSON_OBJECT(), NOW(3), NOW(3));
+     'marketing-specialist', 'chat', '', '', 40, 0, 'ACTIVE', '', JSON_OBJECT(), NOW(3), NOW(3));
 
 INSERT INTO tool_definition (
     tool_key, display_name, description, risk_level, status, sort_index, config_json, created_time, updated_time

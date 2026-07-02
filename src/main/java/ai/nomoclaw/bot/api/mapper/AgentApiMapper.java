@@ -53,6 +53,7 @@ public final class AgentApiMapper {
                 dto.agentUid(),
                 dto.agentName(),
                 dto.displayName(),
+                dto.agentType(),
                 dto.avatar(),
                 dto.avatarColor(),
                 dto.description(),
@@ -60,6 +61,7 @@ public final class AgentApiMapper {
                 dto.modelName(),
                 dto.modelNames(),
                 dto.workspace(),
+                dto.codexWorkdir(),
                 dto.reportDir(),
                 dto.tmpDir(),
                 dto.sortIndex(),
@@ -137,13 +139,15 @@ public final class AgentApiMapper {
     public static UpdateAgentBasicInfoParam toParam(UpdateAgentBasicInfoRequest request) {
         return new UpdateAgentBasicInfoParam(
                 request.displayName(),
+                request.agentType(),
                 request.description(),
                 request.avatar(),
                 request.avatarColor(),
                 request.modelProvider(),
                 request.modelName(),
                 request.modelNames(),
-                request.workspace()
+                request.workspace(),
+                request.codexWorkdir()
         );
     }
 
@@ -151,13 +155,15 @@ public final class AgentApiMapper {
         return new CreateAgentParam(
                 request == null ? null : request.agentName(),
                 request == null ? null : request.displayName(),
+                request == null ? null : request.agentType(),
                 request == null ? null : request.description(),
                 request == null ? null : request.avatar(),
                 request == null ? null : request.avatarColor(),
                 request == null ? null : request.modelProvider(),
                 request == null ? null : request.modelName(),
                 request == null ? null : request.modelNames(),
-                request == null ? null : request.workspace()
+                request == null ? null : request.workspace(),
+                request == null ? null : request.codexWorkdir()
         );
     }
 

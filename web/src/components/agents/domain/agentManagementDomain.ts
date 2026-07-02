@@ -29,6 +29,10 @@ export interface AgentDomainOptions {
   defaultAvatarColor: string;
 }
 
+export const AGENT_TYPE_OPTIONS = ["chat", "coding", "codex", "research", "ops"] as const;
+
+export type AgentTypeOption = (typeof AGENT_TYPE_OPTIONS)[number];
+
 export function joinPath(base: string, ...parts: string[]) {
   const normalizedBase = (base || "").replace(/[\\/]+$/, "");
   const normalizedParts = parts
@@ -120,6 +124,14 @@ export function normalizeAvatarColor(raw: unknown, options: AgentDomainOptions) 
   return options.defaultAvatarColor;
 }
 
+export function normalizeAgentType(raw: unknown): AgentTypeOption {
+  const value = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  if (AGENT_TYPE_OPTIONS.includes(value as AgentTypeOption)) {
+    return value as AgentTypeOption;
+  }
+  return "chat";
+}
+
 export function toManagedAgent(agent: AgentCatalogAgent, agentGroupUid: string, options: AgentDomainOptions): ManagedAgent {
   const docs = defaultDocs(agent.displayName || agent.agentName);
   const defaults = resolveDefaultWorkspacePaths(options.agentsRootDir, agent.agentName);
@@ -129,9 +141,11 @@ export function toManagedAgent(agent: AgentCatalogAgent, agentGroupUid: string, 
   return {
     ...agent,
     agentGroupUid,
+    agentType: normalizeAgentType(agent.agentType),
     avatar: normalizeAvatarIcon(agent.avatar, options),
     avatarColor: normalizeAvatarColor(agent.avatarColor, options),
     workspace,
+    codexWorkdir: (agent.codexWorkdir || "").trim(),
     reportDir,
     tmpDir,
     managedSkills: (agent.capabilityTags || []).map((skillKey) => ({

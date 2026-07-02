@@ -2,6 +2,7 @@ export interface AgentCatalogAgent {
   agentUid: string;
   agentName: string;
   displayName: string;
+  agentType: string;
   avatar: string;
   avatarColor: string;
   description: string;
@@ -9,6 +10,7 @@ export interface AgentCatalogAgent {
   modelName: string;
   modelNames: string[];
   workspace: string;
+  codexWorkdir: string;
   reportDir: string;
   tmpDir: string;
   sortIndex: number;

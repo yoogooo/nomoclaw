@@ -127,6 +127,7 @@ export const conversationApi = {
   },
   updateAgentBasicInfo(agentUid: string, payload: {
     displayName: string;
+    agentType: string;
     description: string;
     avatar: string;
     avatarColor: string;
@@ -134,6 +135,7 @@ export const conversationApi = {
     modelName: string;
     modelNames: string[];
     workspace: string;
+    codexWorkdir: string;
   }) {
     return requestJson<AgentCatalogAgent>(`/api/agents/${agentUid}/basic`, {
       method: "PATCH",
@@ -144,6 +146,7 @@ export const conversationApi = {
   createAgent(payload: {
     agentName: string;
     displayName: string;
+    agentType: string;
     description: string;
     avatar: string;
     avatarColor: string;
@@ -151,6 +154,7 @@ export const conversationApi = {
     modelName: string;
     modelNames: string[];
     workspace: string;
+    codexWorkdir: string;
   }) {
     return requestJson<AgentCatalogAgent>("/api/agents", {
       method: "POST",

@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { Bot } from "lucide-vue-next";
-import { NButton, NForm, NFormItem, NInput } from "naive-ui";
+import { NButton, NForm, NFormItem, NInput, NSelect } from "naive-ui";
 import type { AvatarIconOption, BasicFormModel, ManagedAgent } from "@/components/agents/agentManagementTypes";
 
 const props = defineProps<{
@@ -10,16 +10,19 @@ const props = defineProps<{
   basicForm: BasicFormModel;
   avatarIconOptions: AvatarIconOption[];
   avatarColorOptions: string[];
+  agentTypeOptions: Array<{ label: string; value: string }>;
 }>();
 
 const emit = defineEmits<{
   (e: "save"): void;
   (e: "remove"): void;
   (e: "update:displayName", value: string): void;
+  (e: "update:agentType", value: string): void;
   (e: "update:description", value: string): void;
   (e: "update:avatar", value: string): void;
   (e: "update:avatarColor", value: string): void;
   (e: "update:workspace", value: string): void;
+  (e: "update:codexWorkdir", value: string): void;
 }>();
 const { t } = useI18n();
 
@@ -48,6 +51,8 @@ const derivedTmpDir = computed(() => {
   const workspace = normalizePath(props.basicForm.workspace);
   return workspace ? `${workspace}/tmp` : "";
 });
+
+const isCodexAgent = computed(() => props.basicForm.agentType === "codex");
 </script>
 
 <template>
@@ -73,6 +78,13 @@ const derivedTmpDir = computed(() => {
           @update:value="emit('update:description', $event)"
         />
       </n-form-item>
+      <n-form-item :label="t('agents.basic.agentType')">
+        <n-select
+          :value="basicForm.agentType"
+          :options="agentTypeOptions"
+          @update:value="emit('update:agentType', String($event || 'chat'))"
+        />
+      </n-form-item>
       <div class="ui-form-grid-single">
         <n-form-item :label="t('agents.basic.workspaceDir')">
           <n-input :value="basicForm.workspace" @update:value="emit('update:workspace', $event)" />
@@ -81,6 +93,9 @@ const derivedTmpDir = computed(() => {
           <n-input :value="derivedReportDir" disabled />
         </n-form-item>
       </div>
+      <n-form-item v-if="isCodexAgent" :label="t('agents.basic.codexWorkdir')">
+        <n-input :value="basicForm.codexWorkdir" @update:value="emit('update:codexWorkdir', $event)" />
+      </n-form-item>
       <n-form-item :label="t('agents.basic.tmpDir')">
         <n-input :value="derivedTmpDir" disabled />
       </n-form-item>

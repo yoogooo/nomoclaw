@@ -83,8 +83,10 @@ export interface AvatarIconOption {
 
 export interface BasicFormModel {
   displayName: string;
+  agentType: string;
   description: string;
   avatar: string;
   avatarColor: string;
   workspace: string;
+  codexWorkdir: string;
 }

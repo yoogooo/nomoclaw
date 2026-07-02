@@ -727,8 +727,10 @@ const zhCN = {
       displayName: "显示名称",
       agentName: "Agent 标识",
       agentNameHint: "创建后不可修改，仅允许字母/数字/下划线/中划线。",
+      agentType: "Agent 类型",
       description: "描述",
       workspaceDir: "工作区目录",
+      codexWorkdir: "Codex 工作目录",
       reportDir: "产出目录",
       tmpDir: "临时目录",
       iconSelect: "Icon 选择",
@@ -741,9 +743,17 @@ const zhCN = {
       displayNamePlaceholder: "例如：默认助手",
       agentNamePlaceholder: "例如：default_agent",
       workspaceDirPlaceholder: "默认：<agentsRoot>/<agentName>/workspace",
+      codexWorkdirPlaceholder: "例如：/Users/name/project",
       reportDirPlaceholder: "默认：<workspace>/report",
       tmpDirPlaceholder: "默认：<workspace>/tmp",
       submit: "创建 Agent"
+    },
+    types: {
+      chat: "Chat",
+      coding: "Coding",
+      codex: "Codex",
+      research: "Research",
+      ops: "Ops"
     },
     skills: {
       description: "导入后可在该 Agent 的系统提示词中按需启用 Skills。",
