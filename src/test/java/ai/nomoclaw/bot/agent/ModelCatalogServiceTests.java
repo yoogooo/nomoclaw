@@ -81,6 +81,19 @@ class ModelCatalogServiceTests {
     }
 
     @Test
+    void fallsBackAfterRemovingOpenAiGpt52() {
+        NomoClawPaths.configureRoot(tempDir);
+        ModelCatalogService service = new ModelCatalogService(HttpClient.newHttpClient(), "");
+
+        var metadata = service.resolve("openai", "gpt-5.2");
+
+        assertThat(metadata.matched()).isFalse();
+        assertThat(metadata.inputModalities()).containsExactly("text");
+        assertThat(metadata.uploadPolicy().enabled()).isFalse();
+        assertThat(metadata.source()).isEqualTo("fallback");
+    }
+
+    @Test
     void localCustomCatalogOverridesBundledCatalog() throws Exception {
         NomoClawPaths.configureRoot(tempDir);
         Path catalogDir = tempDir.resolve("model-catalog");

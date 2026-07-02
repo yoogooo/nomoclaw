@@ -287,7 +287,7 @@ function getRunStepRenderData(step: ConversationRunStep): RunStepRenderData {
     return emptyData;
   }
 
-  if (!isCommandStep(details, step.displayTitle || "")) {
+  if (!isCommandToolStep(step)) {
     const plainData: RunStepRenderData = {
       cacheKey,
       isCommand: false,
@@ -326,9 +326,8 @@ function runStepTitle(step: ConversationRunStep) {
   return step.displayTitle || t("chat.runtime.processingStep");
 }
 
-function isCommandStep(details: string, title: string) {
-  const content = `${title}\n${details}`;
-  return /执行命令|本地命令|命令执行|command/i.test(content);
+function isCommandToolStep(step: ConversationRunStep) {
+  return (step.toolName || "").trim() === "CommandTool";
 }
 
 function extractCommand(details: string, title: string, toolArgs?: Record<string, any>) {

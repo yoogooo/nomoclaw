@@ -116,7 +116,6 @@ public final class ModelProviderDefaults {
                         "",
                         "gpt-5.4",
                         List.of(
-                                model("gpt-5.2", "GPT-5.2", List.of("text", "image", "audio"), true, 0, 0, 0, disabledUpload()),
                                 model("gpt-5.3", "GPT-5.3", List.of("text", "image", "audio"), true, 0, 0, 0, disabledUpload()),
                                 model("gpt-5.4", "GPT-5.4", List.of("text", "image", "audio"), true, 0, 0, 0, disabledUpload()),
                                 model("gpt-4.1", "GPT-4.1", List.of("text", "image"), false, 0, 0, 0, disabledUpload()),

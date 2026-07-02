@@ -58,19 +58,22 @@ public class McpApplicationService {
     private final McpClientFactory clientFactory;
     private final McpToolKeyGenerator toolKeyGenerator;
     private final SystemErrorLogService systemErrorLogService;
+    private final CodexAppServerBridge codexAppServerBridge;
 
     public McpApplicationService(McpServerDefinitionRepository serverRepository,
                                  McpToolSnapshotRepository toolSnapshotRepository,
                                  AgentMcpToolRelationRepository agentMcpToolRelationRepository,
                                  McpClientFactory clientFactory,
                                  McpToolKeyGenerator toolKeyGenerator,
-                                 SystemErrorLogService systemErrorLogService) {
+                                 SystemErrorLogService systemErrorLogService,
+                                 CodexAppServerBridge codexAppServerBridge) {
         this.serverRepository = serverRepository;
         this.toolSnapshotRepository = toolSnapshotRepository;
         this.agentMcpToolRelationRepository = agentMcpToolRelationRepository;
         this.clientFactory = clientFactory;
         this.toolKeyGenerator = toolKeyGenerator;
         this.systemErrorLogService = systemErrorLogService;
+        this.codexAppServerBridge = codexAppServerBridge;
     }
 
     public List<McpServerDto> listServers() {
@@ -154,7 +157,8 @@ public class McpApplicationService {
 
     public McpServerDto testServer(String serverUid) {
         McpServerDefinitionEntity server = requireServer(serverUid);
-        try (McpClient client = clientFactory.create(server, readConfig(server))) {
+        McpServerConfig serverConfig = readConfig(server);
+        try (McpClient client = clientFactory.create(server, serverConfig)) {
             client.checkHealth();
             markConnected(server, "");
         } catch (Exception ex) {
@@ -409,6 +413,10 @@ public class McpApplicationService {
         String requestArgsJson = request.args() == null ? "{}" : request.args().toString();
         log.info("[MCP] execute toolKey={} originalToolName={} serverUid={} args={}",
                 toolKey, snapshot.getOriginalToolName(), server.getServerUid(), truncateForLog(requestArgsJson, 1600));
+        McpServerConfig serverConfig = readConfig(server);
+        if (codexAppServerBridge.supports(snapshot, server, serverConfig)) {
+            return codexAppServerBridge.execute(snapshot, server, serverConfig, request);
+        }
         try (McpClient client = clientFactory.create(server, readConfig(server))) {
             ToolExecutionRequest executionRequest = ToolExecutionRequest.builder()
                     .name(snapshot.getOriginalToolName())
