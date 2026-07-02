@@ -635,43 +635,6 @@
       "providerIds": [
         "openai"
       ],
-      "modelId": "gpt-5.2",
-      "displayName": "GPT-5.2",
-      "aliases": [],
-      "inputModalities": [
-        "text",
-        "image"
-      ],
-      "outputModalities": [
-        "text"
-      ],
-      "reasoning": true,
-      "contextWindowTokens": 400000,
-      "maxInputTokens": 0,
-      "maxOutputTokens": 128000,
-      "uploadPolicy": {
-        "enabled": true,
-        "allowedMimeGroups": [
-          "image"
-        ],
-        "maxFilesPerMessage": 0,
-        "maxImagesPerMessage": 1500,
-        "maxFileBytes": 0,
-        "maxTotalBytes": 536870912,
-        "singleMimeGroupOnly": true,
-        "allowMixedImageAndFile": false
-      },
-      "sourceRefs": [
-        "https://platform.openai.com/docs/models/gpt-5.2",
-        "https://platform.openai.com/docs/guides/images-vision"
-      ],
-      "lastVerifiedAt": "2026-04-16",
-      "confidence": "high"
-    },
-    {
-      "providerIds": [
-        "openai"
-      ],
       "modelId": "gpt-4.1",
       "displayName": "GPT-4.1",
       "aliases": [],
