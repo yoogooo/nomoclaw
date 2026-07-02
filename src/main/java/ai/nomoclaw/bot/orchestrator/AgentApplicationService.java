@@ -14,6 +14,7 @@ import ai.nomoclaw.bot.conversation.model.ConversationSummaryDto;
 import ai.nomoclaw.bot.conversation.model.ConversationSummaryPageDto;
 import ai.nomoclaw.bot.domain.AgentConversation;
 import ai.nomoclaw.bot.domain.AgentMessage;
+import ai.nomoclaw.bot.llm.codex.CodexUsageLimitException;
 import ai.nomoclaw.bot.llm.config.LlmProperties;
 import ai.nomoclaw.bot.model.*;
 import ai.nomoclaw.bot.orchestrator.approval.ApprovalGrantedEvent;
@@ -61,6 +62,8 @@ import java.net.UnknownHostException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -91,6 +94,7 @@ public class AgentApplicationService {
     private static final String APPROVAL_MODE_DEFAULT = "default";
     private static final String APPROVAL_MODE_FULL_ACCESS = "full_access";
     private static final int CONVERSATION_CONTEXT_LIMIT = 30;
+    private static final DateTimeFormatter CODEX_RESET_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss z");
 
     private final AgentStore store;
     private final Planner planner;
@@ -450,6 +454,9 @@ public class AgentApplicationService {
 
     private String toUserFriendlyFailureMessage(Throwable throwable, AgentMessage agentMessage) {
         Throwable root = rootCauseOf(throwable);
+        if (root instanceof CodexUsageLimitException usageLimitException) {
+            return formatCodexUsageLimitMessage(usageLimitException);
+        }
         if (root instanceof ConnectException || root instanceof ClosedChannelException) {
             String provider = agentMessage == null ? "" : nullToEmpty(agentMessage.provider()).trim();
             return connectFailureHintByProvider(provider);
@@ -465,6 +472,25 @@ public class AgentApplicationService {
             return "任务执行失败，请稍后重试。";
         }
         return message;
+    }
+
+    private String formatCodexUsageLimitMessage(CodexUsageLimitException exception) {
+        StringBuilder builder = new StringBuilder("Codex 使用额度已用尽");
+        if (!exception.planType().isBlank()) {
+            builder.append("（套餐：").append(exception.planType()).append("）");
+        }
+        Long resetAtEpochSecond = exception.resetAtEpochSecond();
+        if (resetAtEpochSecond != null && resetAtEpochSecond > 0) {
+            String resetTime = Instant.ofEpochSecond(resetAtEpochSecond)
+                    .atZone(ZoneId.systemDefault())
+                    .format(CODEX_RESET_TIME_FORMATTER);
+            builder.append("，预计 ").append(resetTime).append(" 后恢复");
+        } else if (exception.resetsInSeconds() != null && exception.resetsInSeconds() > 0) {
+            long minutes = Math.max(1L, (exception.resetsInSeconds() + 59L) / 60L);
+            builder.append("，预计约 ").append(minutes).append(" 分钟后恢复");
+        }
+        builder.append("。请稍后重试，或切换到可用的账号、套餐或模型提供商。");
+        return builder.toString();
     }
 
     private String connectFailureHintByProvider(String provider) {

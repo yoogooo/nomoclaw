@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 final class CodexApiClient {
 
@@ -89,7 +90,7 @@ final class CodexApiClient {
             HttpResponse<InputStream> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofInputStream());
             if (!isSuccess(response.statusCode())) {
                 String body = new String(response.body().readAllBytes(), StandardCharsets.UTF_8);
-                throw new IllegalStateException("Codex streaming API failed: status=" + response.statusCode() + ", body=" + safeBody(body));
+                throw buildApiException(response.statusCode(), body);
             }
 
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(response.body(), StandardCharsets.UTF_8))) {
@@ -124,6 +125,25 @@ final class CodexApiClient {
         } catch (Exception ex) {
             handler.onError(ex);
         }
+    }
+
+    private RuntimeException buildApiException(int statusCode, String body) {
+        Optional<JsonNode> rootOptional = JsonUtil.fromJsonQuietly(body, JsonNode.class);
+        if (statusCode == 429 && rootOptional.isPresent()) {
+            JsonNode errorNode = rootOptional.get().path("error");
+            String errorType = trim(errorNode.path("type").asText(""));
+            if ("usage_limit_reached".equals(errorType)) {
+                return new CodexUsageLimitException(
+                        statusCode,
+                        errorType,
+                        trim(errorNode.path("plan_type").asText("")),
+                        trim(errorNode.path("message").asText("")),
+                        errorNode.path("resets_at").isNumber() ? errorNode.path("resets_at").asLong() : null,
+                        errorNode.path("resets_in_seconds").isNumber() ? errorNode.path("resets_in_seconds").asLong() : null
+                );
+            }
+        }
+        return new IllegalStateException("Codex streaming API failed: status=" + statusCode + ", body=" + safeBody(body));
     }
 
     private HttpRequest request(ChatRequest request, String modelName, boolean stream, String accept) {
