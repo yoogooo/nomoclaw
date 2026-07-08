@@ -29,6 +29,7 @@ class McpApplicationServiceTests {
         McpClientFactory clientFactory = mock(McpClientFactory.class);
         McpToolKeyGenerator toolKeyGenerator = mock(McpToolKeyGenerator.class);
         SystemErrorLogService systemErrorLogService = mock(SystemErrorLogService.class);
+        CodexAppServerBridge codexAppServerBridge = mock(CodexAppServerBridge.class);
 
         McpToolSnapshotEntity firstTool = new McpToolSnapshotEntity();
         firstTool.setToolKey("mcp_maps_text_search");
@@ -42,7 +43,8 @@ class McpApplicationServiceTests {
                 agentMcpToolRelationRepository,
                 clientFactory,
                 toolKeyGenerator,
-                systemErrorLogService
+                systemErrorLogService,
+                codexAppServerBridge
         );
 
         LocalDateTime now = LocalDateTime.now();
