@@ -20,11 +20,14 @@ public final class ModelProviderDefaults {
                         true,
                         "https://chatgpt.com/backend-api/codex",
                         "",
-                        "gpt-5.5",
+                        "gpt-5.4",
                         List.of(
-                                model("gpt-5.5", "GPT-5.5", List.of("text", "image"), true, 0, 0, 0, imageUpload()),
-                                model("gpt-5.4", "GPT-5.4", List.of("text", "image"), true, 0, 0, 0, imageUpload()),
-                                model("gpt-5.4-mini", "GPT-5.4 Mini", List.of("text", "image"), true, 0, 0, 0, imageUpload())
+                                model("gpt-5.5", "5.5", List.of("text", "image"), true, 0, 0, 0, imageUpload()),
+                                model("gpt-5.6-sol", "5.6 Sol", List.of("text", "image"), true, 0, 0, 0, imageUpload()),
+                                model("gpt-5.6-terra", "5.6 Terra", List.of("text", "image"), true, 0, 0, 0, imageUpload()),
+                                model("gpt-5.6-luna", "5.6 Luna", List.of("text", "image"), true, 0, 0, 0, imageUpload()),
+                                model("gpt-5.4", "5.4", List.of("text", "image"), true, 0, 0, 0, imageUpload()),
+                                model("gpt-5.4-mini", "5.4 Mini", List.of("text", "image"), true, 0, 0, 0, imageUpload())
                         )
                 ),
                 provider(

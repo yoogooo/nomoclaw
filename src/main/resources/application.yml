@@ -99,7 +99,7 @@ llm:
     include-response-text: true
     max-file-size-bytes: 52428800
   codex:
-    model-name: gpt-5.5
+    model-name: gpt-5.4
     instructions: "You are a task planner and execution assistant."
   ollama:
     base-url: "http://localhost:11434"

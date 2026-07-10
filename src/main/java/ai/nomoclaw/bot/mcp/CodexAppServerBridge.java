@@ -2,8 +2,10 @@ package ai.nomoclaw.bot.mcp;
 
 import ai.nomoclaw.bot.model.ToolRequest;
 import ai.nomoclaw.bot.model.ToolResult;
+import ai.nomoclaw.bot.store.entity.AgentEventEntity;
 import ai.nomoclaw.bot.store.entity.McpServerDefinitionEntity;
 import ai.nomoclaw.bot.store.entity.McpToolSnapshotEntity;
+import ai.nomoclaw.bot.store.repository.AgentEventRepository;
 import ai.nomoclaw.bot.util.JsonUtil;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
@@ -18,8 +20,10 @@ import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -40,6 +44,23 @@ public class CodexAppServerBridge {
     private static final long PROGRESS_REPORT_INTERVAL_MS = 700L;
     private static final int MAX_PROGRESS_DETAILS_CHARS = 12_000;
     private static final int MAX_FINAL_OUTPUT_CHARS = 64_000;
+    private static final Map<String, String> APPROVAL_POLICY_ALIASES = new LinkedHashMap<>();
+    private final AgentEventRepository agentEventRepository;
+
+    static {
+        APPROVAL_POLICY_ALIASES.put("on-failure", "on-request");
+        APPROVAL_POLICY_ALIASES.put("on_failure", "on-request");
+        APPROVAL_POLICY_ALIASES.put("onrequest", "on-request");
+        APPROVAL_POLICY_ALIASES.put("on_request", "on-request");
+        APPROVAL_POLICY_ALIASES.put("on-request", "on-request");
+        APPROVAL_POLICY_ALIASES.put("untrusted", "untrusted");
+        APPROVAL_POLICY_ALIASES.put("granular", "granular");
+        APPROVAL_POLICY_ALIASES.put("never", "never");
+    }
+
+    public CodexAppServerBridge(AgentEventRepository agentEventRepository) {
+        this.agentEventRepository = agentEventRepository;
+    }
 
     public boolean supports(McpToolSnapshotEntity snapshot, McpServerDefinitionEntity server, McpServerConfig config) {
         if (snapshot == null || server == null || config == null) {
@@ -67,11 +88,12 @@ public class CodexAppServerBridge {
         if (prompt.isBlank()) {
             return ToolResult.failure("INVALID_ARGS", "prompt is required", JsonNodeFactory.instance.objectNode());
         }
-        if (TOOL_CODEX_REPLY.equals(originalToolName) && resolveThreadId(request.args()).isBlank()) {
-            return ToolResult.failure("INVALID_ARGS", "threadId is required for codex-reply", JsonNodeFactory.instance.objectNode());
+        String resolvedThreadId = resolveTargetThreadId(request);
+        if (TOOL_CODEX_REPLY.equals(originalToolName) && resolvedThreadId.isBlank()) {
+            return ToolResult.failure("INVALID_ARGS", "threadId or conversationId is required for codex-reply", JsonNodeFactory.instance.objectNode());
         }
 
-        AppServerSession session = new AppServerSession(snapshot, server, config, request);
+        AppServerSession session = new AppServerSession(snapshot, server, config, request, resolvedThreadId);
         try {
             return session.run();
         } catch (Exception ex) {
@@ -82,12 +104,52 @@ public class CodexAppServerBridge {
         }
     }
 
+    String resolveTargetThreadId(ToolRequest request) {
+        if (request == null) {
+            return "";
+        }
+        String explicitThreadId = resolveThreadId(request.args());
+        if (!explicitThreadId.isBlank()) {
+            return explicitThreadId;
+        }
+        String conversationUid = resolveConversationUid(request.args(), request.conversationUid());
+        return findLatestThreadIdByConversationUid(conversationUid);
+    }
+
     private String resolveThreadId(JsonNode args) {
         String threadId = normalize(args.path("threadId").asText(""));
-        if (!threadId.isBlank()) {
-            return threadId;
+        return threadId;
+    }
+
+    private String resolveConversationUid(JsonNode args, String fallbackConversationUid) {
+        String conversationId = normalize(args.path("conversationId").asText(""));
+        if (!conversationId.isBlank()) {
+            return conversationId;
         }
-        return normalize(args.path("conversationId").asText(""));
+        return normalize(fallbackConversationUid);
+    }
+
+    private String findLatestThreadIdByConversationUid(String conversationUid) {
+        String normalizedConversationUid = normalize(conversationUid);
+        if (normalizedConversationUid.isBlank()) {
+            return "";
+        }
+        List<AgentEventEntity> events = agentEventRepository.listByConversationUid(normalizedConversationUid);
+        for (int index = events.size() - 1; index >= 0; index--) {
+            AgentEventEntity event = events.get(index);
+            JsonNode payload = JsonUtil.fromJsonQuietly(event.getPayload(), JsonNode.class)
+                    .orElse(JsonNodeFactory.instance.objectNode());
+            JsonNode artifacts = payload.path("artifacts");
+            String threadId = normalize(artifacts.path("threadId").asText(""));
+            if (threadId.isBlank()) {
+                continue;
+            }
+            String originalToolName = normalize(artifacts.path("originalToolName").asText(""));
+            if (TOOL_CODEX.equals(originalToolName) || TOOL_CODEX_REPLY.equals(originalToolName)) {
+                return threadId;
+            }
+        }
+        return "";
     }
 
     private String normalize(String value) {
@@ -102,7 +164,7 @@ public class CodexAppServerBridge {
         private final ToolRequest request;
         private final String toolName;
         private final String prompt;
-        private final String requestedThreadId;
+        private final String resolvedThreadId;
         private final BlockingQueue<String> stdoutQueue = new LinkedBlockingQueue<>();
         private final StringBuilder stderrBuffer = new StringBuilder();
         private final StringBuilder agentMessageBuffer = new StringBuilder();
@@ -123,14 +185,15 @@ public class CodexAppServerBridge {
         private AppServerSession(McpToolSnapshotEntity snapshot,
                                  McpServerDefinitionEntity server,
                                  McpServerConfig config,
-                                 ToolRequest request) {
+                                 ToolRequest request,
+                                 String resolvedThreadId) {
             this.snapshot = snapshot;
             this.server = server;
             this.config = config;
             this.request = request;
             this.toolName = normalize(snapshot.getOriginalToolName());
             this.prompt = normalize(request.args().path("prompt").asText(""));
-            this.requestedThreadId = resolveThreadId(request.args());
+            this.resolvedThreadId = normalize(resolvedThreadId);
         }
 
         private ToolResult run() throws Exception {
@@ -221,16 +284,16 @@ public class CodexAppServerBridge {
         }
 
         private void startOrResumeThread() throws Exception {
-            if (TOOL_CODEX_REPLY.equals(toolName)) {
+            if (TOOL_CODEX_REPLY.equals(toolName) || !resolvedThreadId.isBlank()) {
                 ObjectNode params = JsonNodeFactory.instance.objectNode();
-                params.put("threadId", requestedThreadId);
+                params.put("threadId", resolvedThreadId);
                 applyThreadOverrides(params);
                 sendRequest("thread/resume", THREAD_REQUEST_ID, params);
                 JsonNode response = waitForResponse(THREAD_REQUEST_ID);
                 ensureSuccessResponse(response, "thread/resume");
                 threadId = normalize(response.path("result").path("thread").path("id").asText(""));
                 if (threadId.isBlank()) {
-                    threadId = requestedThreadId;
+                    threadId = resolvedThreadId;
                 }
                 return;
             }
@@ -250,7 +313,7 @@ public class CodexAppServerBridge {
         private void applyThreadOverrides(ObjectNode params) {
             putIfPresent(params, "cwd", resolveTurnCwd());
             putIfPresent(params, "model", normalize(request.args().path("model").asText("")));
-            putIfPresent(params, "approvalPolicy", normalize(request.args().path("approval-policy").asText("")));
+            putIfPresent(params, "approvalPolicy", normalizeApprovalPolicy(request.args().path("approval-policy").asText("")));
             putIfPresent(params, "sandbox", normalize(request.args().path("sandbox").asText("")));
             putIfPresent(params, "baseInstructions", normalize(request.args().path("base-instructions").asText("")));
             putIfPresent(params, "developerInstructions", normalize(request.args().path("developer-instructions").asText("")));
@@ -274,6 +337,14 @@ public class CodexAppServerBridge {
                     ? request.agentWorkspacePath().toAbsolutePath().normalize()
                     : Path.of(base).toAbsolutePath().normalize();
             return basePath.resolve(path).normalize().toString();
+        }
+
+        private String normalizeApprovalPolicy(String rawValue) {
+            String normalized = normalize(rawValue).toLowerCase(Locale.ROOT);
+            if (normalized.isBlank()) {
+                return "";
+            }
+            return APPROVAL_POLICY_ALIASES.getOrDefault(normalized, "");
         }
 
         private void startTurn() throws Exception {
