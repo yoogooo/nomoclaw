@@ -1,0 +1,52 @@
+package ai.nomoclaw.bot.knowledge.model;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+/**
+ * Public knowledge-base request and response models.
+ */
+public final class KnowledgeModels {
+    private KnowledgeModels() {
+    }
+
+    public record CreateRequest(String name, String description, String embeddingProviderId, String embeddingModelId,
+                                Integer embeddingDimension) {
+    }
+
+    public record UpdateRequest(String name, String description, Integer retrievalTopK, Double similarityThreshold) {
+    }
+
+    public record Base(String knowledgeBaseUid, String name, String description, String status,
+                       String embeddingProviderId, String embeddingModelId, int embeddingDimension,
+                       String vectorCollectionName, int documentCount, long chunkCount, LocalDateTime updatedTime) {
+    }
+
+    public record Document(String documentUid, String knowledgeBaseUid, String displayName, String contentType,
+                           long sizeBytes, String status, String failureCode, String failureMessage, int pageCount,
+                           int chunkCount, String jobUid, int progressPercent, LocalDateTime updatedTime) {
+    }
+
+    public record UploadResult(List<Document> documents) {
+    }
+
+    public record SearchRequest(String query, Integer topK) {
+    }
+
+    public record SearchHit(String citationId, String knowledgeBaseUid, String knowledgeBaseName, String documentUid,
+                            String documentName, Integer pageFrom, Integer pageTo, String sectionPath, String excerpt,
+                            double score, String chunkUid) {
+    }
+
+    public record BindingRequest(List<String> include, List<String> exclude) {
+    }
+
+    public record Binding(List<String> effective, List<String> include, List<String> exclude) {
+    }
+
+    public record Retrieval(String retrievalUid, List<SearchHit> hits, String context) {
+        public static Retrieval empty() {
+            return new Retrieval("", List.of(), "");
+        }
+    }
+}

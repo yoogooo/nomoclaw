@@ -1,0 +1,4 @@
+-- H2 的基础 schema 已包含以下索引：
+-- idx_agent_conversation_agent_time_id
+-- idx_agent_message_conversation_id
+-- 保留此版本号以与 MySQL migration 序列对齐，避免重复建索引。

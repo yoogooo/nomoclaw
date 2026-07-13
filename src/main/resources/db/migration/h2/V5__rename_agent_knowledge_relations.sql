@@ -1,0 +1,5 @@
+ALTER TABLE conversation_knowledge_base_relation RENAME TO agent_conversation_knowledge_base_relation;
+ALTER TABLE message_knowledge_citation RENAME TO agent_message_knowledge_citation;
+
+COMMENT ON TABLE agent_conversation_knowledge_base_relation IS 'Agent会话与知识库覆盖绑定表';
+COMMENT ON TABLE agent_message_knowledge_citation IS 'Agent消息知识库引用表';

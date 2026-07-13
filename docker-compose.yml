@@ -7,6 +7,13 @@ services:
     extends:
       file: ./docker/compose.yml
       service: frontend
+  qdrant:
+    image: qdrant/qdrant:v1.15.4
+    ports:
+      - "6333:6333"
+    volumes:
+      - nomoclaw_qdrant:/qdrant/storage
 
 volumes:
   nomoclaw_data:
+  nomoclaw_qdrant:

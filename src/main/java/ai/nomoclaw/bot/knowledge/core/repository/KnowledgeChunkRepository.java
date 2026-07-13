@@ -1,0 +1,28 @@
+package ai.nomoclaw.bot.knowledge.core.repository;
+
+import com.baomidou.mybatisplus.extension.repository.CrudRepository;
+import ai.nomoclaw.bot.knowledge.core.entity.KnowledgeChunkEntity;
+import ai.nomoclaw.bot.knowledge.core.mapper.KnowledgeChunkMapper;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public class KnowledgeChunkRepository extends CrudRepository<KnowledgeChunkMapper, KnowledgeChunkEntity> {
+
+    /** Finds a chunk by its stable business UID. */
+    public KnowledgeChunkEntity findByUid(String chunkUid) {
+        return lambdaQuery().eq(KnowledgeChunkEntity::getChunkUid, chunkUid).one();
+    }
+
+    /** Lists ready chunks in a knowledge base. */
+    public List<KnowledgeChunkEntity> listReadyByBase(String knowledgeBaseUid) {
+        return lambdaQuery().eq(KnowledgeChunkEntity::getKnowledgeBaseUid, knowledgeBaseUid).eq(KnowledgeChunkEntity::getStatus, "READY").list();
+    }
+
+    /** Counts ready chunks in a knowledge base. */
+    public long countReadyByBase(String knowledgeBaseUid) {
+        return lambdaQuery().eq(KnowledgeChunkEntity::getKnowledgeBaseUid, knowledgeBaseUid).eq(KnowledgeChunkEntity::getStatus, "READY").count();
+    }
+
+}

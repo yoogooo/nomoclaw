@@ -221,6 +221,8 @@ const zhCN = {
       saveTipConfirm: "保存为锦囊？",
       savedAsTip: "已保存为锦囊",
       openFile: "打开 {name}",
+      knowledgeCitations: "知识库引用（{count}）",
+      knowledgePage: "第 {page} 页",
       expandMessage: "展开",
       collapseMessage: "收起",
       loadingHistory: "正在加载更早消息...",
@@ -1052,8 +1054,22 @@ const zhCN = {
         warning: "需关注"
       },
       units: {
-        documents: "文档"
-      }
+        documents: "文档",
+        chunks: "分块"
+      },
+      vectorUnavailable: "Qdrant 向量服务不可用，普通对话不受影响",
+      empty: "还没有知识库",
+      back: "返回知识库",
+      upload: "上传文档",
+      documents: "文档",
+      noDocuments: "尚未上传文档",
+      retry: "重试",
+      searchTest: "检索测试",
+      searchPlaceholder: "输入要检索的问题",
+      noHits: "暂无检索结果",
+      page: "第",
+      form: { name: "知识库名称", description: "描述", provider: "Embedding Provider ID", model: "Embedding 模型 ID", dimension: "向量维度" },
+      messages: { created: "知识库已创建", uploaded: "文档已提交处理" }
     },
     skills: {
       title: "技能管理",

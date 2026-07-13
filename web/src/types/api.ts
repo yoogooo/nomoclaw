@@ -502,6 +502,18 @@ export interface ConversationMessage {
   createdTime: string;
   fileLinks?: MessageFileLink[];
   attachments?: ConversationAttachment[];
+  knowledgeCitations?: Array<{
+    citationId: string;
+    knowledgeBaseUid: string;
+    knowledgeBaseName: string;
+    documentUid: string;
+    documentName: string;
+    pageFrom?: number;
+    pageTo?: number;
+    sectionPath: string;
+    excerpt: string;
+    score: number;
+  }>;
 }
 
 export interface ConversationMessagePage {

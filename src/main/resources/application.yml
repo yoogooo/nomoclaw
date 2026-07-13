@@ -3,8 +3,8 @@ spring:
     name: bot
   servlet:
     multipart:
-      max-file-size: 20MB
-      max-request-size: 40MB
+      max-file-size: 50MB
+      max-request-size: 200MB
   mvc:
     async:
       request-timeout: -1
@@ -128,3 +128,29 @@ llm:
 logging:
   level:
     "ai.nomoclaw.bot": INFO
+
+knowledge:
+  enabled: true
+  storage-root: "${NOMOCLAW_ROOT_DIR:${user.home}/.nomoclaw}/knowledge"
+  upload:
+    max-file-size: 50MB
+    max-request-size: 200MB
+    max-files-per-request: 20
+  ingestion:
+    worker-count: 2
+    lease-seconds: 300
+    max-attempts: 3
+    embedding-batch-size: 32
+  chunking:
+    default-size-tokens: 500
+    default-overlap-tokens: 80
+  retrieval:
+    default-top-k: 8
+    max-context-tokens: 6000
+    default-similarity-threshold: 0.35
+    max-chunks-per-document: 3
+  vector:
+    qdrant:
+      url: "${QDRANT_URL:http://127.0.0.1:6333}"
+      api-key: "${QDRANT_API_KEY:}"
+      timeout: 10s

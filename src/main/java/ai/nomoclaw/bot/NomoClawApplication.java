@@ -15,7 +15,8 @@ import org.springframework.scheduling.annotation.EnableAsync;
 @ConfigurationPropertiesScan(basePackages = {"ai.nomoclaw.bot"})
 @MapperScan({
 		"ai.nomoclaw.bot.store.mapper",
-		"ai.nomoclaw.bot.channel.store.mapper"
+		"ai.nomoclaw.bot.channel.store.mapper",
+		"ai.nomoclaw.bot.knowledge.core.mapper"
 })
 public class NomoClawApplication {
 	private static final Logger log = LoggerFactory.getLogger(NomoClawApplication.class);

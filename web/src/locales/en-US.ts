@@ -221,6 +221,8 @@ const enUS = {
       saveTipConfirm: "Save as tip?",
       savedAsTip: "Saved as tip",
       openFile: "Open {name}",
+      knowledgeCitations: "Knowledge citations ({count})",
+      knowledgePage: "Page {page}",
       expandMessage: "Expand",
       collapseMessage: "Collapse",
       loadingHistory: "Loading older messages...",
@@ -1052,8 +1054,22 @@ const enUS = {
         warning: "Needs Attention"
       },
       units: {
-        documents: "docs"
-      }
+        documents: "docs",
+        chunks: "chunks"
+      },
+      vectorUnavailable: "Qdrant is unavailable. Regular conversations are unaffected.",
+      empty: "No knowledge bases yet",
+      back: "Back",
+      upload: "Upload documents",
+      documents: "Documents",
+      noDocuments: "No documents uploaded",
+      retry: "Retry",
+      searchTest: "Retrieval test",
+      searchPlaceholder: "Enter a question to search",
+      noHits: "No retrieval results",
+      page: "Page",
+      form: { name: "Knowledge base name", description: "Description", provider: "Embedding provider ID", model: "Embedding model ID", dimension: "Vector dimension" },
+      messages: { created: "Knowledge base created", uploaded: "Documents queued for processing" }
     },
     skills: {
       title: "Skill Management",

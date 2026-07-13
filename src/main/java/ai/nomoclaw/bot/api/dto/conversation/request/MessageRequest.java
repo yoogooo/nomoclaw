@@ -9,6 +9,7 @@ public record MessageRequest(
         List<String> fileUrls,
         @NotBlank String modelProvider,
         @NotBlank String modelName,
-        String approvalMode
+        String approvalMode,
+        Boolean knowledgeOnly
 ) {
 }

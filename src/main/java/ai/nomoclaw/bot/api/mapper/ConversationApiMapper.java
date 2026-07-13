@@ -101,7 +101,8 @@ public final class ConversationApiMapper {
                 dto.totalTokens(),
                 dto.createdTime(),
                 dto.fileLinks().stream().map(ConversationApiMapper::toMessageFileLink).toList(),
-                dto.attachments().stream().map(ConversationApiMapper::toConversationAttachment).toList()
+                dto.attachments().stream().map(ConversationApiMapper::toConversationAttachment).toList(),
+                dto.knowledgeCitations()
         );
     }
 

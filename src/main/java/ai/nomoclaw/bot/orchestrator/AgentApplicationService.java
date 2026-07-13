@@ -16,6 +16,8 @@ import ai.nomoclaw.bot.domain.AgentConversation;
 import ai.nomoclaw.bot.domain.AgentMessage;
 import ai.nomoclaw.bot.llm.codex.CodexUsageLimitException;
 import ai.nomoclaw.bot.llm.config.LlmProperties;
+import ai.nomoclaw.bot.knowledge.app.KnowledgeService;
+import ai.nomoclaw.bot.knowledge.model.KnowledgeModels;
 import ai.nomoclaw.bot.model.*;
 import ai.nomoclaw.bot.orchestrator.approval.ApprovalGrantedEvent;
 import ai.nomoclaw.bot.orchestrator.execution.*;
@@ -41,6 +43,7 @@ import ai.nomoclaw.bot.workspace.NomoClawPaths;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.request.ToolChoice;
@@ -49,6 +52,7 @@ import dev.langchain4j.model.output.TokenUsage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.JsonNodeFactory;
@@ -113,7 +117,9 @@ public class AgentApplicationService {
     private final MessageExecutionOrchestrator messageExecutionOrchestrator;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final ConversationService conversationService;
+    private final KnowledgeService knowledgeService;
 
+    @Autowired
     public AgentApplicationService(AgentStore store,
                                    Planner planner,
                                    RiskPolicy riskPolicy,
@@ -130,7 +136,8 @@ public class AgentApplicationService {
                                    ExecutionScopeResolver executionScopeResolver,
                                    MessageExecutionOrchestrator messageExecutionOrchestrator,
                                    ApplicationEventPublisher applicationEventPublisher,
-                                   ConversationService conversationService) {
+                                   ConversationService conversationService,
+                                   KnowledgeService knowledgeService) {
         this.store = store;
         this.planner = planner;
         this.riskPolicy = riskPolicy;
@@ -148,6 +155,22 @@ public class AgentApplicationService {
         this.messageExecutionOrchestrator = messageExecutionOrchestrator;
         this.applicationEventPublisher = applicationEventPublisher;
         this.conversationService = conversationService;
+        this.knowledgeService = knowledgeService;
+    }
+
+    public AgentApplicationService(AgentStore store, Planner planner, RiskPolicy riskPolicy, AgentEventBus eventBus,
+                                   MessageCancellationRegistry cancellationRegistry, AgentProperties properties,
+                                   LlmProperties llmProperties, ConversationAttachmentService conversationAttachmentAppService,
+                                   ToolExecutionPolicyGateway toolExecutionPolicyGateway,
+                                   ToolPermissionPolicyService toolPermissionPolicyService,
+                                   PermissionAppService permissionAppService, ExecutionFeedbackBuilder feedbackBuilder,
+                                   StepExecutionService stepExecutionService, ExecutionScopeResolver executionScopeResolver,
+                                   MessageExecutionOrchestrator messageExecutionOrchestrator,
+                                   ApplicationEventPublisher applicationEventPublisher, ConversationService conversationService) {
+        this(store, planner, riskPolicy, eventBus, cancellationRegistry, properties, llmProperties,
+                conversationAttachmentAppService, toolExecutionPolicyGateway, toolPermissionPolicyService,
+                permissionAppService, feedbackBuilder, stepExecutionService, executionScopeResolver,
+                messageExecutionOrchestrator, applicationEventPublisher, conversationService, null);
     }
 
     public String createConversation(String agentGroupUid, String agentUid) {
@@ -1022,6 +1045,9 @@ public class AgentApplicationService {
         }
         int fromIndex = Math.max(0, allMessages.size() - CONVERSATION_CONTEXT_LIMIT);
         List<ChatMessage> memory = new ArrayList<>();
+        KnowledgeModels.Retrieval retrieval = knowledgeService == null
+                ? KnowledgeModels.Retrieval.empty()
+                : knowledgeService.retrieve(currentMessage.conversationUid(), currentMessage.messageUid(), currentMessage.content());
         for (AgentMessage message : allMessages.subList(fromIndex, allMessages.size())) {
             boolean hasString = message.content() != null && !message.content().isBlank();
             boolean hasAttachments = !conversationAttachmentAppService.listByMessageUid(message.messageUid()).isEmpty();
@@ -1029,6 +1055,9 @@ public class AgentApplicationService {
                 continue;
             }
             if ("user".equals(message.role())) {
+                if (message.messageUid().equals(currentMessage.messageUid()) && !retrieval.context().isBlank()) {
+                    memory.add(SystemMessage.from(retrieval.context()));
+                }
                 memory.add(toUserMessage(message));
                 continue;
             }

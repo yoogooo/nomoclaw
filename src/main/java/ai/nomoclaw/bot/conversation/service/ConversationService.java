@@ -12,6 +12,7 @@ import ai.nomoclaw.bot.conversation.model.ConversationSummaryDto;
 import ai.nomoclaw.bot.conversation.model.ConversationSummaryPageDto;
 import ai.nomoclaw.bot.conversation.model.MessageFileLinkDto;
 import ai.nomoclaw.bot.conversation.support.ConversationAttachmentService;
+import ai.nomoclaw.bot.knowledge.app.KnowledgeService;
 import ai.nomoclaw.bot.domain.AgentConversation;
 import ai.nomoclaw.bot.domain.AgentMessage;
 import ai.nomoclaw.bot.model.AgentEvent;
@@ -32,6 +33,7 @@ import ai.nomoclaw.bot.util.UuidUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -74,14 +76,17 @@ public class ConversationService {
     private final ExecutionScopeResolver executionScopeResolver;
     private final ConversationAttachmentService conversationAttachmentService;
     private final RunViewAssembler runViewAssembler;
+    private final KnowledgeService knowledgeService;
 
+    @Autowired
     public ConversationService(AgentStore store,
                                AgentProperties properties,
                                MessageCancellationRegistry cancellationRegistry,
                                MessageExecutionOrchestrator messageExecutionOrchestrator,
                                ExecutionScopeResolver executionScopeResolver,
                                ConversationAttachmentService conversationAttachmentService,
-                               RunViewAssembler runViewAssembler) {
+                               RunViewAssembler runViewAssembler,
+                               KnowledgeService knowledgeService) {
         this.store = store;
         this.properties = properties;
         this.cancellationRegistry = cancellationRegistry;
@@ -89,6 +94,17 @@ public class ConversationService {
         this.executionScopeResolver = executionScopeResolver;
         this.conversationAttachmentService = conversationAttachmentService;
         this.runViewAssembler = runViewAssembler;
+        this.knowledgeService = knowledgeService;
+    }
+
+    public ConversationService(AgentStore store, AgentProperties properties,
+                               MessageCancellationRegistry cancellationRegistry,
+                               MessageExecutionOrchestrator messageExecutionOrchestrator,
+                               ExecutionScopeResolver executionScopeResolver,
+                               ConversationAttachmentService conversationAttachmentService,
+                               RunViewAssembler runViewAssembler) {
+        this(store, properties, cancellationRegistry, messageExecutionOrchestrator, executionScopeResolver,
+                conversationAttachmentService, runViewAssembler, null);
     }
 
     public String createConversation(String agentGroupUid, String agentUid, String channel) {
@@ -262,7 +278,10 @@ public class ConversationService {
                         message.totalTokens(),
                         message.createdAt(),
                         buildMessageFileLinks(message),
-                        attachmentsByMessage.getOrDefault(message.messageUid(), List.of())
+                        attachmentsByMessage.getOrDefault(message.messageUid(), List.of()),
+                        "assistant".equals(message.role()) && knowledgeService != null
+                                ? knowledgeService.citations(message.parentMessageUid())
+                                : List.of()
                 ))
                 .toList();
     }

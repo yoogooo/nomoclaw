@@ -1032,6 +1032,14 @@ onMounted(() => {
                 {{ t("chat.messages.openFile", { name: fileLink.name }) }}
               </n-button>
             </n-flex>
+            <details v-if="message.knowledgeCitations?.length" class="knowledge-citations">
+              <summary>{{ t("chat.messages.knowledgeCitations", { count: message.knowledgeCitations.length }) }}</summary>
+              <div v-for="citation in message.knowledgeCitations" :key="citation.citationId" class="knowledge-citation">
+                <strong>[{{ citation.citationId }}] {{ citation.documentName }}</strong>
+                <span v-if="citation.pageFrom">{{ t("chat.messages.knowledgePage", { page: citation.pageFrom }) }}</span>
+                <p>{{ citation.excerpt }}</p>
+              </div>
+            </details>
           </div>
           <div v-if="message.role !== 'user'" class="message-meta">
             <div class="message-time">{{ formatMessageTime(message.createdTime) }}</div>
@@ -2045,6 +2053,26 @@ onMounted(() => {
 
 .message-file-links {
   margin-top: var(--space-3);
+}
+
+.knowledge-citations {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-lg);
+}
+
+.knowledge-citation {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+  color: var(--color-text-secondary);
+}
+
+.knowledge-citation p {
+  margin: 0;
+  white-space: pre-wrap;
 }
 
 .run-steps-collapse {
