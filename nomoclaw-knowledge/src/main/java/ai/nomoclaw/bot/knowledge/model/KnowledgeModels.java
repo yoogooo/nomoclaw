@@ -10,6 +10,9 @@ public final class KnowledgeModels {
     private KnowledgeModels() {
     }
 
+    public record StatusResponse(String status) {
+    }
+
     public record CreateRequest(String name, String description, String embeddingProviderId, String embeddingModelId,
                                 Integer embeddingDimension) {
     }

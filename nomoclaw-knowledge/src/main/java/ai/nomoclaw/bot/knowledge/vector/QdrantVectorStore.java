@@ -1,7 +1,7 @@
 package ai.nomoclaw.bot.knowledge.vector;
 
 import ai.nomoclaw.bot.knowledge.config.KnowledgeProperties;
-import ai.nomoclaw.bot.util.JsonUtil;
+import ai.nomoclaw.bot.knowledge.util.JsonUtil;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.JsonNode;

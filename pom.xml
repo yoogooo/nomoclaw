@@ -17,11 +17,14 @@
 
     <modules>
         <module>nomoclaw-agent</module>
+        <module>nomoclaw-knowledge</module>
         <module>nomoclaw-develop-tool</module>
     </modules>
 
     <properties>
         <java.version>21</java.version>
+        <maven.compiler.source>${java.version}</maven.compiler.source>
+        <maven.compiler.target>${java.version}</maven.compiler.target>
         <langchain4j.version>1.16.3</langchain4j.version>
         <langchain4j.skills.version>1.17.2-beta27</langchain4j.skills.version>
         <langchain4j.dashscope.version>1.17.2-beta27</langchain4j.dashscope.version>

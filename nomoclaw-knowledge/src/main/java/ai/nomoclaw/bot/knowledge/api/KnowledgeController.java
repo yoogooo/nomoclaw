@@ -1,6 +1,5 @@
 package ai.nomoclaw.bot.knowledge.api;
 
-import ai.nomoclaw.bot.api.dto.common.response.SimpleResponse;
 import ai.nomoclaw.bot.knowledge.app.KnowledgeService;
 import ai.nomoclaw.bot.knowledge.model.KnowledgeModels;
 import org.springframework.core.io.FileSystemResource;
@@ -90,9 +89,9 @@ public class KnowledgeController {
      * Resubmits a failed document ingestion job.
      */
     @PostMapping("/knowledge-bases/{uid}/documents/{documentUid}/retry")
-    public SimpleResponse retry(@PathVariable String uid, @PathVariable String documentUid) {
+    public KnowledgeModels.StatusResponse retry(@PathVariable String uid, @PathVariable String documentUid) {
         service.retry(uid, documentUid);
-        return new SimpleResponse("accepted");
+        return new KnowledgeModels.StatusResponse("accepted");
     }
 
     /**
@@ -124,9 +123,9 @@ public class KnowledgeController {
      * Replaces the Agent's default knowledge-base bindings.
      */
     @PutMapping("/agents/{agentUid}/knowledge-bases")
-    public SimpleResponse setAgentBindings(@PathVariable String agentUid, @RequestBody List<String> uids) {
+    public KnowledgeModels.StatusResponse setAgentBindings(@PathVariable String agentUid, @RequestBody List<String> uids) {
         service.setAgentBinding(agentUid, uids);
-        return new SimpleResponse("updated");
+        return new KnowledgeModels.StatusResponse("updated");
     }
 
     /**
@@ -141,8 +140,8 @@ public class KnowledgeController {
      * Replaces conversation-level include and exclude overrides.
      */
     @PutMapping("/conversations/{conversationUid}/knowledge-bases")
-    public SimpleResponse setConversationBindings(@PathVariable String conversationUid, @RequestBody KnowledgeModels.BindingRequest request) {
+    public KnowledgeModels.StatusResponse setConversationBindings(@PathVariable String conversationUid, @RequestBody KnowledgeModels.BindingRequest request) {
         service.setConversationBinding(conversationUid, request);
-        return new SimpleResponse("updated");
+        return new KnowledgeModels.StatusResponse("updated");
     }
 }
