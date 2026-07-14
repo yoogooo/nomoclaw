@@ -18,6 +18,7 @@ import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.lang.ProcessBuilder.Redirect;
@@ -27,8 +28,11 @@ import java.net.URI;
 import java.net.URL;
 import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
@@ -441,7 +445,23 @@ public class BrowserTool implements Tool {
                 context = createBrowserContext(cacheRoot, playwrightEnv, profileKey, headless, userDataDir, executablePath);
             } catch (Exception launchEx) {
                 if (!isMissingExecutable(launchEx)) {
-                    throw launchEx;
+                    if (!resetBrowserProfileAfterLaunchFailure(profileKey, userDataDir, launchEx)) {
+                        throw launchEx;
+                    }
+                    context = createBrowserContext(cacheRoot, playwrightEnv, profileKey, headless, userDataDir, executablePath);
+                    long resetFinalBytes = cacheRoot == null ? baselineBytes : safeDirectorySize(cacheRoot);
+                    long resetDownloadedBytes = Math.max(0L, resetFinalBytes - baselineBytes);
+                    String resetDetails = resetDownloadedBytes > 0
+                            ? "browser.runtime.ready_with_cache_delta:" + formatBytes(resetDownloadedBytes)
+                            : "browser.runtime.ready";
+                    request.reportProgress(
+                            "browser.runtime.ready",
+                            resetDetails,
+                            progressMetrics("ready", resetFinalBytes, resetDownloadedBytes, monitorStartedAt, cliProgressPercent.get(), installProgressState.snapshot())
+                    );
+                    log.info("[Tool][browser] browser context recovered after profile reset profile={} dir={} headless={} mode={}",
+                            profileKey, userDataDir, headless, PlatformSupport.isWindows() ? "windows_cdp" : "persistent");
+                    return context;
                 }
                 log.info("[Tool][browser] chromium executable missing during launch, reinstalling runtime");
                 long repairBaselineBytes = cacheRoot == null ? 0L : safeDirectorySize(cacheRoot);
@@ -1913,6 +1933,67 @@ public class BrowserTool implements Tool {
             current = current.getCause();
         }
         return false;
+    }
+
+    private boolean resetBrowserProfileAfterLaunchFailure(String profileKey, Path userDataDir, Exception launchEx) {
+        if (!agentProperties.getBrowser().isSharedProfileEnabled()) {
+            return false;
+        }
+        log.warn("[Tool][browser] browser launch failed, resetting shared profile profile={} dir={} err={}",
+                profileKey, userDataDir, buildErrorMessage(launchEx));
+        try {
+            invalidateProfileContext(profileKey);
+            resetBrowserProfileDirectory(userDataDir);
+            return true;
+        } catch (Exception resetEx) {
+            log.warn("[Tool][browser] failed to reset shared browser profile profile={} dir={} err={}",
+                    profileKey, userDataDir, resetEx.getMessage(), resetEx);
+            return false;
+        }
+    }
+
+    private void resetBrowserProfileDirectory(Path userDataDir) throws IOException {
+        if (userDataDir == null) {
+            return;
+        }
+        if (Files.notExists(userDataDir)) {
+            Files.createDirectories(userDataDir);
+            return;
+        }
+        Path backupDir = userDataDir.resolveSibling(buildBrokenProfileBackupName(userDataDir));
+        try {
+            Files.move(userDataDir, backupDir);
+        } catch (Exception moveEx) {
+            log.warn("[Tool][browser] failed to move broken browser profile dir={} backup={} err={}",
+                    userDataDir, backupDir, moveEx.getMessage());
+            deleteDirectory(userDataDir);
+        }
+        Files.createDirectories(userDataDir);
+    }
+
+    private String buildBrokenProfileBackupName(Path userDataDir) {
+        Path fileName = userDataDir == null ? null : userDataDir.getFileName();
+        String baseName = fileName == null ? "browser-profile" : fileName.toString();
+        return baseName + ".broken-" + Instant.now().toEpochMilli();
+    }
+
+    private void deleteDirectory(Path root) throws IOException {
+        if (root == null || Files.notExists(root)) {
+            return;
+        }
+        Files.walkFileTree(root, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                Files.deleteIfExists(file);
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                Files.deleteIfExists(dir);
+                return FileVisitResult.CONTINUE;
+            }
+        });
     }
 
     private ObjectNode metric(long start) {

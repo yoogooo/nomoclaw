@@ -17,6 +17,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 import java.lang.reflect.Method;
 import java.util.Map;
+import java.util.List;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
@@ -106,6 +107,31 @@ class BrowserToolRuntimePathTests {
     }
 
     @Test
+    void resetsBrowserProfileDirectoryByBackingUpExistingContents() throws Exception {
+        NomoClawPaths.configureRoot(tempDir);
+        BrowserTool tool = new BrowserTool(new AgentProperties(), new MessageCancellationRegistry());
+        Path profileDir = tempDir.resolve("runtime").resolve("browser-profiles").resolve("shared");
+        Files.createDirectories(profileDir);
+        Files.writeString(profileDir.resolve("Preferences"), "broken");
+
+        invoke(tool, "resetBrowserProfileDirectory", profileDir);
+
+        assertThat(Files.isDirectory(profileDir)).isTrue();
+        List<Path> profileEntries;
+        try (var stream = Files.list(profileDir)) {
+            profileEntries = stream.toList();
+        }
+        assertThat(profileEntries).isEmpty();
+
+        Path profileRoot = profileDir.getParent();
+        List<Path> backups;
+        try (var stream = Files.list(profileRoot)) {
+            backups = stream.filter(path -> path.getFileName().toString().startsWith("shared.broken-")).toList();
+        }
+        assertThat(backups).isNotEmpty();
+    }
+
+    @Test
     void waitForShouldRejectBlankSelector() throws Exception {
         BrowserTool tool = new BrowserTool(new AgentProperties(), new MessageCancellationRegistry());
         ToolRequest request = toolRequest("wait_for", "");
@@ -161,7 +187,7 @@ class BrowserToolRuntimePathTests {
                 if (args[i] == null) {
                     continue;
                 }
-                if (!parameterTypes[i].isAssignableFrom(args[i].getClass())) {
+                if (!isAssignable(parameterTypes[i], args[i].getClass())) {
                     match = false;
                     break;
                 }
@@ -176,5 +202,22 @@ class BrowserToolRuntimePathTests {
         }
         method.setAccessible(true);
         return method.invoke(tool, args);
+    }
+
+    private boolean isAssignable(Class<?> parameterType, Class<?> argumentType) {
+        if (parameterType.isAssignableFrom(argumentType)) {
+            return true;
+        }
+        return switch (parameterType.getName()) {
+            case "boolean" -> argumentType == Boolean.class;
+            case "byte" -> argumentType == Byte.class;
+            case "short" -> argumentType == Short.class;
+            case "int" -> argumentType == Integer.class;
+            case "long" -> argumentType == Long.class;
+            case "float" -> argumentType == Float.class;
+            case "double" -> argumentType == Double.class;
+            case "char" -> argumentType == Character.class;
+            default -> false;
+        };
     }
 }
