@@ -1,6 +1,10 @@
 package ai.nomoclaw.bot.knowledge.app;
 
 import ai.nomoclaw.bot.knowledge.config.KnowledgeProperties;
+import ai.nomoclaw.bot.knowledge.core.entity.KnowledgeChunkEntity;
+import ai.nomoclaw.bot.knowledge.core.entity.KnowledgeDocumentEntity;
+import ai.nomoclaw.bot.knowledge.core.repository.KnowledgeChunkRepository;
+import ai.nomoclaw.bot.knowledge.core.repository.KnowledgeDocumentRepository;
 import ai.nomoclaw.bot.knowledge.ingestion.DefaultDocumentParser.KnowledgeParseException;
 import ai.nomoclaw.bot.knowledge.ingestion.DocumentChunker;
 import ai.nomoclaw.bot.knowledge.ingestion.DocumentParser;
@@ -46,10 +50,13 @@ public class KnowledgeService {
     private final EmbeddingProvider embeddingProvider;
     private final VectorStore vectorStore;
     private final Executor executor;
+    private final KnowledgeChunkRepository chunkRepository;
+    private final KnowledgeDocumentRepository documentRepository;
 
     public KnowledgeService(JdbcTemplate jdbc, TransactionTemplate transactions, KnowledgeProperties properties,
                             DocumentParser parser, DocumentChunker chunker, EmbeddingProvider embeddingProvider,
-                            VectorStore vectorStore, @Qualifier("knowledgeIngestionExecutor") Executor executor) {
+                            VectorStore vectorStore, @Qualifier("knowledgeIngestionExecutor") Executor executor,
+                            KnowledgeChunkRepository chunkRepository, KnowledgeDocumentRepository documentRepository) {
         this.jdbc = jdbc;
         this.transactions = transactions;
         this.properties = properties;
@@ -58,6 +65,8 @@ public class KnowledgeService {
         this.embeddingProvider = embeddingProvider;
         this.vectorStore = vectorStore;
         this.executor = executor;
+        this.chunkRepository = chunkRepository;
+        this.documentRepository = documentRepository;
     }
 
     public KnowledgeModels.Base create(KnowledgeModels.CreateRequest request) {
@@ -228,10 +237,7 @@ public class KnowledgeService {
                 for (KnowledgeModels.Base base : group) {
                     for (VectorStore.Hit hit : vectorStore.search(collectionName(base), vector, List.of(base.knowledgeBaseUid()), 8)) {
                         String chunkUid = String.valueOf(hit.payload().get("chunkUid"));
-                        jdbc.query("SELECT c.*,d.display_name,b.name base_name FROM knowledge_chunk c JOIN knowledge_document d ON d.document_uid=c.document_uid JOIN knowledge_base b ON b.knowledge_base_uid=c.knowledge_base_uid WHERE c.chunk_uid=? AND c.status='READY' AND d.current_version_uid=c.document_version_uid", rs -> {
-                            if (rs.next())
-                                all.add(new KnowledgeModels.SearchHit("", rs.getString("knowledge_base_uid"), rs.getString("base_name"), rs.getString("document_uid"), rs.getString("display_name"), integer(rs.getObject("page_from")), integer(rs.getObject("page_to")), rs.getString("section_path"), rs.getString("content"), hit.score(), chunkUid));
-                        }, chunkUid);
+                        toSearchHit(chunkUid, hit.score()).ifPresent(all::add);
                     }
                 }
             }
@@ -259,9 +265,15 @@ public class KnowledgeService {
     }
 
     public List<KnowledgeModels.SearchHit> search(String baseUid, String query, Integer topK) {
-        get(baseUid);
+        KnowledgeModels.Base base = get(baseUid);
+        long started = System.nanoTime();
+        log.info("[KnowledgeSearch][Debug] started knowledgeBaseUid={} collection={} queryLength={} topK={}",
+                baseUid, collectionName(base), query == null ? 0 : query.length(), topK);
         String syntheticConversation = "debug:" + baseUid;
-        return retrieveForBases(syntheticConversation, query, List.of(baseUid), topK);
+        List<KnowledgeModels.SearchHit> hits = retrieveForBases(syntheticConversation, query, List.of(baseUid), topK);
+        log.info("[KnowledgeSearch][Debug] completed knowledgeBaseUid={} hitCount={} chunkUids={} scores={} costMs={}",
+                baseUid, hits.size(), hits.stream().map(KnowledgeModels.SearchHit::chunkUid).toList(), hits.stream().map(KnowledgeModels.SearchHit::score).toList(), elapsedMillis(started));
+        return hits;
     }
 
     private List<KnowledgeModels.SearchHit> retrieveForBases(String ignored, String query, List<String> ids, Integer topK) {
@@ -270,10 +282,7 @@ public class KnowledgeService {
         List<KnowledgeModels.SearchHit> result = new ArrayList<>();
         for (VectorStore.Hit hit : vectorStore.search(collectionName(base), vector, ids, topK == null ? base.documentCount() + 8 : topK)) {
             String chunkUid = String.valueOf(hit.payload().get("chunkUid"));
-            jdbc.query("SELECT c.*,d.display_name,b.name base_name FROM knowledge_chunk c JOIN knowledge_document d ON d.document_uid=c.document_uid JOIN knowledge_base b ON b.knowledge_base_uid=c.knowledge_base_uid WHERE c.chunk_uid=?", rs -> {
-                if (rs.next())
-                    result.add(withCitation(new KnowledgeModels.SearchHit("", rs.getString("knowledge_base_uid"), rs.getString("base_name"), rs.getString("document_uid"), rs.getString("display_name"), integer(rs.getObject("page_from")), integer(rs.getObject("page_to")), rs.getString("section_path"), rs.getString("content"), hit.score(), chunkUid), "K" + (result.size() + 1)));
-            }, chunkUid);
+            toSearchHit(chunkUid, hit.score()).ifPresent(searchHit -> result.add(withCitation(searchHit, "K" + (result.size() + 1))));
         }
         return result;
     }
@@ -395,6 +404,15 @@ public class KnowledgeService {
         return new KnowledgeModels.SearchHit(citation, hit.knowledgeBaseUid(), hit.knowledgeBaseName(), hit.documentUid(), hit.documentName(), hit.pageFrom(), hit.pageTo(), hit.sectionPath(), hit.excerpt(), hit.score(), hit.chunkUid());
     }
 
+    private Optional<KnowledgeModels.SearchHit> toSearchHit(String chunkUid, double score) {
+        KnowledgeChunkEntity chunk = chunkRepository.findByUid(chunkUid);
+        if (chunk == null || !"READY".equals(chunk.getStatus())) return Optional.empty();
+        KnowledgeDocumentEntity document = documentRepository.findByBaseAndUid(chunk.getKnowledgeBaseUid(), chunk.getDocumentUid());
+        if (document == null || !chunk.getDocumentVersionUid().equals(document.getCurrentVersionUid())) return Optional.empty();
+        KnowledgeModels.Base base = get(chunk.getKnowledgeBaseUid());
+        return Optional.of(new KnowledgeModels.SearchHit("", chunk.getKnowledgeBaseUid(), base.name(), chunk.getDocumentUid(), document.getDisplayName(), chunk.getPageFrom(), chunk.getPageTo(), safe(chunk.getSectionPath()), chunk.getContent(), score, chunk.getChunkUid()));
+    }
+
     private KnowledgeModels.Base base(ResultSet rs) throws SQLException {
         return new KnowledgeModels.Base(rs.getString("knowledge_base_uid"), rs.getString("name"), rs.getString("description"), rs.getString("status"), rs.getString("embedding_provider_id"), rs.getString("embedding_model_id"), rs.getInt("embedding_dimension"), rs.getString("vector_collection_name"), rs.getInt("document_count"), rs.getLong("chunk_count"), rs.getTimestamp("updated_time").toLocalDateTime());
     }
@@ -494,6 +512,10 @@ public class KnowledgeService {
     private String abbreviate(String value) {
         if (value == null) return "";
         return value.length() <= 1000 ? value : value.substring(0, 1000);
+    }
+
+    private long elapsedMillis(long started) {
+        return (System.nanoTime() - started) / 1_000_000;
     }
 
     private record ExistingChunk(String chunkUid, String content, String documentUid, String documentVersionUid) {

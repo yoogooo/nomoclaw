@@ -2,6 +2,8 @@ package ai.nomoclaw.bot.knowledge.vector;
 
 import ai.nomoclaw.bot.knowledge.config.KnowledgeProperties;
 import ai.nomoclaw.bot.knowledge.util.JsonUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.JsonNode;
@@ -20,6 +22,8 @@ import java.util.Map;
  */
 @Component
 public class QdrantVectorStore implements VectorStore {
+    private static final Logger log = LoggerFactory.getLogger(QdrantVectorStore.class);
+
     private final KnowledgeProperties properties;
     private final HttpClient httpClient;
 
@@ -45,6 +49,7 @@ public class QdrantVectorStore implements VectorStore {
 
     @Override
     public List<Hit> search(String collection, List<Float> vector, List<String> knowledgeBaseUids, int limit) {
+        long started = System.nanoTime();
         List<Map<String, Object>> should = knowledgeBaseUids.stream().map(uid -> Map.of("key", "knowledgeBaseUid", "match", Map.of("value", uid))).toList();
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("query", vector);
@@ -60,6 +65,8 @@ public class QdrantVectorStore implements VectorStore {
             });
             hits.add(new Hit(point.path("id").asText(), point.path("score").asDouble(), payload));
         }
+        log.info("[KnowledgeSearch][Qdrant] collection={} vectorDimension={} knowledgeBaseCount={} limit={} candidateCount={} scores={} costMs={}",
+                collection, vector.size(), knowledgeBaseUids.size(), limit, hits.size(), hits.stream().map(Hit::score).toList(), elapsedMillis(started));
         return hits;
     }
 
@@ -85,8 +92,10 @@ public class QdrantVectorStore implements VectorStore {
             if ("GET".equals(method)) builder.GET();
             else builder.method(method, HttpRequest.BodyPublishers.ofString(JsonUtil.toJson(body)));
             HttpResponse<String> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() / 100 != 2 && !(allowExists && response.statusCode() == 409))
+            if (response.statusCode() / 100 != 2 && !(allowExists && response.statusCode() == 409)) {
+                log.warn("[KnowledgeSearch][Qdrant] requestFailed method={} path={} status={}", method, path, response.statusCode());
                 throw new IllegalStateException("Qdrant HTTP " + response.statusCode() + ": " + response.body());
+            }
             return response.body().isBlank() ? JsonUtil.mapper().createObjectNode() : JsonUtil.mapper().readTree(response.body());
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
@@ -94,5 +103,9 @@ public class QdrantVectorStore implements VectorStore {
         } catch (Exception ex) {
             throw new IllegalStateException("Qdrant request failed: " + ex.getMessage(), ex);
         }
+    }
+
+    private long elapsedMillis(long started) {
+        return (System.nanoTime() - started) / 1_000_000;
     }
 }
