@@ -122,6 +122,7 @@ public class KnowledgeProperties {
         private int maxContextTokens = 6000;
         private double defaultSimilarityThreshold = .35;
         private int maxChunksPerDocument = 3;
+        private final Bm25 bm25 = new Bm25();
 
         public int getDefaultTopK() {
             return defaultTopK;
@@ -153,6 +154,49 @@ public class KnowledgeProperties {
 
         public void setMaxChunksPerDocument(int value) {
             maxChunksPerDocument = value;
+        }
+
+        public Bm25 getBm25() {
+            return bm25;
+        }
+    }
+
+    public static class Bm25 {
+        private boolean enabled = true;
+        private Path indexPath;
+        private int candidateLimit = 40;
+        private int rrfK = 60;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean value) {
+            enabled = value;
+        }
+
+        public Path getIndexPath() {
+            return indexPath;
+        }
+
+        public void setIndexPath(Path value) {
+            indexPath = value;
+        }
+
+        public int getCandidateLimit() {
+            return candidateLimit;
+        }
+
+        public void setCandidateLimit(int value) {
+            candidateLimit = value;
+        }
+
+        public int getRrfK() {
+            return rrfK;
+        }
+
+        public void setRrfK(int value) {
+            rrfK = value;
         }
     }
 

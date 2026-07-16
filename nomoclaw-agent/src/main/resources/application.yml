@@ -149,6 +149,11 @@ knowledge:
     max-context-tokens: 6000
     default-similarity-threshold: 0.35
     max-chunks-per-document: 3
+    bm25:
+      enabled: true
+      index-path: "${NOMOCLAW_ROOT_DIR:${user.home}/.nomoclaw}/knowledge/bm25"
+      candidate-limit: 40
+      rrf-k: 60
   vector:
     qdrant:
       url: "${QDRANT_URL:http://127.0.0.1:6333}"

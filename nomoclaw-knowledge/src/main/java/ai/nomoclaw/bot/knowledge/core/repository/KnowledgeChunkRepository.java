@@ -25,4 +25,13 @@ public class KnowledgeChunkRepository extends CrudRepository<KnowledgeChunkMappe
         return lambdaQuery().eq(KnowledgeChunkEntity::getKnowledgeBaseUid, knowledgeBaseUid).eq(KnowledgeChunkEntity::getStatus, "READY").count();
     }
 
+    /** Lists all ready chunks that belong to the current version of a document. */
+    public List<KnowledgeChunkEntity> listReadyByDocumentVersion(String documentUid, String documentVersionUid) {
+        return lambdaQuery().eq(KnowledgeChunkEntity::getDocumentUid, documentUid)
+                .eq(KnowledgeChunkEntity::getDocumentVersionUid, documentVersionUid)
+                .eq(KnowledgeChunkEntity::getStatus, "READY")
+                .orderByAsc(KnowledgeChunkEntity::getChunkIndex)
+                .list();
+    }
+
 }

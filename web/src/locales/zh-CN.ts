@@ -1067,6 +1067,10 @@ const zhCN = {
       searchTest: "检索测试",
       searchPlaceholder: "输入要检索的问题",
       noHits: "暂无检索结果",
+      fusedScore: "融合分数",
+      denseScore: "向量分数",
+      bm25Score: "BM25 分数",
+      retrievalSources: { DENSE: "向量检索", BM25: "关键词检索" },
       page: "第",
       form: { name: "知识库名称", description: "描述", provider: "Embedding Provider ID", model: "Embedding 模型 ID", dimension: "向量维度" },
       messages: { created: "知识库已创建", uploaded: "文档已提交处理" }

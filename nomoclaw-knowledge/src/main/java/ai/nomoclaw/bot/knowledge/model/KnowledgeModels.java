@@ -38,7 +38,8 @@ public final class KnowledgeModels {
 
     public record SearchHit(String citationId, String knowledgeBaseUid, String knowledgeBaseName, String documentUid,
                             String documentName, Integer pageFrom, Integer pageTo, String sectionPath, String excerpt,
-                            double score, String chunkUid) {
+                            double score, String chunkUid, Double denseScore, Double bm25Score,
+                            List<String> retrievalSources) {
     }
 
     public record BindingRequest(List<String> include, List<String> exclude) {

@@ -1067,6 +1067,10 @@ const enUS = {
       searchTest: "Retrieval test",
       searchPlaceholder: "Enter a question to search",
       noHits: "No retrieval results",
+      fusedScore: "Fused score",
+      denseScore: "Dense score",
+      bm25Score: "BM25 score",
+      retrievalSources: { DENSE: "Dense", BM25: "BM25" },
       page: "Page",
       form: { name: "Knowledge base name", description: "Description", provider: "Embedding provider ID", model: "Embedding model ID", dimension: "Vector dimension" },
       messages: { created: "Knowledge base created", uploaded: "Documents queued for processing" }
