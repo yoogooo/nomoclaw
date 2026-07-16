@@ -104,10 +104,10 @@ public class KnowledgeController {
     }
 
     /**
-     * Runs a debug similarity search within one knowledge base.
+     * Runs a debug hybrid search within one knowledge base.
      */
     @PostMapping("/knowledge-bases/{uid}/search")
-    public List<KnowledgeModels.SearchHit> search(@PathVariable String uid, @RequestBody KnowledgeModels.SearchRequest request) {
+    public KnowledgeModels.SearchResponse search(@PathVariable String uid, @RequestBody KnowledgeModels.SearchRequest request) {
         return service.search(uid, request.query(), request.topK());
     }
 

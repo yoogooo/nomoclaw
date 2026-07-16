@@ -1071,6 +1071,13 @@ const zhCN = {
       denseScore: "向量分数",
       bm25Score: "BM25 分数",
       retrievalSources: { DENSE: "向量检索", BM25: "关键词检索" },
+      searchDiagnostics: {
+        OLLAMA_EMBEDDING_UNAVAILABLE: "Ollama Embedding 服务不可用，已自动降级为关键词检索。请启动 Ollama，并确认对应 Embedding 模型已安装。",
+        DENSE_RETRIEVAL_FAILED: "向量检索失败，已自动降级为关键词检索。请检查 Embedding 服务与向量服务。",
+        VECTOR_STORE_UNAVAILABLE: "Qdrant 向量服务不可用，已自动降级为关键词检索。",
+        LEXICAL_INDEX_UNAVAILABLE: "关键词索引不可用，已自动降级为向量检索。",
+        LEXICAL_RETRIEVAL_FAILED: "关键词检索失败，已自动降级为向量检索。"
+      },
       page: "第",
       form: { name: "知识库名称", description: "描述", provider: "Embedding Provider ID", model: "Embedding 模型 ID", dimension: "向量维度" },
       messages: { created: "知识库已创建", uploaded: "文档已提交处理" }

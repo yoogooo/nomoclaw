@@ -237,7 +237,7 @@ public class KnowledgeService {
             }
             List<KnowledgeModels.Base> activeBases = groups.values().stream().flatMap(Collection::stream).toList();
             List<KnowledgeModels.SearchHit> all = retrieveHybrid(query, activeBases,
-                    properties.getRetrieval().getDefaultTopK());
+                    properties.getRetrieval().getDefaultTopK()).hits();
             Map<String, Integer> perDocument = new HashMap<>();
             List<KnowledgeModels.SearchHit> selected = new ArrayList<>();
             int tokens = 0;
@@ -259,32 +259,36 @@ public class KnowledgeService {
         }
     }
 
-    public List<KnowledgeModels.SearchHit> search(String baseUid, String query, Integer topK) {
+    public KnowledgeModels.SearchResponse search(String baseUid, String query, Integer topK) {
         KnowledgeModels.Base base = get(baseUid);
         long started = System.nanoTime();
         log.info("[KnowledgeSearch][Debug] started knowledgeBaseUid={} collection={} queryLength={} topK={}",
                 baseUid, collectionName(base), query == null ? 0 : query.length(), topK);
         String syntheticConversation = "debug:" + baseUid;
-        List<KnowledgeModels.SearchHit> hits = retrieveForBases(syntheticConversation, query, List.of(baseUid), topK);
-        log.info("[KnowledgeSearch][Debug] completed knowledgeBaseUid={} hitCount={} chunkUids={} fusedScores={} denseScores={} bm25Scores={} sources={} costMs={}",
-                baseUid, hits.size(), hits.stream().map(KnowledgeModels.SearchHit::chunkUid).toList(),
+        KnowledgeModels.SearchResponse response = retrieveForBases(syntheticConversation, query, List.of(baseUid), topK);
+        List<KnowledgeModels.SearchHit> hits = response.hits();
+        log.info("[KnowledgeSearch][Debug] completed knowledgeBaseUid={} hitCount={} diagnostics={} chunkUids={} fusedScores={} denseScores={} bm25Scores={} sources={} costMs={}",
+                baseUid, hits.size(), response.diagnostics().stream().map(KnowledgeModels.SearchDiagnostic::code).toList(),
+                hits.stream().map(KnowledgeModels.SearchHit::chunkUid).toList(),
                 hits.stream().map(KnowledgeModels.SearchHit::score).toList(),
                 hits.stream().map(KnowledgeModels.SearchHit::denseScore).toList(),
                 hits.stream().map(KnowledgeModels.SearchHit::bm25Score).toList(),
                 hits.stream().map(KnowledgeModels.SearchHit::retrievalSources).toList(), elapsedMillis(started));
-        return hits;
+        return response;
     }
 
-    private List<KnowledgeModels.SearchHit> retrieveForBases(String ignored, String query, List<String> ids, Integer topK) {
+    private KnowledgeModels.SearchResponse retrieveForBases(String ignored, String query, List<String> ids, Integer topK) {
         List<KnowledgeModels.Base> bases = ids.stream().map(this::get)
                 .filter(base -> "ACTIVE".equals(base.status())).toList();
         int limit = topK == null ? properties.getRetrieval().getDefaultTopK() : topK;
-        List<KnowledgeModels.SearchHit> hits = retrieveHybrid(query, bases, limit);
+        HybridSearchResult hybridResult = retrieveHybrid(query, bases, limit);
+        List<KnowledgeModels.SearchHit> hits = hybridResult.hits();
         List<KnowledgeModels.SearchHit> result = new ArrayList<>(Math.min(limit, hits.size()));
         for (KnowledgeModels.SearchHit hit : hits.subList(0, Math.min(limit, hits.size()))) {
             result.add(withCitation(hit, "K" + (result.size() + 1)));
         }
-        return result;
+        return new KnowledgeModels.SearchResponse(result, hybridResult.diagnostics().stream()
+                .map(KnowledgeModels.SearchDiagnostic::new).toList());
     }
 
     public KnowledgeModels.Binding getConversationBinding(String conversationUid) {
@@ -392,22 +396,25 @@ public class KnowledgeService {
             jdbc.update("INSERT INTO agent_message_knowledge_citation(message_uid,assistant_message_uid,retrieval_uid,chunk_uid,rank_index,score,created_time) VALUES(?,?,?,?,?,?,?)", message, "", uid, hits.get(i).chunkUid(), i + 1, hits.get(i).score(), now);
     }
 
-    private List<KnowledgeModels.SearchHit> retrieveHybrid(String query, List<KnowledgeModels.Base> bases, int requestedTopK) {
-        if (query == null || query.isBlank() || bases.isEmpty()) return List.of();
+    private HybridSearchResult retrieveHybrid(String query, List<KnowledgeModels.Base> bases, int requestedTopK) {
+        if (query == null || query.isBlank() || bases.isEmpty()) return new HybridSearchResult(List.of(), List.of());
         int candidateLimit = Math.max(properties.getRetrieval().getBm25().getCandidateLimit(), requestedTopK * 5);
         Map<String, HybridCandidate> candidates = new LinkedHashMap<>();
-        retrieveDenseCandidates(query, bases, candidateLimit, candidates);
-        retrieveBm25Candidates(query, bases, candidateLimit, candidates);
-        return candidates.values().stream()
+        Set<String> diagnostics = new LinkedHashSet<>();
+        retrieveDenseCandidates(query, bases, candidateLimit, candidates, diagnostics);
+        retrieveBm25Candidates(query, bases, candidateLimit, candidates, diagnostics);
+        List<KnowledgeModels.SearchHit> hits = candidates.values().stream()
                 .map(HybridCandidate::toSearchHit)
                 .sorted(Comparator.comparingDouble(KnowledgeModels.SearchHit::score).reversed())
                 .toList();
+        return new HybridSearchResult(hits, List.copyOf(diagnostics));
     }
 
     private void retrieveDenseCandidates(String query, List<KnowledgeModels.Base> bases, int candidateLimit,
-                                        Map<String, HybridCandidate> candidates) {
+                                        Map<String, HybridCandidate> candidates, Set<String> diagnostics) {
         if (!vectorStore.available()) {
             log.warn("[KnowledgeSearch][Dense] Qdrant unavailable; falling back to BM25 only");
+            diagnostics.add("VECTOR_STORE_UNAVAILABLE");
             return;
         }
         Map<String, List<KnowledgeModels.Base>> groups = new LinkedHashMap<>();
@@ -432,14 +439,16 @@ public class KnowledgeService {
             } catch (Exception ex) {
                 log.warn("[KnowledgeSearch][Dense] retrieval failed; falling back to BM25 for fingerprint={}",
                         fingerprint(group.get(0)), ex);
+                diagnostics.add(denseFailureDiagnostic(group.get(0)));
             }
         }
     }
 
     private void retrieveBm25Candidates(String query, List<KnowledgeModels.Base> bases, int candidateLimit,
-                                        Map<String, HybridCandidate> candidates) {
+                                        Map<String, HybridCandidate> candidates, Set<String> diagnostics) {
         if (!lexicalSearchStore.available()) {
             log.warn("[KnowledgeSearch][BM25] index unavailable; falling back to dense retrieval only");
+            diagnostics.add("LEXICAL_INDEX_UNAVAILABLE");
             return;
         }
         for (KnowledgeModels.Base base : bases) {
@@ -452,6 +461,7 @@ public class KnowledgeService {
             } catch (Exception ex) {
                 log.warn("[KnowledgeSearch][BM25] retrieval failed; falling back to dense retrieval for knowledgeBaseUid={}",
                         base.knowledgeBaseUid(), ex);
+                diagnostics.add("LEXICAL_RETRIEVAL_FAILED");
             }
         }
     }
@@ -461,6 +471,11 @@ public class KnowledgeService {
         toSearchHit(chunkUid).ifPresent(hit -> candidates
                 .computeIfAbsent(chunkUid, ignored -> new HybridCandidate(hit))
                 .add(rank, denseScore, bm25Score, source, properties.getRetrieval().getBm25().getRrfK()));
+    }
+
+    private String denseFailureDiagnostic(KnowledgeModels.Base base) {
+        return "ollama".equalsIgnoreCase(base.embeddingProviderId())
+                ? "OLLAMA_EMBEDDING_UNAVAILABLE" : "DENSE_RETRIEVAL_FAILED";
     }
 
     private void indexDocumentInBm25(String knowledgeBaseUid, String documentUid, String documentVersionUid,
@@ -632,6 +647,9 @@ public class KnowledgeService {
                     hit.documentName(), hit.pageFrom(), hit.pageTo(), hit.sectionPath(), hit.excerpt(), fusedScore,
                     hit.chunkUid(), denseScore, bm25Score, List.copyOf(sources));
         }
+    }
+
+    private record HybridSearchResult(List<KnowledgeModels.SearchHit> hits, List<String> diagnostics) {
     }
 
     private record ExistingChunk(String chunkUid, String content, String documentUid, String documentVersionUid) {

@@ -36,6 +36,12 @@ public final class KnowledgeModels {
     public record SearchRequest(String query, Integer topK) {
     }
 
+    public record SearchDiagnostic(String code) {
+    }
+
+    public record SearchResponse(List<SearchHit> hits, List<SearchDiagnostic> diagnostics) {
+    }
+
     public record SearchHit(String citationId, String knowledgeBaseUid, String knowledgeBaseName, String documentUid,
                             String documentName, Integer pageFrom, Integer pageTo, String sectionPath, String excerpt,
                             double score, String chunkUid, Double denseScore, Double bm25Score,
