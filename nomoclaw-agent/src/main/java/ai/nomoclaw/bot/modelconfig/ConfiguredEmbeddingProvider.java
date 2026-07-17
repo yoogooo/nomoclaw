@@ -6,6 +6,7 @@ import ai.nomoclaw.bot.util.JsonUtil;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
+import java.net.ConnectException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -33,9 +34,10 @@ public class ConfiguredEmbeddingProvider implements EmbeddingProvider {
         ModelConfigDto.Provider provider = modelConfigService.getModelConfig().providers().stream()
                 .filter(item -> item.id().equals(providerId)).findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Embedding provider not found: " + providerId));
+        String endpoint = "";
         try {
             boolean ollama = provider.local() || "ollama".equals(provider.id());
-            String endpoint = trimSlash(provider.baseUrl()) + (ollama ? "/api/embed" : "/embeddings");
+            endpoint = trimSlash(provider.baseUrl()) + (ollama ? "/api/embed" : "/embeddings");
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("model", modelId);
             body.put("input", texts);
@@ -71,8 +73,27 @@ public class ConfiguredEmbeddingProvider implements EmbeddingProvider {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Embedding request interrupted", ex);
         } catch (Exception ex) {
-            throw new IllegalStateException("Embedding request failed: " + ex.getMessage(), ex);
+            throw new IllegalStateException("Embedding request failed: "
+                    + embeddingFailureMessage(ex, providerId, modelId, endpoint), ex);
         }
+    }
+
+    private String embeddingFailureMessage(Exception exception, String providerId, String modelId, String endpoint) {
+        if (hasCause(exception, ConnectException.class)) {
+            return "unable to connect to embedding service (provider=" + providerId + ", model=" + modelId
+                    + ", endpoint=" + endpoint + ")";
+        }
+        String message = exception.getMessage();
+        return message == null || message.isBlank() ? exception.getClass().getSimpleName() : message;
+    }
+
+    private boolean hasCause(Throwable exception, Class<? extends Throwable> type) {
+        Throwable current = exception;
+        while (current != null) {
+            if (type.isInstance(current)) return true;
+            current = current.getCause();
+        }
+        return false;
     }
 
     private String trimSlash(String value) {

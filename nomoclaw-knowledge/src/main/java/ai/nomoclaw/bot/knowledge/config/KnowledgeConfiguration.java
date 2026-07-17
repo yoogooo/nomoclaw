@@ -26,4 +26,18 @@ public class KnowledgeConfiguration {
         executor.initialize();
         return executor;
     }
+
+    /**
+     * Executor used to bound local reranker inference time independently from ingestion.
+     */
+    @Bean("knowledgeRerankExecutor")
+    public Executor knowledgeRerankExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(1);
+        executor.setQueueCapacity(10);
+        executor.setThreadNamePrefix("knowledge-rerank-");
+        executor.initialize();
+        return executor;
+    }
 }

@@ -2,7 +2,7 @@ import { requestJson } from "@/utils/http";
 
 export interface KnowledgeBase { knowledgeBaseUid: string; name: string; description: string; status: string; embeddingProviderId: string; embeddingModelId: string; embeddingDimension: number; vectorCollectionName: string; documentCount: number; chunkCount: number; updatedTime: string; }
 export interface KnowledgeDocument { documentUid: string; displayName: string; contentType: string; sizeBytes: number; status: string; failureCode: string; failureMessage: string; pageCount: number; chunkCount: number; jobUid: string; progressPercent: number; updatedTime: string; }
-export interface KnowledgeHit { citationId: string; documentName: string; pageFrom?: number; sectionPath: string; excerpt: string; score: number; denseScore?: number | null; bm25Score?: number | null; retrievalSources: string[]; }
+export interface KnowledgeHit { citationId: string; documentName: string; pageFrom?: number; sectionPath: string; excerpt: string; score: number; rrfScore?: number | null; denseScore?: number | null; bm25Score?: number | null; rerankScore?: number | null; retrievalSources: string[]; }
 export interface KnowledgeSearchDiagnostic { code: string; }
 export interface KnowledgeSearchResponse { hits: KnowledgeHit[]; diagnostics: KnowledgeSearchDiagnostic[]; }
 

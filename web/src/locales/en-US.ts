@@ -1070,13 +1070,16 @@ const enUS = {
       fusedScore: "Fused score",
       denseScore: "Dense score",
       bm25Score: "BM25 score",
-      retrievalSources: { DENSE: "Dense", BM25: "BM25" },
+      rerankScore: "Rerank score",
+      retrievalSources: { DENSE: "Dense", BM25: "BM25", RERANK: "Rerank" },
       searchDiagnostics: {
         OLLAMA_EMBEDDING_UNAVAILABLE: "Ollama Embedding is unavailable. The search was automatically downgraded to keyword retrieval. Start Ollama and verify that the embedding model is installed.",
         DENSE_RETRIEVAL_FAILED: "Dense retrieval failed. The search was automatically downgraded to keyword retrieval. Check the embedding and vector services.",
         VECTOR_STORE_UNAVAILABLE: "Qdrant is unavailable. The search was automatically downgraded to keyword retrieval.",
         LEXICAL_INDEX_UNAVAILABLE: "The keyword index is unavailable. The search was automatically downgraded to dense retrieval.",
-        LEXICAL_RETRIEVAL_FAILED: "Keyword retrieval failed. The search was automatically downgraded to dense retrieval."
+        LEXICAL_RETRIEVAL_FAILED: "Keyword retrieval failed. The search was automatically downgraded to dense retrieval.",
+        RERANKER_UNAVAILABLE: "The reranker is unavailable. Fused retrieval order was retained. Check the ONNX model and tokenizer paths.",
+        RERANK_FAILED: "Reranking failed or timed out. Fused retrieval order was retained."
       },
       page: "Page",
       form: { name: "Knowledge base name", description: "Description", provider: "Embedding provider ID", model: "Embedding model ID", dimension: "Vector dimension" },

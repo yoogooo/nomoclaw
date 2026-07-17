@@ -44,7 +44,8 @@ public final class KnowledgeModels {
 
     public record SearchHit(String citationId, String knowledgeBaseUid, String knowledgeBaseName, String documentUid,
                             String documentName, Integer pageFrom, Integer pageTo, String sectionPath, String excerpt,
-                            double score, String chunkUid, Double denseScore, Double bm25Score,
+                            double score, String chunkUid, Double rrfScore, Double denseScore, Double bm25Score,
+                            Double rerankScore,
                             List<String> retrievalSources) {
     }
 

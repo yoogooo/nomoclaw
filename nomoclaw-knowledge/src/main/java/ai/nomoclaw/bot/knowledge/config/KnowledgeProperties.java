@@ -123,6 +123,7 @@ public class KnowledgeProperties {
         private double defaultSimilarityThreshold = .35;
         private int maxChunksPerDocument = 3;
         private final Bm25 bm25 = new Bm25();
+        private final Rerank rerank = new Rerank();
 
         public int getDefaultTopK() {
             return defaultTopK;
@@ -158,6 +159,10 @@ public class KnowledgeProperties {
 
         public Bm25 getBm25() {
             return bm25;
+        }
+
+        public Rerank getRerank() {
+            return rerank;
         }
     }
 
@@ -197,6 +202,63 @@ public class KnowledgeProperties {
 
         public void setRrfK(int value) {
             rrfK = value;
+        }
+    }
+
+    public static class Rerank {
+        private boolean enabled;
+        private String provider = "onnx";
+        private Path modelPath;
+        private Path tokenizerPath;
+        private int candidateLimit = 50;
+        private Duration timeout = Duration.ofSeconds(15);
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean value) {
+            enabled = value;
+        }
+
+        public String getProvider() {
+            return provider;
+        }
+
+        public void setProvider(String value) {
+            provider = value;
+        }
+
+        public Path getModelPath() {
+            return modelPath;
+        }
+
+        public void setModelPath(Path value) {
+            modelPath = value;
+        }
+
+        public Path getTokenizerPath() {
+            return tokenizerPath;
+        }
+
+        public void setTokenizerPath(Path value) {
+            tokenizerPath = value;
+        }
+
+        public int getCandidateLimit() {
+            return candidateLimit;
+        }
+
+        public void setCandidateLimit(int value) {
+            candidateLimit = value;
+        }
+
+        public Duration getTimeout() {
+            return timeout;
+        }
+
+        public void setTimeout(Duration value) {
+            timeout = value;
         }
     }
 

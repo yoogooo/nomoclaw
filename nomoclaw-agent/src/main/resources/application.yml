@@ -154,6 +154,13 @@ knowledge:
       index-path: "${NOMOCLAW_ROOT_DIR:${user.home}/.nomoclaw}/knowledge/bm25"
       candidate-limit: 40
       rrf-k: 60
+    rerank:
+      enabled: true
+      provider: onnx
+      model-path: "${NOMOCLAW_ROOT_DIR:${user.home}/.nomoclaw}/models/bge-reranker-v2-m3/onnx/model_int8.onnx"
+      tokenizer-path: "${NOMOCLAW_ROOT_DIR:${user.home}/.nomoclaw}/models/bge-reranker-v2-m3/tokenizer.json"
+      candidate-limit: 50
+      timeout: 15s
   vector:
     qdrant:
       url: "${QDRANT_URL:http://127.0.0.1:6333}"

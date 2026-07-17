@@ -11,6 +11,7 @@ import ai.nomoclaw.bot.knowledge.ingestion.DocumentChunker;
 import ai.nomoclaw.bot.knowledge.ingestion.DocumentParser;
 import ai.nomoclaw.bot.knowledge.ingestion.EmbeddingProvider;
 import ai.nomoclaw.bot.knowledge.model.KnowledgeModels;
+import ai.nomoclaw.bot.knowledge.rerank.Reranker;
 import ai.nomoclaw.bot.knowledge.util.JsonUtil;
 import ai.nomoclaw.bot.knowledge.util.UuidUtil;
 import ai.nomoclaw.bot.knowledge.vector.VectorStore;
@@ -51,6 +52,7 @@ public class KnowledgeService {
     private final EmbeddingProvider embeddingProvider;
     private final VectorStore vectorStore;
     private final LexicalSearchStore lexicalSearchStore;
+    private final Reranker reranker;
     private final Executor executor;
     private final KnowledgeChunkRepository chunkRepository;
     private final KnowledgeDocumentRepository documentRepository;
@@ -59,7 +61,7 @@ public class KnowledgeService {
                             DocumentParser parser, DocumentChunker chunker, EmbeddingProvider embeddingProvider,
                             VectorStore vectorStore, @Qualifier("knowledgeIngestionExecutor") Executor executor,
                             KnowledgeChunkRepository chunkRepository, KnowledgeDocumentRepository documentRepository,
-                            LexicalSearchStore lexicalSearchStore) {
+                            LexicalSearchStore lexicalSearchStore, Reranker reranker) {
         this.jdbc = jdbc;
         this.transactions = transactions;
         this.properties = properties;
@@ -68,6 +70,7 @@ public class KnowledgeService {
         this.embeddingProvider = embeddingProvider;
         this.vectorStore = vectorStore;
         this.lexicalSearchStore = lexicalSearchStore;
+        this.reranker = reranker;
         this.executor = executor;
         this.chunkRepository = chunkRepository;
         this.documentRepository = documentRepository;
@@ -267,12 +270,14 @@ public class KnowledgeService {
         String syntheticConversation = "debug:" + baseUid;
         KnowledgeModels.SearchResponse response = retrieveForBases(syntheticConversation, query, List.of(baseUid), topK);
         List<KnowledgeModels.SearchHit> hits = response.hits();
-        log.info("[KnowledgeSearch][Debug] completed knowledgeBaseUid={} hitCount={} diagnostics={} chunkUids={} fusedScores={} denseScores={} bm25Scores={} sources={} costMs={}",
+        log.info("[KnowledgeSearch][Debug] completed knowledgeBaseUid={} hitCount={} diagnostics={} chunkUids={} finalScores={} rrfScores={} denseScores={} bm25Scores={} rerankScores={} sources={} costMs={}",
                 baseUid, hits.size(), response.diagnostics().stream().map(KnowledgeModels.SearchDiagnostic::code).toList(),
                 hits.stream().map(KnowledgeModels.SearchHit::chunkUid).toList(),
                 hits.stream().map(KnowledgeModels.SearchHit::score).toList(),
+                hits.stream().map(KnowledgeModels.SearchHit::rrfScore).toList(),
                 hits.stream().map(KnowledgeModels.SearchHit::denseScore).toList(),
                 hits.stream().map(KnowledgeModels.SearchHit::bm25Score).toList(),
+                hits.stream().map(KnowledgeModels.SearchHit::rerankScore).toList(),
                 hits.stream().map(KnowledgeModels.SearchHit::retrievalSources).toList(), elapsedMillis(started));
         return response;
     }
@@ -364,7 +369,7 @@ public class KnowledgeService {
 
     public List<KnowledgeModels.SearchHit> citations(String messageUid) {
         if (messageUid == null || messageUid.isBlank()) return List.of();
-        return jdbc.query("SELECT c.rank_index,c.score,k.*,d.display_name,b.name base_name FROM agent_message_knowledge_citation c JOIN knowledge_chunk k ON k.chunk_uid=c.chunk_uid JOIN knowledge_document d ON d.document_uid=k.document_uid JOIN knowledge_base b ON b.knowledge_base_uid=k.knowledge_base_uid WHERE c.message_uid=? ORDER BY c.rank_index", (rs, row) -> new KnowledgeModels.SearchHit("K" + rs.getInt("rank_index"), rs.getString("knowledge_base_uid"), rs.getString("base_name"), rs.getString("document_uid"), rs.getString("display_name"), integer(rs.getObject("page_from")), integer(rs.getObject("page_to")), rs.getString("section_path"), rs.getString("content"), rs.getDouble("score"), rs.getString("chunk_uid"), null, null, List.of()), messageUid);
+        return jdbc.query("SELECT c.rank_index,c.score,k.*,d.display_name,b.name base_name FROM agent_message_knowledge_citation c JOIN knowledge_chunk k ON k.chunk_uid=c.chunk_uid JOIN knowledge_document d ON d.document_uid=k.document_uid JOIN knowledge_base b ON b.knowledge_base_uid=k.knowledge_base_uid WHERE c.message_uid=? ORDER BY c.rank_index", (rs, row) -> new KnowledgeModels.SearchHit("K" + rs.getInt("rank_index"), rs.getString("knowledge_base_uid"), rs.getString("base_name"), rs.getString("document_uid"), rs.getString("display_name"), integer(rs.getObject("page_from")), integer(rs.getObject("page_to")), rs.getString("section_path"), rs.getString("content"), rs.getDouble("score"), rs.getString("chunk_uid"), null, null, null, null, List.of()), messageUid);
     }
 
     private List<String> effectiveBaseUids(String conversationUid) {
@@ -407,7 +412,48 @@ public class KnowledgeService {
                 .map(HybridCandidate::toSearchHit)
                 .sorted(Comparator.comparingDouble(KnowledgeModels.SearchHit::score).reversed())
                 .toList();
-        return new HybridSearchResult(hits, List.copyOf(diagnostics));
+        return new HybridSearchResult(rerank(query, hits, diagnostics), List.copyOf(diagnostics));
+    }
+
+    private List<KnowledgeModels.SearchHit> rerank(String query, List<KnowledgeModels.SearchHit> hits,
+                                                    Set<String> diagnostics) {
+        if (!properties.getRetrieval().getRerank().isEnabled() || hits.isEmpty()) return hits;
+        if (!reranker.available()) {
+            log.warn("[KnowledgeSearch][Rerank] configured reranker is unavailable; falling back to RRF");
+            diagnostics.add("RERANKER_UNAVAILABLE");
+            return hits;
+        }
+        int limit = Math.min(properties.getRetrieval().getRerank().getCandidateLimit(), hits.size());
+        List<KnowledgeModels.SearchHit> candidates = hits.subList(0, limit);
+        try {
+            Reranker.RerankResult result = reranker.rerank(query, candidates.stream()
+                    .map(hit -> new Reranker.RerankCandidate(hit.chunkUid(), rerankText(hit))).toList());
+            if (result.scores().size() != candidates.size()) {
+                throw new IllegalStateException("Reranker returned an unexpected score count");
+            }
+            Map<String, Double> scores = new HashMap<>();
+            for (Reranker.RerankScore score : result.scores()) {
+                if (scores.put(score.id(), score.score()) != null) {
+                    throw new IllegalStateException("Reranker returned duplicate candidate scores");
+                }
+            }
+            if (scores.size() != candidates.size() || candidates.stream().anyMatch(hit -> !scores.containsKey(hit.chunkUid()))) {
+                throw new IllegalStateException("Reranker returned incomplete candidate scores");
+            }
+            return candidates.stream().map(hit -> withRerankScore(hit, scores.get(hit.chunkUid())))
+                    .sorted(Comparator.comparingDouble(KnowledgeModels.SearchHit::score).reversed()).toList();
+        } catch (Exception ex) {
+            log.warn("[KnowledgeSearch][Rerank] scoring failed; falling back to RRF candidateCount={}",
+                    candidates.size(), ex);
+            diagnostics.add("RERANK_FAILED");
+            return hits;
+        }
+    }
+
+    private String rerankText(KnowledgeModels.SearchHit hit) {
+        String section = safe(hit.sectionPath());
+        return "文档：" + hit.documentName() + (section.isBlank() ? "" : "\n章节：" + section)
+                + "\n内容：" + hit.excerpt();
     }
 
     private void retrieveDenseCandidates(String query, List<KnowledgeModels.Base> bases, int candidateLimit,
@@ -503,7 +549,15 @@ public class KnowledgeService {
     }
 
     private KnowledgeModels.SearchHit withCitation(KnowledgeModels.SearchHit hit, String citation) {
-        return new KnowledgeModels.SearchHit(citation, hit.knowledgeBaseUid(), hit.knowledgeBaseName(), hit.documentUid(), hit.documentName(), hit.pageFrom(), hit.pageTo(), hit.sectionPath(), hit.excerpt(), hit.score(), hit.chunkUid(), hit.denseScore(), hit.bm25Score(), hit.retrievalSources());
+        return new KnowledgeModels.SearchHit(citation, hit.knowledgeBaseUid(), hit.knowledgeBaseName(), hit.documentUid(), hit.documentName(), hit.pageFrom(), hit.pageTo(), hit.sectionPath(), hit.excerpt(), hit.score(), hit.chunkUid(), hit.rrfScore(), hit.denseScore(), hit.bm25Score(), hit.rerankScore(), hit.retrievalSources());
+    }
+
+    private KnowledgeModels.SearchHit withRerankScore(KnowledgeModels.SearchHit hit, double score) {
+        List<String> sources = new ArrayList<>(hit.retrievalSources());
+        sources.add("RERANK");
+        return new KnowledgeModels.SearchHit(hit.citationId(), hit.knowledgeBaseUid(), hit.knowledgeBaseName(),
+                hit.documentUid(), hit.documentName(), hit.pageFrom(), hit.pageTo(), hit.sectionPath(), hit.excerpt(),
+                score, hit.chunkUid(), hit.rrfScore(), hit.denseScore(), hit.bm25Score(), score, List.copyOf(sources));
     }
 
     private Optional<KnowledgeModels.SearchHit> toSearchHit(String chunkUid) {
@@ -512,7 +566,7 @@ public class KnowledgeService {
         KnowledgeDocumentEntity document = documentRepository.findByBaseAndUid(chunk.getKnowledgeBaseUid(), chunk.getDocumentUid());
         if (document == null || !chunk.getDocumentVersionUid().equals(document.getCurrentVersionUid())) return Optional.empty();
         KnowledgeModels.Base base = get(chunk.getKnowledgeBaseUid());
-        return Optional.of(new KnowledgeModels.SearchHit("", chunk.getKnowledgeBaseUid(), base.name(), chunk.getDocumentUid(), document.getDisplayName(), chunk.getPageFrom(), chunk.getPageTo(), safe(chunk.getSectionPath()), chunk.getContent(), 0, chunk.getChunkUid(), null, null, List.of()));
+        return Optional.of(new KnowledgeModels.SearchHit("", chunk.getKnowledgeBaseUid(), base.name(), chunk.getDocumentUid(), document.getDisplayName(), chunk.getPageFrom(), chunk.getPageTo(), safe(chunk.getSectionPath()), chunk.getContent(), 0, chunk.getChunkUid(), null, null, null, null, List.of()));
     }
 
     private KnowledgeModels.Base base(ResultSet rs) throws SQLException {
@@ -645,7 +699,7 @@ public class KnowledgeService {
         private KnowledgeModels.SearchHit toSearchHit() {
             return new KnowledgeModels.SearchHit("", hit.knowledgeBaseUid(), hit.knowledgeBaseName(), hit.documentUid(),
                     hit.documentName(), hit.pageFrom(), hit.pageTo(), hit.sectionPath(), hit.excerpt(), fusedScore,
-                    hit.chunkUid(), denseScore, bm25Score, List.copyOf(sources));
+                    hit.chunkUid(), fusedScore, denseScore, bm25Score, null, List.copyOf(sources));
         }
     }
 
