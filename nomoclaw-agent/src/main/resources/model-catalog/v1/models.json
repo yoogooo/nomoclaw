@@ -119,42 +119,6 @@
         "dashscope",
         "aliyun-codingplan"
       ],
-      "modelId": "qwen3-max",
-      "displayName": "Qwen3 Max",
-      "aliases": [
-        "qwen3-max-2026-01-23"
-      ],
-      "inputModalities": [
-        "text"
-      ],
-      "outputModalities": [
-        "text"
-      ],
-      "reasoning": true,
-      "contextWindowTokens": 262144,
-      "maxInputTokens": 0,
-      "maxOutputTokens": 0,
-      "uploadPolicy": {
-        "enabled": false,
-        "allowedMimeGroups": [],
-        "maxFilesPerMessage": 0,
-        "maxImagesPerMessage": 0,
-        "maxFileBytes": 0,
-        "maxTotalBytes": 0,
-        "singleMimeGroupOnly": false,
-        "allowMixedImageAndFile": false
-      },
-      "sourceRefs": [
-        "https://help.aliyun.com/zh/model-studio/text-generation-model/"
-      ],
-      "lastVerifiedAt": "2026-06-04",
-      "confidence": "high"
-    },
-    {
-      "providerIds": [
-        "dashscope",
-        "aliyun-codingplan"
-      ],
       "modelId": "qwen3.5-plus",
       "displayName": "Qwen3.5 Plus",
       "aliases": [],
@@ -273,46 +237,9 @@
       "providerIds": [
         "aliyun-codingplan"
       ],
-      "modelId": "qwen3-coder-next",
-      "displayName": "Qwen3 Coder Next",
-      "aliases": [
-        "qwen3-coder-plus"
-      ],
-      "inputModalities": [
-        "text"
-      ],
-      "outputModalities": [
-        "text"
-      ],
-      "reasoning": true,
-      "contextWindowTokens": 262144,
-      "maxInputTokens": 204800,
-      "maxOutputTokens": 65536,
-      "uploadPolicy": {
-        "enabled": false,
-        "allowedMimeGroups": [],
-        "maxFilesPerMessage": 0,
-        "maxImagesPerMessage": 0,
-        "maxFileBytes": 0,
-        "maxTotalBytes": 0,
-        "singleMimeGroupOnly": false,
-        "allowMixedImageAndFile": false
-      },
-      "sourceRefs": [
-        "https://help.aliyun.com/zh/model-studio/models"
-      ],
-      "lastVerifiedAt": "2026-04-16",
-      "confidence": "high"
-    },
-    {
-      "providerIds": [
-        "aliyun-codingplan"
-      ],
       "modelId": "glm-5",
       "displayName": "GLM-5",
-      "aliases": [
-        "glm-4.7"
-      ],
+      "aliases": [],
       "inputModalities": [
         "text"
       ],
@@ -504,41 +431,6 @@
         "text"
       ],
       "reasoning": false,
-      "contextWindowTokens": 262144,
-      "maxInputTokens": 0,
-      "maxOutputTokens": 0,
-      "uploadPolicy": {
-        "enabled": false,
-        "allowedMimeGroups": [],
-        "maxFilesPerMessage": 0,
-        "maxImagesPerMessage": 0,
-        "maxFileBytes": 0,
-        "maxTotalBytes": 0,
-        "singleMimeGroupOnly": false,
-        "allowMixedImageAndFile": false
-      },
-      "sourceRefs": [
-        "https://platform.kimi.ai/docs/models",
-        "https://platform.kimi.ai/docs/pricing/chat"
-      ],
-      "lastVerifiedAt": "2026-04-16",
-      "confidence": "high"
-    },
-    {
-      "providerIds": [
-        "kimi-cn",
-        "aliyun-codingplan"
-      ],
-      "modelId": "kimi-k2-thinking",
-      "displayName": "Kimi K2 Thinking",
-      "aliases": [],
-      "inputModalities": [
-        "text"
-      ],
-      "outputModalities": [
-        "text"
-      ],
-      "reasoning": true,
       "contextWindowTokens": 262144,
       "maxInputTokens": 0,
       "maxOutputTokens": 0,

@@ -57,7 +57,6 @@ public final class ModelProviderDefaults {
                         "qwen3.7-max",
                         List.of(
                                 model("qwen3.7-max", "Qwen3.7 Max", List.of("text"), true, 1000000, 0, 65536, disabledUpload()),
-                                model("qwen3-max", "Qwen3 Max", List.of("text"), true, 262144, 0, 0, disabledUpload()),
                                 model("qwen3.5-plus", "Qwen3.5 Plus", List.of("text", "image", "video"), true, 1000000, 0, 65536,
                                         new ModelConfigDto.UploadPolicy(true, List.of("image", "video"), 64, 256, 0L, 0L, true, false)),
                                 model("qwen3.6-plus", "Qwen3.6 Plus", List.of("text", "image", "video"), true, 1000000, 0, 65536,
@@ -81,12 +80,8 @@ public final class ModelProviderDefaults {
                                         new ModelConfigDto.UploadPolicy(true, List.of("image", "pdf", "text"), 1, 5, 20971520L, 104857600L, true, false)),
                                 model("qwen3.7-plus", "Qwen3.7 Plus", List.of("text"), true, 0, 0, 0, disabledUpload()),
                                 model("glm-5", "GLM-5", List.of("text"), true, 0, 0, 0, disabledUpload()),
-                                model("glm-4.7", "GLM-4.7", List.of("text"), true, 0, 0, 0, disabledUpload()),
                                 model("MiniMax-M2.5", "MiniMax M2.5", List.of("text"), true, 0, 0, 0, disabledUpload()),
-                                model("kimi-k2.5", "Kimi K2.5", List.of("text"), true, 0, 0, 0, disabledUpload()),
-                                model("qwen3-max-2026-01-23", "Qwen3 Max 2026-01-23", List.of("text"), true, 0, 0, 0, disabledUpload()),
-                                model("qwen3-coder-next", "Qwen3 Coder Next", List.of("text"), true, 0, 0, 0, disabledUpload()),
-                                model("qwen3-coder-plus", "Qwen3 Coder Plus", List.of("text"), true, 0, 0, 0, disabledUpload())
+                                model("kimi-k2.5", "Kimi K2.5", List.of("text"), true, 0, 0, 0, disabledUpload())
                         )
                 ),
                 provider(
@@ -104,7 +99,6 @@ public final class ModelProviderDefaults {
                                 model("kimi-k2-0905-preview", "Kimi K2 0905 Preview", List.of("text"), true, 0, 0, 0, disabledUpload()),
                                 model("kimi-k2-0711-preview", "Kimi K2 0711 Preview", List.of("text"), true, 0, 0, 0, disabledUpload()),
                                 model("kimi-k2-turbo-preview", "Kimi K2 Turbo Preview", List.of("text"), true, 0, 0, 0, disabledUpload()),
-                                model("kimi-k2-thinking", "Kimi K2 Thinking", List.of("text"), true, 0, 0, 0, disabledUpload()),
                                 model("kimi-k2-thinking-turbo", "Kimi K2 Thinking Turbo", List.of("text"), true, 0, 0, 0, disabledUpload())
                         )
                 ),

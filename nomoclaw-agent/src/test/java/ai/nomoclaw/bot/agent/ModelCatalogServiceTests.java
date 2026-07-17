@@ -47,7 +47,7 @@ class ModelCatalogServiceTests {
         NomoClawPaths.configureRoot(tempDir);
         ModelCatalogService service = new ModelCatalogService(HttpClient.newHttpClient(), "");
 
-        var alias = service.resolve("dashscope", "qwen3-max-2026-01-23");
+        var alias = service.resolve("dashscope", "qwen3.7-max-preview");
         var qwenMax = service.resolve("dashscope", "qwen3.7-max");
         var global = service.resolve("aliyun-codingplan", "gpt-4o");
         var qwen = service.resolve("dashscope", "qwen3.7-plus");
@@ -91,6 +91,26 @@ class ModelCatalogServiceTests {
         assertThat(metadata.inputModalities()).containsExactly("text");
         assertThat(metadata.uploadPolicy().enabled()).isFalse();
         assertThat(metadata.source()).isEqualTo("fallback");
+    }
+
+    @Test
+    void fallsBackForRetiredDashScopeModels() {
+        NomoClawPaths.configureRoot(tempDir);
+        ModelCatalogService service = new ModelCatalogService(HttpClient.newHttpClient(), "");
+
+        var qwenMax = service.resolve("dashscope", "qwen3-max-2026-01-23");
+        var glm = service.resolve("aliyun-codingplan", "glm-4.7");
+        var qwenCoder = service.resolve("aliyun-codingplan", "qwen3-coder-plus");
+        var kimiThinking = service.resolve("kimi-cn", "kimi-k2-thinking");
+
+        assertThat(qwenMax.matched()).isFalse();
+        assertThat(glm.matched()).isFalse();
+        assertThat(qwenCoder.matched()).isFalse();
+        assertThat(kimiThinking.matched()).isFalse();
+        assertThat(qwenMax.source()).isEqualTo("fallback");
+        assertThat(glm.source()).isEqualTo("fallback");
+        assertThat(qwenCoder.source()).isEqualTo("fallback");
+        assertThat(kimiThinking.source()).isEqualTo("fallback");
     }
 
     @Test
