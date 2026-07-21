@@ -43,6 +43,7 @@ public class LangChain4jOnnxReranker implements Reranker {
      */
     @PostConstruct
     public void warmup() {
+        if (!properties.getRetrieval().getRerank().isWarmupEnabled()) return;
         if (!available()) return;
         try {
             scoringModel().scoreAll(List.of(TextSegment.from("warmup document")), "warmup query").content();
@@ -95,6 +96,10 @@ public class LangChain4jOnnxReranker implements Reranker {
             }
             return scoringModel;
         }
+    }
+
+    boolean loaded() {
+        return scoringModel != null;
     }
 
     private boolean exists(Path path) {

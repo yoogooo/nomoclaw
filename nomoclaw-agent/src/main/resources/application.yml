@@ -156,6 +156,7 @@ knowledge:
       rrf-k: 60
     rerank:
       enabled: true
+      warmup-enabled: false
       provider: onnx
       model-path: "${NOMOCLAW_ROOT_DIR:${user.home}/.nomoclaw}/models/bge-reranker-v2-m3/onnx/model_int8.onnx"
       tokenizer-path: "${NOMOCLAW_ROOT_DIR:${user.home}/.nomoclaw}/models/bge-reranker-v2-m3/tokenizer.json"

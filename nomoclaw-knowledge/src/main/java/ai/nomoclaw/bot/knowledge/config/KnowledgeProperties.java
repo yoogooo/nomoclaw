@@ -207,6 +207,7 @@ public class KnowledgeProperties {
 
     public static class Rerank {
         private boolean enabled;
+        private boolean warmupEnabled;
         private String provider = "onnx";
         private Path modelPath;
         private Path tokenizerPath;
@@ -219,6 +220,14 @@ public class KnowledgeProperties {
 
         public void setEnabled(boolean value) {
             enabled = value;
+        }
+
+        public boolean isWarmupEnabled() {
+            return warmupEnabled;
+        }
+
+        public void setWarmupEnabled(boolean value) {
+            warmupEnabled = value;
         }
 
         public String getProvider() {

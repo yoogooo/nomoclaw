@@ -202,6 +202,12 @@ knowledge:
     max-context-tokens: 6000
     default-similarity-threshold: 0.35
     max-chunks-per-document: 3
+    rerank:
+      enabled: true
+      warmup-enabled: false
+      provider: onnx
+      candidate-limit: 50
+      timeout: 15s
   vector:
     qdrant:
       url: "${QDRANT_URL:http://127.0.0.1:6333}"
