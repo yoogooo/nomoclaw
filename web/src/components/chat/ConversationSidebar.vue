@@ -790,6 +790,7 @@ watch(
   flex: 1;
   width: 100%;
   margin: 0;
+  scrollbar-gutter: stable;
 }
 
 .conversation-list-empty {
@@ -801,9 +802,9 @@ watch(
 }
 
 .conversation-row {
-  --conversation-meta-min-width: 3.5rem;
+  --conversation-meta-width: 4rem;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) var(--conversation-meta-width);
   align-items: center;
   column-gap: var(--space-1_5);
   padding-top: var(--space-2_5);
@@ -958,8 +959,8 @@ watch(
 
 .conversation-meta-slot {
   position: relative;
-  min-width: var(--conversation-meta-min-width);
-  width: max-content;
+  min-width: 0;
+  width: var(--conversation-meta-width);
   height: var(--size-24);
   display: flex;
   align-items: center;

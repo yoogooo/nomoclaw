@@ -65,7 +65,7 @@ public class KnowledgeController {
      */
     @PostMapping(value = "/knowledge-bases/{uid}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<KnowledgeModels.UploadResult> upload(@PathVariable String uid, @RequestParam("files") List<MultipartFile> files) {
-        return ResponseEntity.accepted().body(new KnowledgeModels.UploadResult(service.upload(uid, files)));
+        return ResponseEntity.accepted().body(service.upload(uid, files));
     }
 
     /**

@@ -38,6 +38,9 @@ public class KnowledgeIngestionJobEntity implements Serializable {
     @Schema(description = "任务状态")
     private String status;
 
+    @Schema(description = "当前处理阶段")
+    private String stage;
+
     @Schema(description = "处理进度百分比")
     private Integer progressPercent;
 
@@ -56,8 +59,23 @@ public class KnowledgeIngestionJobEntity implements Serializable {
     @Schema(description = "失败原因")
     private String failureMessage;
 
+    @Schema(description = "当前工作实例ID")
+    private String workerId;
+
+    @Schema(description = "当前租约令牌")
+    private String leaseToken;
+
     @Schema(description = "任务租约到期时间")
     private Date leaseUntil;
+
+    @Schema(description = "最后心跳时间")
+    private Date lastHeartbeatTime;
+
+    @Schema(description = "下次自动重试时间")
+    private Date nextRetryTime;
+
+    @Schema(description = "失败是否可重试")
+    private Boolean retryable;
 
     @Schema(description = "开始时间")
     private Date startedTime;

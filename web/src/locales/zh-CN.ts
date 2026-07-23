@@ -1064,6 +1064,32 @@ const zhCN = {
       documents: "文档",
       noDocuments: "尚未上传文档",
       retry: "重试",
+      attempt: "第 {current}/{max} 次尝试",
+      nextRetry: "预计 {time} 自动重试",
+      jobStatuses: {
+        PENDING: "等待处理",
+        RUNNING: "处理中",
+        RETRY_WAIT: "等待重试",
+        COMPLETED: "已完成",
+        FAILED: "失败"
+      },
+      stages: {
+        QUEUED: "排队中",
+        PARSING: "解析文档",
+        CHUNKING: "文档分块",
+        EMBEDDING: "生成向量",
+        VECTOR_INDEXING: "写入向量索引",
+        LEXICAL_INDEXING: "写入关键词索引",
+        PUBLISHING: "发布版本",
+        COMPLETED: "处理完成",
+        FAILED: "处理失败"
+      },
+      uploadOutcomes: {
+        ACCEPTED: "已接收",
+        DUPLICATE: "重复文件",
+        REJECTED: "已拒绝",
+        FAILED: "接收失败"
+      },
       searchTest: "检索测试",
       searchPlaceholder: "输入要检索的问题",
       noHits: "暂无检索结果",
@@ -1083,7 +1109,11 @@ const zhCN = {
       },
       page: "第",
       form: { name: "知识库名称", description: "描述", provider: "Embedding Provider ID", model: "Embedding 模型 ID", dimension: "向量维度" },
-      messages: { created: "知识库已创建", uploaded: "文档已提交处理" }
+      messages: {
+        created: "知识库已创建",
+        uploaded: "文档已提交处理",
+        uploadSummary: "已接收 {accepted} 个，重复 {duplicate} 个，失败 {failed} 个"
+      }
     },
     skills: {
       title: "技能管理",

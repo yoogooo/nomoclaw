@@ -28,6 +28,11 @@ public interface VectorStore {
     void deleteByDocument(String collection, String documentUid);
 
     /**
+     * Removes all vector points that belong to one immutable document version.
+     */
+    void deleteByDocumentVersion(String collection, String documentVersionUid);
+
+    /**
      * Returns whether the configured vector database is currently reachable.
      */
     boolean available();

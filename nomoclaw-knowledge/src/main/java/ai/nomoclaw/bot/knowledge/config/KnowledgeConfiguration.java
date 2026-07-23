@@ -4,6 +4,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 import java.util.concurrent.Executor;
 
@@ -25,6 +26,18 @@ public class KnowledgeConfiguration {
         executor.setThreadNamePrefix("knowledge-ingestion-");
         executor.initialize();
         return executor;
+    }
+
+    /**
+     * Scheduler for durable-job dispatching and lease heartbeats.
+     */
+    @Bean("knowledgeIngestionScheduler")
+    public ThreadPoolTaskScheduler knowledgeIngestionScheduler() {
+        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
+        scheduler.setPoolSize(2);
+        scheduler.setThreadNamePrefix("knowledge-ingestion-scheduler-");
+        scheduler.setWaitForTasksToCompleteOnShutdown(false);
+        return scheduler;
     }
 
     /**

@@ -1064,6 +1064,32 @@ const enUS = {
       documents: "Documents",
       noDocuments: "No documents uploaded",
       retry: "Retry",
+      attempt: "Attempt {current}/{max}",
+      nextRetry: "Automatic retry at {time}",
+      jobStatuses: {
+        PENDING: "Pending",
+        RUNNING: "Processing",
+        RETRY_WAIT: "Waiting to retry",
+        COMPLETED: "Completed",
+        FAILED: "Failed"
+      },
+      stages: {
+        QUEUED: "Queued",
+        PARSING: "Parsing document",
+        CHUNKING: "Chunking document",
+        EMBEDDING: "Generating embeddings",
+        VECTOR_INDEXING: "Writing vector index",
+        LEXICAL_INDEXING: "Writing keyword index",
+        PUBLISHING: "Publishing version",
+        COMPLETED: "Completed",
+        FAILED: "Failed"
+      },
+      uploadOutcomes: {
+        ACCEPTED: "Accepted",
+        DUPLICATE: "Duplicate",
+        REJECTED: "Rejected",
+        FAILED: "Upload failed"
+      },
       searchTest: "Retrieval test",
       searchPlaceholder: "Enter a question to search",
       noHits: "No retrieval results",
@@ -1083,7 +1109,11 @@ const enUS = {
       },
       page: "Page",
       form: { name: "Knowledge base name", description: "Description", provider: "Embedding provider ID", model: "Embedding model ID", dimension: "Vector dimension" },
-      messages: { created: "Knowledge base created", uploaded: "Documents queued for processing" }
+      messages: {
+        created: "Knowledge base created",
+        uploaded: "Documents queued for processing",
+        uploadSummary: "Accepted {accepted}, duplicate {duplicate}, failed {failed}"
+      }
     },
     skills: {
       title: "Skill Management",

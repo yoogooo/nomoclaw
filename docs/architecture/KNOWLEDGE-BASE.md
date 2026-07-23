@@ -86,10 +86,11 @@ Qdrant payload 包含：`knowledgeBaseUid`、`documentUid`、`documentVersionUid
 1. `POST /api/knowledge-bases/{uid}/documents` 接收 multipart 文件。
 2. 服务校验扩展名、文件数量和路径安全性，将文件保存到知识库目录。
 3. 在事务中创建 document、version 和 ingestion job。
-4. 专用 `knowledgeIngestionExecutor` 后台执行解析、分块、embedding 和 Qdrant upsert。
-5. 每批向量写入成功后，更新 chunk 和 job 进度。
-6. 所有分块成功后，文档版本和文档变为 `READY`，更新知识库统计。
-7. 任一阶段失败时，文档和任务变为 `FAILED`，记录稳定错误码与简短原因，可通过 retry API 再次提交。
+4. 数据库 dispatcher 使用 CAS 和租约领取 `PENDING`、到期的 `RETRY_WAIT` 或租约过期任务，再交给专用 `knowledgeIngestionExecutor`。
+5. worker 按 `PARSING`、`CHUNKING`、`EMBEDDING`、`VECTOR_INDEXING`、`LEXICAL_INDEXING`、`PUBLISHING` 阶段处理并续租。
+6. chunk 与 Qdrant point 使用确定性 ID；重试先按版本清理暂存数据，避免重复分块和向量。
+7. Qdrant 与 BM25 都准备完成后，在数据库事务中发布当前版本、完成任务并更新知识库统计。
+8. 临时错误进入指数退避的 `RETRY_WAIT`，永久错误或达到最大尝试次数后进入 `FAILED`；应用重启后任务可自动恢复。
 
 支持的解析错误码：
 
@@ -192,6 +193,10 @@ knowledge:
     max-files-per-request: 20
   ingestion:
     worker-count: 2
+    lease-seconds: 300
+    dispatch-interval: 1s
+    initial-retry-delay: 5s
+    max-retry-delay: 5m
     max-attempts: 3
     embedding-batch-size: 32
   chunking:

@@ -48,6 +48,12 @@ public class QdrantVectorStore implements VectorStore {
     }
 
     @Override
+    public void deleteByDocumentVersion(String collection, String documentVersionUid) {
+        request("POST", "/collections/" + collection + "/points/delete?wait=true",
+                Map.of("filter", match("documentVersionUid", documentVersionUid)), false);
+    }
+
+    @Override
     public List<Hit> search(String collection, List<Float> vector, List<String> knowledgeBaseUids, int limit) {
         long started = System.nanoTime();
         List<Map<String, Object>> should = knowledgeBaseUids.stream().map(uid -> Map.of("key", "knowledgeBaseUid", "match", Map.of("value", uid))).toList();

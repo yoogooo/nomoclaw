@@ -68,6 +68,10 @@ public class KnowledgeProperties {
 
     public static class Ingestion {
         private int workerCount = 2;
+        private int leaseSeconds = 300;
+        private Duration dispatchInterval = Duration.ofSeconds(1);
+        private Duration initialRetryDelay = Duration.ofSeconds(5);
+        private Duration maxRetryDelay = Duration.ofMinutes(5);
         private int maxAttempts = 3;
         private int embeddingBatchSize = 32;
 
@@ -77,6 +81,38 @@ public class KnowledgeProperties {
 
         public void setWorkerCount(int value) {
             workerCount = value;
+        }
+
+        public int getLeaseSeconds() {
+            return leaseSeconds;
+        }
+
+        public void setLeaseSeconds(int value) {
+            leaseSeconds = value;
+        }
+
+        public Duration getDispatchInterval() {
+            return dispatchInterval;
+        }
+
+        public void setDispatchInterval(Duration value) {
+            dispatchInterval = value;
+        }
+
+        public Duration getInitialRetryDelay() {
+            return initialRetryDelay;
+        }
+
+        public void setInitialRetryDelay(Duration value) {
+            initialRetryDelay = value;
+        }
+
+        public Duration getMaxRetryDelay() {
+            return maxRetryDelay;
+        }
+
+        public void setMaxRetryDelay(Duration value) {
+            maxRetryDelay = value;
         }
 
         public int getMaxAttempts() {

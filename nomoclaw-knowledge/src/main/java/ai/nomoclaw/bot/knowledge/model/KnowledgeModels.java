@@ -27,10 +27,16 @@ public final class KnowledgeModels {
 
     public record Document(String documentUid, String knowledgeBaseUid, String displayName, String contentType,
                            long sizeBytes, String status, String failureCode, String failureMessage, int pageCount,
-                           int chunkCount, String jobUid, int progressPercent, LocalDateTime updatedTime) {
+                           int chunkCount, String jobUid, String jobStatus, String stage, int progressPercent,
+                           int attemptCount, int maxAttempts, int processedChunks, int totalChunks,
+                           LocalDateTime nextRetryTime, boolean retryable, LocalDateTime updatedTime) {
     }
 
-    public record UploadResult(List<Document> documents) {
+    public record UploadFileResult(String fileName, String outcome, Document document, String errorCode,
+                                   String errorMessage) {
+    }
+
+    public record UploadResult(List<Document> documents, List<UploadFileResult> items) {
     }
 
     public record SearchRequest(String query, Integer topK) {
