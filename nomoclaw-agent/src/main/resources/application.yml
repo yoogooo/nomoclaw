@@ -147,6 +147,11 @@ knowledge:
   chunking:
     default-size-tokens: 500
     default-overlap-tokens: 80
+  embedding-cache:
+    enabled: true
+    max-entries: 100000
+    ttl: 30d
+    cleanup-interval: 1h
   retrieval:
     default-top-k: 8
     max-context-tokens: 6000
@@ -154,9 +159,15 @@ knowledge:
     max-chunks-per-document: 3
     bm25:
       enabled: true
+      backend: elasticsearch
       index-path: "${NOMOCLAW_ROOT_DIR:${user.home}/.nomoclaw}/knowledge/bm25"
       candidate-limit: 40
       rrf-k: 60
+      elasticsearch:
+        url: "${ELASTICSEARCH_URL:http://127.0.0.1:9200}"
+        api-key: "${ELASTICSEARCH_API_KEY:}"
+        timeout: 10s
+        index-name: "${ELASTICSEARCH_BM25_INDEX:nomoclaw_knowledge_bm25}"
     rerank:
       enabled: true
       warmup-enabled: false

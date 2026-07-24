@@ -7,6 +7,13 @@ import java.util.List;
  */
 public interface EmbeddingProvider {
     /**
+     * Returns a stable cache namespace for the effective provider configuration.
+     */
+    default String fingerprint(String providerId, String modelId, int expectedDimension) {
+        return providerId + ":" + modelId + ":" + expectedDimension;
+    }
+
+    /**
      * Generates vectors and verifies every result has the requested dimension.
      */
     List<List<Float>> embed(List<String> texts, String providerId, String modelId, int expectedDimension);

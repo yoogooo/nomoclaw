@@ -17,7 +17,41 @@ public interface DocumentParser {
      */
     ParsedDocument parse(Path file);
 
-    record ParsedDocument(List<Page> pages) {
+    /**
+     * Parses while reporting durable page progress when the format exposes page boundaries.
+     */
+    default ParsedDocument parse(Path file, PageProgress progress) {
+        ParsedDocument parsed = parse(file);
+        progress.accept(parsed.pages().size(), parsed.pages().size());
+        return parsed;
+    }
+
+    @FunctionalInterface
+    interface PageProgress {
+        void accept(int processedPages, int totalPages);
+    }
+
+    /**
+     * Signals that the caller lost ownership and parsing must stop at the next page boundary.
+     */
+    final class ParsingAbortedException extends RuntimeException {
+        public ParsingAbortedException() {
+            super("Document parsing aborted");
+        }
+    }
+
+    enum BlockType {
+        HEADING, PARAGRAPH, TABLE, LIST, CODE
+    }
+
+    record DocumentBlock(BlockType type, int page, String sectionPath, String text) {
+    }
+
+    record ParsedDocument(List<Page> pages, List<DocumentBlock> blocks, List<String> warnings) {
+        public ParsedDocument(List<Page> pages) {
+            this(pages, pages.stream().map(page -> new DocumentBlock(
+                    BlockType.PARAGRAPH, page.number(), page.section(), page.text())).toList(), List.of());
+        }
     }
 
     record Page(int number, String section, String text) {

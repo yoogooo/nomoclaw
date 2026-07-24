@@ -1,47 +1,44 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
-import { Database, FileText, Plus, RefreshCw, Search, Upload } from "lucide-vue-next";
-import { NAlert, NButton, NCard, NEmpty, NInput, NInputNumber, NModal, NProgress, NSpin, NTag } from "naive-ui";
+import { Database, Plus, Search, Upload } from "lucide-vue-next";
+import { NAlert, NButton, NCard, NEmpty, NInput, NInputNumber, NModal, NSpin, NTag } from "naive-ui";
 import { useI18n } from "vue-i18n";
+import { useRoute, useRouter } from "vue-router";
 import DirectoryRail from "@/components/chat/DirectoryRail.vue";
+import KnowledgeDocumentRow from "@/components/knowledge/KnowledgeDocumentRow.vue";
 import AppPageHeader from "@/components/layout/AppPageHeader.vue";
-import { knowledgeApi, type KnowledgeBase, type KnowledgeDocument, type KnowledgeHit, type KnowledgeSearchDiagnostic, type KnowledgeUploadItem } from "@/api/knowledgeApi";
+import { knowledgeApi, type KnowledgeBase, type KnowledgeDocument, type KnowledgeHit, type KnowledgeSearchDiagnostic } from "@/api/knowledgeApi";
 import { message } from "@/discrete";
-import { formatDateTime } from "@/utils/format";
 
 const { t } = useI18n();
+const route = useRoute();
+const router = useRouter();
 const bases = ref<KnowledgeBase[]>([]);
 const documents = ref<KnowledgeDocument[]>([]);
 const hits = ref<KnowledgeHit[]>([]);
 const searchDiagnostics = ref<KnowledgeSearchDiagnostic[]>([]);
-const uploadResults = ref<KnowledgeUploadItem[]>([]);
 const selected = ref<KnowledgeBase | null>(null);
 const loading = ref(false);
 const searching = ref(false);
 const vectorAvailable = ref(true);
 const createVisible = ref(false);
 const searchQuery = ref("");
-const fileInput = ref<HTMLInputElement>();
 const form = reactive({ name: "", description: "", embeddingProviderId: "dashscope", embeddingModelId: "text-embedding-v3", embeddingDimension: 1024 });
 let pollTimer: number | undefined;
 const processing = computed(() => documents.value.some(item => ["PENDING", "RUNNING", "RETRY_WAIT"].includes(item.jobStatus)));
 
-async function loadBases() { loading.value = true; try { const response = await knowledgeApi.list(); bases.value = response.items; vectorAvailable.value = response.vectorAvailable; } finally { loading.value = false; } }
-async function openBase(base: KnowledgeBase) { selected.value = base; hits.value = []; searchDiagnostics.value = []; uploadResults.value = []; await loadDocuments(); }
+async function loadBases() { loading.value = true; try { const response = await knowledgeApi.list(); bases.value = response.items; vectorAvailable.value = response.vectorAvailable; const requested = String(route.query.base || ""); if (requested && !selected.value) { const base = bases.value.find(item => item.knowledgeBaseUid === requested); if (base) await openBase(base); } } finally { loading.value = false; } }
+async function openBase(base: KnowledgeBase) { selected.value = base; hits.value = []; searchDiagnostics.value = []; await loadDocuments(); }
 async function loadDocuments() { if (!selected.value) return; documents.value = (await knowledgeApi.documents(selected.value.knowledgeBaseUid)).items; schedulePoll(); }
 function schedulePoll() { if (pollTimer) window.clearTimeout(pollTimer); if (processing.value) pollTimer = window.setTimeout(() => void loadDocuments(), 1500); }
 async function createBase() { const created = await knowledgeApi.create(form); createVisible.value = false; message.success(t("pages.knowledge.messages.created")); await loadBases(); await openBase(created); }
-function chooseFiles() { fileInput.value?.click(); }
-async function uploadFiles(event: Event) { const input = event.target as HTMLInputElement; const files = Array.from(input.files || []); input.value = ""; if (!selected.value || !files.length) return; const result = await knowledgeApi.upload(selected.value.knowledgeBaseUid, files); uploadResults.value = result.items || []; const accepted = uploadResults.value.filter(item => item.outcome === "ACCEPTED").length; const duplicate = uploadResults.value.filter(item => item.outcome === "DUPLICATE").length; const failed = uploadResults.value.length - accepted - duplicate; message.success(t("pages.knowledge.messages.uploadSummary", { accepted, duplicate, failed })); await loadDocuments(); }
+async function startImport() { if (!selected.value) return; const batch = await knowledgeApi.createImport(selected.value.knowledgeBaseUid); await router.push({ name: "knowledge-import", params: { knowledgeBaseUid: selected.value.knowledgeBaseUid, batchUid: batch.batchUid } }); }
 async function retry(document: KnowledgeDocument) { if (!selected.value) return; await knowledgeApi.retry(selected.value.knowledgeBaseUid, document.documentUid); await loadDocuments(); }
+async function openBuild(document: KnowledgeDocument) { if (!selected.value || !document.importBatchUid) return; await router.push({ name: "knowledge-import", params: { knowledgeBaseUid: selected.value.knowledgeBaseUid, batchUid: document.importBatchUid } }); }
+async function reindex(document: KnowledgeDocument) { if (!selected.value) return; const batch = await knowledgeApi.reindexSession(selected.value.knowledgeBaseUid, document.documentUid); await router.push({ name: "knowledge-import", params: { knowledgeBaseUid: selected.value.knowledgeBaseUid, batchUid: batch.batchUid } }); }
+async function removeUploaded(document: KnowledgeDocument) { if (!selected.value) return; await knowledgeApi.deleteUploadedDocument(selected.value.knowledgeBaseUid, document.documentUid); await loadDocuments(); }
 async function search() { if (!selected.value || !searchQuery.value.trim() || searching.value) return; searching.value = true; searchDiagnostics.value = []; try { const response = await knowledgeApi.search(selected.value.knowledgeBaseUid, searchQuery.value.trim()); hits.value = response.hits || []; searchDiagnostics.value = response.diagnostics || []; } finally { searching.value = false; } }
 function statusType(status: string) { return status === "READY" || status === "ACTIVE" ? "success" : status === "FAILED" || status === "ERROR" ? "error" : "warning"; }
-function jobStatusType(status: string) { return status === "COMPLETED" ? "success" : status === "FAILED" ? "error" : status === "RETRY_WAIT" ? "warning" : "info"; }
-function uploadOutcomeType(outcome: string) { return outcome === "ACCEPTED" ? "success" : outcome === "DUPLICATE" ? "info" : "error"; }
-function stageLabel(stage: string) { return t(`pages.knowledge.stages.${stage || "QUEUED"}`); }
-function jobStatusLabel(status: string) { return t(`pages.knowledge.jobStatuses.${status || "PENDING"}`); }
-function shouldShowAttempts(document: KnowledgeDocument) { return document.attemptCount > 1 || ["RETRY_WAIT", "FAILED"].includes(document.jobStatus); }
-function uploadOutcomeLabel(outcome: string) { return t(`pages.knowledge.uploadOutcomes.${outcome}`); }
 function retrievalSourceLabel(source: string) { return t(`pages.knowledge.retrievalSources.${source}`); }
 function searchDiagnosticLabel(code: string) { return t(`pages.knowledge.searchDiagnostics.${code}`); }
 function dismissSearchDiagnostic(code: string) { searchDiagnostics.value = searchDiagnostics.value.filter(item => item.code !== code); }
@@ -62,10 +59,9 @@ onBeforeUnmount(() => { if (pollTimer) window.clearTimeout(pollTimer); });
         </button><NEmpty v-if="!bases.length" :description="t('pages.knowledge.empty')" />
       </section></NSpin>
 
-      <template v-if="selected"><div class="detail-header"><NButton quaternary @click="selected = null">{{ t("pages.knowledge.back") }}</NButton><div><h2>{{ selected.name }}</h2><p>{{ selected.description }}</p></div><NButton type="primary" @click="chooseFiles"><template #icon><Upload/></template>{{ t("pages.knowledge.upload") }}</NButton><input ref="fileInput" hidden type="file" multiple accept=".pdf,.docx,.txt,.md" @change="uploadFiles"></div>
-        <div v-if="uploadResults.length" class="upload-results"><div v-for="item in uploadResults" :key="`${item.fileName}-${item.outcome}`" class="upload-result"><span>{{ item.fileName }}</span><NTag size="small" :type="uploadOutcomeType(item.outcome)">{{ uploadOutcomeLabel(item.outcome) }}</NTag><span v-if="item.errorMessage" class="error">{{ item.errorMessage }}</span></div></div>
+      <template v-if="selected"><div class="detail-header"><NButton quaternary @click="selected = null">{{ t("pages.knowledge.back") }}</NButton><div><h2>{{ selected.name }}</h2><p>{{ selected.description }}</p></div><NButton type="primary" @click="startImport"><template #icon><Upload/></template>{{ t("pages.knowledge.upload") }}</NButton></div>
         <div class="detail-grid"><NCard :title="t('pages.knowledge.documents')"><NEmpty v-if="!documents.length" :description="t('pages.knowledge.noDocuments')"/>
-          <div v-for="document in documents" :key="document.documentUid" class="document-row"><FileText/><div class="document-main"><strong>{{ document.displayName }}</strong><span class="job-detail">{{ stageLabel(document.stage) }}<template v-if="shouldShowAttempts(document)"> · {{ t("pages.knowledge.attempt", { current: document.attemptCount, max: document.maxAttempts }) }}</template><template v-if="document.totalChunks"> · {{ document.processedChunks }}/{{ document.totalChunks }} {{ t("pages.knowledge.units.chunks") }}</template></span><span v-if="document.jobStatus === 'RETRY_WAIT' && document.nextRetryTime" class="job-detail">{{ t("pages.knowledge.nextRetry", { time: formatDateTime(document.nextRetryTime) }) }}</span><span v-if="document.failureMessage" :class="{ error: document.jobStatus === 'FAILED' }">{{ document.failureMessage }}</span><NProgress v-if="!['COMPLETED', 'FAILED'].includes(document.jobStatus)" type="line" :percentage="document.progressPercent" :show-indicator="false"/></div><NTag size="small" :type="jobStatusType(document.jobStatus)">{{ jobStatusLabel(document.jobStatus) }}</NTag><NButton v-if="document.jobStatus === 'FAILED'" size="small" @click="retry(document)"><RefreshCw/> {{ t("pages.knowledge.retry") }}</NButton></div>
+          <KnowledgeDocumentRow v-for="document in documents" :key="document.documentUid" :document="document" @retry="retry(document)" @build="openBuild(document)" @reindex="reindex(document)" @remove="removeUploaded(document)" />
         </NCard><NCard :title="t('pages.knowledge.searchTest')"><div class="search-bar"><NInput v-model:value="searchQuery" :placeholder="t('pages.knowledge.searchPlaceholder')" :disabled="searching" @keyup.enter="search"/><NButton type="primary" :loading="searching" :disabled="!searchQuery.trim()" @click="search"><template v-if="!searching" #icon><Search/></template></NButton></div><NSpin :show="searching"><NAlert v-for="diagnostic in searchDiagnostics" :key="diagnostic.code" type="warning" closable class="search-diagnostic" @close="dismissSearchDiagnostic(diagnostic.code)">{{ searchDiagnosticLabel(diagnostic.code) }}</NAlert><NEmpty v-if="!hits.length" :description="t('pages.knowledge.noHits')"/><div v-for="hit in hits" :key="hit.citationId" class="hit"><strong>[{{ hit.citationId }}] {{ hit.documentName }}</strong><span>{{ hit.pageFrom ? `${t('pages.knowledge.page')} ${hit.pageFrom}` : '' }} {{ hit.sectionPath }}</span><p>{{ hit.excerpt }}</p><div class="hit-scores"><NTag size="small">{{ t('pages.knowledge.fusedScore') }} {{ (hit.rrfScore ?? hit.score).toFixed(3) }}</NTag><NTag v-if="hit.rerankScore != null" size="small" type="warning">{{ t('pages.knowledge.rerankScore') }} {{ hit.rerankScore.toFixed(3) }}</NTag><NTag v-if="hit.denseScore != null" size="small" type="info">{{ t('pages.knowledge.denseScore') }} {{ hit.denseScore.toFixed(3) }}</NTag><NTag v-if="hit.bm25Score != null" size="small" type="success">{{ t('pages.knowledge.bm25Score') }} {{ hit.bm25Score.toFixed(3) }}</NTag><NTag v-for="source in hit.retrievalSources" :key="source" size="small" :bordered="false">{{ retrievalSourceLabel(source) }}</NTag></div></div></NSpin></NCard></div>
       </template>
     </div></main>

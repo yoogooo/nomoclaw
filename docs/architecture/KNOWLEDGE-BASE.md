@@ -207,6 +207,17 @@ knowledge:
     max-context-tokens: 6000
     default-similarity-threshold: 0.35
     max-chunks-per-document: 3
+    bm25:
+      enabled: true
+      backend: elasticsearch
+      index-path: "${NOMOCLAW_ROOT_DIR:${user.home}/.nomoclaw}/knowledge/bm25"
+      candidate-limit: 40
+      rrf-k: 60
+      elasticsearch:
+        url: "${ELASTICSEARCH_URL:http://127.0.0.1:9200}"
+        api-key: "${ELASTICSEARCH_API_KEY:}"
+        timeout: 10s
+        index-name: "${ELASTICSEARCH_BM25_INDEX:nomoclaw_knowledge_bm25}"
     rerank:
       enabled: true
       warmup-enabled: false
@@ -218,6 +229,53 @@ knowledge:
       url: "${QDRANT_URL:http://127.0.0.1:6333}"
       api-key: "${QDRANT_API_KEY:}"
       timeout: 10s
+```
+
+### BM25 后端切换
+
+当前项目同时支持两种 BM25 实现，通过 `knowledge.retrieval.bm25.backend` 切换：
+
+| `backend` 值 | 实现 | 适用场景 |
+| --- | --- | --- |
+| `lucene` | 本地 Lucene 文件索引 | 单机开发、无额外服务依赖、索引跟随本机目录 |
+| `elasticsearch` | Elasticsearch 索引 | 多实例部署、集中化检索、避免本地 Lucene 文件锁冲突 |
+
+说明：
+
+- `lucene` 模式会使用 `knowledge.retrieval.bm25.index-path` 指向的目录。
+- `elasticsearch` 模式会使用 `knowledge.retrieval.bm25.elasticsearch.*` 配置连接 ES。
+- 两种实现都遵循同一个 `LexicalSearchStore` 抽象，上层知识库检索逻辑无需修改。
+
+### 配置示例
+
+本地文件版 BM25：
+
+```yaml
+knowledge:
+  retrieval:
+    bm25:
+      enabled: true
+      backend: lucene
+      index-path: "${NOMOCLAW_ROOT_DIR:${user.home}/.nomoclaw}/knowledge/bm25"
+      candidate-limit: 40
+      rrf-k: 60
+```
+
+Elasticsearch 版 BM25：
+
+```yaml
+knowledge:
+  retrieval:
+    bm25:
+      enabled: true
+      backend: elasticsearch
+      candidate-limit: 40
+      rrf-k: 60
+      elasticsearch:
+        url: "${ELASTICSEARCH_URL:http://127.0.0.1:9200}"
+        api-key: "${ELASTICSEARCH_API_KEY:}"
+        timeout: 10s
+        index-name: "${ELASTICSEARCH_BM25_INDEX:nomoclaw_knowledge_bm25}"
 ```
 
 `docker-compose.yml` 已定义 `qdrant` 服务及 `nomoclaw_qdrant` 持久化 volume。源码运行时需自行启动 Qdrant，或设置 `QDRANT_URL` 指向可访问实例。

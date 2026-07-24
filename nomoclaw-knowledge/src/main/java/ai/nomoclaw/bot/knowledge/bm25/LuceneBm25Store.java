@@ -27,18 +27,22 @@ import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.util.BytesRef;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Embedded Lucene implementation of the persistent BM25 lexical index.
  */
 @Component
+@ConditionalOnProperty(prefix = "knowledge.retrieval.bm25", name = "backend", havingValue = "lucene")
 public class LuceneBm25Store implements LexicalSearchStore {
     private static final Logger log = LoggerFactory.getLogger(LuceneBm25Store.class);
     private static final String FIELD_CHUNK_UID = "chunkUid";
@@ -55,20 +59,40 @@ public class LuceneBm25Store implements LexicalSearchStore {
     private final IndexWriter writer;
 
     public LuceneBm25Store(KnowledgeProperties properties) {
-        enabled = properties.getRetrieval().getBm25().isEnabled();
-        analyzer = new SmartChineseAnalyzer();
+        boolean configuredEnabled = properties.getRetrieval().getBm25().isEnabled();
+        Analyzer initializedAnalyzer = null;
+        Directory initializedDirectory = null;
+        IndexWriter initializedWriter = null;
+        boolean initializedEnabled = false;
         try {
-            Path configuredPath = properties.getRetrieval().getBm25().getIndexPath();
-            Path indexPath = configuredPath == null ? properties.getStorageRoot().resolve("bm25") : configuredPath;
-            Files.createDirectories(indexPath);
-            directory = FSDirectory.open(indexPath);
-            IndexWriterConfig config = new IndexWriterConfig(analyzer);
-            config.setSimilarity(new BM25Similarity());
-            writer = new IndexWriter(directory, config);
-            log.info("[KnowledgeSearch][BM25] initialized indexPath={} enabled={}", indexPath, enabled);
-        } catch (IOException ex) {
-            throw new IllegalStateException("无法初始化知识库 BM25 索引", ex);
+            if (!configuredEnabled) {
+                log.info("[KnowledgeSearch][BM25] disabled by configuration");
+            } else {
+                initializedAnalyzer = new SmartChineseAnalyzer();
+                Path configuredPath = properties.getRetrieval().getBm25().getIndexPath();
+                Path storageRoot = properties.getStorageRoot();
+                Path indexPath = configuredPath == null
+                        ? storageRoot == null ? null : storageRoot.resolve("bm25")
+                        : configuredPath;
+                if (indexPath == null) {
+                    throw new IllegalStateException("knowledge.storage-root 未配置，且 knowledge.retrieval.bm25.index-path 为空");
+                }
+                Files.createDirectories(indexPath);
+                initializedDirectory = FSDirectory.open(indexPath);
+                IndexWriterConfig config = new IndexWriterConfig(initializedAnalyzer);
+                config.setSimilarity(new BM25Similarity());
+                initializedWriter = new IndexWriter(initializedDirectory, config);
+                initializedEnabled = true;
+                log.info("[KnowledgeSearch][BM25] initialized indexPath={} enabled={}", indexPath, configuredEnabled);
+            }
+        } catch (Exception ex) {
+            closeQuietly(initializedWriter, initializedDirectory, initializedAnalyzer);
+            log.warn("[KnowledgeSearch][BM25] initialization failed, lexical retrieval disabled", ex);
         }
+        enabled = initializedEnabled;
+        analyzer = initializedAnalyzer;
+        directory = initializedDirectory;
+        writer = initializedWriter;
     }
 
     @Override
@@ -76,7 +100,7 @@ public class LuceneBm25Store implements LexicalSearchStore {
                                              String documentName, List<IndexedChunk> chunks) {
         if (!enabled) return;
         try {
-            writer.deleteDocuments(new Term(FIELD_DOCUMENT_UID, documentUid));
+            writer.deleteDocuments(new Term(FIELD_DOCUMENT_VERSION_UID, documentVersionUid));
             for (IndexedChunk chunk : chunks) {
                 Document document = new Document();
                 document.add(new StringField(FIELD_CHUNK_UID, chunk.chunkUid(), Field.Store.YES));
@@ -97,6 +121,60 @@ public class LuceneBm25Store implements LexicalSearchStore {
     }
 
     @Override
+    public IndexSession beginDocumentVersion(String knowledgeBaseUid, String documentUid,
+                                             String documentVersionUid, String documentName) {
+        if (!enabled) return LexicalSearchStore.super.beginDocumentVersion(
+                knowledgeBaseUid, documentUid, documentVersionUid, documentName);
+        synchronized (this) {
+            try {
+                writer.deleteDocuments(new Term(FIELD_DOCUMENT_VERSION_UID, documentVersionUid));
+            } catch (IOException ex) {
+                throw new IllegalStateException("初始化知识库 BM25 增量索引失败", ex);
+            }
+        }
+        return new IndexSession() {
+            private boolean committed;
+
+            @Override
+            public void add(IndexedChunk chunk) {
+                synchronized (LuceneBm25Store.this) {
+                    try {
+                        writer.addDocument(luceneDocument(knowledgeBaseUid, documentUid, documentVersionUid,
+                                documentName, chunk));
+                    } catch (IOException ex) {
+                        throw new IllegalStateException("写入知识库 BM25 增量索引失败", ex);
+                    }
+                }
+            }
+
+            @Override
+            public void commit() {
+                synchronized (LuceneBm25Store.this) {
+                    try {
+                        writer.commit();
+                        committed = true;
+                    } catch (IOException ex) {
+                        throw new IllegalStateException("提交知识库 BM25 增量索引失败", ex);
+                    }
+                }
+            }
+
+            @Override
+            public void close() {
+                if (committed) return;
+                synchronized (LuceneBm25Store.this) {
+                    try {
+                        writer.deleteDocuments(new Term(FIELD_DOCUMENT_VERSION_UID, documentVersionUid));
+                        writer.commit();
+                    } catch (IOException ex) {
+                        throw new IllegalStateException("回滚知识库 BM25 增量索引失败", ex);
+                    }
+                }
+            }
+        };
+    }
+
+    @Override
     public synchronized List<Hit> search(String query, List<String> knowledgeBaseUids, int limit) {
         if (!available() || query == null || query.isBlank() || knowledgeBaseUids == null || knowledgeBaseUids.isEmpty()) return List.of();
         try (DirectoryReader reader = DirectoryReader.open(writer)) {
@@ -110,9 +188,9 @@ public class LuceneBm25Store implements LexicalSearchStore {
                     .add(baseFilter, BooleanClause.Occur.FILTER)
                     .build();
             TopDocs results = searcher.search(combined, limit);
-            List<Hit> hits = new java.util.ArrayList<>(results.scoreDocs.length);
+            List<Hit> hits = new ArrayList<>(results.scoreDocs.length);
             for (ScoreDoc scoreDoc : results.scoreDocs) {
-                Document document = searcher.doc(scoreDoc.doc);
+                Document document = searcher.storedFields().document(scoreDoc.doc, Set.of(FIELD_CHUNK_UID));
                 hits.add(new Hit(document.get(FIELD_CHUNK_UID), scoreDoc.score));
             }
             log.info("[KnowledgeSearch][BM25] knowledgeBaseCount={} limit={} candidateCount={} scores={}",
@@ -126,6 +204,11 @@ public class LuceneBm25Store implements LexicalSearchStore {
     @Override
     public synchronized void deleteByDocument(String documentUid) {
         delete(new Term(FIELD_DOCUMENT_UID, documentUid));
+    }
+
+    @Override
+    public synchronized void deleteByDocumentVersion(String documentVersionUid) {
+        delete(new Term(FIELD_DOCUMENT_VERSION_UID, documentVersionUid));
     }
 
     @Override
@@ -146,7 +229,7 @@ public class LuceneBm25Store implements LexicalSearchStore {
 
     @Override
     public boolean available() {
-        return enabled && writer.isOpen();
+        return enabled && writer != null && writer.isOpen();
     }
 
     /**
@@ -154,13 +237,7 @@ public class LuceneBm25Store implements LexicalSearchStore {
      */
     @PreDestroy
     public synchronized void close() {
-        try {
-            writer.close();
-            directory.close();
-            analyzer.close();
-        } catch (IOException ex) {
-            log.warn("Unable to close knowledge BM25 index", ex);
-        }
+        closeQuietly(writer, directory, analyzer);
     }
 
     private Query textQuery(String query) throws Exception {
@@ -182,5 +259,34 @@ public class LuceneBm25Store implements LexicalSearchStore {
 
     private String safe(String value) {
         return value == null ? "" : value;
+    }
+
+    private Document luceneDocument(String knowledgeBaseUid, String documentUid, String documentVersionUid,
+                                    String documentName, IndexedChunk chunk) {
+        Document document = new Document();
+        document.add(new StringField(FIELD_CHUNK_UID, chunk.chunkUid(), Field.Store.YES));
+        document.add(new StringField(FIELD_KNOWLEDGE_BASE_UID, knowledgeBaseUid, Field.Store.NO));
+        document.add(new StringField(FIELD_DOCUMENT_UID, documentUid, Field.Store.NO));
+        document.add(new StringField(FIELD_DOCUMENT_VERSION_UID, documentVersionUid, Field.Store.NO));
+        document.add(new TextField(FIELD_DOCUMENT_NAME, safe(documentName), Field.Store.NO));
+        document.add(new TextField(FIELD_SECTION_PATH, safe(chunk.sectionPath()), Field.Store.NO));
+        document.add(new TextField(FIELD_CONTENT, safe(chunk.content()), Field.Store.NO));
+        return document;
+    }
+
+    private void closeQuietly(IndexWriter indexWriter, Directory luceneDirectory, Analyzer luceneAnalyzer) {
+        try {
+            if (indexWriter != null) {
+                indexWriter.close();
+            }
+            if (luceneDirectory != null) {
+                luceneDirectory.close();
+            }
+            if (luceneAnalyzer != null) {
+                luceneAnalyzer.close();
+            }
+        } catch (IOException ex) {
+            log.warn("Unable to close knowledge BM25 index", ex);
+        }
     }
 }

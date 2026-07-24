@@ -25,18 +25,34 @@ public final class KnowledgeModels {
                        String vectorCollectionName, int documentCount, long chunkCount, LocalDateTime updatedTime) {
     }
 
-    public record Document(String documentUid, String knowledgeBaseUid, String displayName, String contentType,
+    public record Document(String documentUid, String knowledgeBaseUid, String importBatchUid,
+                           String displayName, String contentType,
                            long sizeBytes, String status, String failureCode, String failureMessage, int pageCount,
                            int chunkCount, String jobUid, String jobStatus, String stage, int progressPercent,
                            int attemptCount, int maxAttempts, int processedChunks, int totalChunks,
-                           LocalDateTime nextRetryTime, boolean retryable, LocalDateTime updatedTime) {
+                           int processedPages, int totalPages, int cacheHitChunks, int cacheMissChunks,
+                           List<String> parseWarnings, LocalDateTime nextRetryTime, boolean retryable,
+                           LocalDateTime updatedTime) {
     }
 
     public record UploadFileResult(String fileName, String outcome, Document document, String errorCode,
                                    String errorMessage) {
     }
 
-    public record UploadResult(List<Document> documents, List<UploadFileResult> items) {
+    public record UploadResult(String batchUid, List<Document> documents, List<UploadFileResult> items) {
+    }
+
+    public record BuildRequest(String parserMode, Integer chunkSizeTokens, Integer chunkOverlapTokens) {
+    }
+
+    public record ImportItem(String itemUid, String fileName, String mode, String outcome, String status,
+                             Document document, String errorCode, String errorMessage) {
+    }
+
+    public record ImportBatch(String batchUid, String knowledgeBaseUid, String status, String parserMode,
+                              int chunkSizeTokens, int chunkOverlapTokens, String embeddingProviderId,
+                              String embeddingModelId, int embeddingDimension, List<ImportItem> items,
+                              LocalDateTime createdTime, LocalDateTime updatedTime) {
     }
 
     public record SearchRequest(String query, Integer topK) {

@@ -1,5 +1,6 @@
 package ai.nomoclaw.bot.knowledge.config;
 
+import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -52,5 +53,20 @@ public class KnowledgeConfiguration {
         executor.setThreadNamePrefix("knowledge-rerank-");
         executor.initialize();
         return executor;
+    }
+
+    /**
+     * Shared official Elasticsearch Java client for lexical BM25 indexing and retrieval.
+     */
+    @Bean
+    public ElasticsearchClient knowledgeElasticsearchClient(KnowledgeProperties properties) {
+        KnowledgeProperties.Elasticsearch config = properties.getRetrieval().getBm25().getElasticsearch();
+        return ElasticsearchClient.of(builder -> {
+            builder.host(config.getUrl());
+            if (!config.getApiKey().isBlank()) {
+                builder.apiKey(config.getApiKey());
+            }
+            return builder;
+        });
     }
 }

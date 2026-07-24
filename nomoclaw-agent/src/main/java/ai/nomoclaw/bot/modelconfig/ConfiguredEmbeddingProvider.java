@@ -30,10 +30,14 @@ public class ConfiguredEmbeddingProvider implements EmbeddingProvider {
     }
 
     @Override
+    public String fingerprint(String providerId, String modelId, int expectedDimension) {
+        ModelConfigDto.Provider provider = provider(providerId);
+        return providerId + ":" + trimSlash(provider.baseUrl()) + ":" + modelId + ":" + expectedDimension;
+    }
+
+    @Override
     public List<List<Float>> embed(List<String> texts, String providerId, String modelId, int expectedDimension) {
-        ModelConfigDto.Provider provider = modelConfigService.getModelConfig().providers().stream()
-                .filter(item -> item.id().equals(providerId)).findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Embedding provider not found: " + providerId));
+        ModelConfigDto.Provider provider = provider(providerId);
         String endpoint = "";
         try {
             boolean ollama = provider.local() || "ollama".equals(provider.id());
@@ -98,5 +102,11 @@ public class ConfiguredEmbeddingProvider implements EmbeddingProvider {
 
     private String trimSlash(String value) {
         return value == null ? "" : value.replaceAll("/+$", "");
+    }
+
+    private ModelConfigDto.Provider provider(String providerId) {
+        return modelConfigService.getModelConfig().providers().stream()
+                .filter(item -> item.id().equals(providerId)).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Embedding provider not found: " + providerId));
     }
 }

@@ -43,6 +43,27 @@ public class KnowledgeIngestionMetrics {
         }
     }
 
+    public void embeddingCache(int hits, int misses) {
+        if (registry == null) return;
+        registry.counter("nomoclaw.knowledge.embedding_cache.requests", "outcome", "hit").increment(hits);
+        registry.counter("nomoclaw.knowledge.embedding_cache.requests", "outcome", "miss").increment(misses);
+    }
+
+    public void parsedPages(int pages) {
+        if (registry != null && pages > 0) {
+            registry.counter("nomoclaw.knowledge.ingestion.parsed_pages").increment(pages);
+        }
+    }
+
+    public void batchFinished(String outcome, Duration duration) {
+        if (registry == null) return;
+        registry.counter("nomoclaw.knowledge.import.batches", "outcome", outcome).increment();
+        Timer.builder("nomoclaw.knowledge.import.duration")
+                .tag("outcome", outcome)
+                .register(registry)
+                .record(duration);
+    }
+
     private String safeCode(String code) {
         return code == null || code.isBlank() ? "UNKNOWN" : code;
     }

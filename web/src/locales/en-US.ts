@@ -1055,7 +1055,8 @@ const enUS = {
       },
       units: {
         documents: "docs",
-        chunks: "chunks"
+        chunks: "chunks",
+        pages: "pages"
       },
       vectorUnavailable: "Qdrant is unavailable. Regular conversations are unaffected.",
       empty: "No knowledge bases yet",
@@ -1066,6 +1067,12 @@ const enUS = {
       retry: "Retry",
       attempt: "Attempt {current}/{max}",
       nextRetry: "Automatic retry at {time}",
+      cacheSummary: "{hits} cache hits, {misses} generated",
+      documentStatuses: { UPLOADED: "Awaiting build", awaitingBuild: "Waiting for build configuration" },
+      actions: { configureBuild: "Configure and build", reindex: "Rebuild index", more: "More actions" },
+      parseWarnings: {
+        PARTIAL_TEXT_EXTRACTION: "Some PDF pages have no text layer. OCR is not available in this phase, so those pages were not indexed."
+      },
       jobStatuses: {
         PENDING: "Pending",
         RUNNING: "Processing",
@@ -1089,6 +1096,25 @@ const enUS = {
         DUPLICATE: "Duplicate",
         REJECTED: "Rejected",
         FAILED: "Upload failed"
+      },
+      import: {
+        title: "Upload documents",
+        subtitle: "Choose files and review how they will be processed into searchable content.",
+        back: "Back to knowledge base",
+        previous: "Previous",
+        next: "Next",
+        cancel: "Cancel upload",
+        start: "Start processing",
+        return: "Return to knowledge base",
+        steps: { files: "Choose files", config: "Processing settings", confirm: "Review and start", build: "Processing progress" },
+        files: { title: "Choose documents to upload", description: "Add the files to process and review the list before continuing.", add: "Add files", empty: "No files selected yet", skippedTitle: "Some files were not added" },
+        config: { title: "Choose processing settings", description: "All files use the same content parsing and segmentation settings.", ocrTitle: "Scanned PDF notice", ocrDescription: "OCR is not included in this phase. Scanned PDFs without a text layer will report OCR_REQUIRED.", advanced: "Advanced settings", chunkSize: "Segment size (tokens)", overlap: "Context overlap (tokens)", invalid: "Invalid segmentation settings: size must be 100–2000 and overlap cannot exceed half of the segment size." },
+        presets: { precise: "Precise", balanced: "Balanced (recommended)", context: "Long context" },
+        confirm: { title: "Review upload and processing", files: "Files to process", chunking: "Segment / overlap" },
+        pipeline: { parse: "Structured parsing", chunk: "Document chunking" },
+        progress: { title: "Processing documents", completed: "Document processing completed" },
+        itemStatuses: { UPLOADED: "Awaiting build", BUILDING: "Building", READY: "Completed", FAILED: "Failed", SKIPPED: "Skipped", REJECTED: "Rejected", CANCELLED: "Cancelled", REMOVED: "Removed" },
+        messages: { started: "Document processing started" }
       },
       searchTest: "Retrieval test",
       searchPlaceholder: "Enter a question to search",

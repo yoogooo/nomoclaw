@@ -15,6 +15,7 @@ public class KnowledgeProperties {
     private final Upload upload = new Upload();
     private final Ingestion ingestion = new Ingestion();
     private final Chunking chunking = new Chunking();
+    private final EmbeddingCache embeddingCache = new EmbeddingCache();
     private final Retrieval retrieval = new Retrieval();
     private final Vector vector = new Vector();
 
@@ -44,6 +45,10 @@ public class KnowledgeProperties {
 
     public Chunking getChunking() {
         return chunking;
+    }
+
+    public EmbeddingCache getEmbeddingCache() {
+        return embeddingCache;
     }
 
     public Retrieval getRetrieval() {
@@ -153,6 +158,45 @@ public class KnowledgeProperties {
         }
     }
 
+    public static class EmbeddingCache {
+        private boolean enabled = true;
+        private int maxEntries = 100000;
+        private Duration ttl = Duration.ofDays(30);
+        private Duration cleanupInterval = Duration.ofHours(1);
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean value) {
+            enabled = value;
+        }
+
+        public int getMaxEntries() {
+            return maxEntries;
+        }
+
+        public void setMaxEntries(int value) {
+            maxEntries = value;
+        }
+
+        public Duration getTtl() {
+            return ttl;
+        }
+
+        public void setTtl(Duration value) {
+            ttl = value;
+        }
+
+        public Duration getCleanupInterval() {
+            return cleanupInterval;
+        }
+
+        public void setCleanupInterval(Duration value) {
+            cleanupInterval = value;
+        }
+    }
+
     public static class Retrieval {
         private int defaultTopK = 8;
         private int maxContextTokens = 6000;
@@ -204,9 +248,11 @@ public class KnowledgeProperties {
 
     public static class Bm25 {
         private boolean enabled = true;
+        private String backend = "elasticsearch";
         private Path indexPath;
         private int candidateLimit = 40;
         private int rrfK = 60;
+        private final Elasticsearch elasticsearch = new Elasticsearch();
 
         public boolean isEnabled() {
             return enabled;
@@ -214,6 +260,14 @@ public class KnowledgeProperties {
 
         public void setEnabled(boolean value) {
             enabled = value;
+        }
+
+        public String getBackend() {
+            return backend;
+        }
+
+        public void setBackend(String value) {
+            backend = value;
         }
 
         public Path getIndexPath() {
@@ -238,6 +292,49 @@ public class KnowledgeProperties {
 
         public void setRrfK(int value) {
             rrfK = value;
+        }
+
+        public Elasticsearch getElasticsearch() {
+            return elasticsearch;
+        }
+    }
+
+    public static class Elasticsearch {
+        private String url = "http://127.0.0.1:9200";
+        private String apiKey = "";
+        private Duration timeout = Duration.ofSeconds(10);
+        private String indexName = "nomoclaw_knowledge_bm25";
+
+        public String getUrl() {
+            return url;
+        }
+
+        public void setUrl(String value) {
+            url = value;
+        }
+
+        public String getApiKey() {
+            return apiKey;
+        }
+
+        public void setApiKey(String value) {
+            apiKey = value;
+        }
+
+        public Duration getTimeout() {
+            return timeout;
+        }
+
+        public void setTimeout(Duration value) {
+            timeout = value;
+        }
+
+        public String getIndexName() {
+            return indexName;
+        }
+
+        public void setIndexName(String value) {
+            indexName = value;
         }
     }
 

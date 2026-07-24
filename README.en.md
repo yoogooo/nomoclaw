@@ -149,6 +149,7 @@ For users:
 
 For developers:
 - Architecture: [`docs/architecture/ARCHITECTURE.md`](./docs/architecture/ARCHITECTURE.md)
+- Knowledge base architecture and retrieval config: [`docs/architecture/KNOWLEDGE-BASE.md`](./docs/architecture/KNOWLEDGE-BASE.md)
 - Frontend architecture: [`docs/architecture/FRONTEND.md`](./docs/architecture/FRONTEND.md)
 - Frontend API design: [`docs/architecture/FRONTEND-API.md`](./docs/architecture/FRONTEND-API.md)
 - Desktop lifecycle (Tauri): [`docs/architecture/DESKTOP-TAURI-LIFECYCLE.md`](./docs/architecture/DESKTOP-TAURI-LIFECYCLE.md)
@@ -156,6 +157,7 @@ For developers:
 For operations and configuration:
 - Core config: `src/main/resources/application.yml`
 - Common env vars: `MYSQL_URL`, `MYSQL_USER`, `MYSQL_PASSWORD`, `NOMOCLAW_ROOT_DIR`, `DASHSCOPE_API_KEY`, `LLM_MODEL_CONFIG_ENCRYPTION_KEY`, `FEISHU_APP_ID`, `FEISHU_APP_SECRET`, `DINGTALK_CLIENT_ID`, `DINGTALK_CLIENT_SECRET`, `DINGTALK_ROBOT_CODE`
+- BM25 can be switched with `knowledge.retrieval.bm25.backend` between `lucene` (local file index) and `elasticsearch` (ES index). See [`docs/architecture/KNOWLEDGE-BASE.md`](./docs/architecture/KNOWLEDGE-BASE.md) for examples.
 
 ## Upcoming Feature Roadmap
 

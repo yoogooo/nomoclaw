@@ -1055,7 +1055,8 @@ const zhCN = {
       },
       units: {
         documents: "文档",
-        chunks: "分块"
+        chunks: "分块",
+        pages: "页"
       },
       vectorUnavailable: "Qdrant 向量服务不可用，普通对话不受影响",
       empty: "还没有知识库",
@@ -1066,6 +1067,12 @@ const zhCN = {
       retry: "重试",
       attempt: "第 {current}/{max} 次尝试",
       nextRetry: "预计 {time} 自动重试",
+      cacheSummary: "缓存命中 {hits}，新生成 {misses}",
+      documentStatuses: { UPLOADED: "待构建", awaitingBuild: "等待配置构建" },
+      actions: { configureBuild: "配置并构建", reindex: "重新构建索引", more: "更多操作" },
+      parseWarnings: {
+        PARTIAL_TEXT_EXTRACTION: "部分 PDF 页面没有文本层，本阶段暂不支持 OCR，这些页面未进入索引。"
+      },
       jobStatuses: {
         PENDING: "等待处理",
         RUNNING: "处理中",
@@ -1089,6 +1096,25 @@ const zhCN = {
         DUPLICATE: "重复文件",
         REJECTED: "已拒绝",
         FAILED: "接收失败"
+      },
+      import: {
+        title: "上传文档",
+        subtitle: "选择文件并确认处理方式，完成后系统会生成可检索内容。",
+        back: "返回知识库",
+        previous: "上一步",
+        next: "下一步",
+        cancel: "取消上传",
+        start: "开始处理",
+        return: "返回知识库",
+        steps: { files: "选择文件", config: "处理设置", confirm: "确认并开始", build: "处理进度" },
+        files: { title: "选择要上传的文件", description: "添加需要处理的文件，并在继续前检查文件清单。", add: "添加文件", empty: "还没有选择文件", skippedTitle: "部分文件未添加" },
+        config: { title: "选择处理方式", description: "同一批文件使用相同的内容解析和分段设置。", ocrTitle: "扫描 PDF 提示", ocrDescription: "本阶段暂不支持 OCR。没有文本层的扫描 PDF 会给出 OCR_REQUIRED 诊断。", advanced: "高级设置", chunkSize: "分段大小（tokens）", overlap: "上下文重叠（tokens）", invalid: "分段设置无效：大小需为 100–2000，重叠不得超过分段大小的一半。" },
+        presets: { precise: "精细", balanced: "均衡（推荐）", context: "长上下文" },
+        confirm: { title: "确认上传与处理", files: "待处理文件", chunking: "分段 / 重叠" },
+        pipeline: { parse: "结构化解析", chunk: "文档分块" },
+        progress: { title: "正在处理文档", completed: "文档处理完成" },
+        itemStatuses: { UPLOADED: "待构建", BUILDING: "构建中", READY: "已完成", FAILED: "失败", SKIPPED: "已跳过", REJECTED: "已拒绝", CANCELLED: "已取消", REMOVED: "已移除" },
+        messages: { started: "已开始处理文档" }
       },
       searchTest: "检索测试",
       searchPlaceholder: "输入要检索的问题",

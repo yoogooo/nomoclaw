@@ -61,11 +61,56 @@ public class KnowledgeController {
     }
 
     /**
-     * Accepts documents and creates asynchronous ingestion jobs for them.
+     * Accepts documents into a durable draft import batch without starting ingestion.
      */
     @PostMapping(value = "/knowledge-bases/{uid}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<KnowledgeModels.UploadResult> upload(@PathVariable String uid, @RequestParam("files") List<MultipartFile> files) {
         return ResponseEntity.accepted().body(service.upload(uid, files));
+    }
+
+    /**
+     * Creates an empty draft and lets the user select files inside the import wizard.
+     */
+    @PostMapping("/knowledge-bases/{uid}/imports")
+    public ResponseEntity<KnowledgeModels.ImportBatch> createImport(@PathVariable String uid) {
+        return ResponseEntity.accepted().body(service.createImportSession(uid));
+    }
+
+    /**
+     * Appends files to a draft import batch.
+     */
+    @PostMapping(value = "/knowledge-bases/{uid}/imports/{batchUid}/files",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<KnowledgeModels.UploadResult> addImportFiles(
+            @PathVariable String uid, @PathVariable String batchUid,
+            @RequestParam("files") List<MultipartFile> files) {
+        return ResponseEntity.accepted().body(service.addFiles(uid, batchUid, files));
+    }
+
+    /**
+     * Restores a persisted import-builder session.
+     */
+    @GetMapping("/knowledge-bases/{uid}/imports/{batchUid}")
+    public KnowledgeModels.ImportBatch importBatch(@PathVariable String uid, @PathVariable String batchUid) {
+        return service.getImportBatch(uid, batchUid);
+    }
+
+    /**
+     * Confirms one import batch and creates durable ingestion jobs.
+     */
+    @PostMapping("/knowledge-bases/{uid}/imports/{batchUid}/build")
+    public KnowledgeModels.ImportBatch buildImport(@PathVariable String uid, @PathVariable String batchUid,
+                                                   @RequestBody KnowledgeModels.BuildRequest request) {
+        return service.buildImportBatch(uid, batchUid, request);
+    }
+
+    /**
+     * Cancels a draft import batch and removes its unbuilt files.
+     */
+    @DeleteMapping("/knowledge-bases/{uid}/imports/{batchUid}")
+    public KnowledgeModels.StatusResponse cancelImport(@PathVariable String uid, @PathVariable String batchUid) {
+        service.cancelImportBatch(uid, batchUid);
+        return new KnowledgeModels.StatusResponse("cancelled");
     }
 
     /**
@@ -83,6 +128,25 @@ public class KnowledgeController {
     @GetMapping("/knowledge-bases/{uid}/documents/{documentUid}")
     public KnowledgeModels.Document document(@PathVariable String uid, @PathVariable String documentUid) {
         return service.getDocument(uid, documentUid);
+    }
+
+    /**
+     * Deletes an uploaded document that has not started building.
+     */
+    @DeleteMapping("/knowledge-bases/{uid}/documents/{documentUid}")
+    public KnowledgeModels.StatusResponse deleteUploadedDocument(
+            @PathVariable String uid, @PathVariable String documentUid) {
+        service.deleteUploadedDocument(uid, documentUid);
+        return new KnowledgeModels.StatusResponse("deleted");
+    }
+
+    /**
+     * Creates a draft builder session for a safe replacement version.
+     */
+    @PostMapping("/knowledge-bases/{uid}/documents/{documentUid}/reindex-session")
+    public KnowledgeModels.ImportBatch reindexSession(
+            @PathVariable String uid, @PathVariable String documentUid) {
+        return service.createReindexSession(uid, documentUid);
     }
 
     /**

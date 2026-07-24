@@ -149,6 +149,7 @@ pnpm build
 
 开发者：
 - 架构文档：[`docs/architecture/ARCHITECTURE.md`](./docs/architecture/ARCHITECTURE.md)
+- 知识库架构与检索配置：[`docs/architecture/KNOWLEDGE-BASE.md`](./docs/architecture/KNOWLEDGE-BASE.md)
 - 前端架构：[`docs/architecture/FRONTEND.md`](./docs/architecture/FRONTEND.md)
 - 前端 API 设计：[`docs/architecture/FRONTEND-API.md`](./docs/architecture/FRONTEND-API.md)
 - 桌面端生命周期（Tauri）：[`docs/architecture/DESKTOP-TAURI-LIFECYCLE.md`](./docs/architecture/DESKTOP-TAURI-LIFECYCLE.md)
@@ -156,6 +157,7 @@ pnpm build
 运维与配置：
 - 核心配置：`src/main/resources/application.yml`
 - 常用环境变量：`MYSQL_URL`、`MYSQL_USER`、`MYSQL_PASSWORD`、`NOMOCLAW_ROOT_DIR`、`DASHSCOPE_API_KEY`、`LLM_MODEL_CONFIG_ENCRYPTION_KEY`、`FEISHU_APP_ID`、`FEISHU_APP_SECRET`、`DINGTALK_CLIENT_ID`、`DINGTALK_CLIENT_SECRET`、`DINGTALK_ROBOT_CODE`
+- BM25 可在 `knowledge.retrieval.bm25.backend` 上切换 `lucene`（本地文件索引）或 `elasticsearch`（ES 索引），示例见 [`docs/architecture/KNOWLEDGE-BASE.md`](./docs/architecture/KNOWLEDGE-BASE.md)
 
 ## 后续功能规划
 
