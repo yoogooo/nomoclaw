@@ -72,17 +72,21 @@ public class OfficialElasticsearchBm25Client implements ElasticsearchBm25Client 
     public void bulkIndex(String indexName, List<IndexDocument> documents) {
         if (documents == null || documents.isEmpty()) return;
         try {
-            BulkRequest.Builder builder = new BulkRequest.Builder().index(indexName).refresh(Refresh.True);
-            for (IndexDocument document : documents) {
-                builder.operations(BulkOperation.of(operation -> operation
-                        .index(index -> index
-                                .id(document.id())
-                                .document(toJsonNode(document.source())))));
-            }
-            if (builder.build().operations().isEmpty()) {
+            List<BulkOperation> operations = documents.stream()
+                    .map(document -> BulkOperation.of(operation -> operation
+                            .index(index -> index
+                                    .id(document.id())
+                                    .document(toJsonNode(document.source())))))
+                    .toList();
+            if (operations.isEmpty()) {
                 return;
             }
-            var response = client.bulk(builder.build());
+            BulkRequest request = new BulkRequest.Builder()
+                    .index(indexName)
+                    .refresh(Refresh.True)
+                    .operations(operations)
+                    .build();
+            var response = client.bulk(request);
             if (response.errors()) {
                 throw new IllegalStateException("写入知识库 BM25 ES 索引失败: bulk 返回 errors=true");
             }
