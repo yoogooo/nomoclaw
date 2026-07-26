@@ -1,12 +1,19 @@
 package ai.nomoclaw.bot.knowledge.config;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.json.jackson.JacksonJsonpMapper;
+import co.elastic.clients.transport.rest5_client.Rest5ClientTransport;
+import co.elastic.clients.transport.rest5_client.low_level.Rest5Client;
+import co.elastic.clients.transport.rest5_client.low_level.Rest5ClientBuilder;
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.message.BasicHeader;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
+import java.net.URI;
 import java.util.concurrent.Executor;
 
 /**
@@ -56,17 +63,27 @@ public class KnowledgeConfiguration {
     }
 
     /**
+     * Shared Elasticsearch low-level REST client for lexical BM25 indexing and retrieval.
+     */
+    @Bean(destroyMethod = "close")
+    public Rest5Client knowledgeElasticsearchRestClient(KnowledgeProperties properties) {
+        KnowledgeProperties.Elasticsearch config = properties.getRetrieval().getBm25().getElasticsearch();
+        Rest5ClientBuilder builder = Rest5Client.builder(URI.create(config.getUrl()));
+        if (!config.getApiKey().isBlank()) {
+            Header[] headers = new Header[]{new BasicHeader("Authorization", "ApiKey " + config.getApiKey())};
+            builder.setDefaultHeaders(headers);
+        }
+        return builder.build();
+    }
+
+    /**
      * Shared official Elasticsearch Java client for lexical BM25 indexing and retrieval.
      */
     @Bean
-    public ElasticsearchClient knowledgeElasticsearchClient(KnowledgeProperties properties) {
-        KnowledgeProperties.Elasticsearch config = properties.getRetrieval().getBm25().getElasticsearch();
-        return ElasticsearchClient.of(builder -> {
-            builder.host(config.getUrl());
-            if (!config.getApiKey().isBlank()) {
-                builder.apiKey(config.getApiKey());
-            }
-            return builder;
-        });
+    public ElasticsearchClient knowledgeElasticsearchClient(Rest5Client knowledgeElasticsearchRestClient) {
+        Rest5ClientTransport transport = new Rest5ClientTransport(
+                knowledgeElasticsearchRestClient,
+                new JacksonJsonpMapper());
+        return new ElasticsearchClient(transport);
     }
 }
