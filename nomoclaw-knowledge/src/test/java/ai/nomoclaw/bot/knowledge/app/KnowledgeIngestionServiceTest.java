@@ -2,6 +2,7 @@ package ai.nomoclaw.bot.knowledge.app;
 
 import ai.nomoclaw.bot.knowledge.bm25.LexicalSearchStore;
 import ai.nomoclaw.bot.knowledge.config.KnowledgeProperties;
+import ai.nomoclaw.bot.knowledge.config.KnowledgePropertiesTestSupport;
 import ai.nomoclaw.bot.knowledge.ingestion.DefaultDocumentParser.KnowledgeParseException;
 import ai.nomoclaw.bot.knowledge.ingestion.DocumentChunker;
 import ai.nomoclaw.bot.knowledge.ingestion.DocumentParser;
@@ -47,7 +48,7 @@ class KnowledgeIngestionServiceTest {
         jdbc = new JdbcTemplate(dataSource);
         jdbc.execute("DROP ALL OBJECTS");
         createSchema();
-        properties = new KnowledgeProperties();
+        properties = KnowledgePropertiesTestSupport.properties();
         properties.setStorageRoot(storageRoot);
         properties.getEmbeddingCache().setEnabled(false);
         properties.getIngestion().setInitialRetryDelay(Duration.ofMillis(1));

@@ -2,6 +2,7 @@ package ai.nomoclaw.bot.knowledge.app;
 
 import ai.nomoclaw.bot.knowledge.bm25.LexicalSearchStore;
 import ai.nomoclaw.bot.knowledge.config.KnowledgeProperties;
+import ai.nomoclaw.bot.knowledge.config.KnowledgePropertiesTestSupport;
 import ai.nomoclaw.bot.knowledge.ingestion.DocumentChunker;
 import ai.nomoclaw.bot.knowledge.ingestion.DocumentParser;
 import ai.nomoclaw.bot.knowledge.ingestion.EmbeddingProvider;
@@ -40,7 +41,7 @@ class KnowledgeUploadServiceTest {
         jdbc = new JdbcTemplate(dataSource);
         jdbc.execute("DROP ALL OBJECTS");
         createSchema();
-        KnowledgeProperties properties = new KnowledgeProperties();
+        KnowledgeProperties properties = KnowledgePropertiesTestSupport.properties();
         properties.setStorageRoot(storageRoot);
         TransactionTemplate transactions = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
         DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();

@@ -1,6 +1,7 @@
 package ai.nomoclaw.bot.knowledge.bm25;
 
 import ai.nomoclaw.bot.knowledge.config.KnowledgeProperties;
+import ai.nomoclaw.bot.knowledge.config.KnowledgePropertiesTestSupport;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -18,7 +19,7 @@ class LuceneBm25StoreTest {
 
     @Test
     void shouldIndexChineseContentFilterByKnowledgeBaseAndDeleteDocument() {
-        KnowledgeProperties properties = new KnowledgeProperties();
+        KnowledgeProperties properties = KnowledgePropertiesTestSupport.properties();
         properties.setStorageRoot(temporaryDirectory);
         properties.getRetrieval().getBm25().setIndexPath(temporaryDirectory.resolve("bm25"));
         LuceneBm25Store store = new LuceneBm25Store(properties);
@@ -47,7 +48,7 @@ class LuceneBm25StoreTest {
         Path indexFile = temporaryDirectory.resolve("bm25-file");
         Files.writeString(indexFile, "occupied");
 
-        KnowledgeProperties properties = new KnowledgeProperties();
+        KnowledgeProperties properties = KnowledgePropertiesTestSupport.properties();
         properties.setStorageRoot(temporaryDirectory);
         properties.getRetrieval().getBm25().setIndexPath(indexFile);
 

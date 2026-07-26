@@ -1,6 +1,7 @@
 package ai.nomoclaw.bot.knowledge.rerank;
 
 import ai.nomoclaw.bot.knowledge.config.KnowledgeProperties;
+import ai.nomoclaw.bot.knowledge.config.KnowledgePropertiesTestSupport;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -15,7 +16,7 @@ class LangChain4jOnnxRerankerTest {
 
     @Test
     void warmupDoesNotLoadModelWhenDisabled() throws Exception {
-        KnowledgeProperties properties = new KnowledgeProperties();
+        KnowledgeProperties properties = KnowledgePropertiesTestSupport.properties();
         Path model = tempDir.resolve("model.onnx");
         Path tokenizer = tempDir.resolve("tokenizer.json");
         Files.writeString(model, "not a real model");

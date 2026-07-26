@@ -1,6 +1,7 @@
 package ai.nomoclaw.bot.knowledge.app;
 
 import ai.nomoclaw.bot.knowledge.config.KnowledgeProperties;
+import ai.nomoclaw.bot.knowledge.config.KnowledgePropertiesTestSupport;
 import org.h2.jdbcx.JdbcDataSource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,7 +40,7 @@ class KnowledgeIngestionDispatcherTest {
                 + "started_time TIMESTAMP(3), finished_time TIMESTAMP(3), updated_time TIMESTAMP(3) NOT NULL)");
         jdbc.execute("CREATE TABLE knowledge_document (document_uid VARCHAR(64) PRIMARY KEY, status VARCHAR(32) NOT NULL, "
                 + "failure_code VARCHAR(64) NOT NULL DEFAULT '', failure_message VARCHAR(1000), updated_time TIMESTAMP(3) NOT NULL)");
-        properties = new KnowledgeProperties();
+        properties = KnowledgePropertiesTestSupport.properties();
         properties.getIngestion().setWorkerCount(2);
         properties.getIngestion().setLeaseSeconds(30);
         properties.getIngestion().setDispatchInterval(Duration.ofMillis(20));

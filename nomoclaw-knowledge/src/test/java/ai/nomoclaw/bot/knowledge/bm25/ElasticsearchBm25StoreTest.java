@@ -4,6 +4,7 @@ import ai.nomoclaw.bot.knowledge.bm25.ElasticsearchBm25Client.IndexDocument;
 import ai.nomoclaw.bot.knowledge.bm25.ElasticsearchBm25Client.QuerySpec;
 import ai.nomoclaw.bot.knowledge.bm25.ElasticsearchBm25Client.SearchDocumentHit;
 import ai.nomoclaw.bot.knowledge.config.KnowledgeProperties;
+import ai.nomoclaw.bot.knowledge.config.KnowledgePropertiesTestSupport;
 import org.junit.jupiter.api.Test;
 
 import java.util.Iterator;
@@ -49,7 +50,7 @@ class ElasticsearchBm25StoreTest {
     }
 
     private KnowledgeProperties properties() {
-        KnowledgeProperties properties = new KnowledgeProperties();
+        KnowledgeProperties properties = KnowledgePropertiesTestSupport.properties();
         properties.getRetrieval().getBm25().setBackend("elasticsearch");
         properties.getRetrieval().getBm25().setEnabled(true);
         properties.getRetrieval().getBm25().getElasticsearch().setIndexName("bm25_test");

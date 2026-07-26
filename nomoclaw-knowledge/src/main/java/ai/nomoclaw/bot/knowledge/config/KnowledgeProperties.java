@@ -10,7 +10,7 @@ import java.time.Duration;
  */
 @ConfigurationProperties(prefix = "knowledge")
 public class KnowledgeProperties {
-    private boolean enabled = true;
+    private boolean enabled;
     private Path storageRoot;
     private final Upload upload = new Upload();
     private final Ingestion ingestion = new Ingestion();
@@ -60,7 +60,7 @@ public class KnowledgeProperties {
     }
 
     public static class Upload {
-        private int maxFilesPerRequest = 20;
+        private int maxFilesPerRequest;
 
         public int getMaxFilesPerRequest() {
             return maxFilesPerRequest;
@@ -72,13 +72,13 @@ public class KnowledgeProperties {
     }
 
     public static class Ingestion {
-        private int workerCount = 2;
-        private int leaseSeconds = 300;
-        private Duration dispatchInterval = Duration.ofSeconds(1);
-        private Duration initialRetryDelay = Duration.ofSeconds(5);
-        private Duration maxRetryDelay = Duration.ofMinutes(5);
-        private int maxAttempts = 3;
-        private int embeddingBatchSize = 32;
+        private int workerCount;
+        private int leaseSeconds;
+        private Duration dispatchInterval;
+        private Duration initialRetryDelay;
+        private Duration maxRetryDelay;
+        private int maxAttempts;
+        private int embeddingBatchSize;
 
         public int getWorkerCount() {
             return workerCount;
@@ -138,8 +138,8 @@ public class KnowledgeProperties {
     }
 
     public static class Chunking {
-        private int defaultSizeTokens = 500;
-        private int defaultOverlapTokens = 80;
+        private int defaultSizeTokens;
+        private int defaultOverlapTokens;
 
         public int getDefaultSizeTokens() {
             return defaultSizeTokens;
@@ -159,10 +159,10 @@ public class KnowledgeProperties {
     }
 
     public static class EmbeddingCache {
-        private boolean enabled = true;
-        private int maxEntries = 100000;
-        private Duration ttl = Duration.ofDays(30);
-        private Duration cleanupInterval = Duration.ofHours(1);
+        private boolean enabled;
+        private int maxEntries;
+        private Duration ttl;
+        private Duration cleanupInterval;
 
         public boolean isEnabled() {
             return enabled;
@@ -198,10 +198,10 @@ public class KnowledgeProperties {
     }
 
     public static class Retrieval {
-        private int defaultTopK = 8;
-        private int maxContextTokens = 6000;
-        private double defaultSimilarityThreshold = .35;
-        private int maxChunksPerDocument = 3;
+        private int defaultTopK;
+        private int maxContextTokens;
+        private double defaultSimilarityThreshold;
+        private int maxChunksPerDocument;
         private final Bm25 bm25 = new Bm25();
         private final Rerank rerank = new Rerank();
 
@@ -247,11 +247,11 @@ public class KnowledgeProperties {
     }
 
     public static class Bm25 {
-        private boolean enabled = true;
-        private String backend = "elasticsearch";
+        private boolean enabled;
+        private String backend;
         private Path indexPath;
-        private int candidateLimit = 40;
-        private int rrfK = 60;
+        private int candidateLimit;
+        private int rrfK;
         private final Elasticsearch elasticsearch = new Elasticsearch();
 
         public boolean isEnabled() {
@@ -300,10 +300,10 @@ public class KnowledgeProperties {
     }
 
     public static class Elasticsearch {
-        private String url = "http://127.0.0.1:9200";
-        private String apiKey = "";
-        private Duration timeout = Duration.ofSeconds(10);
-        private String indexName = "nomoclaw_knowledge_bm25";
+        private String url;
+        private String apiKey;
+        private Duration timeout;
+        private String indexName;
 
         public String getUrl() {
             return url;
@@ -341,11 +341,11 @@ public class KnowledgeProperties {
     public static class Rerank {
         private boolean enabled;
         private boolean warmupEnabled;
-        private String provider = "onnx";
+        private String provider;
         private Path modelPath;
         private Path tokenizerPath;
-        private int candidateLimit = 50;
-        private Duration timeout = Duration.ofSeconds(15);
+        private int candidateLimit;
+        private Duration timeout;
 
         public boolean isEnabled() {
             return enabled;
@@ -413,9 +413,9 @@ public class KnowledgeProperties {
     }
 
     public static class Qdrant {
-        private String url = "http://127.0.0.1:6333";
-        private String apiKey = "";
-        private Duration timeout = Duration.ofSeconds(10);
+        private String url;
+        private String apiKey;
+        private Duration timeout;
 
         public String getUrl() {
             return url;
