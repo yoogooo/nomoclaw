@@ -39,7 +39,7 @@ function resolveApis(): DiscreteApis {
   const apis = createDiscreteApi(["message", "dialog", "notification"], {
     messageProviderProps: {
       placement: "top",
-      duration: 2200,
+      duration: 3500,
       max: 3
     },
     notificationProviderProps: {
