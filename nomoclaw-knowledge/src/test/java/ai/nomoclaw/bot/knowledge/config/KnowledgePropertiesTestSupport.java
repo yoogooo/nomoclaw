@@ -32,6 +32,7 @@ public final class KnowledgePropertiesTestSupport {
         properties.getRetrieval().setMaxChunksPerDocument(3);
         properties.getRetrieval().getBm25().setEnabled(true);
         properties.getRetrieval().getBm25().setBackend("elasticsearch");
+        properties.getRetrieval().getBm25().setStartupRebuildEnabled(false);
         properties.getRetrieval().getBm25().setCandidateLimit(40);
         properties.getRetrieval().getBm25().setRrfK(60);
         properties.getRetrieval().getBm25().getElasticsearch().setUrl("http://127.0.0.1:9200");

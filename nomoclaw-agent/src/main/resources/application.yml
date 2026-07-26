@@ -161,6 +161,7 @@ knowledge:
       enabled: true
       backend: elasticsearch
       index-path: "${NOMOCLAW_ROOT_DIR:${user.home}/.nomoclaw}/knowledge/bm25"
+      startup-rebuild-enabled: false
       candidate-limit: 40
       rrf-k: 60
       elasticsearch:

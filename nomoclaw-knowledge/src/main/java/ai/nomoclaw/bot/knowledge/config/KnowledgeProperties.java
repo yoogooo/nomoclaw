@@ -250,6 +250,7 @@ public class KnowledgeProperties {
         private boolean enabled;
         private String backend;
         private Path indexPath;
+        private boolean startupRebuildEnabled;
         private int candidateLimit;
         private int rrfK;
         private final Elasticsearch elasticsearch = new Elasticsearch();
@@ -276,6 +277,14 @@ public class KnowledgeProperties {
 
         public void setIndexPath(Path value) {
             indexPath = value;
+        }
+
+        public boolean isStartupRebuildEnabled() {
+            return startupRebuildEnabled;
+        }
+
+        public void setStartupRebuildEnabled(boolean value) {
+            startupRebuildEnabled = value;
         }
 
         public int getCandidateLimit() {

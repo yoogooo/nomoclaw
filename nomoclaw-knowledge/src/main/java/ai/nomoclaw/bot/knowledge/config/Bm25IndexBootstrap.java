@@ -26,20 +26,26 @@ public class Bm25IndexBootstrap implements ApplicationRunner {
     private final KnowledgeBaseRepository knowledgeBaseRepository;
     private final KnowledgeDocumentRepository documentRepository;
     private final KnowledgeChunkRepository chunkRepository;
+    private final KnowledgeProperties properties;
     private final Executor executor;
 
     public Bm25IndexBootstrap(LexicalSearchStore lexicalSearchStore, KnowledgeBaseRepository knowledgeBaseRepository,
                               KnowledgeDocumentRepository documentRepository, KnowledgeChunkRepository chunkRepository,
-                              @Qualifier("knowledgeIngestionExecutor") Executor executor) {
+                              KnowledgeProperties properties, @Qualifier("knowledgeIngestionExecutor") Executor executor) {
         this.lexicalSearchStore = lexicalSearchStore;
         this.knowledgeBaseRepository = knowledgeBaseRepository;
         this.documentRepository = documentRepository;
         this.chunkRepository = chunkRepository;
+        this.properties = properties;
         this.executor = executor;
     }
 
     @Override
     public void run(ApplicationArguments args) {
+        if (!properties.getRetrieval().getBm25().isStartupRebuildEnabled()) {
+            log.info("[KnowledgeSearch][BM25] startup rebuild skipped");
+            return;
+        }
         if (!lexicalSearchStore.available()) return;
         executor.execute(this::rebuild);
     }
