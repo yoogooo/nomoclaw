@@ -25,6 +25,13 @@ public final class KnowledgePropertiesTestSupport {
         properties.getParsing().getPdf().getPreprocessing().setMaxHeaderLines(2);
         properties.getParsing().getPdf().getPreprocessing().setMaxFooterLines(2);
         properties.getParsing().getPdf().getPreprocessing().setRepeatedLineThresholdRatio(.5);
+        properties.getParsing().getPdf().getPreprocessing().setWatermarkRepeatedThresholdRatio(.5);
+        properties.getParsing().getPdf().getPreprocessing().setWatermarkCenterRegionRatio(.65);
+        properties.getParsing().getPdf().getPreprocessing().setWatermarkMinTextLength(2);
+        properties.getParsing().getPdf().getPreprocessing().setWatermarkMaxTextLength(80);
+        properties.getParsing().getPdf().getPreprocessing().setWatermarkRotationThresholdDegrees(10);
+        properties.getParsing().getPdf().getPreprocessing().setWatermarkMinFontSize(18);
+        properties.getParsing().getPdf().getPreprocessing().setWatermarkNormalizeSpacing(true);
         properties.getEmbeddingCache().setEnabled(true);
         properties.getEmbeddingCache().setMaxEntries(100000);
         properties.getEmbeddingCache().setTtl(Duration.ofDays(30));

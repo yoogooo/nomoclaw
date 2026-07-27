@@ -74,6 +74,68 @@ class DefaultDocumentParserTest {
     }
 
     @Test
+    void removesRepeatedCenteredTextWatermarkAutomatically() throws Exception {
+        Path file = directory.resolve("watermarked.pdf");
+        writeWatermarkedPdf(file, true);
+        DefaultDocumentParser parser = new DefaultDocumentParser(KnowledgePropertiesTestSupport.properties());
+
+        DocumentParser.ParsedDocument parsed = parser.parse(file, new DocumentParser.PreprocessingOptions(true,
+                new DocumentParser.PdfPreprocessingOptions(false, false, true)), (processed, total) -> {
+        });
+        String text = parsed.pages().stream().map(DocumentParser.Page::text).reduce("", String::concat);
+
+        assertFalse(text.contains("DRAFT WATERMARK"));
+        assertTrue(text.contains("Meal allowance policy"));
+        assertTrue(text.contains("Attendance policy"));
+        assertTrue(parsed.warnings().contains("PDF_PREPROCESSING_APPLIED"));
+    }
+
+    @Test
+    void keepsSingleOccurrenceTextWhenWatermarkRemovalIsEnabled() throws Exception {
+        Path file = directory.resolve("single-watermark-like-text.pdf");
+        writeWatermarkedPdf(file, false);
+        DefaultDocumentParser parser = new DefaultDocumentParser(KnowledgePropertiesTestSupport.properties());
+
+        DocumentParser.ParsedDocument parsed = parser.parse(file, new DocumentParser.PreprocessingOptions(true,
+                new DocumentParser.PdfPreprocessingOptions(false, false, true)), (processed, total) -> {
+        });
+        String text = parsed.pages().stream().map(DocumentParser.Page::text).reduce("", String::concat);
+
+        assertTrue(text.contains("DRAFT WATERMARK"));
+        assertTrue(text.contains("Attendance policy"));
+    }
+
+    @Test
+    void keepsDetectedWatermarkWhenWatermarkRemovalIsDisabled() throws Exception {
+        Path file = directory.resolve("watermark-disabled.pdf");
+        writeWatermarkedPdf(file, true);
+        DefaultDocumentParser parser = new DefaultDocumentParser(KnowledgePropertiesTestSupport.properties());
+
+        DocumentParser.ParsedDocument parsed = parser.parse(file, new DocumentParser.PreprocessingOptions(true,
+                new DocumentParser.PdfPreprocessingOptions(true, true, false)), (processed, total) -> {
+        });
+        String text = parsed.pages().stream().map(DocumentParser.Page::text).reduce("", String::concat);
+
+        assertTrue(text.contains("DRAFT WATERMARK"));
+    }
+
+    @Test
+    void removesHeaderAndFooterWithoutRemovingWatermark() throws Exception {
+        Path file = directory.resolve("header-footer-only.pdf");
+        writeWatermarkedPdf(file, true);
+        DefaultDocumentParser parser = new DefaultDocumentParser(KnowledgePropertiesTestSupport.properties());
+
+        DocumentParser.ParsedDocument parsed = parser.parse(file, new DocumentParser.PreprocessingOptions(true,
+                new DocumentParser.PdfPreprocessingOptions(true, true, false)), (processed, total) -> {
+        });
+        String text = parsed.pages().stream().map(DocumentParser.Page::text).reduce("", String::concat);
+
+        assertFalse(text.contains("Company Handbook"));
+        assertFalse(text.contains("Internal Use Only"));
+        assertTrue(text.contains("DRAFT WATERMARK"));
+    }
+
+    @Test
     void estimatesCjkAndLatinRunsDifferently() {
         UnicodeTokenEstimator estimator = new UnicodeTokenEstimator();
 
@@ -104,6 +166,37 @@ class DefaultDocumentParserTest {
             content.newLineAtOffset(0, -420);
             content.showText("Internal Use Only");
             content.endText();
+        }
+    }
+
+    private void writeWatermarkedPdf(Path file, boolean repeatedWatermark) throws Exception {
+        try (PDDocument document = new PDDocument()) {
+            addWatermarkedPage(document, "Meal allowance policy", true);
+            addWatermarkedPage(document, "Attendance policy", repeatedWatermark);
+            document.save(file.toFile());
+        }
+    }
+
+    private void addWatermarkedPage(PDDocument document, String body, boolean watermark) throws Exception {
+        PDPage page = new PDPage();
+        document.addPage(page);
+        try (PDPageContentStream content = new PDPageContentStream(document, page)) {
+            content.beginText();
+            content.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 12);
+            content.newLineAtOffset(50, 750);
+            content.showText("Company Handbook");
+            content.newLineAtOffset(0, -100);
+            content.showText(body);
+            content.newLineAtOffset(0, -470);
+            content.showText("Internal Use Only");
+            content.endText();
+            if (watermark) {
+                content.beginText();
+                content.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 28);
+                content.newLineAtOffset(170, 390);
+                content.showText("DRAFT WATERMARK");
+                content.endText();
+            }
         }
     }
 }

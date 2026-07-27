@@ -185,6 +185,13 @@ public class KnowledgeProperties {
         private int maxHeaderLines;
         private int maxFooterLines;
         private double repeatedLineThresholdRatio;
+        private double watermarkRepeatedThresholdRatio;
+        private double watermarkCenterRegionRatio;
+        private int watermarkMinTextLength;
+        private int watermarkMaxTextLength;
+        private double watermarkRotationThresholdDegrees;
+        private double watermarkMinFontSize;
+        private boolean watermarkNormalizeSpacing;
         private List<String> headerLines = new ArrayList<>();
         private List<String> footerLines = new ArrayList<>();
         private List<String> watermarkLines = new ArrayList<>();
@@ -211,6 +218,62 @@ public class KnowledgeProperties {
 
         public void setRepeatedLineThresholdRatio(double value) {
             repeatedLineThresholdRatio = value;
+        }
+
+        public double getWatermarkRepeatedThresholdRatio() {
+            return watermarkRepeatedThresholdRatio;
+        }
+
+        public void setWatermarkRepeatedThresholdRatio(double value) {
+            watermarkRepeatedThresholdRatio = value;
+        }
+
+        public double getWatermarkCenterRegionRatio() {
+            return watermarkCenterRegionRatio;
+        }
+
+        public void setWatermarkCenterRegionRatio(double value) {
+            watermarkCenterRegionRatio = value;
+        }
+
+        public int getWatermarkMinTextLength() {
+            return watermarkMinTextLength;
+        }
+
+        public void setWatermarkMinTextLength(int value) {
+            watermarkMinTextLength = value;
+        }
+
+        public int getWatermarkMaxTextLength() {
+            return watermarkMaxTextLength;
+        }
+
+        public void setWatermarkMaxTextLength(int value) {
+            watermarkMaxTextLength = value;
+        }
+
+        public double getWatermarkRotationThresholdDegrees() {
+            return watermarkRotationThresholdDegrees;
+        }
+
+        public void setWatermarkRotationThresholdDegrees(double value) {
+            watermarkRotationThresholdDegrees = value;
+        }
+
+        public double getWatermarkMinFontSize() {
+            return watermarkMinFontSize;
+        }
+
+        public void setWatermarkMinFontSize(double value) {
+            watermarkMinFontSize = value;
+        }
+
+        public boolean isWatermarkNormalizeSpacing() {
+            return watermarkNormalizeSpacing;
+        }
+
+        public void setWatermarkNormalizeSpacing(boolean value) {
+            watermarkNormalizeSpacing = value;
         }
 
         public List<String> getHeaderLines() {

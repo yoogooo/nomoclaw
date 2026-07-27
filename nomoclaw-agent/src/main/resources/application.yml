@@ -153,6 +153,13 @@ knowledge:
         max-header-lines: 2
         max-footer-lines: 2
         repeated-line-threshold-ratio: 0.5
+        watermark-repeated-threshold-ratio: 0.5
+        watermark-center-region-ratio: 0.65
+        watermark-min-text-length: 2
+        watermark-max-text-length: 80
+        watermark-rotation-threshold-degrees: 10
+        watermark-min-font-size: 18
+        watermark-normalize-spacing: true
         header-lines: []
         footer-lines: []
         watermark-lines: []
