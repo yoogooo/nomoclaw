@@ -147,6 +147,15 @@ knowledge:
   chunking:
     default-size-tokens: 500
     default-overlap-tokens: 80
+  parsing:
+    pdf:
+      preprocessing:
+        max-header-lines: 2
+        max-footer-lines: 2
+        repeated-line-threshold-ratio: 0.5
+        header-lines: []
+        footer-lines: []
+        watermark-lines: []
   embedding-cache:
     enabled: true
     max-entries: 100000

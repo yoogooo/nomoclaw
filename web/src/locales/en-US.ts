@@ -1071,7 +1071,8 @@ const enUS = {
       documentStatuses: { UPLOADED: "Awaiting build", awaitingBuild: "Waiting for build configuration" },
       actions: { configureBuild: "Configure and build", reindex: "Rebuild index", more: "More actions" },
       parseWarnings: {
-        PARTIAL_TEXT_EXTRACTION: "Some PDF pages have no text layer. OCR is not available in this phase, so those pages were not indexed."
+        PARTIAL_TEXT_EXTRACTION: "Some PDF pages have no text layer. OCR is not available in this phase, so those pages were not indexed.",
+        PDF_PREPROCESSING_APPLIED: "PDF preprocessing was applied."
       },
       jobStatuses: {
         PENDING: "Pending",
@@ -1109,8 +1110,9 @@ const enUS = {
         steps: { files: "Choose files", config: "Processing settings", confirm: "Review and start", build: "Processing progress" },
         files: { title: "Choose documents to upload", description: "Add the files to process and review the list before continuing.", add: "Add files", empty: "No files selected yet", skippedTitle: "Some files were not added" },
         config: { title: "Choose processing settings", description: "All files use the same content parsing and segmentation settings.", ocrTitle: "Scanned PDF notice", ocrDescription: "OCR is not included in this phase. Scanned PDFs without a text layer will report OCR_REQUIRED.", advanced: "Advanced settings", chunkSize: "Segment size (tokens)", overlap: "Context overlap (tokens)", invalid: "Invalid segmentation settings: size must be 100–2000 and overlap cannot exceed half of the segment size." },
+        preprocessing: { enabled: "Enable PDF preprocessing", pdfHeader: "Remove headers", pdfFooter: "Remove footers", pdfWatermark: "Remove watermarks" },
         presets: { precise: "Precise", balanced: "Balanced (recommended)", context: "Long context" },
-        confirm: { title: "Review upload and processing", files: "Files to process", chunking: "Segment / overlap" },
+        confirm: { title: "Review upload and processing", files: "Files to process", chunking: "Segment / overlap", preprocessing: "PDF preprocessing" },
         pipeline: { parse: "Structured parsing", chunk: "Document chunking" },
         progress: { title: "Processing documents", completed: "Document processing completed" },
         itemStatuses: { UPLOADED: "Awaiting build", BUILDING: "Building", READY: "Completed", FAILED: "Failed", SKIPPED: "Skipped", REJECTED: "Rejected", CANCELLED: "Cancelled", REMOVED: "Removed" },

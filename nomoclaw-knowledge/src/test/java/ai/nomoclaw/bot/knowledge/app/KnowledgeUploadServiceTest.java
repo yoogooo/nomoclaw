@@ -3,6 +3,7 @@ package ai.nomoclaw.bot.knowledge.app;
 import ai.nomoclaw.bot.knowledge.bm25.LexicalSearchStore;
 import ai.nomoclaw.bot.knowledge.config.KnowledgeProperties;
 import ai.nomoclaw.bot.knowledge.config.KnowledgePropertiesTestSupport;
+import ai.nomoclaw.bot.knowledge.core.repository.KnowledgePersistenceRepository;
 import ai.nomoclaw.bot.knowledge.ingestion.DocumentChunker;
 import ai.nomoclaw.bot.knowledge.ingestion.DocumentParser;
 import ai.nomoclaw.bot.knowledge.ingestion.EmbeddingProvider;
@@ -15,9 +16,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.file.Path;
@@ -31,27 +34,27 @@ class KnowledgeUploadServiceTest {
     @TempDir
     Path storageRoot;
 
-    private JdbcTemplate jdbc;
+    private KnowledgePersistenceRepository persistence;
     private KnowledgeService service;
 
     @BeforeEach
     void setUp() {
         JdbcDataSource dataSource = new JdbcDataSource();
         dataSource.setURL("jdbc:h2:mem:knowledge-upload;MODE=MySQL;DB_CLOSE_DELAY=-1");
-        jdbc = new JdbcTemplate(dataSource);
-        jdbc.execute("DROP ALL OBJECTS");
+        persistence = new KnowledgePersistenceRepository(dataSource);
+        persistence.execute("DROP ALL OBJECTS");
         createSchema();
         KnowledgeProperties properties = KnowledgePropertiesTestSupport.properties();
         properties.setStorageRoot(storageRoot);
-        TransactionTemplate transactions = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
+        TransactionTemplate transactions = new TransactionTemplate(new NoopTransactionManager());
         DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
         KnowledgeIngestionMetrics metrics = new KnowledgeIngestionMetrics(
                 beanFactory.getBeanProvider(MeterRegistry.class));
-        service = new KnowledgeService(jdbc, transactions, properties, new TextParser(), new EmptyChunker(),
+        service = new KnowledgeService(persistence, transactions, properties, new TextParser(), new EmptyChunker(),
                 new EmptyEmbeddingProvider(), new EmptyVectorStore(), Runnable::run, null, null,
                 new EmptyLexicalStore(), new NoopReranker(), metrics);
         LocalDateTime now = LocalDateTime.now();
-        jdbc.update("INSERT INTO knowledge_base(knowledge_base_uid,name,description,status,embedding_provider_id,"
+        persistence.update("INSERT INTO knowledge_base(knowledge_base_uid,name,description,status,embedding_provider_id,"
                         + "embedding_model_id,embedding_dimension,vector_collection_name,chunk_size_tokens,chunk_overlap_tokens,"
                         + "retrieval_top_k,similarity_threshold,document_count,chunk_count,created_time,updated_time) "
                         + "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -70,9 +73,9 @@ class KnowledgeUploadServiceTest {
         assertEquals(List.of("ACCEPTED", "DUPLICATE", "REJECTED"),
                 result.items().stream().map(KnowledgeModels.UploadFileResult::outcome).toList());
         assertEquals(2, result.documents().size());
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM knowledge_document", Integer.class));
-        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM knowledge_ingestion_job", Integer.class));
-        assertEquals("DRAFT", jdbc.queryForObject(
+        assertEquals(1, persistence.queryForObject("SELECT COUNT(*) FROM knowledge_document", Integer.class));
+        assertEquals(0, persistence.queryForObject("SELECT COUNT(*) FROM knowledge_ingestion_job", Integer.class));
+        assertEquals("DRAFT", persistence.queryForObject(
                 "SELECT status FROM knowledge_import_batch WHERE batch_uid=?", String.class, result.batchUid()));
     }
 
@@ -82,8 +85,8 @@ class KnowledgeUploadServiceTest {
 
         assertEquals("DRAFT", batch.status());
         assertEquals(List.of(), batch.items());
-        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM knowledge_document", Integer.class));
-        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM knowledge_ingestion_job", Integer.class));
+        assertEquals(0, persistence.queryForObject("SELECT COUNT(*) FROM knowledge_document", Integer.class));
+        assertEquals(0, persistence.queryForObject("SELECT COUNT(*) FROM knowledge_ingestion_job", Integer.class));
     }
 
     @Test
@@ -91,7 +94,7 @@ class KnowledgeUploadServiceTest {
         KnowledgeModels.UploadResult upload = service.upload("kb_test", List.of(
                 new MockMultipartFile("files", "a.txt", "text/plain", "content".getBytes())));
 
-        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM knowledge_document_version", Integer.class));
+        assertEquals(0, persistence.queryForObject("SELECT COUNT(*) FROM knowledge_document_version", Integer.class));
         KnowledgeModels.ImportBatch first = service.buildImportBatch("kb_test", upload.batchUid(),
                 new KnowledgeModels.BuildRequest("STRUCTURED", 500, 80));
         KnowledgeModels.ImportBatch repeated = service.buildImportBatch("kb_test", upload.batchUid(),
@@ -99,36 +102,37 @@ class KnowledgeUploadServiceTest {
 
         assertEquals("BUILDING", first.status());
         assertEquals(first.batchUid(), repeated.batchUid());
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM knowledge_document_version", Integer.class));
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM knowledge_ingestion_job", Integer.class));
+        assertEquals(1, persistence.queryForObject("SELECT COUNT(*) FROM knowledge_document_version", Integer.class));
+        assertEquals(1, persistence.queryForObject("SELECT COUNT(*) FROM knowledge_ingestion_job", Integer.class));
         assertThrows(Exception.class, () -> service.buildImportBatch("kb_test", upload.batchUid(),
                 new KnowledgeModels.BuildRequest("STRUCTURED", 800, 120)));
     }
 
     private void createSchema() {
-        jdbc.execute("CREATE TABLE knowledge_base (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, knowledge_base_uid VARCHAR(64) UNIQUE, "
+        persistence.execute("CREATE TABLE knowledge_base (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, knowledge_base_uid VARCHAR(64) UNIQUE, "
                 + "name VARCHAR(255), description VARCHAR(1000), status VARCHAR(32), embedding_provider_id VARCHAR(64), embedding_model_id VARCHAR(128), "
                 + "embedding_dimension INT, vector_collection_name VARCHAR(128), chunk_size_tokens INT, chunk_overlap_tokens INT, retrieval_top_k INT, "
                 + "similarity_threshold DOUBLE, document_count INT, chunk_count BIGINT, created_time TIMESTAMP, updated_time TIMESTAMP)");
-        jdbc.execute("CREATE TABLE knowledge_document (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, document_uid VARCHAR(64) UNIQUE, "
+        persistence.execute("CREATE TABLE knowledge_document (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, document_uid VARCHAR(64) UNIQUE, "
                 + "knowledge_base_uid VARCHAR(64), display_name VARCHAR(255), source_type VARCHAR(32), original_file_name VARCHAR(255), content_type VARCHAR(128), "
                 + "file_path VARCHAR(1024), size_bytes BIGINT, checksum_sha256 VARCHAR(64), current_version_uid VARCHAR(64), status VARCHAR(32), "
                 + "failure_code VARCHAR(64), failure_message VARCHAR(1000), page_count INT, chunk_count INT, created_time TIMESTAMP, updated_time TIMESTAMP, "
                 + "CONSTRAINT uk_doc_checksum UNIQUE(knowledge_base_uid, checksum_sha256))");
-        jdbc.execute("CREATE TABLE knowledge_document_version (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, document_version_uid VARCHAR(64) UNIQUE, "
+        persistence.execute("CREATE TABLE knowledge_document_version (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, document_version_uid VARCHAR(64) UNIQUE, "
                 + "document_uid VARCHAR(64), version_no INT, checksum_sha256 VARCHAR(64), parser_version VARCHAR(32), chunker_version VARCHAR(32), "
                 + "parser_mode VARCHAR(32), chunk_size_tokens INT, chunk_overlap_tokens INT, build_mode VARCHAR(16), embedding_provider_id VARCHAR(64), "
-                + "embedding_model_id VARCHAR(128), embedding_dimension INT, embedding_model_fingerprint VARCHAR(255), parse_warnings VARCHAR(1000), status VARCHAR(32), created_time TIMESTAMP)");
-        jdbc.execute("CREATE TABLE knowledge_ingestion_job (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, job_uid VARCHAR(64) UNIQUE, "
+                + "embedding_model_id VARCHAR(128), embedding_dimension INT, embedding_model_fingerprint VARCHAR(255), preprocessing_config VARCHAR(1000), "
+                + "parse_warnings VARCHAR(1000), status VARCHAR(32), created_time TIMESTAMP)");
+        persistence.execute("CREATE TABLE knowledge_ingestion_job (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, job_uid VARCHAR(64) UNIQUE, "
                 + "knowledge_base_uid VARCHAR(64), document_uid VARCHAR(64), document_version_uid VARCHAR(64), status VARCHAR(32), stage VARCHAR(32), "
                 + "progress_percent INT, total_chunks INT, processed_chunks INT, processed_pages INT, total_pages INT, cache_hit_chunks INT, cache_miss_chunks INT, attempt_count INT, failure_code VARCHAR(64), failure_message VARCHAR(1000), "
                 + "worker_id VARCHAR(128), lease_token VARCHAR(64), lease_until TIMESTAMP, last_heartbeat_time TIMESTAMP, next_retry_time TIMESTAMP, "
                 + "retryable INT, started_time TIMESTAMP, finished_time TIMESTAMP, created_time TIMESTAMP, updated_time TIMESTAMP)");
-        jdbc.execute("CREATE TABLE knowledge_import_batch (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, batch_uid VARCHAR(64) UNIQUE, "
+        persistence.execute("CREATE TABLE knowledge_import_batch (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, batch_uid VARCHAR(64) UNIQUE, "
                 + "knowledge_base_uid VARCHAR(64), status VARCHAR(32), parser_mode VARCHAR(32), chunk_size_tokens INT, chunk_overlap_tokens INT, "
                 + "embedding_provider_id VARCHAR(64), embedding_model_id VARCHAR(128), embedding_dimension INT, embedding_model_fingerprint VARCHAR(512), "
-                + "config_hash VARCHAR(64), created_time TIMESTAMP, updated_time TIMESTAMP)");
-        jdbc.execute("CREATE TABLE knowledge_import_item (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, item_uid VARCHAR(64) UNIQUE, "
+                + "preprocessing_config VARCHAR(1000), config_hash VARCHAR(64), created_time TIMESTAMP, updated_time TIMESTAMP)");
+        persistence.execute("CREATE TABLE knowledge_import_item (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, item_uid VARCHAR(64) UNIQUE, "
                 + "batch_uid VARCHAR(64), document_uid VARCHAR(64), document_version_uid VARCHAR(64), original_file_name VARCHAR(255), mode VARCHAR(16), "
                 + "outcome VARCHAR(16), status VARCHAR(32), error_code VARCHAR(64), error_message VARCHAR(1000), created_time TIMESTAMP, updated_time TIMESTAMP)");
     }
@@ -175,5 +179,20 @@ class KnowledgeUploadServiceTest {
         @Override public void deleteByKnowledgeBase(String knowledgeBaseUid) { }
         @Override public void clear() { }
         @Override public boolean available() { return false; }
+    }
+
+    private static final class NoopTransactionManager implements PlatformTransactionManager {
+        @Override
+        public TransactionStatus getTransaction(TransactionDefinition definition) {
+            return new SimpleTransactionStatus();
+        }
+
+        @Override
+        public void commit(TransactionStatus status) {
+        }
+
+        @Override
+        public void rollback(TransactionStatus status) {
+        }
     }
 }

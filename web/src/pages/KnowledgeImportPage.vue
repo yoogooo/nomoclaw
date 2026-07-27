@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { ArrowLeft, Check, FilePlus2, Layers3, Play, Trash2 } from "lucide-vue-next";
 import {
-  NAlert, NButton, NCard, NEmpty, NInputNumber, NProgress, NRadio, NRadioGroup,
+  NAlert, NButton, NCard, NCheckbox, NEmpty, NInputNumber, NProgress, NRadio, NRadioGroup,
   NSpin, NStep, NSteps, NTag, type TagProps
 } from "naive-ui";
 import { useI18n } from "vue-i18n";
@@ -26,7 +26,15 @@ const submitting = ref(false);
 const step = ref(1);
 const advanced = ref(false);
 const fileInput = ref<HTMLInputElement>();
-const config = reactive({ preset: "balanced", chunkSizeTokens: 500, chunkOverlapTokens: 80 });
+const config = reactive({
+  preset: "balanced",
+  chunkSizeTokens: 500,
+  chunkOverlapTokens: 80,
+  preprocessing: {
+    enabled: true,
+    pdf: { removeHeader: true, removeFooter: true, removeWatermark: true }
+  }
+});
 let pollTimer: number | undefined;
 
 const accepted = computed(() => batch.value?.items.filter(item => item.outcome === "ACCEPTED" && item.status !== "REMOVED") || []);
@@ -62,6 +70,12 @@ async function load() {
     if (batch.value.status !== "DRAFT") step.value = 4;
     config.chunkSizeTokens = batch.value.chunkSizeTokens;
     config.chunkOverlapTokens = batch.value.chunkOverlapTokens;
+    if (batch.value.preprocessing) {
+      config.preprocessing.enabled = batch.value.preprocessing.enabled;
+      config.preprocessing.pdf.removeHeader = batch.value.preprocessing.pdf.removeHeader;
+      config.preprocessing.pdf.removeFooter = batch.value.preprocessing.pdf.removeFooter;
+      config.preprocessing.pdf.removeWatermark = batch.value.preprocessing.pdf.removeWatermark;
+    }
     schedulePoll();
   } finally {
     loading.value = false;
@@ -102,7 +116,8 @@ async function startBuild() {
     batch.value = await knowledgeApi.buildImport(baseUid.value, batchUid.value, {
       parserMode: "STRUCTURED",
       chunkSizeTokens: config.chunkSizeTokens,
-      chunkOverlapTokens: config.chunkOverlapTokens
+      chunkOverlapTokens: config.chunkOverlapTokens,
+      preprocessing: config.preprocessing
     });
     step.value = 4;
     message.success(t("pages.knowledge.import.messages.started"));
@@ -172,6 +187,14 @@ onBeforeUnmount(() => { if (pollTimer) window.clearTimeout(pollTimer); });
             <NRadio value="balanced"><strong>{{ t("pages.knowledge.import.presets.balanced") }}</strong><span>500 / 80</span></NRadio>
             <NRadio value="context"><strong>{{ t("pages.knowledge.import.presets.context") }}</strong><span>800 / 120</span></NRadio>
           </NRadioGroup>
+          <div class="preprocessing-panel">
+            <NCheckbox v-model:checked="config.preprocessing.enabled">{{ t("pages.knowledge.import.preprocessing.enabled") }}</NCheckbox>
+            <div class="preprocessing-options" :class="{ disabled: !config.preprocessing.enabled }">
+              <NCheckbox v-model:checked="config.preprocessing.pdf.removeHeader" :disabled="!config.preprocessing.enabled">{{ t("pages.knowledge.import.preprocessing.pdfHeader") }}</NCheckbox>
+              <NCheckbox v-model:checked="config.preprocessing.pdf.removeFooter" :disabled="!config.preprocessing.enabled">{{ t("pages.knowledge.import.preprocessing.pdfFooter") }}</NCheckbox>
+              <NCheckbox v-model:checked="config.preprocessing.pdf.removeWatermark" :disabled="!config.preprocessing.enabled">{{ t("pages.knowledge.import.preprocessing.pdfWatermark") }}</NCheckbox>
+            </div>
+          </div>
           <NButton text type="primary" @click="advanced = !advanced">{{ t("pages.knowledge.import.config.advanced") }}</NButton>
           <div v-if="advanced" class="advanced-grid">
             <label>{{ t("pages.knowledge.import.config.chunkSize") }}<NInputNumber v-model:value="config.chunkSizeTokens" :min="100" :max="2000" /></label>
@@ -185,6 +208,7 @@ onBeforeUnmount(() => { if (pollTimer) window.clearTimeout(pollTimer); });
           <div class="confirm-grid">
             <div class="summary-panel"><span>{{ t("pages.knowledge.import.confirm.files") }}</span><strong>{{ accepted.length }}</strong></div>
             <div class="summary-panel"><span>{{ t("pages.knowledge.import.confirm.chunking") }}</span><strong>{{ config.chunkSizeTokens }} / {{ config.chunkOverlapTokens }}</strong></div>
+            <div class="summary-panel"><span>{{ t("pages.knowledge.import.confirm.preprocessing") }}</span><strong>{{ config.preprocessing.enabled ? t("common.enabled") : t("common.disabled") }}</strong></div>
             <div class="summary-panel"><span>Embedding</span><strong>{{ batch.embeddingProviderId }} · {{ batch.embeddingModelId }} · {{ batch.embeddingDimension }}</strong></div>
           </div>
           <div class="pipeline"><span><Check />{{ t("pages.knowledge.import.pipeline.parse") }}</span><span><Layers3 />{{ t("pages.knowledge.import.pipeline.chunk") }}</span><span><Play />Embedding / Qdrant / BM25</span></div>
@@ -222,5 +246,5 @@ onBeforeUnmount(() => { if (pollTimer) window.clearTimeout(pollTimer); });
 </template>
 
 <style scoped>
-.import-page{gap:var(--space-5)}.import-steps{max-width:900px;margin:0 auto;width:100%}.mobile-step{display:none}.wizard-card{max-width:1000px;margin:0 auto;min-height:420px}.section-heading,.file-row,.wizard-actions,.pipeline{display:flex;align-items:center;gap:var(--space-3)}.section-heading{justify-content:space-between}.section-heading h2,.section-heading p,.wizard-card h2{margin:0}.file-list{display:flex;flex-direction:column;margin:var(--space-4) 0}.file-row{padding:var(--space-3);border-bottom:1px solid var(--color-border-soft)}.file-row>.file-info{display:flex;min-width:0;flex:1;flex-direction:column;gap:var(--space-1)}.file-info strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.file-info>span,.progress-row>span{color:var(--color-text-muted);font-size:var(--font-size-sm)}.file-row>.outcome-tag{flex:0 0 auto;align-self:center}.file-row .item-error{color:var(--color-danger)}.preset-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--space-3);margin:var(--space-5) 0}.preset-grid :deep(.n-radio){padding:var(--space-4);border:1px solid var(--color-border-soft);border-radius:var(--radius-lg)}.preset-grid :deep(.n-radio__label){display:flex;flex-direction:column;gap:var(--space-1)}.advanced-grid,.confirm-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-4);margin:var(--space-4) 0}.advanced-grid label{display:flex;flex-direction:column;gap:var(--space-2)}.confirm-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.summary-panel{display:flex;min-height:110px;flex-direction:column;justify-content:space-between;padding:var(--space-4);border:1px solid var(--color-border-soft);border-radius:var(--radius-lg)}.pipeline{flex-wrap:wrap;margin-top:var(--space-5)}.pipeline span{display:flex;align-items:center;gap:var(--space-2)}.wizard-actions{max-width:1000px;width:100%;justify-content:flex-end;margin:0 auto}.wizard-actions>button:first-child:last-child{margin-left:auto}@media(max-width:760px){.import-steps{display:none}.mobile-step{display:block;padding:0 var(--space-2);color:var(--color-text-muted);font-size:var(--font-size-sm)}.preset-grid,.advanced-grid,.confirm-grid{grid-template-columns:1fr}.wizard-card{min-height:0}.wizard-actions{position:sticky;bottom:0;padding:var(--space-3);background:var(--color-bg-page);z-index:2}.progress-row{align-items:flex-start;flex-wrap:wrap}}
+.import-page{gap:var(--space-5)}.import-steps{max-width:900px;margin:0 auto;width:100%}.mobile-step{display:none}.wizard-card{max-width:1000px;margin:0 auto;min-height:420px}.section-heading,.file-row,.wizard-actions,.pipeline{display:flex;align-items:center;gap:var(--space-3)}.section-heading{justify-content:space-between}.section-heading h2,.section-heading p,.wizard-card h2{margin:0}.file-list{display:flex;flex-direction:column;margin:var(--space-4) 0}.file-row{padding:var(--space-3);border-bottom:1px solid var(--color-border-soft)}.file-row>.file-info{display:flex;min-width:0;flex:1;flex-direction:column;gap:var(--space-1)}.file-info strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.file-info>span,.progress-row>span{color:var(--color-text-muted);font-size:var(--font-size-sm)}.file-row>.outcome-tag{flex:0 0 auto;align-self:center}.file-row .item-error{color:var(--color-danger)}.preset-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--space-3);margin:var(--space-5) 0}.preset-grid :deep(.n-radio){padding:var(--space-4);border:1px solid var(--color-border-soft);border-radius:var(--radius-lg)}.preset-grid :deep(.n-radio__label){display:flex;flex-direction:column;gap:var(--space-1)}.preprocessing-panel{display:flex;flex-direction:column;gap:var(--space-3);padding:var(--space-4);margin-bottom:var(--space-4);border:1px solid var(--color-border-soft);border-radius:var(--radius-lg)}.preprocessing-options{display:flex;flex-wrap:wrap;gap:var(--space-4)}.preprocessing-options.disabled{opacity:.55}.advanced-grid,.confirm-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-4);margin:var(--space-4) 0}.advanced-grid label{display:flex;flex-direction:column;gap:var(--space-2)}.confirm-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.summary-panel{display:flex;min-height:110px;flex-direction:column;justify-content:space-between;padding:var(--space-4);border:1px solid var(--color-border-soft);border-radius:var(--radius-lg)}.pipeline{flex-wrap:wrap;margin-top:var(--space-5)}.pipeline span{display:flex;align-items:center;gap:var(--space-2)}.wizard-actions{max-width:1000px;width:100%;justify-content:flex-end;margin:0 auto}.wizard-actions>button:first-child:last-child{margin-left:auto}@media(max-width:760px){.import-steps{display:none}.mobile-step{display:block;padding:0 var(--space-2);color:var(--color-text-muted);font-size:var(--font-size-sm)}.preset-grid,.advanced-grid,.confirm-grid{grid-template-columns:1fr}.wizard-card{min-height:0}.wizard-actions{position:sticky;bottom:0;padding:var(--space-3);background:var(--color-bg-page);z-index:2}.progress-row{align-items:flex-start;flex-wrap:wrap}}
 </style>

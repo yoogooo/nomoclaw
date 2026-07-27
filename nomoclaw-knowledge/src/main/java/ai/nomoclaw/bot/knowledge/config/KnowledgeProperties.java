@@ -4,6 +4,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Knowledge-base runtime configuration.
@@ -15,6 +17,7 @@ public class KnowledgeProperties {
     private final Upload upload = new Upload();
     private final Ingestion ingestion = new Ingestion();
     private final Chunking chunking = new Chunking();
+    private final Parsing parsing = new Parsing();
     private final EmbeddingCache embeddingCache = new EmbeddingCache();
     private final Retrieval retrieval = new Retrieval();
     private final Vector vector = new Vector();
@@ -45,6 +48,10 @@ public class KnowledgeProperties {
 
     public Chunking getChunking() {
         return chunking;
+    }
+
+    public Parsing getParsing() {
+        return parsing;
     }
 
     public EmbeddingCache getEmbeddingCache() {
@@ -155,6 +162,79 @@ public class KnowledgeProperties {
 
         public void setDefaultOverlapTokens(int value) {
             defaultOverlapTokens = value;
+        }
+    }
+
+    public static class Parsing {
+        private final Pdf pdf = new Pdf();
+
+        public Pdf getPdf() {
+            return pdf;
+        }
+    }
+
+    public static class Pdf {
+        private final PdfPreprocessing preprocessing = new PdfPreprocessing();
+
+        public PdfPreprocessing getPreprocessing() {
+            return preprocessing;
+        }
+    }
+
+    public static class PdfPreprocessing {
+        private int maxHeaderLines;
+        private int maxFooterLines;
+        private double repeatedLineThresholdRatio;
+        private List<String> headerLines = new ArrayList<>();
+        private List<String> footerLines = new ArrayList<>();
+        private List<String> watermarkLines = new ArrayList<>();
+
+        public int getMaxHeaderLines() {
+            return maxHeaderLines;
+        }
+
+        public void setMaxHeaderLines(int value) {
+            maxHeaderLines = value;
+        }
+
+        public int getMaxFooterLines() {
+            return maxFooterLines;
+        }
+
+        public void setMaxFooterLines(int value) {
+            maxFooterLines = value;
+        }
+
+        public double getRepeatedLineThresholdRatio() {
+            return repeatedLineThresholdRatio;
+        }
+
+        public void setRepeatedLineThresholdRatio(double value) {
+            repeatedLineThresholdRatio = value;
+        }
+
+        public List<String> getHeaderLines() {
+            return headerLines;
+        }
+
+        public void setHeaderLines(List<String> value) {
+            headerLines = value == null ? new ArrayList<>() : value;
+        }
+
+        public List<String> getFooterLines() {
+            return footerLines;
+        }
+
+        public void setFooterLines(List<String> value) {
+            footerLines = value == null ? new ArrayList<>() : value;
+        }
+
+        public List<String> getWatermarkLines() {
+            return watermarkLines;
+        }
+
+        public void setWatermarkLines(List<String> value) {
+            watermarkLines = value == null ? new ArrayList<>() : value;
         }
     }
 

@@ -21,6 +21,13 @@ public interface DocumentParser {
      * Parses while reporting durable page progress when the format exposes page boundaries.
      */
     default ParsedDocument parse(Path file, PageProgress progress) {
+        return parse(file, PreprocessingOptions.disabled(), progress);
+    }
+
+    /**
+     * Parses with optional preprocessing selected for this import.
+     */
+    default ParsedDocument parse(Path file, PreprocessingOptions preprocessing, PageProgress progress) {
         ParsedDocument parsed = parse(file);
         progress.accept(parsed.pages().size(), parsed.pages().size());
         return parsed;
@@ -55,5 +62,21 @@ public interface DocumentParser {
     }
 
     record Page(int number, String section, String text) {
+    }
+
+    record PreprocessingOptions(boolean enabled, PdfPreprocessingOptions pdf) {
+        public static PreprocessingOptions disabled() {
+            return new PreprocessingOptions(false, PdfPreprocessingOptions.disabled());
+        }
+
+        public PdfPreprocessingOptions pdfOptions() {
+            return pdf == null ? PdfPreprocessingOptions.disabled() : pdf;
+        }
+    }
+
+    record PdfPreprocessingOptions(boolean removeHeader, boolean removeFooter, boolean removeWatermark) {
+        public static PdfPreprocessingOptions disabled() {
+            return new PdfPreprocessingOptions(false, false, false);
+        }
     }
 }

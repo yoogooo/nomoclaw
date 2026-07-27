@@ -1,6 +1,7 @@
 package ai.nomoclaw.bot.knowledge.app;
 
 import ai.nomoclaw.bot.knowledge.config.KnowledgeProperties;
+import ai.nomoclaw.bot.knowledge.core.repository.KnowledgePersistenceRepository;
 import ai.nomoclaw.bot.knowledge.util.UuidUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -8,7 +9,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.stereotype.Component;
 
@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class KnowledgeIngestionDispatcher implements DisposableBean {
     private static final Logger log = LoggerFactory.getLogger(KnowledgeIngestionDispatcher.class);
 
-    private final JdbcTemplate jdbc;
+    private final KnowledgePersistenceRepository persistence;
     private final KnowledgeProperties properties;
     private final KnowledgeIngestionRunner runner;
     private final Executor executor;
@@ -38,10 +38,10 @@ public class KnowledgeIngestionDispatcher implements DisposableBean {
     private final AtomicBoolean running = new AtomicBoolean();
     private ScheduledFuture<?> dispatchFuture;
 
-    public KnowledgeIngestionDispatcher(JdbcTemplate jdbc, KnowledgeProperties properties, KnowledgeIngestionRunner runner,
+    public KnowledgeIngestionDispatcher(KnowledgePersistenceRepository persistence, KnowledgeProperties properties, KnowledgeIngestionRunner runner,
                                         @Qualifier("knowledgeIngestionExecutor") Executor executor,
                                         @Qualifier("knowledgeIngestionScheduler") ThreadPoolTaskScheduler scheduler) {
-        this.jdbc = jdbc;
+        this.persistence = persistence;
         this.properties = properties;
         this.runner = runner;
         this.executor = executor;
@@ -92,7 +92,7 @@ public class KnowledgeIngestionDispatcher implements DisposableBean {
         int available = workerSlots.availablePermits();
         if (available <= 0) return;
         LocalDateTime now = LocalDateTime.now();
-        List<JobCandidate> candidates = jdbc.query("SELECT id,job_uid,status,attempt_count FROM knowledge_ingestion_job "
+        List<JobCandidate> candidates = persistence.query("SELECT id,job_uid,status,attempt_count FROM knowledge_ingestion_job "
                         + "WHERE (((status='PENDING' OR status='RETRY_WAIT') AND (next_retry_time IS NULL OR next_retry_time<=?)) "
                         + "OR (status='RUNNING' AND lease_until<?)) AND attempt_count<? ORDER BY id LIMIT ?",
                 (rs, row) -> new JobCandidate(rs.getLong("id"), rs.getString("job_uid"),
@@ -107,7 +107,7 @@ public class KnowledgeIngestionDispatcher implements DisposableBean {
     private void claimAndSubmit(JobCandidate candidate, LocalDateTime now) {
         String token = UuidUtil.newUuid();
         LocalDateTime leaseUntil = now.plusSeconds(Math.max(1, properties.getIngestion().getLeaseSeconds()));
-        int updated = jdbc.update("UPDATE knowledge_ingestion_job SET status='RUNNING',stage='QUEUED',worker_id=?,lease_token=?,"
+        int updated = persistence.update("UPDATE knowledge_ingestion_job SET status='RUNNING',stage='QUEUED',worker_id=?,lease_token=?,"
                         + "lease_until=?,last_heartbeat_time=?,next_retry_time=NULL,retryable=0,attempt_count=attempt_count+1,"
                         + "started_time=COALESCE(started_time,?),finished_time=NULL,updated_time=? WHERE id=? AND attempt_count=? "
                         + "AND (((status='PENDING' OR status='RETRY_WAIT') AND (next_retry_time IS NULL OR next_retry_time<=?)) "
@@ -141,7 +141,7 @@ public class KnowledgeIngestionDispatcher implements DisposableBean {
 
     private void renewLease(String jobUid, String token) {
         LocalDateTime now = LocalDateTime.now();
-        int updated = jdbc.update("UPDATE knowledge_ingestion_job SET lease_until=?,last_heartbeat_time=?,updated_time=? "
+        int updated = persistence.update("UPDATE knowledge_ingestion_job SET lease_until=?,last_heartbeat_time=?,updated_time=? "
                         + "WHERE job_uid=? AND status='RUNNING' AND lease_token=?",
                 now.plusSeconds(Math.max(1, properties.getIngestion().getLeaseSeconds())), now, now, jobUid, token);
         if (updated == 0) log.debug("[KnowledgeIngestion] heartbeat ignored after lease loss jobUid={}", jobUid);
@@ -149,7 +149,7 @@ public class KnowledgeIngestionDispatcher implements DisposableBean {
 
     private void releaseRejected(String jobUid, String token) {
         LocalDateTime now = LocalDateTime.now();
-        jdbc.update("UPDATE knowledge_ingestion_job SET status='PENDING',stage='QUEUED',worker_id=NULL,lease_token=NULL,"
+        persistence.update("UPDATE knowledge_ingestion_job SET status='PENDING',stage='QUEUED',worker_id=NULL,lease_token=NULL,"
                         + "lease_until=NULL,last_heartbeat_time=NULL,attempt_count=CASE WHEN attempt_count>0 THEN attempt_count-1 ELSE 0 END,updated_time=? "
                         + "WHERE job_uid=? AND status='RUNNING' AND lease_token=?",
                 now, jobUid, token);
@@ -157,17 +157,17 @@ public class KnowledgeIngestionDispatcher implements DisposableBean {
 
     private void expireExhaustedJobs() {
         LocalDateTime now = LocalDateTime.now();
-        List<String> exhausted = jdbc.queryForList("SELECT job_uid FROM knowledge_ingestion_job WHERE status='RUNNING' "
+        List<String> exhausted = persistence.queryForList("SELECT job_uid FROM knowledge_ingestion_job WHERE status='RUNNING' "
                         + "AND lease_until<? AND attempt_count>=?", String.class,
                 now, properties.getIngestion().getMaxAttempts());
         for (String jobUid : exhausted) {
-            int updated = jdbc.update("UPDATE knowledge_ingestion_job SET status='FAILED',retryable=1,"
+            int updated = persistence.update("UPDATE knowledge_ingestion_job SET status='FAILED',retryable=1,"
                             + "failure_code='LEASE_EXPIRED',failure_message='任务租约过期且已达到最大重试次数',worker_id=NULL,"
                             + "lease_token=NULL,lease_until=NULL,finished_time=?,updated_time=? WHERE job_uid=? AND status='RUNNING' "
                             + "AND lease_until<? AND attempt_count>=?",
                     now, now, jobUid, now, properties.getIngestion().getMaxAttempts());
             if (updated > 0) {
-                jdbc.update("UPDATE knowledge_document SET status='FAILED',failure_code='LEASE_EXPIRED',"
+                persistence.update("UPDATE knowledge_document SET status='FAILED',failure_code='LEASE_EXPIRED',"
                                 + "failure_message='任务租约过期且已达到最大重试次数',updated_time=? WHERE document_uid="
                                 + "(SELECT document_uid FROM knowledge_ingestion_job WHERE job_uid=?)",
                         now, jobUid);

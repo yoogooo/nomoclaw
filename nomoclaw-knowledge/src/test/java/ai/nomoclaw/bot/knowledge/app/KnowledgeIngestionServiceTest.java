@@ -3,6 +3,7 @@ package ai.nomoclaw.bot.knowledge.app;
 import ai.nomoclaw.bot.knowledge.bm25.LexicalSearchStore;
 import ai.nomoclaw.bot.knowledge.config.KnowledgeProperties;
 import ai.nomoclaw.bot.knowledge.config.KnowledgePropertiesTestSupport;
+import ai.nomoclaw.bot.knowledge.core.repository.KnowledgePersistenceRepository;
 import ai.nomoclaw.bot.knowledge.ingestion.DefaultDocumentParser.KnowledgeParseException;
 import ai.nomoclaw.bot.knowledge.ingestion.DocumentChunker;
 import ai.nomoclaw.bot.knowledge.ingestion.DocumentParser;
@@ -15,9 +16,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.DataSourceTransactionManager;
-import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.file.Files;
@@ -34,7 +36,7 @@ class KnowledgeIngestionServiceTest {
     @TempDir
     Path storageRoot;
 
-    private JdbcTemplate jdbc;
+    private KnowledgePersistenceRepository persistence;
     private KnowledgeProperties properties;
     private RecordingVectorStore vectorStore;
     private RecordingLexicalStore lexicalStore;
@@ -45,8 +47,8 @@ class KnowledgeIngestionServiceTest {
     void setUp() throws Exception {
         JdbcDataSource dataSource = new JdbcDataSource();
         dataSource.setURL("jdbc:h2:mem:knowledge-ingestion;MODE=MySQL;DB_CLOSE_DELAY=-1");
-        jdbc = new JdbcTemplate(dataSource);
-        jdbc.execute("DROP ALL OBJECTS");
+        persistence = new KnowledgePersistenceRepository(dataSource);
+        persistence.execute("DROP ALL OBJECTS");
         createSchema();
         properties = KnowledgePropertiesTestSupport.properties();
         properties.setStorageRoot(storageRoot);
@@ -58,8 +60,8 @@ class KnowledgeIngestionServiceTest {
         DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
         KnowledgeIngestionMetrics metrics = new KnowledgeIngestionMetrics(
                 beanFactory.getBeanProvider(MeterRegistry.class));
-        service = new KnowledgeService(jdbc,
-                new TransactionTemplate(new DataSourceTransactionManager(dataSource)), properties,
+        service = new KnowledgeService(persistence,
+                new TransactionTemplate(new NoopTransactionManager()), properties,
                 new FixedParser(), new FixedChunker(), new FixedEmbeddingProvider(), vectorStore, Runnable::run,
                 null, null, lexicalStore, new NoopReranker(), metrics);
         documentPath = storageRoot.resolve("doc.txt");
@@ -93,15 +95,15 @@ class KnowledgeIngestionServiceTest {
 
     @Test
     void workerThatLosesLeaseCannotPublish() {
-        vectorStore.onUpsert = () -> jdbc.update(
+        vectorStore.onUpsert = () -> persistence.update(
                 "UPDATE knowledge_ingestion_job SET lease_token='new-owner' WHERE job_uid='job_test'");
 
         service.runIngestion("job_test", "token-1");
 
         assertEquals("RUNNING", jobValue("status"));
-        assertEquals("", jdbc.queryForObject(
+        assertEquals("", persistence.queryForObject(
                 "SELECT current_version_uid FROM knowledge_document WHERE document_uid='doc_test'", String.class));
-        assertEquals(0, jdbc.queryForObject(
+        assertEquals(0, persistence.queryForObject(
                 "SELECT COUNT(*) FROM knowledge_chunk WHERE status='READY'", Integer.class));
     }
 
@@ -113,54 +115,52 @@ class KnowledgeIngestionServiceTest {
 
         assertEquals("FAILED", jobValue("status"));
         assertEquals("INVALID_ENCODING", jobValue("failure_code"));
-        assertEquals(0, jdbc.queryForObject("SELECT retryable FROM knowledge_ingestion_job", Integer.class));
+        assertEquals(0, persistence.queryForObject("SELECT retryable FROM knowledge_ingestion_job", Integer.class));
     }
 
     private KnowledgeService serviceWithParser(DocumentParser parser) {
         DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
         KnowledgeIngestionMetrics metrics = new KnowledgeIngestionMetrics(
                 beanFactory.getBeanProvider(MeterRegistry.class));
-        return new KnowledgeService(jdbc, new TransactionTemplate(new DataSourceTransactionManager(
-                new DriverManagerDataSource(
-                        "jdbc:h2:mem:knowledge-ingestion;MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", ""))),
+        return new KnowledgeService(persistence, new TransactionTemplate(new NoopTransactionManager()),
                 properties, parser, new FixedChunker(), new FixedEmbeddingProvider(), vectorStore, Runnable::run,
                 null, null, lexicalStore, new NoopReranker(), metrics);
     }
 
     private void assertCompletedWithSingleChunk() {
         assertEquals("COMPLETED", jobValue("status"));
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM knowledge_chunk", Integer.class));
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM knowledge_chunk WHERE status='READY'", Integer.class));
+        assertEquals(1, persistence.queryForObject("SELECT COUNT(*) FROM knowledge_chunk", Integer.class));
+        assertEquals(1, persistence.queryForObject("SELECT COUNT(*) FROM knowledge_chunk WHERE status='READY'", Integer.class));
         assertEquals(1, vectorStore.points.size());
         assertEquals(1, lexicalStore.chunks.size());
     }
 
     private void resetRunning(String token, int attempt) {
-        jdbc.update("UPDATE knowledge_ingestion_job SET status='RUNNING',stage='QUEUED',lease_token=?,attempt_count=?,"
+        persistence.update("UPDATE knowledge_ingestion_job SET status='RUNNING',stage='QUEUED',lease_token=?,attempt_count=?,"
                         + "worker_id='worker',failure_code='',failure_message='',retryable=0,next_retry_time=NULL WHERE job_uid='job_test'",
                 token, attempt);
     }
 
     private String jobValue(String column) {
-        return jdbc.queryForObject("SELECT " + column + " FROM knowledge_ingestion_job WHERE job_uid='job_test'", String.class);
+        return persistence.queryForObject("SELECT " + column + " FROM knowledge_ingestion_job WHERE job_uid='job_test'", String.class);
     }
 
     private void insertFixture(String token) {
         LocalDateTime now = LocalDateTime.now();
-        jdbc.update("INSERT INTO knowledge_base VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        persistence.update("INSERT INTO knowledge_base VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 1L, "kb_test", "Test", "", "ACTIVE", "provider", "model", 3, "collection", 500, 80,
                 8, .35, 0, 0, now, now);
-        jdbc.update("INSERT INTO knowledge_document VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        persistence.update("INSERT INTO knowledge_document VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 1L, "doc_test", "kb_test", "doc.txt", "UPLOAD", "doc.txt", "text/plain", documentPath.toString(),
                 FilesExists.size(documentPath), "checksum", "", "PROCESSING", "", "", 0, 0, now, now);
-        jdbc.update("INSERT INTO knowledge_document_version(id,document_version_uid,document_uid,version_no,"
+        persistence.update("INSERT INTO knowledge_document_version(id,document_version_uid,document_uid,version_no,"
                         + "checksum_sha256,parser_version,chunker_version,parser_mode,chunk_size_tokens,"
                         + "chunk_overlap_tokens,build_mode,embedding_provider_id,embedding_model_id,"
                         + "embedding_dimension,embedding_model_fingerprint,status,created_time) "
                         + "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 1L, "ver_test", "doc_test", 1, "checksum", "1", "1", "STRUCTURED", 500, 80,
                 "INITIAL", "provider", "model", 3, "provider:model:3", "PENDING", now);
-        jdbc.update("INSERT INTO knowledge_ingestion_job(job_uid,knowledge_base_uid,document_uid,document_version_uid,status,stage,"
+        persistence.update("INSERT INTO knowledge_ingestion_job(job_uid,knowledge_base_uid,document_uid,document_version_uid,status,stage,"
                         + "progress_percent,total_chunks,processed_chunks,processed_pages,total_pages,cache_hit_chunks,"
                         + "cache_miss_chunks,attempt_count,failure_code,failure_message,worker_id,lease_token,"
                         + "retryable,created_time,updated_time) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -169,27 +169,27 @@ class KnowledgeIngestionServiceTest {
     }
 
     private void createSchema() {
-        jdbc.execute("CREATE TABLE knowledge_base (id BIGINT PRIMARY KEY, knowledge_base_uid VARCHAR(64), name VARCHAR(255), description VARCHAR(1000), "
+        persistence.execute("CREATE TABLE knowledge_base (id BIGINT PRIMARY KEY, knowledge_base_uid VARCHAR(64), name VARCHAR(255), description VARCHAR(1000), "
                 + "status VARCHAR(32), embedding_provider_id VARCHAR(64), embedding_model_id VARCHAR(128), embedding_dimension INT, "
                 + "vector_collection_name VARCHAR(128), chunk_size_tokens INT, chunk_overlap_tokens INT, retrieval_top_k INT, similarity_threshold DOUBLE, "
                 + "document_count INT, chunk_count BIGINT, created_time TIMESTAMP, updated_time TIMESTAMP)");
-        jdbc.execute("CREATE TABLE knowledge_document (id BIGINT PRIMARY KEY, document_uid VARCHAR(64), knowledge_base_uid VARCHAR(64), display_name VARCHAR(255), "
+        persistence.execute("CREATE TABLE knowledge_document (id BIGINT PRIMARY KEY, document_uid VARCHAR(64), knowledge_base_uid VARCHAR(64), display_name VARCHAR(255), "
                 + "source_type VARCHAR(32), original_file_name VARCHAR(255), content_type VARCHAR(128), file_path VARCHAR(1024), size_bytes BIGINT, checksum_sha256 VARCHAR(64), "
                 + "current_version_uid VARCHAR(64), status VARCHAR(32), failure_code VARCHAR(64), failure_message VARCHAR(1000), page_count INT, chunk_count INT, "
                 + "created_time TIMESTAMP, updated_time TIMESTAMP)");
-        jdbc.execute("CREATE TABLE knowledge_document_version (id BIGINT PRIMARY KEY, document_version_uid VARCHAR(64), document_uid VARCHAR(64), version_no INT, "
+        persistence.execute("CREATE TABLE knowledge_document_version (id BIGINT PRIMARY KEY, document_version_uid VARCHAR(64), document_uid VARCHAR(64), version_no INT, "
                 + "checksum_sha256 VARCHAR(64), parser_version VARCHAR(32), chunker_version VARCHAR(32), parser_mode VARCHAR(32), chunk_size_tokens INT, "
                 + "chunk_overlap_tokens INT, build_mode VARCHAR(16), embedding_provider_id VARCHAR(64), embedding_model_id VARCHAR(128), embedding_dimension INT, "
-                + "embedding_model_fingerprint VARCHAR(255), parse_warnings VARCHAR(1000), status VARCHAR(32), created_time TIMESTAMP)");
-        jdbc.execute("CREATE TABLE knowledge_ingestion_job (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, job_uid VARCHAR(64), knowledge_base_uid VARCHAR(64), "
+                + "embedding_model_fingerprint VARCHAR(255), preprocessing_config VARCHAR(1000), parse_warnings VARCHAR(1000), status VARCHAR(32), created_time TIMESTAMP)");
+        persistence.execute("CREATE TABLE knowledge_ingestion_job (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, job_uid VARCHAR(64), knowledge_base_uid VARCHAR(64), "
                 + "document_uid VARCHAR(64), document_version_uid VARCHAR(64), status VARCHAR(32), stage VARCHAR(32), progress_percent INT, total_chunks INT, processed_chunks INT, "
                 + "processed_pages INT, total_pages INT, cache_hit_chunks INT, cache_miss_chunks INT, attempt_count INT, failure_code VARCHAR(64), failure_message VARCHAR(1000), worker_id VARCHAR(128), lease_token VARCHAR(64), lease_until TIMESTAMP, "
                 + "last_heartbeat_time TIMESTAMP, next_retry_time TIMESTAMP, retryable INT, started_time TIMESTAMP, finished_time TIMESTAMP, created_time TIMESTAMP, updated_time TIMESTAMP)");
-        jdbc.execute("CREATE TABLE knowledge_chunk (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, chunk_uid VARCHAR(64) UNIQUE, knowledge_base_uid VARCHAR(64), "
+        persistence.execute("CREATE TABLE knowledge_chunk (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, chunk_uid VARCHAR(64) UNIQUE, knowledge_base_uid VARCHAR(64), "
                 + "document_uid VARCHAR(64), document_version_uid VARCHAR(64), chunk_index INT, content VARCHAR(4000), token_count INT, content_hash VARCHAR(64), "
                 + "page_from INT, page_to INT, section_path VARCHAR(1024), char_start INT, char_end INT, vector_point_id VARCHAR(64), status VARCHAR(32), created_time TIMESTAMP)");
-        jdbc.execute("CREATE TABLE knowledge_import_batch (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, batch_uid VARCHAR(64), status VARCHAR(32), updated_time TIMESTAMP)");
-        jdbc.execute("CREATE TABLE knowledge_import_item (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, batch_uid VARCHAR(64), document_version_uid VARCHAR(64), status VARCHAR(32), error_code VARCHAR(64), error_message VARCHAR(1000), updated_time TIMESTAMP)");
+        persistence.execute("CREATE TABLE knowledge_import_batch (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, batch_uid VARCHAR(64), status VARCHAR(32), updated_time TIMESTAMP)");
+        persistence.execute("CREATE TABLE knowledge_import_item (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, batch_uid VARCHAR(64), document_version_uid VARCHAR(64), status VARCHAR(32), error_code VARCHAR(64), error_message VARCHAR(1000), updated_time TIMESTAMP)");
     }
 
     private static final class FixedParser implements DocumentParser {
@@ -253,6 +253,21 @@ class KnowledgeIngestionServiceTest {
             } catch (Exception ex) {
                 throw new IllegalStateException(ex);
             }
+        }
+    }
+
+    private static final class NoopTransactionManager implements PlatformTransactionManager {
+        @Override
+        public TransactionStatus getTransaction(TransactionDefinition definition) {
+            return new SimpleTransactionStatus();
+        }
+
+        @Override
+        public void commit(TransactionStatus status) {
+        }
+
+        @Override
+        public void rollback(TransactionStatus status) {
         }
     }
 }

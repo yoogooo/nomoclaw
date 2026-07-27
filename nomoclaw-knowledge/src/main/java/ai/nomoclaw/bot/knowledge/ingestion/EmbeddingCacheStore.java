@@ -1,8 +1,8 @@
 package ai.nomoclaw.bot.knowledge.ingestion;
 
 import ai.nomoclaw.bot.knowledge.config.KnowledgeProperties;
+import ai.nomoclaw.bot.knowledge.core.repository.KnowledgePersistenceRepository;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.nio.ByteBuffer;
@@ -20,11 +20,11 @@ import java.util.Optional;
  */
 @Component
 public class EmbeddingCacheStore {
-    private final JdbcTemplate jdbc;
+    private final KnowledgePersistenceRepository persistence;
     private final KnowledgeProperties properties;
 
-    public EmbeddingCacheStore(JdbcTemplate jdbc, KnowledgeProperties properties) {
-        this.jdbc = jdbc;
+    public EmbeddingCacheStore(KnowledgePersistenceRepository persistence, KnowledgeProperties properties) {
+        this.persistence = persistence;
         this.properties = properties;
     }
 
@@ -40,12 +40,12 @@ public class EmbeddingCacheStore {
 
     public Optional<List<Float>> get(String cacheKey, int dimension) {
         if (!properties.getEmbeddingCache().isEnabled()) return Optional.empty();
-        List<byte[]> values = jdbc.query("SELECT vector_blob FROM knowledge_embedding_cache "
+        List<byte[]> values = persistence.query("SELECT vector_blob FROM knowledge_embedding_cache "
                         + "WHERE cache_key=? AND dimension=?",
                 (rs, row) -> rs.getBytes(1), cacheKey, dimension);
         if (values.isEmpty()) return Optional.empty();
         LocalDateTime now = LocalDateTime.now();
-        jdbc.update("UPDATE knowledge_embedding_cache SET hit_count=hit_count+1,last_access_time=? WHERE cache_key=?",
+        persistence.update("UPDATE knowledge_embedding_cache SET hit_count=hit_count+1,last_access_time=? WHERE cache_key=?",
                 now, cacheKey);
         return Optional.of(decode(values.get(0), dimension));
     }
@@ -55,24 +55,24 @@ public class EmbeddingCacheStore {
         byte[] bytes = encode(vector);
         LocalDateTime now = LocalDateTime.now();
         try {
-            jdbc.update("INSERT INTO knowledge_embedding_cache(cache_key,model_fingerprint,content_hash,dimension,"
+            persistence.update("INSERT INTO knowledge_embedding_cache(cache_key,model_fingerprint,content_hash,dimension,"
                             + "vector_blob,vector_bytes,hit_count,created_time,last_access_time) VALUES(?,?,?,?,?,?,?,?,?)",
                     cacheKey, modelFingerprint, contentHash, vector.size(), bytes, bytes.length, 0, now, now);
         } catch (DuplicateKeyException ignored) {
-            jdbc.update("UPDATE knowledge_embedding_cache SET last_access_time=? WHERE cache_key=?", now, cacheKey);
+            persistence.update("UPDATE knowledge_embedding_cache SET last_access_time=? WHERE cache_key=?", now, cacheKey);
         }
     }
 
     public void cleanup() {
         if (!properties.getEmbeddingCache().isEnabled()) return;
         LocalDateTime cutoff = LocalDateTime.now().minus(properties.getEmbeddingCache().getTtl());
-        jdbc.update("DELETE FROM knowledge_embedding_cache WHERE last_access_time<?", cutoff);
-        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM knowledge_embedding_cache", Integer.class);
+        persistence.update("DELETE FROM knowledge_embedding_cache WHERE last_access_time<?", cutoff);
+        Integer count = persistence.queryForObject("SELECT COUNT(*) FROM knowledge_embedding_cache", Integer.class);
         int overflow = Math.max(0, (count == null ? 0 : count) - properties.getEmbeddingCache().getMaxEntries());
         if (overflow > 0) {
-            List<Long> ids = jdbc.queryForList("SELECT id FROM knowledge_embedding_cache "
+            List<Long> ids = persistence.queryForList("SELECT id FROM knowledge_embedding_cache "
                     + "ORDER BY last_access_time,id LIMIT ?", Long.class, overflow);
-            for (Long id : ids) jdbc.update("DELETE FROM knowledge_embedding_cache WHERE id=?", id);
+            for (Long id : ids) persistence.update("DELETE FROM knowledge_embedding_cache WHERE id=?", id);
         }
     }
 
