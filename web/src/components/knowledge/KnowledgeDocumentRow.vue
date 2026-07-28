@@ -9,10 +9,11 @@ import type { KnowledgeDocument } from "@/api/knowledgeApi";
 import { formatDateTime } from "@/utils/format";
 
 const props = defineProps<{ document: KnowledgeDocument }>();
-const emit = defineEmits<{ retry: []; build: []; reindex: []; remove: [] }>();
+const emit = defineEmits<{ retry: []; build: []; reindex: []; remove: []; details: [] }>();
 const { t } = useI18n();
 
 const processing = computed(() => ["PENDING", "RUNNING", "RETRY_WAIT"].includes(props.document.jobStatus));
+const detailVisible = computed(() => processing.value || props.document.jobStatus === "FAILED");
 const actions = computed<DropdownOption[]>(() => {
   if (props.document.status === "UPLOADED") {
     return [
@@ -58,19 +59,18 @@ function shouldShowAttempts() {
     <FileText :size="22" />
     <div class="document-main">
       <strong>{{ document.displayName }}</strong>
-      <span class="job-detail">
-        {{ stageLabel() }}
-        <template v-if="shouldShowAttempts()"> · {{ t("pages.knowledge.attempt", { current: document.attemptCount, max: document.maxAttempts }) }}</template>
-        <template v-if="document.totalPages"> · {{ document.processedPages }}/{{ document.totalPages }} {{ t("pages.knowledge.units.pages") }}</template>
-        <template v-if="document.totalChunks"> · {{ document.processedChunks }}/{{ document.totalChunks }} {{ t("pages.knowledge.units.chunks") }}</template>
-      </span>
-      <span v-if="document.cacheHitChunks || document.cacheMissChunks" class="job-detail">
-        {{ t("pages.knowledge.cacheSummary", { hits: document.cacheHitChunks, misses: document.cacheMissChunks }) }}
-      </span>
+      <span v-if="document.status === 'UPLOADED'" class="job-detail">{{ stageLabel() }}</span>
+      <button v-if="detailVisible" type="button" class="document-detail-link" @click="emit('details')">
+        {{ t("pages.knowledge.actions.viewDetails") }}
+      </button>
       <span v-if="document.jobStatus === 'RETRY_WAIT' && document.nextRetryTime" class="job-detail">
         {{ t("pages.knowledge.nextRetry", { time: formatDateTime(document.nextRetryTime) }) }}
       </span>
-      <span v-for="warning in document.parseWarnings || []" :key="warning" class="warning">
+      <span
+        v-for="warning in (document.parseWarnings || []).filter(item => item !== 'PDF_PREPROCESSING_APPLIED')"
+        :key="warning"
+        class="warning"
+      >
         {{ t(`pages.knowledge.parseWarnings.${warning}`) }}
       </span>
       <span v-if="document.failureMessage" :class="{ error: document.jobStatus === 'FAILED' }">
@@ -90,6 +90,8 @@ function shouldShowAttempts() {
 .document-main{display:flex;flex:1;min-width:0;flex-direction:column;gap:var(--space-2)}
 .document-main strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .job-detail{color:var(--color-text-muted);font-size:var(--font-size-sm)}
+.document-detail-link{padding:0;border:0;background:transparent;color:var(--color-brand-400);font-size:var(--font-size-sm);text-align:left;cursor:pointer}
+.document-detail-link:hover{text-decoration:underline}
 .warning{color:var(--color-warning);font-size:var(--font-size-sm)}
 .error{color:var(--color-danger)}
 </style>

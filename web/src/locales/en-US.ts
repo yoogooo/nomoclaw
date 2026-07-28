@@ -1081,7 +1081,8 @@ const enUS = {
       nextRetry: "Automatic retry at {time}",
       cacheSummary: "{hits} cache hits, {misses} generated",
       documentStatuses: { UPLOADED: "Awaiting build", awaitingBuild: "Waiting for build configuration" },
-      actions: { configureBuild: "Configure and build", reindex: "Rebuild index", more: "More actions" },
+      actions: { configureBuild: "Configure and build", reindex: "Rebuild index", more: "More actions", viewDetails: "View details" },
+      documentDetail: { status: "Status", stage: "Stage", pages: "Page progress", chunks: "Chunk progress", attempts: "Attempts", nextRetry: "Next retry", failure: "Failure reason", warnings: "Warnings" },
       parseWarnings: {
         PARTIAL_TEXT_EXTRACTION: "Some PDF pages have no text layer. OCR is not available in this phase, so those pages were not indexed.",
         PDF_PREPROCESSING_APPLIED: "PDF preprocessing was applied."
