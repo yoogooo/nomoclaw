@@ -1148,7 +1148,7 @@ const enUS = {
         RERANK_FAILED: "Reranking failed or timed out. Fused retrieval order was retained."
       },
       page: "Page",
-      form: { name: "Knowledge base name", description: "Description", provider: "Embedding provider ID", model: "Embedding model ID", dimension: "Vector dimension" },
+      form: { name: "Knowledge base name", description: "Description", provider: "Embedding provider", model: "Embedding model", dimension: "Vector dimension" },
       messages: {
         created: "Knowledge base created",
         collectionCopied: "Vector collection name copied",

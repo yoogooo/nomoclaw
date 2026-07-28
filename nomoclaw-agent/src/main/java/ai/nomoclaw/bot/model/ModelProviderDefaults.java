@@ -57,6 +57,7 @@ public final class ModelProviderDefaults {
                         "",
                         "qwen3.7-max",
                         List.of(
+                                embeddingModel("text-embedding-v4", "text-embedding-v4"),
                                 model("qwen3.7-max", "Qwen3.7 Max", List.of("text"), true, 1000000, 0, 65536, disabledUpload()),
                                 model("qwen3.5-plus", "Qwen3.5 Plus", List.of("text", "image", "video"), true, 1000000, 0, 65536,
                                         new ModelConfigDto.UploadPolicy(true, List.of("image", "video"), 64, 256, 0L, 0L, true, false)),
@@ -204,6 +205,10 @@ public final class ModelProviderDefaults {
                                               int maxOutputTokens,
                                               ModelConfigDto.UploadPolicy uploadPolicy) {
         return new ModelConfigDto.Model(id, name, ModelTypes.CHAT, capabilities, reasoning, contextWindow, maxInputTokens, maxOutputTokens, uploadPolicy, false, "builtin");
+    }
+
+    private static ModelConfigDto.Model embeddingModel(String id, String name) {
+        return new ModelConfigDto.Model(id, name, ModelTypes.EMBEDDING, List.of("text"), false, 0, 0, 0, disabledUpload(), false, "builtin");
     }
 
     private static ModelConfigDto.UploadPolicy disabledUpload() {

@@ -78,6 +78,75 @@
     },
     {
       "providerIds": [
+        "dashscope"
+      ],
+      "modelId": "text-embedding-v4",
+      "displayName": "text-embedding-v4",
+      "modelType": "EMBEDDING",
+      "aliases": [],
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "reasoning": false,
+      "contextWindowTokens": 0,
+      "maxInputTokens": 0,
+      "maxOutputTokens": 0,
+      "uploadPolicy": {
+        "enabled": false,
+        "allowedMimeGroups": [],
+        "maxFilesPerMessage": 0,
+        "maxImagesPerMessage": 0,
+        "maxFileBytes": 0,
+        "maxTotalBytes": 0,
+        "singleMimeGroupOnly": false,
+        "allowMixedImageAndFile": false
+      },
+      "sourceRefs": [
+        "https://help.aliyun.com/zh/model-studio/embedding-rerank-model",
+        "https://help.aliyun.com/zh/model-studio/embedding?disableWebsiteRedirect=true"
+      ],
+      "lastVerifiedAt": "2026-07-28",
+      "confidence": "medium"
+    },
+    {
+      "providerIds": [
+        "ollama"
+      ],
+      "modelId": "qwen3-embedding:0.6b",
+      "displayName": "Qwen3 Embedding 0.6B",
+      "modelType": "EMBEDDING",
+      "aliases": [],
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "reasoning": false,
+      "contextWindowTokens": 0,
+      "maxInputTokens": 0,
+      "maxOutputTokens": 0,
+      "uploadPolicy": {
+        "enabled": false,
+        "allowedMimeGroups": [],
+        "maxFilesPerMessage": 0,
+        "maxImagesPerMessage": 0,
+        "maxFileBytes": 0,
+        "maxTotalBytes": 0,
+        "singleMimeGroupOnly": false,
+        "allowMixedImageAndFile": false
+      },
+      "sourceRefs": [
+        "https://ollama.com/library/qwen3-embedding"
+      ],
+      "lastVerifiedAt": "2026-07-28",
+      "confidence": "medium"
+    },
+    {
+      "providerIds": [
         "dashscope",
         "aliyun-codingplan"
       ],

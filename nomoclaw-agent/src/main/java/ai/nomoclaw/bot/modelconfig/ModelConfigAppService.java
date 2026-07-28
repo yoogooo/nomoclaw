@@ -166,6 +166,7 @@ public class ModelConfigAppService {
         List<LlmProviderModelEntity> nextModels = new ArrayList<>();
         for (int i = 0; i < modelIds.size(); i++) {
             String modelId = modelIds.get(i);
+            ModelMetadata metadata = modelCatalogService.resolve(normalizedProviderId, modelId);
             LlmProviderModelEntity entity = existingById.get(modelId);
             if (entity == null) {
                 entity = new LlmProviderModelEntity();
@@ -180,6 +181,7 @@ public class ModelConfigAppService {
                 entity.setUploadPolicyJson(JsonUtil.toJson(new ModelConfigDto.UploadPolicy(false, List.of(), 0, 0, 0L, 0L, false, false)));
                 entity.setCreatedTime(now);
             }
+            entity.setModelType(metadata.matched() ? metadata.modelType() : ModelTypes.CHAT);
             entity.setSortIndex(i);
             entity.setStatus("ACTIVE");
             entity.setUpdatedTime(now);

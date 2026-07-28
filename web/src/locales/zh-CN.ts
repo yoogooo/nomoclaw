@@ -1037,7 +1037,7 @@ const zhCN = {
       createCard: {
         title: "新建知识库",
         subtitle: "上传文档、整理权限与索引策略，创建一个新的知识空间。",
-        action: "新建知识库"
+        action: "创建知识库"
       },
       list: {
         title: "知识库",
@@ -1148,7 +1148,7 @@ const zhCN = {
         RERANK_FAILED: "重排模型评分失败或超时，已保留融合检索排序。"
       },
       page: "第",
-      form: { name: "知识库名称", description: "描述", provider: "Embedding Provider ID", model: "Embedding 模型 ID", dimension: "向量维度" },
+      form: { name: "知识库名称", description: "描述", provider: "向量服务商", model: "向量模型", dimension: "向量维度" },
       messages: {
         created: "知识库已创建",
         collectionCopied: "向量集合名称已复制",
