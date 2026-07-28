@@ -1061,7 +1061,19 @@ const zhCN = {
       vectorUnavailable: "Qdrant 向量服务不可用，普通对话不受影响",
       empty: "还没有知识库",
       back: "返回知识库",
+      backShort: "返回",
       upload: "上传文档",
+      indexConfig: {
+        title: "索引配置",
+        open: "查看索引配置",
+        model: "Embedding 模型",
+        provider: "Provider",
+        dimension: "向量维度",
+        collection: "向量集合",
+        copy: "复制名称",
+        warningTitle: "当前索引配置可能不可用",
+        warningBody: "最近一次向量生成失败，请检查 Provider、API Key 和 Embedding 模型配置。"
+      },
       documents: "文档",
       noDocuments: "尚未上传文档",
       retry: "重试",
@@ -1139,6 +1151,7 @@ const zhCN = {
       form: { name: "知识库名称", description: "描述", provider: "Embedding Provider ID", model: "Embedding 模型 ID", dimension: "向量维度" },
       messages: {
         created: "知识库已创建",
+        collectionCopied: "向量集合名称已复制",
         uploaded: "文档已提交处理",
         uploadSummary: "已接收 {accepted} 个，重复 {duplicate} 个，失败 {failed} 个"
       }

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
-import { Database, Plus, Search, Upload } from "lucide-vue-next";
-import { NAlert, NButton, NCard, NEmpty, NInput, NInputNumber, NModal, NSpin, NTag } from "naive-ui";
+import { ChevronLeft, Copy, Database, Plus, Search, Upload } from "lucide-vue-next";
+import { NAlert, NButton, NCard, NDrawer, NDrawerContent, NEmpty, NInput, NInputNumber, NModal, NSpin, NTag } from "naive-ui";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import DirectoryRail from "@/components/chat/DirectoryRail.vue";
@@ -22,10 +22,15 @@ const loading = ref(false);
 const searching = ref(false);
 const vectorAvailable = ref(true);
 const createVisible = ref(false);
+const configDrawerVisible = ref(false);
 const searchQuery = ref("");
 const form = reactive({ name: "", description: "", embeddingProviderId: "dashscope", embeddingModelId: "text-embedding-v3", embeddingDimension: 1024 });
 let pollTimer: number | undefined;
 const processing = computed(() => documents.value.some(item => ["PENDING", "RUNNING", "RETRY_WAIT"].includes(item.jobStatus)));
+const embeddingFailureDocument = computed(() => documents.value.find(item => {
+  const failure = `${item.failureCode || ""} ${item.failureMessage || ""}`.toUpperCase();
+  return item.status === "FAILED" && failure.includes("EMBEDD");
+}));
 
 async function loadBases() { loading.value = true; try { const response = await knowledgeApi.list(); bases.value = response.items; vectorAvailable.value = response.vectorAvailable; const requested = String(route.query.base || ""); if (requested && !selected.value) { const base = bases.value.find(item => item.knowledgeBaseUid === requested); if (base) await openBase(base); } } finally { loading.value = false; } }
 async function openBase(base: KnowledgeBase) { selected.value = base; hits.value = []; searchDiagnostics.value = []; await loadDocuments(); }
@@ -38,20 +43,22 @@ async function openBuild(document: KnowledgeDocument) { if (!selected.value || !
 async function reindex(document: KnowledgeDocument) { if (!selected.value) return; const batch = await knowledgeApi.reindexSession(selected.value.knowledgeBaseUid, document.documentUid); await router.push({ name: "knowledge-import", params: { knowledgeBaseUid: selected.value.knowledgeBaseUid, batchUid: batch.batchUid } }); }
 async function removeUploaded(document: KnowledgeDocument) { if (!selected.value) return; await knowledgeApi.deleteUploadedDocument(selected.value.knowledgeBaseUid, document.documentUid); await loadDocuments(); }
 async function search() { if (!selected.value || !searchQuery.value.trim() || searching.value) return; searching.value = true; searchDiagnostics.value = []; try { const response = await knowledgeApi.search(selected.value.knowledgeBaseUid, searchQuery.value.trim()); hits.value = response.hits || []; searchDiagnostics.value = response.diagnostics || []; } finally { searching.value = false; } }
+async function copyCollectionName() { if (!selected.value?.vectorCollectionName) return; await navigator.clipboard.writeText(selected.value.vectorCollectionName); message.success(t("pages.knowledge.messages.collectionCopied")); }
 function statusType(status: string) { return status === "READY" || status === "ACTIVE" ? "success" : status === "FAILED" || status === "ERROR" ? "error" : "warning"; }
 function retrievalSourceLabel(source: string) { return t(`pages.knowledge.retrievalSources.${source}`); }
 function searchDiagnosticLabel(code: string) { return t(`pages.knowledge.searchDiagnostics.${code}`); }
 function dismissSearchDiagnostic(code: string) { searchDiagnostics.value = searchDiagnostics.value.filter(item => item.code !== code); }
+function closeBaseDetail() { selected.value = null; }
 onMounted(() => void loadBases());
 onBeforeUnmount(() => { if (pollTimer) window.clearTimeout(pollTimer); });
 </script>
 
 <template>
   <div class="page-frame app-page-shell"><div class="app-layout app-layout-responsive"><DirectoryRail />
-    <main class="app-main-content"><div class="app-page-content knowledge-page">
-      <AppPageHeader :title="t('pages.knowledge.title')" :subtitle="t('pages.knowledge.subtitle')" />
-      <NAlert v-if="!vectorAvailable" type="warning" :title="t('pages.knowledge.vectorUnavailable')" />
-      <NSpin :show="loading"><section v-if="!selected" class="knowledge-grid">
+    <main class="app-main-content"><div class="app-page-content knowledge-page" :class="{ 'knowledge-page--detail': !!selected }">
+      <AppPageHeader v-if="!selected" :title="t('pages.knowledge.title')" :subtitle="t('pages.knowledge.subtitle')" />
+      <NAlert v-if="!selected && !vectorAvailable" type="warning" :title="t('pages.knowledge.vectorUnavailable')" />
+      <NSpin v-if="!selected" :show="loading"><section class="knowledge-grid">
         <button class="knowledge-create-card" type="button" @click="createVisible = true"><Plus :size="28"/><strong>{{ t("pages.knowledge.createCard.title") }}</strong><span>{{ t("pages.knowledge.createCard.subtitle") }}</span></button>
         <button v-for="base in bases" :key="base.knowledgeBaseUid" class="knowledge-card" type="button" @click="openBase(base)">
           <div class="card-heading"><Database :size="20"/><strong>{{ base.name }}</strong><NTag size="small" :type="statusType(base.status)">{{ base.status }}</NTag></div>
@@ -59,16 +66,66 @@ onBeforeUnmount(() => { if (pollTimer) window.clearTimeout(pollTimer); });
         </button><NEmpty v-if="!bases.length" :description="t('pages.knowledge.empty')" />
       </section></NSpin>
 
-      <template v-if="selected"><div class="detail-header"><NButton quaternary @click="selected = null">{{ t("pages.knowledge.back") }}</NButton><div><h2>{{ selected.name }}</h2><p>{{ selected.description }}</p></div><NButton type="primary" @click="startImport"><template #icon><Upload/></template>{{ t("pages.knowledge.upload") }}</NButton></div>
+      <template v-if="selected">
+        <div class="detail-back-row">
+          <button type="button" class="detail-back-btn" @click="closeBaseDetail">
+            <ChevronLeft :size="14" />
+            <span>{{ t("pages.knowledge.backShort") }}</span>
+          </button>
+        </div>
+        <AppPageHeader :title="selected.name" :subtitle="selected.description || undefined">
+          <template #actions>
+            <div class="detail-header-actions">
+              <NButton secondary @click="configDrawerVisible = true">{{ t("pages.knowledge.indexConfig.open") }}</NButton>
+              <NButton type="primary" @click="startImport"><template #icon><Upload/></template>{{ t("pages.knowledge.upload") }}</NButton>
+            </div>
+          </template>
+        </AppPageHeader>
         <div class="detail-grid"><NCard :title="t('pages.knowledge.documents')"><NEmpty v-if="!documents.length" :description="t('pages.knowledge.noDocuments')"/>
           <KnowledgeDocumentRow v-for="document in documents" :key="document.documentUid" :document="document" @retry="retry(document)" @build="openBuild(document)" @reindex="reindex(document)" @remove="removeUploaded(document)" />
         </NCard><NCard :title="t('pages.knowledge.searchTest')"><div class="search-bar"><NInput v-model:value="searchQuery" :placeholder="t('pages.knowledge.searchPlaceholder')" :disabled="searching" @keyup.enter="search"/><NButton type="primary" :loading="searching" :disabled="!searchQuery.trim()" @click="search"><template v-if="!searching" #icon><Search/></template></NButton></div><NSpin :show="searching"><NAlert v-for="diagnostic in searchDiagnostics" :key="diagnostic.code" type="warning" closable class="search-diagnostic" @close="dismissSearchDiagnostic(diagnostic.code)">{{ searchDiagnosticLabel(diagnostic.code) }}</NAlert><NEmpty v-if="!hits.length" :description="t('pages.knowledge.noHits')"/><div v-for="hit in hits" :key="hit.citationId" class="hit"><strong>[{{ hit.citationId }}] {{ hit.documentName }}</strong><span>{{ hit.pageFrom ? `${t('pages.knowledge.page')} ${hit.pageFrom}` : '' }} {{ hit.sectionPath }}</span><p>{{ hit.excerpt }}</p><div class="hit-scores"><NTag size="small">{{ t('pages.knowledge.fusedScore') }} {{ (hit.rrfScore ?? hit.score).toFixed(3) }}</NTag><NTag v-if="hit.rerankScore != null" size="small" type="warning">{{ t('pages.knowledge.rerankScore') }} {{ hit.rerankScore.toFixed(3) }}</NTag><NTag v-if="hit.denseScore != null" size="small" type="info">{{ t('pages.knowledge.denseScore') }} {{ hit.denseScore.toFixed(3) }}</NTag><NTag v-if="hit.bm25Score != null" size="small" type="success">{{ t('pages.knowledge.bm25Score') }} {{ hit.bm25Score.toFixed(3) }}</NTag><NTag v-for="source in hit.retrievalSources" :key="source" size="small" :bordered="false">{{ retrievalSourceLabel(source) }}</NTag></div></div></NSpin></NCard></div>
       </template>
     </div></main>
   </div></div>
+  <NDrawer v-model:show="configDrawerVisible" placement="right" :width="420" resizable>
+    <NDrawerContent v-if="selected" :title="t('pages.knowledge.indexConfig.title')" closable>
+      <NAlert
+        v-if="embeddingFailureDocument"
+        type="warning"
+        class="knowledge-meta-alert"
+        :title="t('pages.knowledge.indexConfig.warningTitle')"
+      >
+        {{ t("pages.knowledge.indexConfig.warningBody") }}
+      </NAlert>
+      <div class="knowledge-meta-grid">
+        <div class="knowledge-meta-item">
+          <span class="knowledge-meta-label">{{ t("pages.knowledge.indexConfig.model") }}</span>
+          <strong>{{ selected.embeddingModelId }}</strong>
+        </div>
+        <div class="knowledge-meta-item">
+          <span class="knowledge-meta-label">{{ t("pages.knowledge.indexConfig.provider") }}</span>
+          <strong>{{ selected.embeddingProviderId }}</strong>
+        </div>
+        <div class="knowledge-meta-item">
+          <span class="knowledge-meta-label">{{ t("pages.knowledge.indexConfig.dimension") }}</span>
+          <strong>{{ selected.embeddingDimension }}</strong>
+        </div>
+      </div>
+      <div class="knowledge-meta-secondary">
+        <div class="knowledge-meta-collection">
+          <span class="knowledge-meta-label">{{ t("pages.knowledge.indexConfig.collection") }}</span>
+          <code>{{ selected.vectorCollectionName }}</code>
+        </div>
+        <NButton secondary size="small" @click="copyCollectionName">
+          <template #icon><Copy :size="14" /></template>
+          {{ t("pages.knowledge.indexConfig.copy") }}
+        </NButton>
+      </div>
+    </NDrawerContent>
+  </NDrawer>
   <NModal v-model:show="createVisible" preset="card" :title="t('pages.knowledge.createCard.title')" :style="{ width: 'min(560px, calc(100vw - 32px))' }"><div class="form"><NInput v-model:value="form.name" :placeholder="t('pages.knowledge.form.name')"/><NInput v-model:value="form.description" type="textarea" :placeholder="t('pages.knowledge.form.description')"/><NInput v-model:value="form.embeddingProviderId" :placeholder="t('pages.knowledge.form.provider')"/><NInput v-model:value="form.embeddingModelId" :placeholder="t('pages.knowledge.form.model')"/><NInputNumber v-model:value="form.embeddingDimension" :min="1" :placeholder="t('pages.knowledge.form.dimension')"/><NButton type="primary" :disabled="!form.name || !form.embeddingProviderId || !form.embeddingModelId" @click="createBase">{{ t("pages.knowledge.createCard.action") }}</NButton></div></NModal>
 </template>
 
 <style scoped>
-.knowledge-page{gap:var(--space-5)}.knowledge-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:var(--space-4)}.knowledge-create-card,.knowledge-card{min-height:220px;padding:var(--space-5);border:1px solid var(--color-border-soft);border-radius:var(--radius-2xl);background:var(--color-bg-surface);text-align:left;display:flex;flex-direction:column;gap:var(--space-3);cursor:pointer}.knowledge-create-card{align-items:center;justify-content:center;text-align:center;border-style:dashed}.card-heading,.metrics,.detail-header,.document-row,.search-bar,.hit-scores{display:flex;align-items:center;gap:var(--space-3)}.card-heading strong{flex:1}.metrics{margin-top:auto;color:var(--color-text-muted);justify-content:space-between}.detail-header>div{flex:1}.detail-header h2,.detail-header p{margin:0}.upload-results{display:flex;flex-direction:column;gap:var(--space-2);padding:var(--space-3);border:1px solid var(--color-border-soft);border-radius:var(--radius-lg);background:var(--color-bg-surface)}.upload-result{display:flex;align-items:center;gap:var(--space-3);font-size:var(--font-size-sm)}.upload-result>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.detail-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(320px,.8fr);gap:var(--space-4)}.document-row{padding:var(--space-3) 0;border-bottom:1px solid var(--color-border-soft)}.document-main{display:flex;flex:1;min-width:0;flex-direction:column;gap:var(--space-2)}.job-detail{color:var(--color-text-muted);font-size:var(--font-size-sm)}.error{color:var(--color-danger)}.search-bar{margin-bottom:var(--space-4)}.search-diagnostic{margin-bottom:var(--space-3)}.hit{padding:var(--space-3);margin-bottom:var(--space-3);border:1px solid var(--color-border-soft);border-radius:var(--radius-lg);display:flex;flex-direction:column;gap:var(--space-2)}.hit p{margin:0;white-space:pre-wrap}.hit-scores{flex-wrap:wrap}.form{display:flex;flex-direction:column;gap:var(--space-3)}@media(max-width:900px){.detail-grid{grid-template-columns:1fr}.detail-header{flex-wrap:wrap}}
+.knowledge-page{gap:var(--space-5)}.knowledge-page--detail{gap:var(--space-4)}.knowledge-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:var(--space-4)}.knowledge-create-card,.knowledge-card{min-height:220px;padding:var(--space-5);border:1px solid var(--color-border-soft);border-radius:var(--radius-2xl);background:var(--color-bg-surface);text-align:left;display:flex;flex-direction:column;gap:var(--space-3);cursor:pointer}.knowledge-create-card{align-items:center;justify-content:center;text-align:center;border-style:dashed}.card-heading,.metrics,.detail-header-actions,.document-row,.search-bar,.hit-scores,.knowledge-meta-secondary{display:flex;align-items:center;gap:var(--space-3)}.card-heading strong{flex:1}.metrics{margin-top:auto;color:var(--color-text-muted);justify-content:space-between}.detail-back-row{display:flex;align-items:center}.detail-back-btn{display:inline-flex;align-items:center;gap:var(--space-1);padding:0;border:0;background:transparent;color:var(--color-text-secondary);font-size:var(--text-body-size);cursor:pointer}.detail-back-btn:hover{color:var(--color-brand-400)}.knowledge-meta-grid{display:grid;grid-template-columns:1fr;gap:var(--space-4)}.knowledge-meta-item{display:flex;flex-direction:column;gap:var(--space-1)}.knowledge-meta-label{font-size:var(--font-size-sm);color:var(--color-text-muted)}.knowledge-meta-secondary{justify-content:space-between;margin-top:var(--space-4);padding-top:var(--space-4);border-top:1px solid var(--color-border-soft)}.knowledge-meta-collection{display:flex;flex-direction:column;gap:var(--space-1);min-width:0}.knowledge-meta-collection code{display:block;max-width:100%;overflow:auto;white-space:nowrap}.knowledge-meta-alert{margin-bottom:var(--space-4)}.upload-results{display:flex;flex-direction:column;gap:var(--space-2);padding:var(--space-3);border:1px solid var(--color-border-soft);border-radius:var(--radius-lg);background:var(--color-bg-surface)}.upload-result{display:flex;align-items:center;gap:var(--space-3);font-size:var(--font-size-sm)}.upload-result>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.detail-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(320px,.8fr);gap:var(--space-4)}.document-row{padding:var(--space-3) 0;border-bottom:1px solid var(--color-border-soft)}.document-main{display:flex;flex:1;min-width:0;flex-direction:column;gap:var(--space-2)}.job-detail{color:var(--color-text-muted);font-size:var(--font-size-sm)}.error{color:var(--color-danger)}.search-bar{margin-bottom:var(--space-4)}.search-diagnostic{margin-bottom:var(--space-3)}.hit{padding:var(--space-3);margin-bottom:var(--space-3);border:1px solid var(--color-border-soft);border-radius:var(--radius-lg);display:flex;flex-direction:column;gap:var(--space-2)}.hit p{margin:0;white-space:pre-wrap}.hit-scores{flex-wrap:wrap}.form{display:flex;flex-direction:column;gap:var(--space-3)}@media(max-width:900px){.detail-grid{grid-template-columns:1fr}.detail-header-actions,.knowledge-meta-secondary{flex-wrap:wrap}}
 </style>

@@ -1061,7 +1061,19 @@ const enUS = {
       vectorUnavailable: "Qdrant is unavailable. Regular conversations are unaffected.",
       empty: "No knowledge bases yet",
       back: "Back",
+      backShort: "Back",
       upload: "Upload documents",
+      indexConfig: {
+        title: "Index configuration",
+        open: "View index config",
+        model: "Embedding model",
+        provider: "Provider",
+        dimension: "Vector dimension",
+        collection: "Vector collection",
+        copy: "Copy name",
+        warningTitle: "This index configuration may be unavailable",
+        warningBody: "The latest embedding job failed. Check the provider, API key, and embedding model configuration."
+      },
       documents: "Documents",
       noDocuments: "No documents uploaded",
       retry: "Retry",
@@ -1139,6 +1151,7 @@ const enUS = {
       form: { name: "Knowledge base name", description: "Description", provider: "Embedding provider ID", model: "Embedding model ID", dimension: "Vector dimension" },
       messages: {
         created: "Knowledge base created",
+        collectionCopied: "Vector collection name copied",
         uploaded: "Documents queued for processing",
         uploadSummary: "Accepted {accepted}, duplicate {duplicate}, failed {failed}"
       }
