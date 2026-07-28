@@ -49,11 +49,19 @@ export function formatConversationListTime(value?: string | null, locale?: strin
   }
 
   const isZh = String(locale || getSortLocale()).toLowerCase().startsWith("zh");
-  const hours = Math.floor(diffMs / 3_600_000);
-  if (hours < 24) {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfYesterday = new Date(startOfToday);
+  startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+  const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  if (startOfDate.getTime() === startOfToday.getTime()) {
     return isZh ? "今天" : "1d";
   }
+  if (startOfDate.getTime() === startOfYesterday.getTime()) {
+    return isZh ? "昨天" : "1d";
+  }
 
+  const hours = Math.floor(diffMs / 3_600_000);
   const days = Math.floor(hours / 24);
   if (days < 7) {
     return isZh ? `${days} 天前` : `${days}d`;
