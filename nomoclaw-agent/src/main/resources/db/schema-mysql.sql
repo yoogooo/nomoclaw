@@ -679,6 +679,7 @@ CREATE TABLE IF NOT EXISTS llm_provider_model (
     provider_id VARCHAR(64) NOT NULL DEFAULT '' COMMENT 'Provider 业务ID',
     model_id VARCHAR(128) NOT NULL DEFAULT '' COMMENT '模型唯一标识',
     model_name VARCHAR(255) NOT NULL DEFAULT '' COMMENT '模型展示名称',
+    model_type VARCHAR(32) NOT NULL DEFAULT 'CHAT' COMMENT '模型类型：CHAT / EMBEDDING / SPEECH / IMAGE / MODERATION / REALTIME',
     capabilities_json JSON NOT NULL COMMENT '能力列表 JSON 数组',
     reasoning TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否支持 reasoning/thinking',
     context_window INT NOT NULL DEFAULT 0 COMMENT '上下文窗口大小，0 表示未知',

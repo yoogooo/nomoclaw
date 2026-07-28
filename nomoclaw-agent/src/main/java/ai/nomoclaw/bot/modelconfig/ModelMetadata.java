@@ -8,6 +8,7 @@ public record ModelMetadata(
         String providerId,
         String modelId,
         String displayName,
+        String modelType,
         List<String> inputModalities,
         List<String> outputModalities,
         boolean reasoning,

@@ -342,6 +342,7 @@ export interface ChannelTargetSearchResponse {
 export interface ModelProviderOption {
   id: string;
   name: string;
+  modelType: string;
   capabilities: string[];
   reasoning: boolean;
   contextWindow: number;

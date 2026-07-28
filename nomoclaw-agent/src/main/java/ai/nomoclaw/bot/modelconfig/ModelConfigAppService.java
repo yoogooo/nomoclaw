@@ -405,15 +405,16 @@ public class ModelConfigAppService {
             if (id.isBlank()) {
                 continue;
             }
-            deduped.put(id, userConfiguredModel(id, trim(model.name()).isBlank() ? id : trim(model.name())));
+            deduped.put(id, userConfiguredModel(id, trim(model.name()).isBlank() ? id : trim(model.name()), model.modelType()));
         }
         return List.copyOf(deduped.values());
     }
 
-    private ModelConfigDto.Model userConfiguredModel(String id, String name) {
+    private ModelConfigDto.Model userConfiguredModel(String id, String name, String modelType) {
         return new ModelConfigDto.Model(
                 id,
                 trim(name).isBlank() ? id : trim(name),
+                sanitizeModelType(modelType),
                 List.of(),
                 false,
                 0,
@@ -453,6 +454,10 @@ public class ModelConfigAppService {
             }
         }
         return List.copyOf(sanitized);
+    }
+
+    private String sanitizeModelType(String modelType) {
+        return ModelTypes.sanitize(modelType);
     }
 
     private Integer sanitizeNonNegative(Integer value) {
@@ -537,6 +542,7 @@ public class ModelConfigAppService {
         entity.setProviderId(providerId);
         entity.setModelId(model.id());
         entity.setModelName(model.name());
+        entity.setModelType(metadata.matched() ? metadata.modelType() : sanitizeModelType(model.modelType()));
         entity.setCapabilitiesJson(JsonUtil.toJson(inputModalities));
         entity.setReasoning((metadata.matched() ? metadata.reasoning() : model.reasoning()) ? 1 : 0);
         entity.setContextWindow(sanitizeNonNegative(metadata.matched() ? metadata.contextWindowTokens() : model.contextWindow()));
@@ -619,6 +625,7 @@ public class ModelConfigAppService {
         return new ModelConfigDto.Model(
                 entity.getModelId(),
                 name,
+                metadata.matched() ? metadata.modelType() : builtin == null ? sanitizeModelType(entity.getModelType()) : sanitizeModelType(builtin.modelType()),
                 capabilities,
                 metadata.matched() ? metadata.reasoning() : builtin == null ? entity.getReasoning() != null && entity.getReasoning() == 1 : builtin.reasoning(),
                 metadata.matched() ? metadata.contextWindowTokens() : builtin == null ? sanitizeNonNegative(entity.getContextWindow()) : builtin.contextWindow(),

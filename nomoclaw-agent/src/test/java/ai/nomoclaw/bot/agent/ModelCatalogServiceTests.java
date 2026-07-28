@@ -37,6 +37,7 @@ class ModelCatalogServiceTests {
         var metadata = service.resolve("openai", "gpt-4.1");
 
         assertThat(metadata.matched()).isTrue();
+        assertThat(metadata.modelType()).isEqualTo("CHAT");
         assertThat(metadata.inputModalities()).contains("text", "image");
         assertThat(metadata.uploadPolicy().enabled()).isTrue();
         assertThat(metadata.uploadPolicy().maxImagesPerMessage()).isEqualTo(1500);
@@ -75,6 +76,7 @@ class ModelCatalogServiceTests {
         var metadata = service.resolve("openai", "unknown-model");
 
         assertThat(metadata.matched()).isFalse();
+        assertThat(metadata.modelType()).isEqualTo("CHAT");
         assertThat(metadata.inputModalities()).containsExactly("text");
         assertThat(metadata.uploadPolicy().enabled()).isFalse();
         assertThat(metadata.source()).isEqualTo("fallback");
@@ -128,6 +130,7 @@ class ModelCatalogServiceTests {
                       "providerIds": ["openai"],
                       "modelId": "gpt-4.1",
                       "displayName": "Custom GPT-4.1",
+                      "modelType": "CHAT",
                       "aliases": [],
                       "inputModalities": ["text"],
                       "outputModalities": ["text"],

@@ -77,6 +77,7 @@ function normalizeModel(model: ModelProviderOption): ModelProviderOption {
   return {
     id: model.id ?? "",
     name: model.name ?? "",
+    modelType: model.modelType ?? "CHAT",
     capabilities: Array.isArray(model.capabilities) ? model.capabilities.filter(Boolean) : [],
     reasoning: Boolean(model.reasoning),
     contextWindow: Number.isFinite(model.contextWindow) ? model.contextWindow : 0,
@@ -149,6 +150,7 @@ async function addModel() {
   provider.models.push({
     id: "",
     name: "",
+    modelType: "CHAT",
     capabilities: [],
     reasoning: false,
     contextWindow: 0,
@@ -210,6 +212,7 @@ async function saveEditor() {
     provider.models = provider.models.map((item) => ({
       id: item.id.trim(),
       name: item.name.trim() || item.id.trim(),
+      modelType: item.modelType || "CHAT",
       capabilities: [],
       reasoning: false,
       contextWindow: 0,

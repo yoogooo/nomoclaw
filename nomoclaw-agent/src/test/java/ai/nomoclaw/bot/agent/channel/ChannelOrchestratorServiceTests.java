@@ -289,6 +289,7 @@ class ChannelOrchestratorServiceTests {
                         List.of(new ModelConfigDto.Model(
                                 modelId,
                                 modelId,
+                                "CHAT",
                                 List.of("text"),
                                 false,
                                 0,

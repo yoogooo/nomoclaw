@@ -233,6 +233,7 @@ public final class SystemApiMapper {
                                         .map(model -> new ModelConfigResponse.Model(
                                                 model.id(),
                                                 model.name(),
+                                                model.modelType(),
                                                 model.capabilities(),
                                                 model.reasoning(),
                                                 model.contextWindow(),
@@ -271,6 +272,7 @@ public final class SystemApiMapper {
                                         .map(model -> new ModelConfigDto.Model(
                                                 model.id(),
                                                 model.name(),
+                                                model.modelType(),
                                                 model.capabilities(),
                                                 model.reasoning(),
                                                 model.contextWindow(),

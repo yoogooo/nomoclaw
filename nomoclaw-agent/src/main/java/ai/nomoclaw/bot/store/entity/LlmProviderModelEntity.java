@@ -14,6 +14,7 @@ public class LlmProviderModelEntity {
     private String providerId;
     private String modelId;
     private String modelName;
+    private String modelType;
     private String capabilitiesJson;
     private Integer reasoning;
     private Integer contextWindow;
@@ -55,6 +56,14 @@ public class LlmProviderModelEntity {
 
     public void setModelName(String modelName) {
         this.modelName = modelName;
+    }
+
+    public String getModelType() {
+        return modelType;
+    }
+
+    public void setModelType(String modelType) {
+        this.modelType = modelType;
     }
 
     public String getCapabilitiesJson() {

@@ -592,6 +592,7 @@ CREATE TABLE IF NOT EXISTS llm_provider_model (
     provider_id VARCHAR(64) NOT NULL DEFAULT '',
     model_id VARCHAR(128) NOT NULL DEFAULT '',
     model_name VARCHAR(255) NOT NULL DEFAULT '',
+    model_type VARCHAR(32) NOT NULL DEFAULT 'CHAT',
     capabilities_json CLOB NOT NULL,
     reasoning TINYINT(1) NOT NULL DEFAULT 0,
     context_window INT NOT NULL DEFAULT 0,

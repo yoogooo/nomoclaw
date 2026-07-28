@@ -1,6 +1,7 @@
 package ai.nomoclaw.bot.model;
 
 import ai.nomoclaw.bot.modelconfig.model.ModelConfigDto;
+import ai.nomoclaw.bot.modelconfig.ModelTypes;
 
 import java.util.List;
 
@@ -202,7 +203,7 @@ public final class ModelProviderDefaults {
                                               int maxInputTokens,
                                               int maxOutputTokens,
                                               ModelConfigDto.UploadPolicy uploadPolicy) {
-        return new ModelConfigDto.Model(id, name, capabilities, reasoning, contextWindow, maxInputTokens, maxOutputTokens, uploadPolicy, false, "builtin");
+        return new ModelConfigDto.Model(id, name, ModelTypes.CHAT, capabilities, reasoning, contextWindow, maxInputTokens, maxOutputTokens, uploadPolicy, false, "builtin");
     }
 
     private static ModelConfigDto.UploadPolicy disabledUpload() {

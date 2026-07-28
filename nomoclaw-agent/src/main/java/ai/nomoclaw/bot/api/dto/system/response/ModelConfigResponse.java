@@ -26,6 +26,7 @@ public record ModelConfigResponse(
     public record Model(
             String id,
             String name,
+            String modelType,
             List<String> capabilities,
             boolean reasoning,
             Integer contextWindow,

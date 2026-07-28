@@ -250,6 +250,9 @@ public class ModelCatalogService {
                 providerId,
                 requestedModelId,
                 trim(model.displayName()).isBlank() ? requestedModelId : trim(model.displayName()),
+                ModelTypes.sanitize(trim(model.modelType()).isBlank()
+                        ? ModelTypes.inferFromModalities(model.inputModalities(), model.outputModalities())
+                        : model.modelType()),
                 sanitize(model.inputModalities()).isEmpty() ? List.of("text") : sanitize(model.inputModalities()),
                 sanitize(model.outputModalities()).isEmpty() ? List.of("text") : sanitize(model.outputModalities()),
                 model.reasoning(),
@@ -268,6 +271,7 @@ public class ModelCatalogService {
                 providerId,
                 modelId,
                 trim(modelId).isBlank() ? "" : trim(modelId),
+                ModelTypes.CHAT,
                 List.of("text"),
                 List.of("text"),
                 false,
@@ -396,6 +400,7 @@ public class ModelCatalogService {
             List<String> providerIds,
             String modelId,
             String displayName,
+            String modelType,
             List<String> aliases,
             List<String> inputModalities,
             List<String> outputModalities,

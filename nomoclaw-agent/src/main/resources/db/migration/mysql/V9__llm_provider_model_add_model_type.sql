@@ -1,0 +1,3 @@
+ALTER TABLE llm_provider_model
+    ADD COLUMN model_type VARCHAR(32) NOT NULL DEFAULT 'CHAT' COMMENT '模型类型：CHAT / EMBEDDING / SPEECH / IMAGE / MODERATION / REALTIME'
+        AFTER model_name;
