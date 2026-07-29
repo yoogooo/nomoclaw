@@ -21,4 +21,9 @@ public class KnowledgeImportBatchRepository extends CrudRepository<KnowledgeImpo
     public long countDraft() {
         return lambdaQuery().eq(KnowledgeImportBatchEntity::getStatus, "DRAFT").count();
     }
+
+    /** Finds one batch by business UID. */
+    public KnowledgeImportBatchEntity findByUid(String batchUid) {
+        return lambdaQuery().eq(KnowledgeImportBatchEntity::getBatchUid, batchUid).one();
+    }
 }

@@ -1,7 +1,10 @@
 package ai.nomoclaw.bot.knowledge.app;
 
 import ai.nomoclaw.bot.knowledge.config.KnowledgeProperties;
-import ai.nomoclaw.bot.knowledge.core.repository.KnowledgePersistenceRepository;
+import ai.nomoclaw.bot.knowledge.core.entity.KnowledgeDocumentEntity;
+import ai.nomoclaw.bot.knowledge.core.entity.KnowledgeIngestionJobEntity;
+import ai.nomoclaw.bot.knowledge.core.repository.KnowledgeDocumentRepository;
+import ai.nomoclaw.bot.knowledge.core.repository.KnowledgeIngestionJobRepository;
 import ai.nomoclaw.bot.knowledge.util.UuidUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,7 +31,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class KnowledgeIngestionDispatcher implements DisposableBean {
     private static final Logger log = LoggerFactory.getLogger(KnowledgeIngestionDispatcher.class);
 
-    private final KnowledgePersistenceRepository persistence;
+    private final KnowledgeIngestionJobRepository ingestionJobRepository;
+    private final KnowledgeDocumentRepository documentRepository;
     private final KnowledgeProperties properties;
     private final KnowledgeIngestionRunner runner;
     private final Executor executor;
@@ -38,10 +42,13 @@ public class KnowledgeIngestionDispatcher implements DisposableBean {
     private final AtomicBoolean running = new AtomicBoolean();
     private ScheduledFuture<?> dispatchFuture;
 
-    public KnowledgeIngestionDispatcher(KnowledgePersistenceRepository persistence, KnowledgeProperties properties, KnowledgeIngestionRunner runner,
+    public KnowledgeIngestionDispatcher(KnowledgeIngestionJobRepository ingestionJobRepository,
+                                        KnowledgeDocumentRepository documentRepository,
+                                        KnowledgeProperties properties, KnowledgeIngestionRunner runner,
                                         @Qualifier("knowledgeIngestionExecutor") Executor executor,
                                         @Qualifier("knowledgeIngestionScheduler") ThreadPoolTaskScheduler scheduler) {
-        this.persistence = persistence;
+        this.ingestionJobRepository = ingestionJobRepository;
+        this.documentRepository = documentRepository;
         this.properties = properties;
         this.runner = runner;
         this.executor = executor;
@@ -92,39 +99,51 @@ public class KnowledgeIngestionDispatcher implements DisposableBean {
         int available = workerSlots.availablePermits();
         if (available <= 0) return;
         LocalDateTime now = LocalDateTime.now();
-        List<JobCandidate> candidates = persistence.query("SELECT id,job_uid,status,attempt_count FROM knowledge_ingestion_job "
-                        + "WHERE (((status='PENDING' OR status='RETRY_WAIT') AND (next_retry_time IS NULL OR next_retry_time<=?)) "
-                        + "OR (status='RUNNING' AND lease_until<?)) AND attempt_count<? ORDER BY id LIMIT ?",
-                (rs, row) -> new JobCandidate(rs.getLong("id"), rs.getString("job_uid"),
-                        rs.getString("status"), rs.getInt("attempt_count")),
-                now, now, properties.getIngestion().getMaxAttempts(), available);
-        for (JobCandidate candidate : candidates) {
+        List<KnowledgeIngestionJobEntity> candidates = ingestionJobRepository.listRunnableCandidates(
+                now, properties.getIngestion().getMaxAttempts(), available);
+        for (KnowledgeIngestionJobEntity candidate : candidates) {
             if (!workerSlots.tryAcquire()) break;
             claimAndSubmit(candidate, now);
         }
     }
 
-    private void claimAndSubmit(JobCandidate candidate, LocalDateTime now) {
+    private void claimAndSubmit(KnowledgeIngestionJobEntity candidate, LocalDateTime now) {
         String token = UuidUtil.newUuid();
         LocalDateTime leaseUntil = now.plusSeconds(Math.max(1, properties.getIngestion().getLeaseSeconds()));
-        int updated = persistence.update("UPDATE knowledge_ingestion_job SET status='RUNNING',stage='QUEUED',worker_id=?,lease_token=?,"
-                        + "lease_until=?,last_heartbeat_time=?,next_retry_time=NULL,retryable=0,attempt_count=attempt_count+1,"
-                        + "started_time=COALESCE(started_time,?),finished_time=NULL,updated_time=? WHERE id=? AND attempt_count=? "
-                        + "AND (((status='PENDING' OR status='RETRY_WAIT') AND (next_retry_time IS NULL OR next_retry_time<=?)) "
-                        + "OR (status='RUNNING' AND lease_until<?))",
-                workerId, token, leaseUntil, now, now, now, candidate.id(), candidate.attemptCount(), now, now);
-        if (updated == 0) {
+        boolean claimable = (("PENDING".equals(candidate.getStatus()) || "RETRY_WAIT".equals(candidate.getStatus()))
+                && (candidate.getNextRetryTime() == null || !candidate.getNextRetryTime().after(toDate(now))))
+                || ("RUNNING".equals(candidate.getStatus()) && candidate.getLeaseUntil() != null
+                && candidate.getLeaseUntil().before(toDate(now)));
+        if (!claimable) {
+            workerSlots.release();
+            return;
+        }
+        candidate.setStatus("RUNNING");
+        candidate.setStage("QUEUED");
+        candidate.setWorkerId(workerId);
+        candidate.setLeaseToken(token);
+        candidate.setLeaseUntil(toDate(leaseUntil));
+        candidate.setLastHeartbeatTime(toDate(now));
+        candidate.setNextRetryTime(null);
+        candidate.setRetryable(false);
+        candidate.setAttemptCount((candidate.getAttemptCount() == null ? 0 : candidate.getAttemptCount()) + 1);
+        if (candidate.getStartedTime() == null) {
+            candidate.setStartedTime(toDate(now));
+        }
+        candidate.setFinishedTime(null);
+        candidate.setUpdatedTime(toDate(now));
+        if (!ingestionJobRepository.updateById(candidate)) {
             workerSlots.release();
             return;
         }
         try {
-            executor.execute(() -> executeClaimed(candidate.jobUid(), token));
+            executor.execute(() -> executeClaimed(candidate.getJobUid(), token));
             log.info("[KnowledgeIngestion] claimed jobUid={} workerId={} attempt={}",
-                    candidate.jobUid(), workerId, candidate.attemptCount() + 1);
+                    candidate.getJobUid(), workerId, candidate.getAttemptCount());
         } catch (RejectedExecutionException ex) {
-            releaseRejected(candidate.jobUid(), token);
+            releaseRejected(candidate.getJobUid(), token);
             workerSlots.release();
-            log.warn("[KnowledgeIngestion] executor rejected jobUid={}", candidate.jobUid());
+            log.warn("[KnowledgeIngestion] executor rejected jobUid={}", candidate.getJobUid());
         }
     }
 
@@ -141,40 +160,59 @@ public class KnowledgeIngestionDispatcher implements DisposableBean {
 
     private void renewLease(String jobUid, String token) {
         LocalDateTime now = LocalDateTime.now();
-        int updated = persistence.update("UPDATE knowledge_ingestion_job SET lease_until=?,last_heartbeat_time=?,updated_time=? "
-                        + "WHERE job_uid=? AND status='RUNNING' AND lease_token=?",
-                now.plusSeconds(Math.max(1, properties.getIngestion().getLeaseSeconds())), now, now, jobUid, token);
-        if (updated == 0) log.debug("[KnowledgeIngestion] heartbeat ignored after lease loss jobUid={}", jobUid);
+        KnowledgeIngestionJobEntity job = ingestionJobRepository.findRunningByUidAndToken(jobUid, token);
+        if (job == null) {
+            log.debug("[KnowledgeIngestion] heartbeat ignored after lease loss jobUid={}", jobUid);
+            return;
+        }
+        job.setLeaseUntil(toDate(now.plusSeconds(Math.max(1, properties.getIngestion().getLeaseSeconds()))));
+        job.setLastHeartbeatTime(toDate(now));
+        job.setUpdatedTime(toDate(now));
+        ingestionJobRepository.updateById(job);
     }
 
     private void releaseRejected(String jobUid, String token) {
         LocalDateTime now = LocalDateTime.now();
-        persistence.update("UPDATE knowledge_ingestion_job SET status='PENDING',stage='QUEUED',worker_id=NULL,lease_token=NULL,"
-                        + "lease_until=NULL,last_heartbeat_time=NULL,attempt_count=CASE WHEN attempt_count>0 THEN attempt_count-1 ELSE 0 END,updated_time=? "
-                        + "WHERE job_uid=? AND status='RUNNING' AND lease_token=?",
-                now, jobUid, token);
+        KnowledgeIngestionJobEntity job = ingestionJobRepository.findRunningByUidAndToken(jobUid, token);
+        if (job == null) return;
+        job.setStatus("PENDING");
+        job.setStage("QUEUED");
+        job.setWorkerId(null);
+        job.setLeaseToken(null);
+        job.setLeaseUntil(null);
+        job.setLastHeartbeatTime(null);
+        job.setAttemptCount(Math.max(0, job.getAttemptCount() == null ? 0 : job.getAttemptCount() - 1));
+        job.setUpdatedTime(toDate(now));
+        ingestionJobRepository.updateById(job);
     }
 
     private void expireExhaustedJobs() {
         LocalDateTime now = LocalDateTime.now();
-        List<String> exhausted = persistence.queryForList("SELECT job_uid FROM knowledge_ingestion_job WHERE status='RUNNING' "
-                        + "AND lease_until<? AND attempt_count>=?", String.class,
-                now, properties.getIngestion().getMaxAttempts());
-        for (String jobUid : exhausted) {
-            int updated = persistence.update("UPDATE knowledge_ingestion_job SET status='FAILED',retryable=1,"
-                            + "failure_code='LEASE_EXPIRED',failure_message='任务租约过期且已达到最大重试次数',worker_id=NULL,"
-                            + "lease_token=NULL,lease_until=NULL,finished_time=?,updated_time=? WHERE job_uid=? AND status='RUNNING' "
-                            + "AND lease_until<? AND attempt_count>=?",
-                    now, now, jobUid, now, properties.getIngestion().getMaxAttempts());
-            if (updated > 0) {
-                persistence.update("UPDATE knowledge_document SET status='FAILED',failure_code='LEASE_EXPIRED',"
-                                + "failure_message='任务租约过期且已达到最大重试次数',updated_time=? WHERE document_uid="
-                                + "(SELECT document_uid FROM knowledge_ingestion_job WHERE job_uid=?)",
-                        now, jobUid);
+        for (KnowledgeIngestionJobEntity job : ingestionJobRepository.listExhaustedRunning(
+                now, properties.getIngestion().getMaxAttempts())) {
+            job.setStatus("FAILED");
+            job.setRetryable(true);
+            job.setFailureCode("LEASE_EXPIRED");
+            job.setFailureMessage("任务租约过期且已达到最大重试次数");
+            job.setWorkerId(null);
+            job.setLeaseToken(null);
+            job.setLeaseUntil(null);
+            job.setFinishedTime(toDate(now));
+            job.setUpdatedTime(toDate(now));
+            if (ingestionJobRepository.updateById(job)) {
+                KnowledgeDocumentEntity document = documentRepository.findByUid(job.getDocumentUid());
+                if (document != null) {
+                    document.setStatus("FAILED");
+                    document.setFailureCode("LEASE_EXPIRED");
+                    document.setFailureMessage("任务租约过期且已达到最大重试次数");
+                    document.setUpdatedTime(toDate(now));
+                    documentRepository.updateById(document);
+                }
             }
         }
     }
 
-    private record JobCandidate(long id, String jobUid, String status, int attemptCount) {
+    private java.util.Date toDate(LocalDateTime value) {
+        return java.sql.Timestamp.valueOf(value);
     }
 }

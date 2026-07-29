@@ -13,7 +13,7 @@ const emit = defineEmits<{ retry: []; build: []; reindex: []; remove: []; detail
 const { t } = useI18n();
 
 const processing = computed(() => ["PENDING", "RUNNING", "RETRY_WAIT"].includes(props.document.jobStatus));
-const detailVisible = computed(() => processing.value || props.document.jobStatus === "FAILED");
+const detailVisible = computed(() => props.document.status !== "UPLOADED");
 const actions = computed<DropdownOption[]>(() => {
   if (props.document.status === "UPLOADED") {
     return [
@@ -21,8 +21,18 @@ const actions = computed<DropdownOption[]>(() => {
       { label: t("common.delete"), key: "remove" }
     ];
   }
-  if (props.document.jobStatus === "FAILED") return [{ label: t("pages.knowledge.retry"), key: "retry" }];
-  if (props.document.status === "READY") return [{ label: t("pages.knowledge.actions.reindex"), key: "reindex" }];
+  if (props.document.jobStatus === "FAILED") {
+    return [
+      { label: t("pages.knowledge.retry"), key: "retry" },
+      { label: t("common.delete"), key: "remove" }
+    ];
+  }
+  if (props.document.status === "READY") {
+    return [
+      { label: t("pages.knowledge.actions.reindex"), key: "reindex" },
+      { label: t("common.delete"), key: "remove" }
+    ];
+  }
   return [];
 });
 

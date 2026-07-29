@@ -34,4 +34,19 @@ public class KnowledgeChunkRepository extends CrudRepository<KnowledgeChunkMappe
                 .list();
     }
 
+    /** Lists chunk business UIDs for one document. */
+    public List<String> listChunkUidsByDocument(String documentUid) {
+        return lambdaQuery().select(KnowledgeChunkEntity::getChunkUid)
+                .eq(KnowledgeChunkEntity::getDocumentUid, documentUid)
+                .list()
+                .stream()
+                .map(KnowledgeChunkEntity::getChunkUid)
+                .toList();
+    }
+
+    /** Deletes all chunks that belong to one document. */
+    public void deleteByDocument(String documentUid) {
+        lambdaUpdate().eq(KnowledgeChunkEntity::getDocumentUid, documentUid).remove();
+    }
+
 }

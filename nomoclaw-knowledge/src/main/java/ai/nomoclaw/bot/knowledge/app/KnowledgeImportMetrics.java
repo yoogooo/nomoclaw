@@ -1,6 +1,6 @@
 package ai.nomoclaw.bot.knowledge.app;
 
-import ai.nomoclaw.bot.knowledge.core.repository.KnowledgePersistenceRepository;
+import ai.nomoclaw.bot.knowledge.core.repository.KnowledgeImportBatchRepository;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.ObjectProvider;
@@ -11,19 +11,17 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class KnowledgeImportMetrics {
-    public KnowledgeImportMetrics(KnowledgePersistenceRepository persistence, ObjectProvider<MeterRegistry> registryProvider) {
+    public KnowledgeImportMetrics(KnowledgeImportBatchRepository batchRepository, ObjectProvider<MeterRegistry> registryProvider) {
         MeterRegistry registry = registryProvider.getIfAvailable();
         if (registry != null) {
-            Gauge.builder("nomoclaw.knowledge.import.draft_batches", persistence, this::draftCount)
+            Gauge.builder("nomoclaw.knowledge.import.draft_batches", batchRepository, this::draftCount)
                     .register(registry);
         }
     }
 
-    private double draftCount(KnowledgePersistenceRepository persistence) {
+    private double draftCount(KnowledgeImportBatchRepository batchRepository) {
         try {
-            Integer count = persistence.queryForObject(
-                    "SELECT COUNT(*) FROM knowledge_import_batch WHERE status='DRAFT'", Integer.class);
-            return count == null ? 0 : count;
+            return batchRepository.countDraft();
         } catch (Exception ignored) {
             return 0;
         }
