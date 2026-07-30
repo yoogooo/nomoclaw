@@ -5,7 +5,10 @@ import ai.nomoclaw.bot.knowledge.core.mapper.KnowledgeImportItemMapper;
 import com.baomidou.mybatisplus.extension.repository.CrudRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Collection;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -70,5 +73,29 @@ public class KnowledgeImportItemRepository extends CrudRepository<KnowledgeImpor
     /** Deletes all import items that belong to one document. */
     public void deleteByDocument(String documentUid) {
         lambdaUpdate().eq(KnowledgeImportItemEntity::getDocumentUid, documentUid).remove();
+    }
+
+    /** Marks one item as building against the generated document version. */
+    public void markBuilding(String itemUid, String versionUid, LocalDateTime updatedTime) {
+        lambdaUpdate().eq(KnowledgeImportItemEntity::getItemUid, itemUid)
+                .set(KnowledgeImportItemEntity::getDocumentVersionUid, versionUid)
+                .set(KnowledgeImportItemEntity::getStatus, "BUILDING")
+                .set(KnowledgeImportItemEntity::getUpdatedTime, toDate(updatedTime))
+                .update();
+    }
+
+    /** Updates all import items for a version with the final status. */
+    public void finalizeByDocumentVersion(String versionUid, String status, String errorCode, String errorMessage,
+                                          LocalDateTime updatedTime) {
+        lambdaUpdate().eq(KnowledgeImportItemEntity::getDocumentVersionUid, versionUid)
+                .set(KnowledgeImportItemEntity::getStatus, status)
+                .set(KnowledgeImportItemEntity::getErrorCode, errorCode)
+                .set(KnowledgeImportItemEntity::getErrorMessage, errorMessage)
+                .set(KnowledgeImportItemEntity::getUpdatedTime, toDate(updatedTime))
+                .update();
+    }
+
+    private Date toDate(LocalDateTime value) {
+        return Date.from(value.atZone(ZoneId.systemDefault()).toInstant());
     }
 }

@@ -5,6 +5,7 @@ import ai.nomoclaw.bot.knowledge.core.entity.KnowledgeChunkEntity;
 import ai.nomoclaw.bot.knowledge.core.mapper.KnowledgeChunkMapper;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 
 @Repository
@@ -49,4 +50,49 @@ public class KnowledgeChunkRepository extends CrudRepository<KnowledgeChunkMappe
         lambdaUpdate().eq(KnowledgeChunkEntity::getDocumentUid, documentUid).remove();
     }
 
+    /** Deletes all chunks for a document version. */
+    public void deleteByDocumentVersion(String documentVersionUid) {
+        lambdaUpdate().eq(KnowledgeChunkEntity::getDocumentVersionUid, documentVersionUid).remove();
+    }
+
+    /** Deletes staged or failed chunks for a document version while retaining ready chunks. */
+    public void deleteNonReadyByDocumentVersion(String documentVersionUid) {
+        lambdaUpdate().eq(KnowledgeChunkEntity::getDocumentVersionUid, documentVersionUid)
+                .ne(KnowledgeChunkEntity::getStatus, "READY")
+                .remove();
+    }
+
+    /** Marks staged chunks for one version ready. */
+    public void markStagedReady(String documentVersionUid) {
+        lambdaUpdate().eq(KnowledgeChunkEntity::getDocumentVersionUid, documentVersionUid)
+                .eq(KnowledgeChunkEntity::getStatus, "STAGED")
+                .set(KnowledgeChunkEntity::getStatus, "READY")
+                .update();
+    }
+
+    /** Updates a staged chunk by business UID. */
+    public boolean updateStagedByUid(KnowledgeChunkEntity chunk) {
+        return lambdaUpdate().eq(KnowledgeChunkEntity::getChunkUid, chunk.getChunkUid())
+                .set(KnowledgeChunkEntity::getContent, chunk.getContent())
+                .set(KnowledgeChunkEntity::getTokenCount, chunk.getTokenCount())
+                .set(KnowledgeChunkEntity::getContentHash, chunk.getContentHash())
+                .set(KnowledgeChunkEntity::getPageFrom, chunk.getPageFrom())
+                .set(KnowledgeChunkEntity::getPageTo, chunk.getPageTo())
+                .set(KnowledgeChunkEntity::getSectionPath, chunk.getSectionPath())
+                .set(KnowledgeChunkEntity::getCharStart, chunk.getCharStart())
+                .set(KnowledgeChunkEntity::getCharEnd, chunk.getCharEnd())
+                .set(KnowledgeChunkEntity::getVectorPointId, chunk.getVectorPointId())
+                .set(KnowledgeChunkEntity::getStatus, "STAGED")
+                .update();
+    }
+
+    /** Lists ready chunks whose version is currently published on their document. */
+    public List<KnowledgeChunkEntity> listReadyCurrentVersionByBase(String knowledgeBaseUid,
+                                                                    Collection<String> currentVersionUids) {
+        if (currentVersionUids == null || currentVersionUids.isEmpty()) return List.of();
+        return lambdaQuery().eq(KnowledgeChunkEntity::getKnowledgeBaseUid, knowledgeBaseUid)
+                .eq(KnowledgeChunkEntity::getStatus, "READY")
+                .in(KnowledgeChunkEntity::getDocumentVersionUid, currentVersionUids)
+                .list();
+    }
 }

@@ -5,6 +5,9 @@ import ai.nomoclaw.bot.knowledge.core.mapper.ConversationKnowledgeBaseRelationMa
 import com.baomidou.mybatisplus.extension.repository.CrudRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Date;
 import java.util.List;
 
 /** Repository for conversation knowledge-base overrides. */
@@ -25,5 +28,20 @@ public class ConversationKnowledgeBaseRelationRepository extends CrudRepository<
     /** Removes all overrides for one conversation. */
     public void deleteByConversation(String conversationUid) {
         lambdaUpdate().eq(ConversationKnowledgeBaseRelationEntity::getConversationUid, conversationUid).remove();
+    }
+
+    /** Saves one conversation-level relation. */
+    public void saveRelation(String conversationUid, String knowledgeBaseUid, String mode, LocalDateTime now) {
+        ConversationKnowledgeBaseRelationEntity entity = new ConversationKnowledgeBaseRelationEntity();
+        entity.setConversationUid(conversationUid);
+        entity.setKnowledgeBaseUid(knowledgeBaseUid);
+        entity.setMode(mode);
+        entity.setCreatedTime(toDate(now));
+        entity.setUpdatedTime(toDate(now));
+        save(entity);
+    }
+
+    private Date toDate(LocalDateTime value) {
+        return Date.from(value.atZone(ZoneId.systemDefault()).toInstant());
     }
 }

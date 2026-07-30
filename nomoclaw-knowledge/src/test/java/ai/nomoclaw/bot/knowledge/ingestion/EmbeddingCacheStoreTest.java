@@ -1,7 +1,10 @@
 package ai.nomoclaw.bot.knowledge.ingestion;
 
+import ai.nomoclaw.bot.knowledge.TestRepositorySupport;
 import ai.nomoclaw.bot.knowledge.config.KnowledgeProperties;
 import ai.nomoclaw.bot.knowledge.config.KnowledgePropertiesTestSupport;
+import ai.nomoclaw.bot.knowledge.core.mapper.KnowledgeEmbeddingCacheMapper;
+import ai.nomoclaw.bot.knowledge.core.repository.KnowledgeEmbeddingCacheRepository;
 import ai.nomoclaw.bot.knowledge.core.repository.KnowledgePersistenceRepository;
 import org.h2.jdbcx.JdbcDataSource;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,7 +22,7 @@ class EmbeddingCacheStoreTest {
     private EmbeddingCacheStore cache;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         JdbcDataSource dataSource = new JdbcDataSource();
         dataSource.setURL("jdbc:h2:mem:embedding-cache;MODE=MySQL;DB_CLOSE_DELAY=-1");
         persistence = new KnowledgePersistenceRepository(dataSource);
@@ -28,7 +31,9 @@ class EmbeddingCacheStoreTest {
                 + "cache_key VARCHAR(64) UNIQUE,model_fingerprint VARCHAR(512),content_hash VARCHAR(64),dimension INT,"
                 + "vector_blob BLOB,vector_bytes INT,hit_count BIGINT,created_time TIMESTAMP,last_access_time TIMESTAMP)");
         properties = KnowledgePropertiesTestSupport.properties();
-        cache = new EmbeddingCacheStore(persistence, properties);
+        TestRepositorySupport repositories = new TestRepositorySupport(dataSource);
+        cache = new EmbeddingCacheStore(repositories.repository(KnowledgeEmbeddingCacheRepository.class,
+                KnowledgeEmbeddingCacheMapper.class), properties);
     }
 
     @Test

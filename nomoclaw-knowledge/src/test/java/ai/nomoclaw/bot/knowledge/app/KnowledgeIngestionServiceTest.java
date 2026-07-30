@@ -1,9 +1,36 @@
 package ai.nomoclaw.bot.knowledge.app;
 
+import ai.nomoclaw.bot.knowledge.TestRepositorySupport;
 import ai.nomoclaw.bot.knowledge.bm25.LexicalSearchStore;
 import ai.nomoclaw.bot.knowledge.config.KnowledgeProperties;
 import ai.nomoclaw.bot.knowledge.config.KnowledgePropertiesTestSupport;
+import ai.nomoclaw.bot.knowledge.core.mapper.AgentKnowledgeBaseRelationMapper;
+import ai.nomoclaw.bot.knowledge.core.mapper.ConversationKnowledgeBaseRelationMapper;
+import ai.nomoclaw.bot.knowledge.core.mapper.KnowledgeAgentConversationMapper;
+import ai.nomoclaw.bot.knowledge.core.mapper.KnowledgeBaseMapper;
+import ai.nomoclaw.bot.knowledge.core.mapper.KnowledgeChunkMapper;
+import ai.nomoclaw.bot.knowledge.core.mapper.KnowledgeDocumentMapper;
+import ai.nomoclaw.bot.knowledge.core.mapper.KnowledgeDocumentVersionMapper;
+import ai.nomoclaw.bot.knowledge.core.mapper.KnowledgeEmbeddingCacheMapper;
+import ai.nomoclaw.bot.knowledge.core.mapper.KnowledgeImportBatchMapper;
+import ai.nomoclaw.bot.knowledge.core.mapper.KnowledgeImportItemMapper;
+import ai.nomoclaw.bot.knowledge.core.mapper.KnowledgeIngestionJobMapper;
+import ai.nomoclaw.bot.knowledge.core.mapper.KnowledgeRetrievalLogMapper;
+import ai.nomoclaw.bot.knowledge.core.mapper.MessageKnowledgeCitationMapper;
+import ai.nomoclaw.bot.knowledge.core.repository.AgentKnowledgeBaseRelationRepository;
+import ai.nomoclaw.bot.knowledge.core.repository.ConversationKnowledgeBaseRelationRepository;
+import ai.nomoclaw.bot.knowledge.core.repository.KnowledgeAgentConversationRepository;
+import ai.nomoclaw.bot.knowledge.core.repository.KnowledgeBaseRepository;
+import ai.nomoclaw.bot.knowledge.core.repository.KnowledgeChunkRepository;
+import ai.nomoclaw.bot.knowledge.core.repository.KnowledgeDocumentRepository;
+import ai.nomoclaw.bot.knowledge.core.repository.KnowledgeDocumentVersionRepository;
+import ai.nomoclaw.bot.knowledge.core.repository.KnowledgeEmbeddingCacheRepository;
+import ai.nomoclaw.bot.knowledge.core.repository.KnowledgeImportBatchRepository;
+import ai.nomoclaw.bot.knowledge.core.repository.KnowledgeImportItemRepository;
+import ai.nomoclaw.bot.knowledge.core.repository.KnowledgeIngestionJobRepository;
 import ai.nomoclaw.bot.knowledge.core.repository.KnowledgePersistenceRepository;
+import ai.nomoclaw.bot.knowledge.core.repository.KnowledgeRetrievalLogRepository;
+import ai.nomoclaw.bot.knowledge.core.repository.MessageKnowledgeCitationRepository;
 import ai.nomoclaw.bot.knowledge.ingestion.DefaultDocumentParser.KnowledgeParseException;
 import ai.nomoclaw.bot.knowledge.ingestion.DocumentChunker;
 import ai.nomoclaw.bot.knowledge.ingestion.DocumentParser;
@@ -16,11 +43,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
-import org.springframework.transaction.TransactionStatus;
-import org.springframework.transaction.support.SimpleTransactionStatus;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -42,6 +64,7 @@ class KnowledgeIngestionServiceTest {
     private RecordingLexicalStore lexicalStore;
     private KnowledgeService service;
     private Path documentPath;
+    private TestRepositorySupport repositories;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -50,6 +73,7 @@ class KnowledgeIngestionServiceTest {
         persistence = new KnowledgePersistenceRepository(dataSource);
         persistence.execute("DROP ALL OBJECTS");
         createSchema();
+        repositories = new TestRepositorySupport(dataSource);
         properties = KnowledgePropertiesTestSupport.properties();
         properties.setStorageRoot(storageRoot);
         properties.getEmbeddingCache().setEnabled(false);
@@ -60,10 +84,7 @@ class KnowledgeIngestionServiceTest {
         DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
         KnowledgeIngestionMetrics metrics = new KnowledgeIngestionMetrics(
                 beanFactory.getBeanProvider(MeterRegistry.class));
-        service = new KnowledgeService(persistence,
-                new TransactionTemplate(new NoopTransactionManager()), properties,
-                new FixedParser(), new FixedChunker(), new FixedEmbeddingProvider(), vectorStore, Runnable::run,
-                null, null, lexicalStore, new NoopReranker(), metrics);
+        service = serviceWithParser(new FixedParser());
         documentPath = storageRoot.resolve("doc.txt");
         Files.writeString(documentPath, "knowledge ingestion test content");
         insertFixture("token-1");
@@ -122,9 +143,26 @@ class KnowledgeIngestionServiceTest {
         DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
         KnowledgeIngestionMetrics metrics = new KnowledgeIngestionMetrics(
                 beanFactory.getBeanProvider(MeterRegistry.class));
-        return new KnowledgeService(persistence, new TransactionTemplate(new NoopTransactionManager()),
-                properties, parser, new FixedChunker(), new FixedEmbeddingProvider(), vectorStore, Runnable::run,
-                null, null, lexicalStore, new NoopReranker(), metrics);
+        try {
+            return new KnowledgeService(properties, parser, new FixedChunker(), new FixedEmbeddingProvider(),
+                    vectorStore, Runnable::run,
+                    repositories.repository(KnowledgeBaseRepository.class, KnowledgeBaseMapper.class),
+                    repositories.repository(KnowledgeChunkRepository.class, KnowledgeChunkMapper.class),
+                    repositories.repository(KnowledgeDocumentRepository.class, KnowledgeDocumentMapper.class),
+                    repositories.repository(KnowledgeDocumentVersionRepository.class, KnowledgeDocumentVersionMapper.class),
+                    repositories.repository(KnowledgeImportBatchRepository.class, KnowledgeImportBatchMapper.class),
+                    repositories.repository(KnowledgeIngestionJobRepository.class, KnowledgeIngestionJobMapper.class),
+                    repositories.repository(KnowledgeImportItemRepository.class, KnowledgeImportItemMapper.class),
+                    repositories.repository(KnowledgeRetrievalLogRepository.class, KnowledgeRetrievalLogMapper.class),
+                    repositories.repository(MessageKnowledgeCitationRepository.class, MessageKnowledgeCitationMapper.class),
+                    repositories.repository(ConversationKnowledgeBaseRelationRepository.class, ConversationKnowledgeBaseRelationMapper.class),
+                    repositories.repository(AgentKnowledgeBaseRelationRepository.class, AgentKnowledgeBaseRelationMapper.class),
+                    repositories.repository(KnowledgeAgentConversationRepository.class, KnowledgeAgentConversationMapper.class),
+                    lexicalStore, new NoopReranker(), metrics,
+                    repositories.repository(KnowledgeEmbeddingCacheRepository.class, KnowledgeEmbeddingCacheMapper.class));
+        } catch (Exception ex) {
+            throw new IllegalStateException(ex);
+        }
     }
 
     private void assertCompletedWithSingleChunk() {
@@ -188,8 +226,15 @@ class KnowledgeIngestionServiceTest {
         persistence.execute("CREATE TABLE knowledge_chunk (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, chunk_uid VARCHAR(64) UNIQUE, knowledge_base_uid VARCHAR(64), "
                 + "document_uid VARCHAR(64), document_version_uid VARCHAR(64), chunk_index INT, content VARCHAR(4000), token_count INT, content_hash VARCHAR(64), "
                 + "page_from INT, page_to INT, section_path VARCHAR(1024), char_start INT, char_end INT, vector_point_id VARCHAR(64), status VARCHAR(32), created_time TIMESTAMP)");
-        persistence.execute("CREATE TABLE knowledge_import_batch (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, batch_uid VARCHAR(64), status VARCHAR(32), updated_time TIMESTAMP)");
-        persistence.execute("CREATE TABLE knowledge_import_item (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, batch_uid VARCHAR(64), document_version_uid VARCHAR(64), status VARCHAR(32), error_code VARCHAR(64), error_message VARCHAR(1000), updated_time TIMESTAMP)");
+        persistence.execute("CREATE TABLE knowledge_import_batch (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,"
+                + "batch_uid VARCHAR(64),knowledge_base_uid VARCHAR(64),status VARCHAR(32),parser_mode VARCHAR(32),"
+                + "chunk_size_tokens INT,chunk_overlap_tokens INT,embedding_provider_id VARCHAR(64),embedding_model_id VARCHAR(128),"
+                + "embedding_dimension INT,embedding_model_fingerprint VARCHAR(255),preprocessing_config VARCHAR(1000),"
+                + "config_hash VARCHAR(64),created_time TIMESTAMP,updated_time TIMESTAMP)");
+        persistence.execute("CREATE TABLE knowledge_import_item (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,"
+                + "item_uid VARCHAR(64),batch_uid VARCHAR(64),document_uid VARCHAR(64),document_version_uid VARCHAR(64),"
+                + "original_file_name VARCHAR(255),mode VARCHAR(32),outcome VARCHAR(32),status VARCHAR(32),"
+                + "error_code VARCHAR(64),error_message VARCHAR(1000),created_time TIMESTAMP,updated_time TIMESTAMP)");
     }
 
     private static final class FixedParser implements DocumentParser {
@@ -253,21 +298,6 @@ class KnowledgeIngestionServiceTest {
             } catch (Exception ex) {
                 throw new IllegalStateException(ex);
             }
-        }
-    }
-
-    private static final class NoopTransactionManager implements PlatformTransactionManager {
-        @Override
-        public TransactionStatus getTransaction(TransactionDefinition definition) {
-            return new SimpleTransactionStatus();
-        }
-
-        @Override
-        public void commit(TransactionStatus status) {
-        }
-
-        @Override
-        public void rollback(TransactionStatus status) {
         }
     }
 }

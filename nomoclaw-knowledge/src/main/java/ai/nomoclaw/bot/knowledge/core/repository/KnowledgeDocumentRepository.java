@@ -5,7 +5,10 @@ import ai.nomoclaw.bot.knowledge.core.entity.KnowledgeDocumentEntity;
 import ai.nomoclaw.bot.knowledge.core.mapper.KnowledgeDocumentMapper;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Collection;
+import java.util.Date;
 import java.util.List;
 
 @Repository
@@ -47,4 +50,60 @@ public class KnowledgeDocumentRepository extends CrudRepository<KnowledgeDocumen
         lambdaUpdate().eq(KnowledgeDocumentEntity::getDocumentUid, documentUid).remove();
     }
 
+    /** Marks a document as processing and clears previous failures. */
+    public void markProcessing(String documentUid, LocalDateTime updatedTime) {
+        lambdaUpdate().eq(KnowledgeDocumentEntity::getDocumentUid, documentUid)
+                .set(KnowledgeDocumentEntity::getStatus, "PROCESSING")
+                .set(KnowledgeDocumentEntity::getFailureCode, "")
+                .set(KnowledgeDocumentEntity::getFailureMessage, "")
+                .set(KnowledgeDocumentEntity::getUpdatedTime, toDate(updatedTime))
+                .update();
+    }
+
+    /** Updates the document status while retaining its current version. */
+    public void updateStatus(String documentUid, String status, LocalDateTime updatedTime) {
+        lambdaUpdate().eq(KnowledgeDocumentEntity::getDocumentUid, documentUid)
+                .set(KnowledgeDocumentEntity::getStatus, status)
+                .set(KnowledgeDocumentEntity::getUpdatedTime, toDate(updatedTime))
+                .update();
+    }
+
+    /** Clears failure metadata and updates the document status. */
+    public void clearFailureAndSetStatus(String documentUid, String status, LocalDateTime updatedTime) {
+        lambdaUpdate().eq(KnowledgeDocumentEntity::getDocumentUid, documentUid)
+                .set(KnowledgeDocumentEntity::getStatus, status)
+                .set(KnowledgeDocumentEntity::getFailureCode, "")
+                .set(KnowledgeDocumentEntity::getFailureMessage, "")
+                .set(KnowledgeDocumentEntity::getUpdatedTime, toDate(updatedTime))
+                .update();
+    }
+
+    /** Publishes the completed version as the current searchable document version. */
+    public void publishVersion(String documentUid, String versionUid, int pageCount, int chunkCount,
+                               LocalDateTime updatedTime) {
+        lambdaUpdate().eq(KnowledgeDocumentEntity::getDocumentUid, documentUid)
+                .set(KnowledgeDocumentEntity::getCurrentVersionUid, versionUid)
+                .set(KnowledgeDocumentEntity::getStatus, "READY")
+                .set(KnowledgeDocumentEntity::getFailureCode, "")
+                .set(KnowledgeDocumentEntity::getFailureMessage, "")
+                .set(KnowledgeDocumentEntity::getPageCount, pageCount)
+                .set(KnowledgeDocumentEntity::getChunkCount, chunkCount)
+                .set(KnowledgeDocumentEntity::getUpdatedTime, toDate(updatedTime))
+                .update();
+    }
+
+    /** Records a build failure status on a document. */
+    public void updateFailureState(String documentUid, String status, String failureCode, String failureMessage,
+                                   LocalDateTime updatedTime) {
+        lambdaUpdate().eq(KnowledgeDocumentEntity::getDocumentUid, documentUid)
+                .set(KnowledgeDocumentEntity::getStatus, status)
+                .set(KnowledgeDocumentEntity::getFailureCode, failureCode)
+                .set(KnowledgeDocumentEntity::getFailureMessage, failureMessage)
+                .set(KnowledgeDocumentEntity::getUpdatedTime, toDate(updatedTime))
+                .update();
+    }
+
+    private Date toDate(LocalDateTime value) {
+        return Date.from(value.atZone(ZoneId.systemDefault()).toInstant());
+    }
 }

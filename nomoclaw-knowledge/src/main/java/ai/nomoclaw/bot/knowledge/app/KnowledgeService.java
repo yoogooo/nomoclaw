@@ -22,7 +22,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -47,7 +46,6 @@ import java.util.concurrent.ThreadLocalRandom;
 public class KnowledgeService implements KnowledgeIngestionRunner {
     private static final Logger log = LoggerFactory.getLogger(KnowledgeService.class);
 
-    private final KnowledgePersistenceRepository persistence;
     private final KnowledgeProperties properties;
     private final DocumentParser parser;
     private final DocumentChunker chunker;
@@ -68,11 +66,11 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
     private final MessageKnowledgeCitationRepository citationRepository;
     private final ConversationKnowledgeBaseRelationRepository conversationRelationRepository;
     private final AgentKnowledgeBaseRelationRepository agentRelationRepository;
-    private final AgentConversationRepository agentConversationRepository;
+    private final KnowledgeAgentConversationRepository agentConversationRepository;
     private final KnowledgeIngestionMetrics ingestionMetrics;
 
     @Autowired
-    public KnowledgeService(KnowledgePersistenceRepository persistence, KnowledgeProperties properties,
+    public KnowledgeService(KnowledgeProperties properties,
                             DocumentParser parser, DocumentChunker chunker, EmbeddingProvider embeddingProvider,
                             VectorStore vectorStore, @Qualifier("knowledgeIngestionExecutor") Executor executor,
                             KnowledgeBaseRepository baseRepository,
@@ -85,10 +83,9 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
                             MessageKnowledgeCitationRepository citationRepository,
                             ConversationKnowledgeBaseRelationRepository conversationRelationRepository,
                             AgentKnowledgeBaseRelationRepository agentRelationRepository,
-                            AgentConversationRepository agentConversationRepository,
+                            KnowledgeAgentConversationRepository agentConversationRepository,
                             LexicalSearchStore lexicalSearchStore, Reranker reranker,
                             KnowledgeIngestionMetrics ingestionMetrics, EmbeddingCacheStore embeddingCache) {
-        this.persistence = persistence;
         this.properties = properties;
         this.parser = parser;
         this.chunker = chunker;
@@ -113,7 +110,7 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
         this.ingestionMetrics = ingestionMetrics;
     }
 
-    KnowledgeService(KnowledgePersistenceRepository persistence, KnowledgeProperties properties,
+    KnowledgeService(KnowledgeProperties properties,
                      DocumentParser parser, DocumentChunker chunker, EmbeddingProvider embeddingProvider,
                      VectorStore vectorStore, Executor executor, KnowledgeBaseRepository baseRepository,
                      KnowledgeChunkRepository chunkRepository,
@@ -126,11 +123,11 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
                      MessageKnowledgeCitationRepository citationRepository,
                      ConversationKnowledgeBaseRelationRepository conversationRelationRepository,
                      AgentKnowledgeBaseRelationRepository agentRelationRepository,
-                     AgentConversationRepository agentConversationRepository,
+                     KnowledgeAgentConversationRepository agentConversationRepository,
                      LexicalSearchStore lexicalSearchStore,
                      Reranker reranker, KnowledgeIngestionMetrics ingestionMetrics,
                      KnowledgeEmbeddingCacheRepository embeddingCacheRepository) {
-        this(persistence, properties, parser, chunker, embeddingProvider, vectorStore, executor,
+        this(properties, parser, chunker, embeddingProvider, vectorStore, executor,
                 baseRepository, chunkRepository, documentRepository, documentVersionRepository,
                 importBatchRepository, ingestionJobRepository, importItemRepository, retrievalLogRepository,
                 citationRepository, conversationRelationRepository, agentRelationRepository,
@@ -257,27 +254,25 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
         String checksum = sha256(path);
         LocalDateTime now = LocalDateTime.now();
         try {
-            transactions.executeWithoutResult(status -> {
-                KnowledgeDocumentEntity entity = new KnowledgeDocumentEntity();
-                entity.setDocumentUid(documentUid);
-                entity.setKnowledgeBaseUid(base.knowledgeBaseUid());
-                entity.setDisplayName(original);
-                entity.setSourceType("UPLOAD");
-                entity.setOriginalFileName(original);
-                entity.setContentType(safe(file.getContentType()));
-                entity.setFilePath(path.toString());
-                entity.setSizeBytes(file.getSize());
-                entity.setChecksumSha256(checksum);
-                entity.setCurrentVersionUid("");
-                entity.setStatus("UPLOADED");
-                entity.setFailureCode("");
-                entity.setFailureMessage("");
-                entity.setPageCount(0);
-                entity.setChunkCount(0);
-                entity.setCreatedTime(toDate(now));
-                entity.setUpdatedTime(toDate(now));
-                documentRepository.save(entity);
-            });
+            KnowledgeDocumentEntity entity = new KnowledgeDocumentEntity();
+            entity.setDocumentUid(documentUid);
+            entity.setKnowledgeBaseUid(base.knowledgeBaseUid());
+            entity.setDisplayName(original);
+            entity.setSourceType("UPLOAD");
+            entity.setOriginalFileName(original);
+            entity.setContentType(safe(file.getContentType()));
+            entity.setFilePath(path.toString());
+            entity.setSizeBytes(file.getSize());
+            entity.setChecksumSha256(checksum);
+            entity.setCurrentVersionUid("");
+            entity.setStatus("UPLOADED");
+            entity.setFailureCode("");
+            entity.setFailureMessage("");
+            entity.setPageCount(0);
+            entity.setChunkCount(0);
+            entity.setCreatedTime(toDate(now));
+            entity.setUpdatedTime(toDate(now));
+            documentRepository.save(entity);
         } catch (DuplicateKeyException ex) {
             try {
                 Files.deleteIfExists(path);
@@ -365,58 +360,68 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
         }
         require(importItemRepository.countAcceptedByBatch(batchUid) > 0, "批次中没有可构建文件");
         LocalDateTime now = LocalDateTime.now();
-        transactions.executeWithoutResult(status -> {
-            int claimed = persistence.update("UPDATE knowledge_import_batch SET status='BUILDING',parser_mode=?,"
-                            + "chunk_size_tokens=?,chunk_overlap_tokens=?,embedding_provider_id=?,"
-                            + "embedding_model_id=?,embedding_dimension=?,embedding_model_fingerprint=?,"
-                            + "preprocessing_config=?,config_hash=?,updated_time=? "
-                            + "WHERE batch_uid=? AND status='DRAFT'",
-                            parserMode, chunkSize, overlap, providerId, modelId, dimension, modelFingerprint,
-                    preprocessingConfig, configHash, now, batchUid);
-            if (claimed == 0) {
-                String persistedHash = persistence.queryForObject(
-                        "SELECT config_hash FROM knowledge_import_batch WHERE batch_uid=?",
-                        String.class, batchUid);
-                if (configHash.equals(persistedHash)) return;
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "导入批次已使用其他配置开始构建");
+        boolean claimed = importBatchRepository.claimBuilding(batchUid, parserMode, chunkSize, overlap,
+                providerId, modelId, dimension, modelFingerprint, preprocessingConfig, configHash, now);
+        if (!claimed) {
+            KnowledgeImportBatchEntity persisted = importBatchRepository.findByUid(batchUid);
+            String persistedHash = persisted == null ? "" : safe(persisted.getConfigHash());
+            if (configHash.equals(persistedHash)) return getImportBatch(baseUid, batchUid);
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "导入批次已使用其他配置开始构建");
+        }
+        for (KnowledgeImportItemEntity item : importItemRepository.listAcceptedByBatch(batchUid)) {
+            String documentUid = item.getDocumentUid();
+            KnowledgeDocumentEntity document = documentRepository.findByBaseAndUid(baseUid, documentUid);
+            require(document != null, "文档不存在");
+            int versionNo = documentVersionRepository.nextVersionNo(documentUid);
+            String versionUid = "ver_" + UuidUtil.newUuid();
+            String jobUid = "job_" + UuidUtil.newUuid();
+            String buildMode = "REINDEX".equals(item.getMode()) ? "REINDEX" : "INITIAL";
+            KnowledgeDocumentVersionEntity version = new KnowledgeDocumentVersionEntity();
+            version.setDocumentVersionUid(versionUid);
+            version.setDocumentUid(documentUid);
+            version.setVersionNo(versionNo);
+            version.setChecksumSha256(document.getChecksumSha256());
+            version.setParserVersion("2");
+            version.setChunkerVersion("2");
+            version.setParserMode(parserMode);
+            version.setChunkSizeTokens(chunkSize);
+            version.setChunkOverlapTokens(overlap);
+            version.setPreprocessingConfig(preprocessingConfig);
+            version.setBuildMode(buildMode);
+            version.setEmbeddingProviderId(providerId);
+            version.setEmbeddingModelId(modelId);
+            version.setEmbeddingDimension(dimension);
+            version.setEmbeddingModelFingerprint(modelFingerprint);
+            version.setStatus("PENDING");
+            version.setCreatedTime(toDate(now));
+            documentVersionRepository.save(version);
+
+            KnowledgeIngestionJobEntity job = new KnowledgeIngestionJobEntity();
+            job.setJobUid(jobUid);
+            job.setKnowledgeBaseUid(baseUid);
+            job.setDocumentUid(documentUid);
+            job.setDocumentVersionUid(versionUid);
+            job.setStatus("PENDING");
+            job.setStage("QUEUED");
+            job.setProgressPercent(0);
+            job.setTotalChunks(0);
+            job.setProcessedChunks(0);
+            job.setProcessedPages(0);
+            job.setTotalPages(0);
+            job.setCacheHitChunks(0);
+            job.setCacheMissChunks(0);
+            job.setAttemptCount(0);
+            job.setFailureCode("");
+            job.setFailureMessage("");
+            job.setRetryable(false);
+            job.setCreatedTime(toDate(now));
+            job.setUpdatedTime(toDate(now));
+            ingestionJobRepository.save(job);
+            importItemRepository.markBuilding(item.getItemUid(), versionUid, now);
+            if ("INITIAL".equals(buildMode)) {
+                documentRepository.markProcessing(documentUid, now);
             }
-            List<Map<String, Object>> items = persistence.queryForList("SELECT * FROM knowledge_import_item "
-                    + "WHERE batch_uid=? AND outcome='ACCEPTED' ORDER BY id", batchUid);
-            for (Map<String, Object> item : items) {
-                String documentUid = string(item, "document_uid");
-                Map<String, Object> document = persistence.queryForMap(
-                        "SELECT * FROM knowledge_document WHERE document_uid=? AND knowledge_base_uid=?",
-                        documentUid, baseUid);
-                int versionNo = Optional.ofNullable(persistence.queryForObject(
-                        "SELECT MAX(version_no) FROM knowledge_document_version WHERE document_uid=?",
-                        Integer.class, documentUid)).orElse(0) + 1;
-                String versionUid = "ver_" + UuidUtil.newUuid();
-                String jobUid = "job_" + UuidUtil.newUuid();
-                String buildMode = string(item, "mode").equals("REINDEX") ? "REINDEX" : "INITIAL";
-                persistence.update("INSERT INTO knowledge_document_version(document_version_uid,document_uid,version_no,"
-                                + "checksum_sha256,parser_version,chunker_version,parser_mode,chunk_size_tokens,"
-                                + "chunk_overlap_tokens,preprocessing_config,build_mode,embedding_provider_id,"
-                                + "embedding_model_id,embedding_dimension,embedding_model_fingerprint,status,created_time) "
-                        + "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                        versionUid, documentUid, versionNo, string(document, "checksum_sha256"), "2", "2",
-                        parserMode, chunkSize, overlap, preprocessingConfig, buildMode, providerId,
-                        modelId, dimension, modelFingerprint, "PENDING", now);
-                persistence.update("INSERT INTO knowledge_ingestion_job(job_uid,knowledge_base_uid,document_uid,"
-                                + "document_version_uid,status,stage,progress_percent,total_chunks,processed_chunks,"
-                                + "processed_pages,total_pages,cache_hit_chunks,cache_miss_chunks,attempt_count,"
-                                + "failure_code,failure_message,retryable,created_time,updated_time) "
-                                + "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                        jobUid, baseUid, documentUid, versionUid, "PENDING", "QUEUED", 0, 0, 0,
-                        0, 0, 0, 0, 0, "", "", false, now, now);
-                persistence.update("UPDATE knowledge_import_item SET document_version_uid=?,status='BUILDING',"
-                                + "updated_time=? WHERE item_uid=?",
-                        versionUid, now, string(item, "item_uid"));
-                if ("INITIAL".equals(buildMode)) {
-                    persistence.update("UPDATE knowledge_document SET status='PROCESSING',failure_code='',"
-                            + "failure_message='',updated_time=? WHERE document_uid=?", now, documentUid);
-                }
-            }
-        });
+        }
         return getImportBatch(baseUid, batchUid);
     }
 
@@ -437,24 +442,22 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
                 .map(item -> documentRepository.findByUid(item.getDocumentUid()))
                 .filter(Objects::nonNull)
                 .toList();
-        transactions.executeWithoutResult(status -> {
-            KnowledgeImportBatchEntity current = importBatchRepository.findByBaseAndUid(baseUid, batchUid);
-            if (current == null || !"DRAFT".equals(current.getStatus())) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "构建已开始，无法取消");
-            }
-            LocalDateTime now = LocalDateTime.now();
-            current.setStatus("CANCELLED");
-            current.setUpdatedTime(toDate(now));
-            importBatchRepository.updateById(current);
-            for (KnowledgeImportItemEntity item : importItemRepository.listByBatch(batchUid)) {
-                item.setStatus("CANCELLED");
-                item.setUpdatedTime(toDate(now));
-                importItemRepository.updateById(item);
-            }
-            for (KnowledgeDocumentEntity staged : stagedDocuments) {
-                deleteUploadedDocumentRecord(baseUid, staged.getDocumentUid());
-            }
-        });
+        KnowledgeImportBatchEntity current = importBatchRepository.findByBaseAndUid(baseUid, batchUid);
+        if (current == null || !"DRAFT".equals(current.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "构建已开始，无法取消");
+        }
+        LocalDateTime now = LocalDateTime.now();
+        current.setStatus("CANCELLED");
+        current.setUpdatedTime(toDate(now));
+        importBatchRepository.updateById(current);
+        for (KnowledgeImportItemEntity item : importItemRepository.listByBatch(batchUid)) {
+            item.setStatus("CANCELLED");
+            item.setUpdatedTime(toDate(now));
+            importItemRepository.updateById(item);
+        }
+        for (KnowledgeDocumentEntity staged : stagedDocuments) {
+            deleteUploadedDocumentRecord(baseUid, staged.getDocumentUid());
+        }
         for (KnowledgeDocumentEntity staged : stagedDocuments) {
             try {
                 Files.deleteIfExists(Path.of(staged.getFilePath()));
@@ -467,7 +470,6 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
                 Duration.between(toLocalDateTime(batch.getCreatedTime()), LocalDateTime.now()));
     }
 
-    @Transactional
     public void deleteUploadedDocument(String baseUid, String documentUid) {
         KnowledgeModels.Document document = getDocument(baseUid, documentUid);
         KnowledgeDocumentEntity entity = documentRepository.findByUid(documentUid);
@@ -594,85 +596,68 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
         KnowledgeModels.Document doc = getDocument(baseUid, documentUid);
         require("FAILED".equals(doc.jobStatus()), "只有失败的构建任务可以重试");
         LocalDateTime now = LocalDateTime.now();
-        persistence.update("UPDATE knowledge_ingestion_job SET status='PENDING',stage='QUEUED',progress_percent=0,total_chunks=0,"
-                        + "processed_chunks=0,processed_pages=0,total_pages=0,cache_hit_chunks=0,cache_miss_chunks=0,"
-                        + "attempt_count=0,failure_code='',failure_message='',worker_id=NULL,lease_token=NULL,"
-                        + "lease_until=NULL,last_heartbeat_time=NULL,next_retry_time=NULL,retryable=0,started_time=NULL,finished_time=NULL,updated_time=? WHERE job_uid=?",
-                now, doc.jobUid());
-        String currentVersion = persistence.queryForObject("SELECT current_version_uid FROM knowledge_document "
-                + "WHERE document_uid=?", String.class, documentUid);
-        persistence.update("UPDATE knowledge_document SET status=?,failure_code='',failure_message='',updated_time=? "
-                        + "WHERE document_uid=?",
-                currentVersion == null || currentVersion.isBlank() ? "PROCESSING" : "READY", now, documentUid);
+        ingestionJobRepository.resetForRetry(doc.jobUid(), now);
+        KnowledgeDocumentEntity document = documentRepository.findByUid(documentUid);
+        String currentVersion = document == null ? "" : safe(document.getCurrentVersionUid());
+        documentRepository.clearFailureAndSetStatus(documentUid,
+                currentVersion.isBlank() ? "PROCESSING" : "READY", now);
     }
 
     @Override
     public void runIngestion(String jobUid, String leaseToken) {
-        List<Map<String, Object>> jobs = persistence.queryForList("SELECT j.*,d.file_path,d.display_name,d.current_version_uid,"
-                        + "v.parser_mode,v.chunk_size_tokens,v.chunk_overlap_tokens,v.preprocessing_config,v.build_mode,"
-                        + "v.embedding_provider_id,v.embedding_model_id,v.embedding_dimension,"
-                        + "v.embedding_model_fingerprint,b.vector_collection_name "
-                        + "FROM knowledge_ingestion_job j JOIN knowledge_document d ON d.document_uid=j.document_uid "
-                        + "JOIN knowledge_document_version v ON v.document_version_uid=j.document_version_uid "
-                        + "JOIN knowledge_base b ON b.knowledge_base_uid=j.knowledge_base_uid "
-                        + "WHERE j.job_uid=? AND j.status='RUNNING' AND j.lease_token=?",
-                jobUid, leaseToken);
-        if (jobs.isEmpty()) {
+        IngestionContext context = ingestionContext(jobUid, leaseToken);
+        if (context == null) {
             log.info("[KnowledgeIngestion] ignored execution after lease loss jobUid={}", jobUid);
             return;
         }
-        Map<String, Object> job = jobs.get(0);
-        String documentUid = string(job, "document_uid");
-        String baseUid = string(job, "knowledge_base_uid");
-        String versionUid = string(job, "document_version_uid");
-        String previousVersionUid = string(job, "current_version_uid");
+        String documentUid = context.document().getDocumentUid();
+        String baseUid = context.job().getKnowledgeBaseUid();
+        String versionUid = context.version().getDocumentVersionUid();
+        String previousVersionUid = safe(context.document().getCurrentVersionUid());
         long started = System.nanoTime();
         ingestionMetrics.started();
         try {
             String collection = collectionName(get(baseUid));
-            vectorStore.ensureCollection(collection, number(job, "embedding_dimension"));
+            vectorStore.ensureCollection(collection, zero(context.version().getEmbeddingDimension()));
             assertLease(jobUid, leaseToken);
             vectorStore.deleteByDocumentVersion(collection, versionUid);
             if (lexicalSearchStore.available()) lexicalSearchStore.deleteByDocumentVersion(versionUid);
             assertLease(jobUid, leaseToken);
-            persistence.update("DELETE FROM knowledge_chunk WHERE document_version_uid=?", versionUid);
-            persistence.update("UPDATE knowledge_document_version SET status='PENDING' WHERE document_version_uid=?", versionUid);
+            chunkRepository.deleteByDocumentVersion(versionUid);
+            documentVersionRepository.updateStatus(versionUid, "PENDING");
 
             stage(jobUid, leaseToken, documentUid, "PARSING", 5);
             DocumentParser.ParsedDocument parsed = parser.parse(
-                    Path.of(string(job, "file_path")),
-                    preprocessingOptions(string(job, "preprocessing_config")),
+                    Path.of(context.document().getFilePath()),
+                    preprocessingOptions(context.version().getPreprocessingConfig()),
                     (processed, total) -> updatePageProgress(jobUid, leaseToken, processed, total));
             assertLease(jobUid, leaseToken);
-            int warningUpdated = persistence.update("UPDATE knowledge_document_version SET parse_warnings=? "
-                            + "WHERE document_version_uid=? AND EXISTS (SELECT 1 FROM knowledge_ingestion_job "
-                            + "WHERE job_uid=? AND status='RUNNING' AND lease_token=?)",
-                    JsonUtil.toJson(parsed.warnings()), versionUid, jobUid, leaseToken);
-            if (warningUpdated == 0) throw new LeaseLostException();
-            int pageUpdated = persistence.update("UPDATE knowledge_ingestion_job SET total_pages=?,processed_pages=?,updated_time=? "
-                            + "WHERE job_uid=? AND status='RUNNING' AND lease_token=?",
-                    parsed.pages().size(), parsed.pages().size(), LocalDateTime.now(), jobUid, leaseToken);
-            if (pageUpdated == 0) throw new LeaseLostException();
+            if (!documentVersionRepository.updateParseWarnings(versionUid, JsonUtil.toJson(parsed.warnings()))
+                    || !ingestionJobRepository.updateRunningPageProgress(jobUid, leaseToken,
+                    parsed.pages().size(), parsed.pages().size(), LocalDateTime.now())) {
+                throw new LeaseLostException();
+            }
             ingestionMetrics.parsedPages(parsed.pages().size());
             stage(jobUid, leaseToken, documentUid, "CHUNKING", 20);
             int batchSize = properties.getIngestion().getEmbeddingBatchSize();
             List<DocumentChunker.Chunk> embeddingBatch = new ArrayList<>(batchSize);
             int[] chunkCount = {0};
             try (LexicalSearchStore.IndexSession lexicalSession = lexicalSearchStore.beginDocumentVersion(
-                    baseUid, documentUid, versionUid, string(job, "display_name"))) {
+                    baseUid, documentUid, versionUid, context.document().getDisplayName())) {
                 updateJob(jobUid, leaseToken, "EMBEDDING", 30, 0, 0);
-                chunker.split(parsed, number(job, "chunk_size_tokens"), number(job, "chunk_overlap_tokens"),
+                chunker.split(parsed, zero(context.version().getChunkSizeTokens()),
+                        zero(context.version().getChunkOverlapTokens()),
                         chunk -> {
                             embeddingBatch.add(chunk);
                             if (embeddingBatch.size() >= batchSize) {
-                                chunkCount[0] += processEmbeddingBatch(job, jobUid, leaseToken, documentUid,
+                                chunkCount[0] += processEmbeddingBatch(context, jobUid, leaseToken, documentUid,
                                         baseUid, versionUid, collection, embeddingBatch, lexicalSession,
                                         chunkCount[0]);
                                 embeddingBatch.clear();
                             }
                         });
                 if (!embeddingBatch.isEmpty()) {
-                    chunkCount[0] += processEmbeddingBatch(job, jobUid, leaseToken, documentUid,
+                    chunkCount[0] += processEmbeddingBatch(context, jobUid, leaseToken, documentUid,
                             baseUid, versionUid, collection, embeddingBatch, lexicalSession, chunkCount[0]);
                     embeddingBatch.clear();
                 }
@@ -685,22 +670,14 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
                 if (lexicalSearchStore.available()) lexicalSession.commit();
             }
             stage(jobUid, leaseToken, documentUid, "PUBLISHING", 97);
-            transactions.executeWithoutResult(status -> {
-                LocalDateTime now = LocalDateTime.now();
-                int claimed = persistence.update("UPDATE knowledge_ingestion_job SET status='COMPLETED',stage='PUBLISHING',"
-                                + "progress_percent=100,processed_chunks=?,total_chunks=?,retryable=0,worker_id=NULL,lease_token=NULL,lease_until=NULL,"
-                                + "last_heartbeat_time=NULL,next_retry_time=NULL,finished_time=?,updated_time=? "
-                                + "WHERE job_uid=? AND status='RUNNING' AND lease_token=?",
-                        chunkCount[0], chunkCount[0], now, now, jobUid, leaseToken);
-                if (claimed == 0) {
-                    status.setRollbackOnly();
-                    throw new LeaseLostException();
-                }
-                persistence.update("UPDATE knowledge_chunk SET status='READY' WHERE document_version_uid=? AND status='STAGED'", versionUid);
-                persistence.update("UPDATE knowledge_document_version SET status='READY' WHERE document_version_uid=?", versionUid);
-                persistence.update("UPDATE knowledge_document SET current_version_uid=?,status='READY',failure_code='',failure_message='',page_count=?,chunk_count=?,updated_time=? WHERE document_uid=?", versionUid, parsed.pages().size(), chunkCount[0], now, documentUid);
-                refreshCounts(baseUid);
-            });
+            LocalDateTime now = LocalDateTime.now();
+            if (!ingestionJobRepository.completeRunning(jobUid, leaseToken, chunkCount[0], now)) {
+                throw new LeaseLostException();
+            }
+            chunkRepository.markStagedReady(versionUid);
+            documentVersionRepository.updateStatus(versionUid, "READY");
+            documentRepository.publishVersion(documentUid, versionUid, parsed.pages().size(), chunkCount[0], now);
+            refreshCounts(baseUid);
             if (lexicalSearchStore.available() && previousVersionUid != null
                     && !previousVersionUid.isBlank() && !previousVersionUid.equals(versionUid)) {
                 lexicalSearchStore.deleteByDocumentVersion(previousVersionUid);
@@ -795,28 +772,28 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
     }
 
     public void setConversationBinding(String conversationUid, KnowledgeModels.BindingRequest request) {
-        persistence.update("DELETE FROM agent_conversation_knowledge_base_relation WHERE conversation_uid=?", conversationUid);
+        conversationRelationRepository.deleteByConversation(conversationUid);
         LocalDateTime now = LocalDateTime.now();
         for (String uid : safeList(request.include())) {
             get(uid);
-            persistence.update("INSERT INTO agent_conversation_knowledge_base_relation(conversation_uid,knowledge_base_uid,mode,created_time,updated_time) VALUES(?,?,?,?,?)", conversationUid, uid, "INCLUDE", now, now);
+            conversationRelationRepository.saveRelation(conversationUid, uid, "INCLUDE", now);
         }
         for (String uid : safeList(request.exclude())) {
             get(uid);
-            persistence.update("INSERT INTO agent_conversation_knowledge_base_relation(conversation_uid,knowledge_base_uid,mode,created_time,updated_time) VALUES(?,?,?,?,?)", conversationUid, uid, "EXCLUDE", now, now);
+            conversationRelationRepository.saveRelation(conversationUid, uid, "EXCLUDE", now);
         }
     }
 
     public List<String> getAgentBinding(String agentUid) {
-        return persistence.queryForList("SELECT knowledge_base_uid FROM agent_knowledge_base_relation WHERE agent_uid=? AND enabled=1", String.class, agentUid);
+        return agentRelationRepository.listEnabledKnowledgeBaseUids(agentUid);
     }
 
     public void setAgentBinding(String agentUid, List<String> uids) {
-        persistence.update("DELETE FROM agent_knowledge_base_relation WHERE agent_uid=?", agentUid);
+        agentRelationRepository.deleteByAgent(agentUid);
         LocalDateTime now = LocalDateTime.now();
         for (String uid : safeList(uids)) {
             get(uid);
-            persistence.update("INSERT INTO agent_knowledge_base_relation(agent_uid,knowledge_base_uid,enabled,created_time,updated_time) VALUES(?,?,?,?,?)", agentUid, uid, 1, now, now);
+            agentRelationRepository.saveEnabledRelation(agentUid, uid, now);
         }
     }
 
@@ -828,7 +805,7 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
      * Assigns dedicated collection names to existing knowledge bases and copies their ready vectors.
      */
     public void migrateLegacyCollections() {
-        List<KnowledgeModels.Base> legacyBases = persistence.query("SELECT * FROM knowledge_base WHERE vector_collection_name=''", (rs, row) -> base(rs));
+        List<KnowledgeModels.Base> legacyBases = baseRepository.listLegacyCollections().stream().map(this::base).toList();
         for (KnowledgeModels.Base legacyBase : legacyBases) {
             String collectionName = collectionName(legacyBase.name(), legacyBase.knowledgeBaseUid());
             executor.execute(() -> copyReadyChunksToDedicatedCollection(legacyBase.knowledgeBaseUid(), collectionName));
@@ -839,7 +816,15 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
         try {
             KnowledgeModels.Base base = get(baseUid);
             vectorStore.ensureCollection(collectionName, base.embeddingDimension());
-            List<ExistingChunk> chunks = persistence.query("SELECT c.chunk_uid,c.content,c.document_uid,c.document_version_uid FROM knowledge_chunk c JOIN knowledge_document d ON d.document_uid=c.document_uid WHERE c.knowledge_base_uid=? AND c.status='READY' AND d.current_version_uid=c.document_version_uid", (rs, row) -> new ExistingChunk(rs.getString("chunk_uid"), rs.getString("content"), rs.getString("document_uid"), rs.getString("document_version_uid")), baseUid);
+            List<String> currentVersionUids = documentRepository.listByBase(baseUid).stream()
+                    .map(KnowledgeDocumentEntity::getCurrentVersionUid)
+                    .filter(value -> value != null && !value.isBlank())
+                    .toList();
+            List<ExistingChunk> chunks = chunkRepository.listReadyCurrentVersionByBase(baseUid, currentVersionUids)
+                    .stream()
+                    .map(chunk -> new ExistingChunk(chunk.getChunkUid(), chunk.getContent(),
+                            chunk.getDocumentUid(), chunk.getDocumentVersionUid()))
+                    .toList();
             int batchSize = properties.getIngestion().getEmbeddingBatchSize();
             for (int offset = 0; offset < chunks.size(); offset += batchSize) {
                 List<ExistingChunk> batch = chunks.subList(offset, Math.min(chunks.size(), offset + batchSize));
@@ -851,7 +836,7 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
                 }
                 vectorStore.upsert(collectionName, points);
             }
-            persistence.update("UPDATE knowledge_base SET vector_collection_name=?,updated_time=? WHERE knowledge_base_uid=? AND vector_collection_name=''", collectionName, LocalDateTime.now(), baseUid);
+            baseRepository.assignLegacyCollection(baseUid, collectionName, LocalDateTime.now());
             log.info("Migrated knowledge base {} to dedicated Qdrant collection {}", baseUid, collectionName);
         } catch (Exception ex) {
             log.warn("Unable to migrate knowledge base {} to dedicated Qdrant collection {}", baseUid, collectionName, ex);
@@ -860,11 +845,15 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
 
     public List<KnowledgeModels.SearchHit> citations(String messageUid) {
         if (messageUid == null || messageUid.isBlank()) return List.of();
-        return persistence.query("SELECT c.rank_index,c.score,k.*,d.display_name,b.name base_name FROM agent_message_knowledge_citation c JOIN knowledge_chunk k ON k.chunk_uid=c.chunk_uid JOIN knowledge_document d ON d.document_uid=k.document_uid JOIN knowledge_base b ON b.knowledge_base_uid=k.knowledge_base_uid WHERE c.message_uid=? ORDER BY c.rank_index", (rs, row) -> new KnowledgeModels.SearchHit("K" + rs.getInt("rank_index"), rs.getString("knowledge_base_uid"), rs.getString("base_name"), rs.getString("document_uid"), rs.getString("display_name"), integer(rs.getObject("page_from")), integer(rs.getObject("page_to")), rs.getString("section_path"), rs.getString("content"), rs.getDouble("score"), rs.getString("chunk_uid"), null, null, null, null, List.of()), messageUid);
+        return citationRepository.listByMessage(messageUid).stream()
+                .map(this::citationHit)
+                .flatMap(Optional::stream)
+                .toList();
     }
 
     private List<String> effectiveBaseUids(String conversationUid) {
-        String agentUid = persistence.queryForObject("SELECT agent_uid FROM agent_conversation WHERE conversation_uid=?", String.class, conversationUid);
+        AgentConversationEntity conversation = agentConversationRepository.findByConversationUid(conversationUid);
+        String agentUid = conversation == null ? "" : conversation.getAgentUid();
         Set<String> result = new HashSet<>(getAgentBinding(agentUid));
         result.addAll(relationList(conversationUid, "INCLUDE"));
         result.removeAll(relationList(conversationUid, "EXCLUDE"));
@@ -872,64 +861,49 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
     }
 
     private List<String> relationList(String conversationUid, String mode) {
-        return persistence.queryForList("SELECT knowledge_base_uid FROM agent_conversation_knowledge_base_relation WHERE conversation_uid=? AND mode=?", String.class, conversationUid, mode);
+        return conversationRelationRepository.listKnowledgeBaseUids(conversationUid, mode);
     }
 
     private void stage(String jobUid, String leaseToken, String documentUid, String stage, int progress) {
         LocalDateTime now = LocalDateTime.now();
-        int updated = persistence.update("UPDATE knowledge_ingestion_job SET stage=?,progress_percent=?,updated_time=? "
-                        + "WHERE job_uid=? AND status='RUNNING' AND lease_token=?",
-                stage, progress, now, jobUid, leaseToken);
-        if (updated == 0) throw new LeaseLostException();
-        persistence.update("UPDATE knowledge_document SET status='PROCESSING',updated_time=? WHERE document_uid=?", now, documentUid);
+        if (!ingestionJobRepository.updateRunningStage(jobUid, leaseToken, stage, progress, now)) {
+            throw new LeaseLostException();
+        }
+        documentRepository.updateStatus(documentUid, "PROCESSING", now);
         log.info("[KnowledgeIngestion] stage jobUid={} stage={} progress={}", jobUid, stage, progress);
     }
 
     private void updateJob(String jobUid, String leaseToken, String stage, int progress, int processed, int total) {
-        int updated = persistence.update("UPDATE knowledge_ingestion_job SET stage=?,progress_percent=?,processed_chunks=?,"
-                        + "total_chunks=?,updated_time=? WHERE job_uid=? AND status='RUNNING' AND lease_token=?",
-                stage, progress, processed, total, LocalDateTime.now(), jobUid, leaseToken);
-        if (updated == 0) throw new LeaseLostException();
+        if (!ingestionJobRepository.updateRunningChunkProgress(jobUid, leaseToken, stage, progress,
+                processed, total, LocalDateTime.now())) {
+            throw new LeaseLostException();
+        }
     }
 
     private void assertLease(String jobUid, String leaseToken) {
-        Integer count = persistence.queryForObject("SELECT COUNT(*) FROM knowledge_ingestion_job "
-                        + "WHERE job_uid=? AND status='RUNNING' AND lease_token=?",
-                Integer.class, jobUid, leaseToken);
-        if (count == null || count == 0) throw new LeaseLostException();
+        if (!ingestionJobRepository.hasRunningLease(jobUid, leaseToken)) throw new LeaseLostException();
     }
 
     private void upsertStagedChunk(String chunkUid, String baseUid, String documentUid, String versionUid,
                                    DocumentChunker.Chunk chunk, String contentHash) {
         LocalDateTime now = LocalDateTime.now();
-        int updated = persistence.update("UPDATE knowledge_chunk SET content=?,token_count=?,content_hash=?,page_from=?,page_to=?,"
-                        + "section_path=?,char_start=?,char_end=?,vector_point_id=?,status='STAGED' WHERE chunk_uid=?",
-                chunk.content(), chunk.tokenCount(), contentHash, chunk.pageFrom(), chunk.pageTo(), chunk.section(),
-                chunk.charStart(), chunk.charEnd(), chunkUid, chunkUid);
-        if (updated > 0) return;
+        KnowledgeChunkEntity entity = stagedChunk(chunkUid, baseUid, documentUid, versionUid, chunk, contentHash, now);
+        if (chunkRepository.updateStagedByUid(entity)) return;
         try {
-            persistence.update("INSERT INTO knowledge_chunk(chunk_uid,knowledge_base_uid,document_uid,document_version_uid,"
-                            + "chunk_index,content,token_count,content_hash,page_from,page_to,section_path,char_start,char_end,"
-                            + "vector_point_id,status,created_time) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                    chunkUid, baseUid, documentUid, versionUid, chunk.index(), chunk.content(), chunk.tokenCount(),
-                    contentHash, chunk.pageFrom(), chunk.pageTo(), chunk.section(), chunk.charStart(), chunk.charEnd(),
-                    chunkUid, "STAGED", now);
+            chunkRepository.save(entity);
         } catch (DuplicateKeyException ex) {
-            persistence.update("UPDATE knowledge_chunk SET content=?,token_count=?,content_hash=?,page_from=?,page_to=?,"
-                            + "section_path=?,char_start=?,char_end=?,vector_point_id=?,status='STAGED' WHERE chunk_uid=?",
-                    chunk.content(), chunk.tokenCount(), contentHash, chunk.pageFrom(), chunk.pageTo(), chunk.section(),
-                    chunk.charStart(), chunk.charEnd(), chunkUid, chunkUid);
+            chunkRepository.updateStagedByUid(entity);
         }
     }
 
     private void updatePageProgress(String jobUid, String leaseToken, int processedPages, int totalPages) {
-        int updated = persistence.update("UPDATE knowledge_ingestion_job SET processed_pages=?,total_pages=?,updated_time=? "
-                        + "WHERE job_uid=? AND status='RUNNING' AND lease_token=?",
-                processedPages, totalPages, LocalDateTime.now(), jobUid, leaseToken);
-        if (updated == 0) throw new ParsingAbortedException();
+        if (!ingestionJobRepository.updateRunningPageProgress(jobUid, leaseToken,
+                processedPages, totalPages, LocalDateTime.now())) {
+            throw new ParsingAbortedException();
+        }
     }
 
-    private int processEmbeddingBatch(Map<String, Object> job, String jobUid, String leaseToken,
+    private int processEmbeddingBatch(IngestionContext context, String jobUid, String leaseToken,
                                       String documentUid, String baseUid, String versionUid, String collection,
                                       List<DocumentChunker.Chunk> batch,
                                       LexicalSearchStore.IndexSession lexicalSession, int processedBefore) {
@@ -937,8 +911,8 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
         List<String> texts = batch.stream().map(chunk -> chunk.section().isBlank()
                 ? chunk.content() : chunk.section() + "\n" + chunk.content()).toList();
         List<List<Float>> vectors = cachedEmbeddings(jobUid, leaseToken, texts,
-                string(job, "embedding_provider_id"), string(job, "embedding_model_id"),
-                number(job, "embedding_dimension"), string(job, "embedding_model_fingerprint"));
+                context.version().getEmbeddingProviderId(), context.version().getEmbeddingModelId(),
+                zero(context.version().getEmbeddingDimension()), context.version().getEmbeddingModelFingerprint());
         stage(jobUid, leaseToken, documentUid, "VECTOR_INDEXING",
                 Math.min(90, 30 + processedBefore));
         List<VectorStore.Point> points = new ArrayList<>(batch.size());
@@ -1007,11 +981,10 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
                         modelFingerprint, contentHashes.get(originalIndex), vector);
             }
         }
-        int updated = persistence.update("UPDATE knowledge_ingestion_job SET cache_hit_chunks=cache_hit_chunks+?,"
-                        + "cache_miss_chunks=cache_miss_chunks+?,updated_time=? "
-                        + "WHERE job_uid=? AND status='RUNNING' AND lease_token=?",
-                hits, missingTexts.size(), LocalDateTime.now(), jobUid, leaseToken);
-        if (updated == 0) throw new LeaseLostException();
+        if (!ingestionJobRepository.addCacheStats(jobUid, leaseToken, hits, missingTexts.size(),
+                LocalDateTime.now())) {
+            throw new LeaseLostException();
+        }
         ingestionMetrics.embeddingCache(hits, missingTexts.size());
         return result;
     }
@@ -1019,38 +992,29 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
     private void handleIngestionFailure(String jobUid, String leaseToken, String documentUid, String versionUid,
                                         Exception exception, long started) {
         IngestionFailure failure = classifyFailure(exception);
-        List<Integer> attempts = persistence.query("SELECT attempt_count FROM knowledge_ingestion_job WHERE job_uid=? "
-                        + "AND status='RUNNING' AND lease_token=?",
-                (rs, row) -> rs.getInt(1), jobUid, leaseToken);
-        if (attempts.isEmpty()) {
+        KnowledgeIngestionJobEntity job = ingestionJobRepository.findRunningByUidAndToken(jobUid, leaseToken);
+        if (job == null) {
             ingestionMetrics.finished("lease_lost", elapsedDuration(started));
             log.info("[KnowledgeIngestion] failure ignored after lease loss jobUid={} code={}", jobUid, failure.code());
             return;
         }
-        int attempt = attempts.get(0);
+        int attempt = zero(job.getAttemptCount());
         boolean retry = failure.retryable() && attempt < properties.getIngestion().getMaxAttempts();
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime nextRetry = retry ? now.plus(retryDelay(attempt)) : null;
         String status = retry ? "RETRY_WAIT" : "FAILED";
         String stage = retry ? "QUEUED" : currentStage(jobUid, leaseToken);
-        int updated = persistence.update("UPDATE knowledge_ingestion_job SET status=?,stage=?,failure_code=?,failure_message=?,"
-                        + "retryable=?,next_retry_time=?,worker_id=NULL,lease_token=NULL,lease_until=NULL,last_heartbeat_time=NULL,"
-                        + "finished_time=?,updated_time=? WHERE job_uid=? AND status='RUNNING' AND lease_token=?",
-                status, stage, failure.code(), abbreviate(failure.message()), failure.retryable(), nextRetry,
-                retry ? null : now, now, jobUid, leaseToken);
-        if (updated == 0) {
+        if (!ingestionJobRepository.failRunning(jobUid, leaseToken, status, stage, failure.code(),
+                abbreviate(failure.message()), failure.retryable(), nextRetry, retry ? null : now, now)) {
             ingestionMetrics.finished("lease_lost", elapsedDuration(started));
             return;
         }
-        String buildMode = persistence.queryForObject("SELECT build_mode FROM knowledge_document_version "
-                + "WHERE document_version_uid=?", String.class, versionUid);
+        KnowledgeDocumentVersionEntity version = documentVersionRepository.findByUid(versionUid);
+        String buildMode = version == null ? "" : version.getBuildMode();
         boolean reindex = "REINDEX".equals(buildMode);
-        persistence.update("UPDATE knowledge_document SET status=?,failure_code=?,failure_message=?,updated_time=? "
-                        + "WHERE document_uid=?",
-                reindex ? "READY" : retry ? "PROCESSING" : "FAILED",
-                reindex ? "" : failure.code(), reindex ? "" : abbreviate(failure.message()), now, documentUid);
-        persistence.update("UPDATE knowledge_document_version SET status=? WHERE document_version_uid=?",
-                retry ? "PENDING" : "FAILED", versionUid);
+        documentRepository.updateFailureState(documentUid, reindex ? "READY" : retry ? "PROCESSING" : "FAILED",
+                reindex ? "" : failure.code(), reindex ? "" : abbreviate(failure.message()), now);
+        documentVersionRepository.updateStatus(versionUid, retry ? "PENDING" : "FAILED");
         if (retry) {
             ingestionMetrics.retried(failure.code());
             ingestionMetrics.finished("retry_wait", elapsedDuration(started));
@@ -1066,19 +1030,16 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
     }
 
     private String currentStage(String jobUid, String leaseToken) {
-        List<String> stages = persistence.queryForList("SELECT stage FROM knowledge_ingestion_job WHERE job_uid=? "
-                + "AND status='RUNNING' AND lease_token=?", String.class, jobUid, leaseToken);
-        return stages.isEmpty() ? "QUEUED" : stages.get(0);
+        KnowledgeIngestionJobEntity job = ingestionJobRepository.findRunningByUidAndToken(jobUid, leaseToken);
+        return job == null || safe(job.getStage()).isBlank() ? "QUEUED" : job.getStage();
     }
 
     private void cleanupFailedVersion(String documentUid, String versionUid) {
         try {
-            List<KnowledgeModels.Base> bases = persistence.query("SELECT b.* FROM knowledge_base b "
-                            + "JOIN knowledge_document d ON d.knowledge_base_uid=b.knowledge_base_uid "
-                            + "WHERE d.document_uid=?",
-                    (rs, row) -> base(rs), documentUid);
-            if (!bases.isEmpty()) {
-                vectorStore.deleteByDocumentVersion(collectionName(bases.get(0)), versionUid);
+            KnowledgeDocumentEntity document = documentRepository.findByUid(documentUid);
+            if (document != null) {
+                KnowledgeBaseEntity base = baseRepository.findByUid(document.getKnowledgeBaseUid());
+                if (base != null) vectorStore.deleteByDocumentVersion(collectionName(base(base)), versionUid);
             }
         } catch (Exception cleanupException) {
             log.warn("[KnowledgeIngestion] unable to clean failed vector version documentUid={} versionUid={}",
@@ -1090,27 +1051,20 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
             log.warn("[KnowledgeIngestion] unable to clean failed lexical version documentUid={} versionUid={}",
                     documentUid, versionUid, cleanupException);
         }
-        persistence.update("DELETE FROM knowledge_chunk WHERE document_version_uid=? AND status<>'READY'", versionUid);
+        chunkRepository.deleteNonReadyByDocumentVersion(versionUid);
     }
 
     private void finalizeImportItem(String versionUid, String status, String errorCode, String errorMessage) {
         LocalDateTime now = LocalDateTime.now();
-        List<String> batches = persistence.queryForList("SELECT batch_uid FROM knowledge_import_item "
-                + "WHERE document_version_uid=?", String.class, versionUid);
-        persistence.update("UPDATE knowledge_import_item SET status=?,error_code=?,error_message=?,updated_time=? "
-                        + "WHERE document_version_uid=?",
-                status, safe(errorCode), safe(errorMessage), now, versionUid);
+        List<String> batches = importItemRepository.listBatchUidsByDocumentVersion(versionUid);
+        importItemRepository.finalizeByDocumentVersion(versionUid, status, safe(errorCode), safe(errorMessage), now);
         for (String batchUid : batches) {
-            Integer active = persistence.queryForObject("SELECT COUNT(*) FROM knowledge_import_item WHERE batch_uid=? "
-                    + "AND status IN ('UPLOADED','BUILDING')", Integer.class, batchUid);
-            if (active != null && active == 0) {
-                LocalDateTime created = persistence.queryForObject(
-                        "SELECT created_time FROM knowledge_import_batch WHERE batch_uid=?",
-                        LocalDateTime.class, batchUid);
-                int updated = persistence.update("UPDATE knowledge_import_batch SET status='COMPLETED',updated_time=? "
-                        + "WHERE batch_uid=? AND status='BUILDING'", now, batchUid);
-                if (updated > 0 && created != null) {
-                    ingestionMetrics.batchFinished("completed", Duration.between(created, now));
+            if (importItemRepository.countActiveByBatch(batchUid) == 0) {
+                KnowledgeImportBatchEntity batch = importBatchRepository.findByUid(batchUid);
+                boolean updated = importBatchRepository.markCompletedIfBuilding(batchUid, now);
+                if (updated && batch != null && batch.getCreatedTime() != null) {
+                    ingestionMetrics.batchFinished("completed",
+                            Duration.between(toLocalDateTime(batch.getCreatedTime()), now));
                 }
             }
         }
@@ -1144,14 +1098,16 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
     }
 
     private void refreshCounts(String baseUid) {
-        persistence.update("UPDATE knowledge_base SET document_count=(SELECT COUNT(*) FROM knowledge_document WHERE knowledge_base_uid=? AND status='READY'),chunk_count=(SELECT COUNT(*) FROM knowledge_chunk WHERE knowledge_base_uid=? AND status='READY'),updated_time=? WHERE knowledge_base_uid=?", baseUid, baseUid, LocalDateTime.now(), baseUid);
+        baseRepository.updateCounts(baseUid, documentRepository.countReadyByBase(baseUid),
+                chunkRepository.countReadyByBase(baseUid), LocalDateTime.now());
     }
 
     private void saveRetrieval(String uid, String conversation, String message, String query, List<String> bases, String fingerprint, int candidates, List<KnowledgeModels.SearchHit> hits, long started, String status, String error) {
         LocalDateTime now = LocalDateTime.now();
-        persistence.update("INSERT INTO knowledge_retrieval_log(retrieval_uid,conversation_uid,message_uid,query_text,knowledge_base_uids,embedding_model_fingerprint,candidate_count,selected_count,latency_ms,status,error_message,created_time) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", uid, conversation, message, query, JsonUtil.toJson(bases), fingerprint, candidates, hits.size(), (System.nanoTime() - started) / 1_000_000, status, error, now);
+        retrievalLogRepository.saveLog(uid, conversation, message, query, JsonUtil.toJson(bases), fingerprint,
+                candidates, hits.size(), elapsedMillis(started), status, error, now);
         for (int i = 0; i < hits.size(); i++)
-            persistence.update("INSERT INTO agent_message_knowledge_citation(message_uid,assistant_message_uid,retrieval_uid,chunk_uid,rank_index,score,created_time) VALUES(?,?,?,?,?,?,?)", message, "", uid, hits.get(i).chunkUid(), i + 1, hits.get(i).score(), now);
+            citationRepository.saveCitation(message, "", uid, hits.get(i).chunkUid(), i + 1, hits.get(i).score(), now);
     }
 
     private HybridSearchResult retrieveHybrid(String query, List<KnowledgeModels.Base> bases, int requestedTopK) {
@@ -1304,6 +1260,51 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
         if (document == null || !chunk.getDocumentVersionUid().equals(document.getCurrentVersionUid())) return Optional.empty();
         KnowledgeModels.Base base = get(chunk.getKnowledgeBaseUid());
         return Optional.of(new KnowledgeModels.SearchHit("", chunk.getKnowledgeBaseUid(), base.name(), chunk.getDocumentUid(), document.getDisplayName(), chunk.getPageFrom(), chunk.getPageTo(), safe(chunk.getSectionPath()), chunk.getContent(), 0, chunk.getChunkUid(), null, null, null, null, List.of()));
+    }
+
+    private Optional<KnowledgeModels.SearchHit> citationHit(MessageKnowledgeCitationEntity citation) {
+        KnowledgeChunkEntity chunk = chunkRepository.findByUid(citation.getChunkUid());
+        if (chunk == null) return Optional.empty();
+        KnowledgeDocumentEntity document = documentRepository.findByUid(chunk.getDocumentUid());
+        KnowledgeBaseEntity base = baseRepository.findByUid(chunk.getKnowledgeBaseUid());
+        if (document == null || base == null) return Optional.empty();
+        return Optional.of(new KnowledgeModels.SearchHit("K" + zero(citation.getRankIndex()),
+                chunk.getKnowledgeBaseUid(), base.getName(), chunk.getDocumentUid(), document.getDisplayName(),
+                chunk.getPageFrom(), chunk.getPageTo(), safe(chunk.getSectionPath()), chunk.getContent(),
+                citation.getScore() == null ? 0D : citation.getScore(), chunk.getChunkUid(),
+                null, null, null, null, List.of()));
+    }
+
+    private IngestionContext ingestionContext(String jobUid, String leaseToken) {
+        KnowledgeIngestionJobEntity job = ingestionJobRepository.findRunningByUidAndToken(jobUid, leaseToken);
+        if (job == null) return null;
+        KnowledgeDocumentEntity document = documentRepository.findByUid(job.getDocumentUid());
+        KnowledgeDocumentVersionEntity version = documentVersionRepository.findByUid(job.getDocumentVersionUid());
+        KnowledgeBaseEntity base = baseRepository.findByUid(job.getKnowledgeBaseUid());
+        if (document == null || version == null || base == null) return null;
+        return new IngestionContext(job, document, version, base);
+    }
+
+    private KnowledgeChunkEntity stagedChunk(String chunkUid, String baseUid, String documentUid, String versionUid,
+                                             DocumentChunker.Chunk chunk, String contentHash, LocalDateTime now) {
+        KnowledgeChunkEntity entity = new KnowledgeChunkEntity();
+        entity.setChunkUid(chunkUid);
+        entity.setKnowledgeBaseUid(baseUid);
+        entity.setDocumentUid(documentUid);
+        entity.setDocumentVersionUid(versionUid);
+        entity.setChunkIndex(chunk.index());
+        entity.setContent(chunk.content());
+        entity.setTokenCount(chunk.tokenCount());
+        entity.setContentHash(contentHash);
+        entity.setPageFrom(chunk.pageFrom());
+        entity.setPageTo(chunk.pageTo());
+        entity.setSectionPath(chunk.section());
+        entity.setCharStart(chunk.charStart());
+        entity.setCharEnd(chunk.charEnd());
+        entity.setVectorPointId(chunkUid);
+        entity.setStatus("STAGED");
+        entity.setCreatedTime(toDate(now));
+        return entity;
     }
 
     private KnowledgeModels.Base base(KnowledgeBaseEntity entity) {
@@ -1491,26 +1492,6 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
         if (!condition) throw new IllegalArgumentException(message);
     }
 
-    private String string(Map<String, Object> map, String key) {
-        Object value = map.get(key);
-        return value == null ? "" : String.valueOf(value);
-    }
-
-    private int number(Map<String, Object> map, String key) {
-        return ((Number) map.get(key)).intValue();
-    }
-
-    private LocalDateTime timestamp(Map<String, Object> map, String key) {
-        Object value = map.get(key);
-        if (value instanceof Timestamp timestamp) return timestamp.toLocalDateTime();
-        if (value instanceof LocalDateTime localDateTime) return localDateTime;
-        throw new IllegalStateException("Missing timestamp: " + key);
-    }
-
-    private Integer integer(Object value) {
-        return value == null ? null : ((Number) value).intValue();
-    }
-
     private String abbreviate(String value) {
         if (value == null) return "";
         return value.length() <= 1000 ? value : value.substring(0, 1000);
@@ -1550,6 +1531,10 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
     }
 
     private record HybridSearchResult(List<KnowledgeModels.SearchHit> hits, List<String> diagnostics) {
+    }
+
+    private record IngestionContext(KnowledgeIngestionJobEntity job, KnowledgeDocumentEntity document,
+                                    KnowledgeDocumentVersionEntity version, KnowledgeBaseEntity base) {
     }
 
     private record ExistingChunk(String chunkUid, String content, String documentUid, String documentVersionUid) {

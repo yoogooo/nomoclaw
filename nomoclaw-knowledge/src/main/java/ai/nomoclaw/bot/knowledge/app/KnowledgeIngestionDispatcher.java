@@ -110,36 +110,15 @@ public class KnowledgeIngestionDispatcher implements DisposableBean {
     private void claimAndSubmit(KnowledgeIngestionJobEntity candidate, LocalDateTime now) {
         String token = UuidUtil.newUuid();
         LocalDateTime leaseUntil = now.plusSeconds(Math.max(1, properties.getIngestion().getLeaseSeconds()));
-        boolean claimable = (("PENDING".equals(candidate.getStatus()) || "RETRY_WAIT".equals(candidate.getStatus()))
-                && (candidate.getNextRetryTime() == null || !candidate.getNextRetryTime().after(toDate(now))))
-                || ("RUNNING".equals(candidate.getStatus()) && candidate.getLeaseUntil() != null
-                && candidate.getLeaseUntil().before(toDate(now)));
-        if (!claimable) {
-            workerSlots.release();
-            return;
-        }
-        candidate.setStatus("RUNNING");
-        candidate.setStage("QUEUED");
-        candidate.setWorkerId(workerId);
-        candidate.setLeaseToken(token);
-        candidate.setLeaseUntil(toDate(leaseUntil));
-        candidate.setLastHeartbeatTime(toDate(now));
-        candidate.setNextRetryTime(null);
-        candidate.setRetryable(false);
-        candidate.setAttemptCount((candidate.getAttemptCount() == null ? 0 : candidate.getAttemptCount()) + 1);
-        if (candidate.getStartedTime() == null) {
-            candidate.setStartedTime(toDate(now));
-        }
-        candidate.setFinishedTime(null);
-        candidate.setUpdatedTime(toDate(now));
-        if (!ingestionJobRepository.updateById(candidate)) {
+        int nextAttempt = (candidate.getAttemptCount() == null ? 0 : candidate.getAttemptCount()) + 1;
+        if (!ingestionJobRepository.claimRunnable(candidate, workerId, token, now, leaseUntil)) {
             workerSlots.release();
             return;
         }
         try {
             executor.execute(() -> executeClaimed(candidate.getJobUid(), token));
             log.info("[KnowledgeIngestion] claimed jobUid={} workerId={} attempt={}",
-                    candidate.getJobUid(), workerId, candidate.getAttemptCount());
+                    candidate.getJobUid(), workerId, nextAttempt);
         } catch (RejectedExecutionException ex) {
             releaseRejected(candidate.getJobUid(), token);
             workerSlots.release();

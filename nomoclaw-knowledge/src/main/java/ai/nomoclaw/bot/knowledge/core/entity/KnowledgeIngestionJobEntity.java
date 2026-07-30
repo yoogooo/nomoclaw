@@ -50,6 +50,18 @@ public class KnowledgeIngestionJobEntity implements Serializable {
     @Schema(description = "已处理分块数")
     private Integer processedChunks;
 
+    @Schema(description = "已处理页数")
+    private Integer processedPages;
+
+    @Schema(description = "总页数")
+    private Integer totalPages;
+
+    @Schema(description = "缓存命中分块数")
+    private Integer cacheHitChunks;
+
+    @Schema(description = "缓存未命中分块数")
+    private Integer cacheMissChunks;
+
     @Schema(description = "执行尝试次数")
     private Integer attemptCount;
 
