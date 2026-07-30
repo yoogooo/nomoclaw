@@ -15,6 +15,11 @@
     <dependencies>
         <dependency>
             <groupId>ai.nomoclaw</groupId>
+            <artifactId>nomoclaw-db-schema</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ai.nomoclaw</groupId>
             <artifactId>nomoclaw-knowledge</artifactId>
             <version>${project.version}</version>
         </dependency>

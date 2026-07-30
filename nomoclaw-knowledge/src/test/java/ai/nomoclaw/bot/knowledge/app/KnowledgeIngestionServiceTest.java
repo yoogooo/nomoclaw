@@ -1,9 +1,15 @@
 package ai.nomoclaw.bot.knowledge.app;
 
+import ai.nomoclaw.bot.knowledge.TestDatabaseSupport;
 import ai.nomoclaw.bot.knowledge.TestRepositorySupport;
 import ai.nomoclaw.bot.knowledge.bm25.LexicalSearchStore;
 import ai.nomoclaw.bot.knowledge.config.KnowledgeProperties;
 import ai.nomoclaw.bot.knowledge.config.KnowledgePropertiesTestSupport;
+import ai.nomoclaw.bot.knowledge.core.entity.KnowledgeBaseEntity;
+import ai.nomoclaw.bot.knowledge.core.entity.KnowledgeChunkEntity;
+import ai.nomoclaw.bot.knowledge.core.entity.KnowledgeDocumentEntity;
+import ai.nomoclaw.bot.knowledge.core.entity.KnowledgeDocumentVersionEntity;
+import ai.nomoclaw.bot.knowledge.core.entity.KnowledgeIngestionJobEntity;
 import ai.nomoclaw.bot.knowledge.core.mapper.AgentKnowledgeBaseRelationMapper;
 import ai.nomoclaw.bot.knowledge.core.mapper.ConversationKnowledgeBaseRelationMapper;
 import ai.nomoclaw.bot.knowledge.core.mapper.KnowledgeAgentConversationMapper;
@@ -28,7 +34,6 @@ import ai.nomoclaw.bot.knowledge.core.repository.KnowledgeEmbeddingCacheReposito
 import ai.nomoclaw.bot.knowledge.core.repository.KnowledgeImportBatchRepository;
 import ai.nomoclaw.bot.knowledge.core.repository.KnowledgeImportItemRepository;
 import ai.nomoclaw.bot.knowledge.core.repository.KnowledgeIngestionJobRepository;
-import ai.nomoclaw.bot.knowledge.core.repository.KnowledgePersistenceRepository;
 import ai.nomoclaw.bot.knowledge.core.repository.KnowledgeRetrievalLogRepository;
 import ai.nomoclaw.bot.knowledge.core.repository.MessageKnowledgeCitationRepository;
 import ai.nomoclaw.bot.knowledge.ingestion.DefaultDocumentParser.KnowledgeParseException;
@@ -37,6 +42,8 @@ import ai.nomoclaw.bot.knowledge.ingestion.DocumentParser;
 import ai.nomoclaw.bot.knowledge.ingestion.EmbeddingProvider;
 import ai.nomoclaw.bot.knowledge.rerank.NoopReranker;
 import ai.nomoclaw.bot.knowledge.vector.VectorStore;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.h2.jdbcx.JdbcDataSource;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,8 +53,10 @@ import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,22 +67,30 @@ class KnowledgeIngestionServiceTest {
     @TempDir
     Path storageRoot;
 
-    private KnowledgePersistenceRepository persistence;
     private KnowledgeProperties properties;
     private RecordingVectorStore vectorStore;
     private RecordingLexicalStore lexicalStore;
     private KnowledgeService service;
     private Path documentPath;
     private TestRepositorySupport repositories;
+    private KnowledgeBaseMapper baseMapper;
+    private KnowledgeDocumentMapper documentMapper;
+    private KnowledgeDocumentVersionMapper documentVersionMapper;
+    private KnowledgeIngestionJobMapper ingestionJobMapper;
+    private KnowledgeChunkMapper chunkMapper;
 
     @BeforeEach
     void setUp() throws Exception {
         JdbcDataSource dataSource = new JdbcDataSource();
-        dataSource.setURL("jdbc:h2:mem:knowledge-ingestion;MODE=MySQL;DB_CLOSE_DELAY=-1");
-        persistence = new KnowledgePersistenceRepository(dataSource);
-        persistence.execute("DROP ALL OBJECTS");
-        createSchema();
+        dataSource.setURL("jdbc:h2:mem:knowledge-ingestion-" + System.nanoTime()
+                + ";MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1");
+        TestDatabaseSupport.migrateKnowledgeSchema(dataSource);
         repositories = new TestRepositorySupport(dataSource);
+        baseMapper = repositories.mapper(KnowledgeBaseMapper.class);
+        documentMapper = repositories.mapper(KnowledgeDocumentMapper.class);
+        documentVersionMapper = repositories.mapper(KnowledgeDocumentVersionMapper.class);
+        ingestionJobMapper = repositories.mapper(KnowledgeIngestionJobMapper.class);
+        chunkMapper = repositories.mapper(KnowledgeChunkMapper.class);
         properties = KnowledgePropertiesTestSupport.properties();
         properties.setStorageRoot(storageRoot);
         properties.getEmbeddingCache().setEnabled(false);
@@ -116,16 +133,17 @@ class KnowledgeIngestionServiceTest {
 
     @Test
     void workerThatLosesLeaseCannotPublish() {
-        vectorStore.onUpsert = () -> persistence.update(
-                "UPDATE knowledge_ingestion_job SET lease_token='new-owner' WHERE job_uid='job_test'");
+        vectorStore.onUpsert = () -> ingestionJobMapper.update(new LambdaUpdateWrapper<KnowledgeIngestionJobEntity>()
+                .set(KnowledgeIngestionJobEntity::getLeaseToken, "new-owner")
+                .eq(KnowledgeIngestionJobEntity::getJobUid, "job_test"));
 
         service.runIngestion("job_test", "token-1");
 
         assertEquals("RUNNING", jobValue("status"));
-        assertEquals("", persistence.queryForObject(
-                "SELECT current_version_uid FROM knowledge_document WHERE document_uid='doc_test'", String.class));
-        assertEquals(0, persistence.queryForObject(
-                "SELECT COUNT(*) FROM knowledge_chunk WHERE status='READY'", Integer.class));
+        assertEquals("", documentMapper.selectOne(new LambdaQueryWrapper<KnowledgeDocumentEntity>()
+                .eq(KnowledgeDocumentEntity::getDocumentUid, "doc_test")).getCurrentVersionUid());
+        assertEquals(0L, chunkMapper.selectCount(new LambdaQueryWrapper<KnowledgeChunkEntity>()
+                .eq(KnowledgeChunkEntity::getStatus, "READY")));
     }
 
     @Test
@@ -136,7 +154,7 @@ class KnowledgeIngestionServiceTest {
 
         assertEquals("FAILED", jobValue("status"));
         assertEquals("INVALID_ENCODING", jobValue("failure_code"));
-        assertEquals(0, persistence.queryForObject("SELECT retryable FROM knowledge_ingestion_job", Integer.class));
+        assertEquals(false, job().getRetryable());
     }
 
     private KnowledgeService serviceWithParser(DocumentParser parser) {
@@ -167,74 +185,131 @@ class KnowledgeIngestionServiceTest {
 
     private void assertCompletedWithSingleChunk() {
         assertEquals("COMPLETED", jobValue("status"));
-        assertEquals(1, persistence.queryForObject("SELECT COUNT(*) FROM knowledge_chunk", Integer.class));
-        assertEquals(1, persistence.queryForObject("SELECT COUNT(*) FROM knowledge_chunk WHERE status='READY'", Integer.class));
+        assertEquals(1L, chunkMapper.selectCount(new LambdaQueryWrapper<>()));
+        assertEquals(1L, chunkMapper.selectCount(new LambdaQueryWrapper<KnowledgeChunkEntity>()
+                .eq(KnowledgeChunkEntity::getStatus, "READY")));
         assertEquals(1, vectorStore.points.size());
         assertEquals(1, lexicalStore.chunks.size());
     }
 
     private void resetRunning(String token, int attempt) {
-        persistence.update("UPDATE knowledge_ingestion_job SET status='RUNNING',stage='QUEUED',lease_token=?,attempt_count=?,"
-                        + "worker_id='worker',failure_code='',failure_message='',retryable=0,next_retry_time=NULL WHERE job_uid='job_test'",
-                token, attempt);
+        ingestionJobMapper.update(new LambdaUpdateWrapper<KnowledgeIngestionJobEntity>()
+                .set(KnowledgeIngestionJobEntity::getStatus, "RUNNING")
+                .set(KnowledgeIngestionJobEntity::getStage, "QUEUED")
+                .set(KnowledgeIngestionJobEntity::getLeaseToken, token)
+                .set(KnowledgeIngestionJobEntity::getAttemptCount, attempt)
+                .set(KnowledgeIngestionJobEntity::getWorkerId, "worker")
+                .set(KnowledgeIngestionJobEntity::getFailureCode, "")
+                .set(KnowledgeIngestionJobEntity::getFailureMessage, "")
+                .set(KnowledgeIngestionJobEntity::getRetryable, false)
+                .set(KnowledgeIngestionJobEntity::getNextRetryTime, null)
+                .eq(KnowledgeIngestionJobEntity::getJobUid, "job_test"));
     }
 
     private String jobValue(String column) {
-        return persistence.queryForObject("SELECT " + column + " FROM knowledge_ingestion_job WHERE job_uid='job_test'", String.class);
+        KnowledgeIngestionJobEntity job = job();
+        return switch (column) {
+            case "status" -> job.getStatus();
+            case "failure_code" -> job.getFailureCode();
+            default -> throw new IllegalArgumentException("Unsupported job column: " + column);
+        };
     }
 
     private void insertFixture(String token) {
         LocalDateTime now = LocalDateTime.now();
-        persistence.update("INSERT INTO knowledge_base VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                1L, "kb_test", "Test", "", "ACTIVE", "provider", "model", 3, "collection", 500, 80,
-                8, .35, 0, 0, now, now);
-        persistence.update("INSERT INTO knowledge_document VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                1L, "doc_test", "kb_test", "doc.txt", "UPLOAD", "doc.txt", "text/plain", documentPath.toString(),
-                FilesExists.size(documentPath), "checksum", "", "PROCESSING", "", "", 0, 0, now, now);
-        persistence.update("INSERT INTO knowledge_document_version(id,document_version_uid,document_uid,version_no,"
-                        + "checksum_sha256,parser_version,chunker_version,parser_mode,chunk_size_tokens,"
-                        + "chunk_overlap_tokens,build_mode,embedding_provider_id,embedding_model_id,"
-                        + "embedding_dimension,embedding_model_fingerprint,status,created_time) "
-                        + "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                1L, "ver_test", "doc_test", 1, "checksum", "1", "1", "STRUCTURED", 500, 80,
-                "INITIAL", "provider", "model", 3, "provider:model:3", "PENDING", now);
-        persistence.update("INSERT INTO knowledge_ingestion_job(job_uid,knowledge_base_uid,document_uid,document_version_uid,status,stage,"
-                        + "progress_percent,total_chunks,processed_chunks,processed_pages,total_pages,cache_hit_chunks,"
-                        + "cache_miss_chunks,attempt_count,failure_code,failure_message,worker_id,lease_token,"
-                        + "retryable,created_time,updated_time) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                "job_test", "kb_test", "doc_test", "ver_test", "RUNNING", "QUEUED", 0, 0, 0, 0,
-                0, 0, 0, 1, "", "", "worker", token, 0, now, now);
+        Date date = toDate(now);
+        KnowledgeBaseEntity base = new KnowledgeBaseEntity();
+        base.setKnowledgeBaseUid("kb_test");
+        base.setName("Test");
+        base.setDescription("");
+        base.setStatus("ACTIVE");
+        base.setEmbeddingProviderId("provider");
+        base.setEmbeddingModelId("model");
+        base.setEmbeddingDimension(3);
+        base.setVectorCollectionName("collection");
+        base.setChunkSizeTokens(500);
+        base.setChunkOverlapTokens(80);
+        base.setRetrievalTopK(8);
+        base.setSimilarityThreshold(.35);
+        base.setDocumentCount(0);
+        base.setChunkCount(0L);
+        base.setCreatedTime(date);
+        base.setUpdatedTime(date);
+        baseMapper.insert(base);
+
+        KnowledgeDocumentEntity document = new KnowledgeDocumentEntity();
+        document.setDocumentUid("doc_test");
+        document.setKnowledgeBaseUid("kb_test");
+        document.setDisplayName("doc.txt");
+        document.setSourceType("UPLOAD");
+        document.setOriginalFileName("doc.txt");
+        document.setContentType("text/plain");
+        document.setFilePath(documentPath.toString());
+        document.setSizeBytes(FilesExists.size(documentPath));
+        document.setChecksumSha256("checksum");
+        document.setCurrentVersionUid("");
+        document.setStatus("PROCESSING");
+        document.setFailureCode("");
+        document.setFailureMessage("");
+        document.setPageCount(0);
+        document.setChunkCount(0);
+        document.setCreatedTime(date);
+        document.setUpdatedTime(date);
+        documentMapper.insert(document);
+
+        KnowledgeDocumentVersionEntity version = new KnowledgeDocumentVersionEntity();
+        version.setDocumentVersionUid("ver_test");
+        version.setDocumentUid("doc_test");
+        version.setVersionNo(1);
+        version.setChecksumSha256("checksum");
+        version.setParserVersion("1");
+        version.setChunkerVersion("1");
+        version.setParserMode("STRUCTURED");
+        version.setChunkSizeTokens(500);
+        version.setChunkOverlapTokens(80);
+        version.setPreprocessingConfig(null);
+        version.setBuildMode("INITIAL");
+        version.setEmbeddingProviderId("provider");
+        version.setEmbeddingModelId("model");
+        version.setEmbeddingDimension(3);
+        version.setEmbeddingModelFingerprint("provider:model:3");
+        version.setParseWarnings(null);
+        version.setStatus("PENDING");
+        version.setCreatedTime(date);
+        documentVersionMapper.insert(version);
+
+        KnowledgeIngestionJobEntity job = new KnowledgeIngestionJobEntity();
+        job.setJobUid("job_test");
+        job.setKnowledgeBaseUid("kb_test");
+        job.setDocumentUid("doc_test");
+        job.setDocumentVersionUid("ver_test");
+        job.setStatus("RUNNING");
+        job.setStage("QUEUED");
+        job.setProgressPercent(0);
+        job.setTotalChunks(0);
+        job.setProcessedChunks(0);
+        job.setProcessedPages(0);
+        job.setTotalPages(0);
+        job.setCacheHitChunks(0);
+        job.setCacheMissChunks(0);
+        job.setAttemptCount(1);
+        job.setFailureCode("");
+        job.setFailureMessage("");
+        job.setWorkerId("worker");
+        job.setLeaseToken(token);
+        job.setRetryable(false);
+        job.setCreatedTime(date);
+        job.setUpdatedTime(date);
+        ingestionJobMapper.insert(job);
     }
 
-    private void createSchema() {
-        persistence.execute("CREATE TABLE knowledge_base (id BIGINT PRIMARY KEY, knowledge_base_uid VARCHAR(64), name VARCHAR(255), description VARCHAR(1000), "
-                + "status VARCHAR(32), embedding_provider_id VARCHAR(64), embedding_model_id VARCHAR(128), embedding_dimension INT, "
-                + "vector_collection_name VARCHAR(128), chunk_size_tokens INT, chunk_overlap_tokens INT, retrieval_top_k INT, similarity_threshold DOUBLE, "
-                + "document_count INT, chunk_count BIGINT, created_time TIMESTAMP, updated_time TIMESTAMP)");
-        persistence.execute("CREATE TABLE knowledge_document (id BIGINT PRIMARY KEY, document_uid VARCHAR(64), knowledge_base_uid VARCHAR(64), display_name VARCHAR(255), "
-                + "source_type VARCHAR(32), original_file_name VARCHAR(255), content_type VARCHAR(128), file_path VARCHAR(1024), size_bytes BIGINT, checksum_sha256 VARCHAR(64), "
-                + "current_version_uid VARCHAR(64), status VARCHAR(32), failure_code VARCHAR(64), failure_message VARCHAR(1000), page_count INT, chunk_count INT, "
-                + "created_time TIMESTAMP, updated_time TIMESTAMP)");
-        persistence.execute("CREATE TABLE knowledge_document_version (id BIGINT PRIMARY KEY, document_version_uid VARCHAR(64), document_uid VARCHAR(64), version_no INT, "
-                + "checksum_sha256 VARCHAR(64), parser_version VARCHAR(32), chunker_version VARCHAR(32), parser_mode VARCHAR(32), chunk_size_tokens INT, "
-                + "chunk_overlap_tokens INT, build_mode VARCHAR(16), embedding_provider_id VARCHAR(64), embedding_model_id VARCHAR(128), embedding_dimension INT, "
-                + "embedding_model_fingerprint VARCHAR(255), preprocessing_config VARCHAR(1000), parse_warnings VARCHAR(1000), status VARCHAR(32), created_time TIMESTAMP)");
-        persistence.execute("CREATE TABLE knowledge_ingestion_job (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, job_uid VARCHAR(64), knowledge_base_uid VARCHAR(64), "
-                + "document_uid VARCHAR(64), document_version_uid VARCHAR(64), status VARCHAR(32), stage VARCHAR(32), progress_percent INT, total_chunks INT, processed_chunks INT, "
-                + "processed_pages INT, total_pages INT, cache_hit_chunks INT, cache_miss_chunks INT, attempt_count INT, failure_code VARCHAR(64), failure_message VARCHAR(1000), worker_id VARCHAR(128), lease_token VARCHAR(64), lease_until TIMESTAMP, "
-                + "last_heartbeat_time TIMESTAMP, next_retry_time TIMESTAMP, retryable INT, started_time TIMESTAMP, finished_time TIMESTAMP, created_time TIMESTAMP, updated_time TIMESTAMP)");
-        persistence.execute("CREATE TABLE knowledge_chunk (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, chunk_uid VARCHAR(64) UNIQUE, knowledge_base_uid VARCHAR(64), "
-                + "document_uid VARCHAR(64), document_version_uid VARCHAR(64), chunk_index INT, content VARCHAR(4000), token_count INT, content_hash VARCHAR(64), "
-                + "page_from INT, page_to INT, section_path VARCHAR(1024), char_start INT, char_end INT, vector_point_id VARCHAR(64), status VARCHAR(32), created_time TIMESTAMP)");
-        persistence.execute("CREATE TABLE knowledge_import_batch (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,"
-                + "batch_uid VARCHAR(64),knowledge_base_uid VARCHAR(64),status VARCHAR(32),parser_mode VARCHAR(32),"
-                + "chunk_size_tokens INT,chunk_overlap_tokens INT,embedding_provider_id VARCHAR(64),embedding_model_id VARCHAR(128),"
-                + "embedding_dimension INT,embedding_model_fingerprint VARCHAR(255),preprocessing_config VARCHAR(1000),"
-                + "config_hash VARCHAR(64),created_time TIMESTAMP,updated_time TIMESTAMP)");
-        persistence.execute("CREATE TABLE knowledge_import_item (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,"
-                + "item_uid VARCHAR(64),batch_uid VARCHAR(64),document_uid VARCHAR(64),document_version_uid VARCHAR(64),"
-                + "original_file_name VARCHAR(255),mode VARCHAR(32),outcome VARCHAR(32),status VARCHAR(32),"
-                + "error_code VARCHAR(64),error_message VARCHAR(1000),created_time TIMESTAMP,updated_time TIMESTAMP)");
+    private KnowledgeIngestionJobEntity job() {
+        return ingestionJobMapper.selectOne(new LambdaQueryWrapper<KnowledgeIngestionJobEntity>()
+                .eq(KnowledgeIngestionJobEntity::getJobUid, "job_test"));
+    }
+
+    private Date toDate(LocalDateTime value) {
+        return Timestamp.valueOf(value);
     }
 
     private static final class FixedParser implements DocumentParser {

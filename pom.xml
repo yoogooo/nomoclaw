@@ -16,6 +16,7 @@
     <description>NomoClaw</description>
 
     <modules>
+        <module>nomoclaw-db-schema</module>
         <module>nomoclaw-agent</module>
         <module>nomoclaw-knowledge</module>
         <module>nomoclaw-develop-tool</module>
