@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -31,8 +32,8 @@ public class RecursiveDocumentChunker implements DocumentChunker {
                       Consumer<Chunk> consumer) {
         Set<String> seen = new LinkedHashSet<>();
         int index = 0;
-        for (DocumentParser.DocumentBlock block : document.blocks()) {
-            String text = block.text();
+        for (ChunkSource source : mergeAdjacentBlocks(document.blocks())) {
+            String text = source.text();
             int start = 0;
             while (start < text.length()) {
                 int end = tokenBound(text, start, sizeTokens);
@@ -46,12 +47,53 @@ public class RecursiveDocumentChunker implements DocumentChunker {
                 String content = text.substring(start, end).trim();
                 if (content.length() >= 20 && seen.add(content)) {
                     consumer.accept(new Chunk(index++, content, tokenEstimator.estimate(content),
-                            block.page(), block.page(), block.sectionPath(), start, end));
+                            source.pageAt(start), source.pageAt(end - 1), source.sectionPath(),
+                            source.charStart() + start, source.charStart() + end));
                 }
                 if (end >= text.length()) break;
                 start = Math.max(start + 1, overlapStart(text, start, end, overlapTokens));
             }
         }
+    }
+
+    /**
+     * Joins consecutive structural blocks when they belong to the same section.
+     * Structural blocks are parsing hints, rather than hard chunk boundaries: treating every
+     * PDF paragraph as a final chunk makes ordinary layout gaps produce tiny embeddings.
+     * A paragraph can continue on a following PDF page, so page changes are retained as
+     * citation metadata instead of being treated as a split boundary.
+     */
+    private List<ChunkSource> mergeAdjacentBlocks(List<DocumentParser.DocumentBlock> blocks) {
+        List<ChunkSource> sources = new ArrayList<>();
+        StringBuilder text = new StringBuilder();
+        String sectionPath = "";
+        int charStart = 0;
+        int nextCharStart = 0;
+        List<PageBoundary> pageBoundaries = new ArrayList<>();
+        for (DocumentParser.DocumentBlock block : blocks) {
+            if (block.text() == null || block.text().isBlank()) continue;
+            if (!text.isEmpty() && !Objects.equals(sectionPath, block.sectionPath())) {
+                sources.add(new ChunkSource(sectionPath, text.toString(), charStart, List.copyOf(pageBoundaries)));
+                nextCharStart += text.length() + 2;
+                text.setLength(0);
+                pageBoundaries.clear();
+            }
+            if (text.isEmpty()) {
+                sectionPath = block.sectionPath();
+                charStart = nextCharStart;
+                pageBoundaries.add(new PageBoundary(0, block.page()));
+            } else {
+                text.append("\n\n");
+                if (pageBoundaries.getLast().page() != block.page()) {
+                    pageBoundaries.add(new PageBoundary(text.length(), block.page()));
+                }
+            }
+            text.append(block.text().trim());
+        }
+        if (!text.isEmpty()) {
+            sources.add(new ChunkSource(sectionPath, text.toString(), charStart, List.copyOf(pageBoundaries)));
+        }
+        return sources;
     }
 
     private int tokenBound(String text, int start, int sizeTokens) {
@@ -85,5 +127,19 @@ public class RecursiveDocumentChunker implements DocumentChunker {
             }
         }
         return best;
+    }
+
+    private record ChunkSource(String sectionPath, String text, int charStart, List<PageBoundary> pageBoundaries) {
+        private int pageAt(int offset) {
+            PageBoundary boundary = pageBoundaries.getFirst();
+            for (PageBoundary candidate : pageBoundaries) {
+                if (candidate.charStart() > offset) break;
+                boundary = candidate;
+            }
+            return boundary.page();
+        }
+    }
+
+    private record PageBoundary(int charStart, int page) {
     }
 }
