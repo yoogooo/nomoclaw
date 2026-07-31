@@ -9,7 +9,7 @@ import type { KnowledgeDocument } from "@/api/knowledgeApi";
 import { formatDateTime } from "@/utils/format";
 
 const props = defineProps<{ document: KnowledgeDocument }>();
-const emit = defineEmits<{ retry: []; build: []; reindex: []; remove: []; details: [] }>();
+const emit = defineEmits<{ retry: []; build: []; reindex: []; remove: []; details: []; chunks: [] }>();
 const { t } = useI18n();
 
 const processing = computed(() => ["PENDING", "RUNNING", "RETRY_WAIT"].includes(props.document.jobStatus));
@@ -72,6 +72,9 @@ function shouldShowAttempts() {
       <span v-if="document.status === 'UPLOADED'" class="job-detail">{{ stageLabel() }}</span>
       <button v-if="detailVisible" type="button" class="document-detail-link" @click="emit('details')">
         {{ t("pages.knowledge.actions.viewDetails") }}
+      </button>
+      <button v-if="document.status === 'READY'" type="button" class="document-detail-link" @click="emit('chunks')">
+        {{ t("pages.knowledge.actions.viewChunks") }}
       </button>
       <span v-if="document.jobStatus === 'RETRY_WAIT' && document.nextRetryTime" class="job-detail">
         {{ t("pages.knowledge.nextRetry", { time: formatDateTime(document.nextRetryTime) }) }}

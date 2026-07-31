@@ -25,12 +25,16 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * Parser for PDF, DOCX, Markdown, and UTF-8 text documents.
  */
 @Component
 public class DefaultDocumentParser implements DocumentParser {
+    private static final Pattern PDF_LIST_MARKER = Pattern.compile(
+            "^(?:\\d+|[一二三四五六七八九十]+)[.)．、]|^[（(][一二三四五六七八九十\\d]+[）)]");
+
     private final KnowledgeProperties properties;
     private final PdfLoader pdfLoader;
     private final TextCleaner textCleaner;
@@ -104,9 +108,12 @@ public class DefaultDocumentParser implements DocumentParser {
                     continue;
                 }
                 for (String paragraph : page.text().split("\\n\\s*\\n")) {
-                    String value = normalize(paragraph);
-                    if (!value.isBlank()) {
-                        blocks.add(new DocumentBlock(BlockType.PARAGRAPH, page.number(), "", value));
+                    String value = normalizePdfParagraph(paragraph);
+                    for (String logicalParagraph : value.split("\\n\\s*\\n")) {
+                        String normalized = normalize(logicalParagraph);
+                        if (!normalized.isBlank()) {
+                            blocks.add(new DocumentBlock(BlockType.PARAGRAPH, page.number(), "", normalized));
+                        }
                     }
                 }
             }
@@ -252,6 +259,54 @@ public class DefaultDocumentParser implements DocumentParser {
 
     private String normalize(String text) {
         return text == null ? "" : text.replace("\r\n", "\n").replace('\r', '\n').replaceAll("[ \\t]+", " ").trim();
+    }
+
+    static String normalizePdfParagraph(String text) {
+        if (text == null || text.isBlank()) return "";
+        StringBuilder result = new StringBuilder();
+        String previousLine = "";
+        for (String rawLine : text.replace("\r\n", "\n").replace('\r', '\n').split("\\n", -1)) {
+            String line = rawLine.replaceAll("[ \\t]+", " ").trim();
+            if (line.isBlank()) {
+                if (!result.isEmpty() && !result.toString().endsWith("\n\n")) {
+                    result.append("\n\n");
+                }
+                previousLine = "";
+                continue;
+            }
+            if (result.isEmpty()) {
+                result.append(line);
+            } else if (isStandaloneListMarker(previousLine)) {
+                result.append(line);
+            } else if (startsPdfParagraph(line)) {
+                result.append("\n\n").append(line);
+            } else if (needsSpaceBetween(previousLine, line)) {
+                result.append(' ').append(line);
+            } else {
+                result.append(line);
+            }
+            previousLine = line;
+        }
+        return result.toString().trim();
+    }
+
+    private static boolean startsPdfParagraph(String line) {
+        return PDF_LIST_MARKER.matcher(line).find();
+    }
+
+    private static boolean isStandaloneListMarker(String line) {
+        return line.matches("^(?:\\d+|[一二三四五六七八九十]+)[.)．、]$|^[（(][一二三四五六七八九十\\d]+[）)]$");
+    }
+
+    private static boolean needsSpaceBetween(String previousLine, String line) {
+        if (previousLine.isEmpty() || line.isEmpty()) return false;
+        char left = previousLine.charAt(previousLine.length() - 1);
+        char right = line.charAt(0);
+        return isAsciiWord(left) && isAsciiWord(right);
+    }
+
+    private static boolean isAsciiWord(char value) {
+        return (value >= 'A' && value <= 'Z') || (value >= 'a' && value <= 'z') || (value >= '0' && value <= '9');
     }
 
     /**

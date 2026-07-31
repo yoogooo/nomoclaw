@@ -131,6 +131,15 @@ public class KnowledgeController {
     }
 
     /**
+     * Lists the ready chunks for the document's currently published version.
+     */
+    @GetMapping("/knowledge-bases/{uid}/documents/{documentUid}/chunks")
+    public Map<String, Object> chunks(@PathVariable String uid, @PathVariable String documentUid) {
+        List<KnowledgeModels.Chunk> items = service.listDocumentChunks(uid, documentUid);
+        return Map.of("items", items, "total", items.size());
+    }
+
+    /**
      * Deletes an uploaded document that has not started building.
      */
     @DeleteMapping("/knowledge-bases/{uid}/documents/{documentUid}")

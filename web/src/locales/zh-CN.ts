@@ -1081,8 +1081,9 @@ const zhCN = {
       nextRetry: "预计 {time} 自动重试",
       cacheSummary: "缓存命中 {hits}，新生成 {misses}",
       documentStatuses: { UPLOADED: "待构建", awaitingBuild: "等待配置构建" },
-      actions: { configureBuild: "配置并构建", reindex: "重新构建索引", more: "更多操作", viewDetails: "查看详情" },
+      actions: { configureBuild: "配置并构建", reindex: "重新构建索引", more: "更多操作", viewDetails: "查看详情", viewChunks: "查看分块" },
       documentDetail: { status: "处理状态", stage: "当前阶段", pages: "页数进度", chunks: "分块进度", attempts: "尝试次数", nextRetry: "下次重试", failure: "失败原因", warnings: "处理提示" },
+      chunks: { title: "文档分块", subtitle: "查看文档当前版本生成的全部 chunk。", empty: "暂无分块", copy: "复制分块内容", copied: "分块内容已复制" },
       parseWarnings: {
         PARTIAL_TEXT_EXTRACTION: "部分 PDF 页面没有文本层，本阶段暂不支持 OCR，这些页面未进入索引。",
         PDF_PREPROCESSING_APPLIED: "已应用 PDF 预处理。"

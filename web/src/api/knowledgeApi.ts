@@ -11,11 +11,14 @@ export interface KnowledgeImportBatch { batchUid: string; knowledgeBaseUid: stri
 export interface KnowledgeHit { citationId: string; documentName: string; pageFrom?: number; sectionPath: string; excerpt: string; score: number; rrfScore?: number | null; denseScore?: number | null; bm25Score?: number | null; rerankScore?: number | null; retrievalSources: string[]; }
 export interface KnowledgeSearchDiagnostic { code: string; }
 export interface KnowledgeSearchResponse { hits: KnowledgeHit[]; diagnostics: KnowledgeSearchDiagnostic[]; }
+export interface KnowledgeChunk { chunkUid: string; chunkIndex: number; content: string; tokenCount: number; pageFrom?: number | null; pageTo?: number | null; sectionPath: string; charStart?: number | null; charEnd?: number | null; status: string; }
 
 export const knowledgeApi = {
   list() { return requestJson<{ items: KnowledgeBase[]; total: number; vectorAvailable: boolean }>("/api/knowledge-bases/page"); },
   create(payload: { name: string; description: string; embeddingProviderId: string; embeddingModelId: string; embeddingDimension: number }) { return requestJson<KnowledgeBase>("/api/knowledge-bases", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); },
   documents(uid: string) { return requestJson<{ items: KnowledgeDocument[]; total: number }>(`/api/knowledge-bases/${uid}/documents/page`); },
+  document(uid: string, documentUid: string) { return requestJson<KnowledgeDocument>(`/api/knowledge-bases/${uid}/documents/${documentUid}`); },
+  chunks(uid: string, documentUid: string) { return requestJson<{ items: KnowledgeChunk[]; total: number }>(`/api/knowledge-bases/${uid}/documents/${documentUid}/chunks`); },
   upload(uid: string, files: File[]) { const body = new FormData(); files.forEach(file => body.append("files", file)); return requestJson<KnowledgeUploadResult>(`/api/knowledge-bases/${uid}/documents`, { method: "POST", body }); },
   createImport(uid: string) { return requestJson<KnowledgeImportBatch>(`/api/knowledge-bases/${uid}/imports`, { method: "POST" }); },
   importBatch(uid: string, batchUid: string) { return requestJson<KnowledgeImportBatch>(`/api/knowledge-bases/${uid}/imports/${batchUid}`); },

@@ -136,6 +136,25 @@ class DefaultDocumentParserTest {
     }
 
     @Test
+    void removesNonRepeatedHeaderAndFooterLines() throws Exception {
+        Path file = directory.resolve("dynamic-header-footer.pdf");
+        writePdfWithDynamicMargins(file);
+        DefaultDocumentParser parser = new DefaultDocumentParser(KnowledgePropertiesTestSupport.properties());
+
+        DocumentParser.ParsedDocument parsed = parser.parse(file, new DocumentParser.PreprocessingOptions(true,
+                new DocumentParser.PdfPreprocessingOptions(true, true, false)), (processed, total) -> {
+        });
+        String text = parsed.pages().stream().map(DocumentParser.Page::text).reduce("", String::concat);
+
+        assertFalse(text.contains("Header 1"));
+        assertFalse(text.contains("Header 2"));
+        assertFalse(text.contains("Footer 1"));
+        assertFalse(text.contains("Footer 2"));
+        assertTrue(text.contains("First page body"));
+        assertTrue(text.contains("Second page body"));
+    }
+
+    @Test
     void estimatesCjkAndLatinRunsDifferently() {
         UnicodeTokenEstimator estimator = new UnicodeTokenEstimator();
 
@@ -147,6 +166,14 @@ class DefaultDocumentParserTest {
         try (PDDocument document = new PDDocument()) {
             addPage(document, "Meal allowance policy");
             addPage(document, "Attendance policy");
+            document.save(file.toFile());
+        }
+    }
+
+    private void writePdfWithDynamicMargins(Path file) throws Exception {
+        try (PDDocument document = new PDDocument()) {
+            addPageWithMargins(document, "Header 1", "First page body", "Footer 1");
+            addPageWithMargins(document, "Header 2", "Second page body", "Footer 2");
             document.save(file.toFile());
         }
     }
@@ -165,6 +192,22 @@ class DefaultDocumentParserTest {
             content.showText(body);
             content.newLineAtOffset(0, -420);
             content.showText("Internal Use Only");
+            content.endText();
+        }
+    }
+
+    private void addPageWithMargins(PDDocument document, String header, String body, String footer) throws Exception {
+        PDPage page = new PDPage();
+        document.addPage(page);
+        try (PDPageContentStream content = new PDPageContentStream(document, page)) {
+            content.beginText();
+            content.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 12);
+            content.newLineAtOffset(50, 750);
+            content.showText(header);
+            content.newLineAtOffset(0, -160);
+            content.showText(body);
+            content.newLineAtOffset(0, -500);
+            content.showText(footer);
             content.endText();
         }
     }

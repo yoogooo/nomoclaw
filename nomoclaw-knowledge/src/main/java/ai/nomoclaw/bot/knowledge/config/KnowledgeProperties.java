@@ -184,7 +184,6 @@ public class KnowledgeProperties {
     public static class PdfPreprocessing {
         private int maxHeaderLines;
         private int maxFooterLines;
-        private double repeatedLineThresholdRatio;
         private double watermarkRepeatedThresholdRatio;
         private double watermarkCenterRegionRatio;
         private int watermarkMinTextLength;
@@ -195,6 +194,7 @@ public class KnowledgeProperties {
         private List<String> headerLines = new ArrayList<>();
         private List<String> footerLines = new ArrayList<>();
         private List<String> watermarkLines = new ArrayList<>();
+        private List<String> standaloneListMarkerPatterns = new ArrayList<>();
 
         public int getMaxHeaderLines() {
             return maxHeaderLines;
@@ -210,14 +210,6 @@ public class KnowledgeProperties {
 
         public void setMaxFooterLines(int value) {
             maxFooterLines = value;
-        }
-
-        public double getRepeatedLineThresholdRatio() {
-            return repeatedLineThresholdRatio;
-        }
-
-        public void setRepeatedLineThresholdRatio(double value) {
-            repeatedLineThresholdRatio = value;
         }
 
         public double getWatermarkRepeatedThresholdRatio() {
@@ -298,6 +290,14 @@ public class KnowledgeProperties {
 
         public void setWatermarkLines(List<String> value) {
             watermarkLines = value == null ? new ArrayList<>() : value;
+        }
+
+        public List<String> getStandaloneListMarkerPatterns() {
+            return standaloneListMarkerPatterns;
+        }
+
+        public void setStandaloneListMarkerPatterns(List<String> value) {
+            standaloneListMarkerPatterns = value == null ? new ArrayList<>() : value;
         }
     }
 

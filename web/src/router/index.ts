@@ -5,6 +5,7 @@ import CronExecutionHistoryPage from "@/pages/CronExecutionHistoryPage.vue";
 import AgentsPage from "@/pages/AgentsPage.vue";
 import KnowledgePage from "@/pages/KnowledgePage.vue";
 import KnowledgeImportPage from "@/pages/KnowledgeImportPage.vue";
+import KnowledgeChunksPage from "@/pages/KnowledgeChunksPage.vue";
 import SkillsPage from "@/pages/SkillsPage.vue";
 import SettingsPage from "@/pages/SettingsPage.vue";
 import SettingsErrorLogsPage from "@/pages/SettingsErrorLogsPage.vue";
@@ -74,6 +75,11 @@ export const router = createRouter({
       path: "/knowledge/:knowledgeBaseUid/import/:batchUid",
       name: "knowledge-import",
       component: KnowledgeImportPage
+    },
+    {
+      path: "/knowledge/:knowledgeBaseUid/documents/:documentUid/chunks",
+      name: "knowledge-chunks",
+      component: KnowledgeChunksPage
     },
     {
       path: "/skills",

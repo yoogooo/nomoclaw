@@ -303,6 +303,16 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
         return documentModel(document);
     }
 
+    public List<KnowledgeModels.Chunk> listDocumentChunks(String baseUid, String documentUid) {
+        KnowledgeDocumentEntity document = documentRepository.findByBaseAndUid(baseUid, documentUid);
+        if (document == null) throw new IllegalArgumentException("文档不存在");
+        String versionUid = safe(document.getCurrentVersionUid());
+        if (versionUid.isBlank()) return List.of();
+        return chunkRepository.listReadyByDocumentVersion(documentUid, versionUid).stream()
+                .map(this::chunkModel)
+                .toList();
+    }
+
     public KnowledgeModels.ImportBatch getImportBatch(String baseUid, String batchUid) {
         KnowledgeModels.Base base = get(baseUid);
         KnowledgeImportBatchEntity batch = requireImportBatch(baseUid, batchUid, null);
@@ -1350,6 +1360,12 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
                 job == null ? null : toLocalDateTime(job.getNextRetryTime()),
                 job != null && Boolean.TRUE.equals(job.getRetryable()),
                 toLocalDateTime(document.getUpdatedTime()));
+    }
+
+    private KnowledgeModels.Chunk chunkModel(KnowledgeChunkEntity chunk) {
+        return new KnowledgeModels.Chunk(chunk.getChunkUid(), zero(chunk.getChunkIndex()), safe(chunk.getContent()),
+                zero(chunk.getTokenCount()), chunk.getPageFrom(), chunk.getPageTo(), safe(chunk.getSectionPath()),
+                chunk.getCharStart(), chunk.getCharEnd(), safe(chunk.getStatus()));
     }
 
     private String originalFileName(MultipartFile file) {

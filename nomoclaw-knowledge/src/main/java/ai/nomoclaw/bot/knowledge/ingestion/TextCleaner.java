@@ -8,12 +8,12 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Removes detected PDF layout artifacts from coordinate-level text elements.
@@ -29,52 +29,41 @@ public class TextCleaner {
     public PdfCleanupResult clean(PdfLoader.PdfDocument document, PreprocessingOptions preprocessing,
                                   KnowledgeProperties.PdfPreprocessing config) {
         if (preprocessing == null || !preprocessing.enabled()) {
-            return pages(document, Set.of(), List.of());
+            return pages(document, Set.of(), List.of(), config);
         }
         PdfPreprocessingOptions pdf = preprocessing.pdfOptions();
         if (!pdf.removeHeader() && !pdf.removeFooter() && !pdf.removeWatermark()) {
-            return pages(document, Set.of(), List.of());
+            return pages(document, Set.of(), List.of(), config);
         }
         Set<String> removed = new HashSet<>();
         if (pdf.removeHeader()) {
-            removed.addAll(repeatedMarginElements(document, true, config));
+            removed.addAll(marginElements(document, true, config));
         }
         if (pdf.removeFooter()) {
-            removed.addAll(repeatedMarginElements(document, false, config));
+            removed.addAll(marginElements(document, false, config));
         }
         if (pdf.removeWatermark()) {
             removed.addAll(watermarkDetector.detect(document, config));
             removed.addAll(configuredWatermarkElements(document, config));
         }
         List<String> warnings = removed.isEmpty() ? List.of() : List.of("PDF_PREPROCESSING_APPLIED");
-        return pages(document, removed, warnings);
+        return pages(document, removed, warnings, config);
     }
 
-    private Set<String> repeatedMarginElements(PdfLoader.PdfDocument document, boolean header,
-                                               KnowledgeProperties.PdfPreprocessing config) {
-        if (document.pages().size() < 2) return Set.of();
+    private Set<String> marginElements(PdfLoader.PdfDocument document, boolean header,
+                                       KnowledgeProperties.PdfPreprocessing config) {
         int maxLines = Math.max(0, header ? config.getMaxHeaderLines() : config.getMaxFooterLines());
         if (maxLines == 0) return Set.of();
-        Map<String, Set<Integer>> pagesByText = new HashMap<>();
-        Map<String, List<String>> idsByText = new HashMap<>();
+        Set<String> removed = new HashSet<>();
         for (PdfLoader.PdfPage page : document.pages()) {
             List<TextLine> lines = lines(page.elements());
             int size = lines.size();
             for (int offset = 0; offset < Math.min(maxLines, size); offset++) {
                 TextLine line = header ? lines.get(offset) : lines.get(size - 1 - offset);
                 if (!nearVerticalPageEdge(line)) continue;
-                String text = normalize(line.text());
-                if (text.isBlank()) continue;
-                pagesByText.computeIfAbsent(text, ignored -> new HashSet<>()).add(page.number());
-                idsByText.computeIfAbsent(text, ignored -> new ArrayList<>()).addAll(line.elementIds());
+                removed.addAll(line.elementIds());
             }
         }
-        int threshold = Math.max(2, (int) Math.ceil(document.pages().size()
-                * Math.max(0, config.getRepeatedLineThresholdRatio())));
-        Set<String> removed = new HashSet<>();
-        pagesByText.forEach((text, pages) -> {
-            if (pages.size() >= threshold) removed.addAll(idsByText.getOrDefault(text, List.of()));
-        });
         return removed;
     }
 
@@ -93,11 +82,13 @@ public class TextCleaner {
         return configured;
     }
 
-    private PdfCleanupResult pages(PdfLoader.PdfDocument document, Set<String> removed, List<String> warnings) {
+    private PdfCleanupResult pages(PdfLoader.PdfDocument document, Set<String> removed, List<String> warnings,
+                                   KnowledgeProperties.PdfPreprocessing config) {
         List<Page> pages = new ArrayList<>();
         int removedCount = 0;
         for (PdfLoader.PdfPage page : document.pages()) {
-            List<String> pageLines = new ArrayList<>();
+            StringBuilder pageText = new StringBuilder();
+            TextLine previousLine = null;
             for (TextLine line : lines(page.elements())) {
                 List<PdfLoader.TextElement> remaining = new ArrayList<>();
                 for (PdfLoader.TextElement element : line.elements()) {
@@ -107,10 +98,16 @@ public class TextCleaner {
                         remaining.add(element);
                     }
                 }
-                String text = normalize(joinLine(remaining));
-                if (!text.isBlank()) pageLines.add(text);
+                TextLine cleanedLine = new TextLine(remaining);
+                String text = normalize(cleanedLine.text());
+                if (text.isBlank()) continue;
+                if (!pageText.isEmpty()) {
+                    pageText.append(startsNewParagraph(previousLine, cleanedLine, config) ? "\n\n" : "\n");
+                }
+                pageText.append(text);
+                previousLine = cleanedLine;
             }
-            pages.add(new Page(page.number(), "", normalize(String.join("\n", pageLines))));
+            pages.add(new Page(page.number(), "", normalize(pageText.toString())));
         }
         List<String> resultWarnings = removedCount == 0 ? List.of() : warnings;
         return new PdfCleanupResult(pages, resultWarnings, removedCount);
@@ -132,12 +129,20 @@ public class TextCleaner {
                 .toList();
     }
 
-    private String joinLine(List<PdfLoader.TextElement> elements) {
-        return elements.stream()
-                .sorted(Comparator.comparing(PdfLoader.TextElement::x)
-                        .thenComparingInt(PdfLoader.TextElement::lineIndex))
-                .map(PdfLoader.TextElement::text)
-                .reduce("", String::concat);
+    private boolean startsNewParagraph(TextLine previousLine, TextLine line,
+                                       KnowledgeProperties.PdfPreprocessing config) {
+        if (previousLine == null || isStandaloneListMarker(normalize(previousLine.text()), config)) {
+            return false;
+        }
+        float lineHeight = Math.max(1F, Math.max(previousLine.height(), line.height()));
+        float verticalGap = line.y() - previousLine.y() - previousLine.height();
+        if (verticalGap > lineHeight * 2F) return true;
+        float indent = line.x() - previousLine.x();
+        return indent > lineHeight * 1.5F && endsParagraph(normalize(previousLine.text()));
+    }
+
+    private boolean endsParagraph(String text) {
+        return text.matches(".*[。！？；;.!?]$");
     }
 
     private boolean nearVerticalPageEdge(TextLine line) {
@@ -145,6 +150,20 @@ public class TextCleaner {
         float centerY = line.y() + line.height() / 2F;
         float edgeBand = line.pageHeight() * .25F;
         return centerY <= edgeBand || centerY >= line.pageHeight() - edgeBand;
+    }
+
+    private boolean isStandaloneListMarker(String text, KnowledgeProperties.PdfPreprocessing config) {
+        return matchesAny(text, config.getStandaloneListMarkerPatterns());
+    }
+
+    private boolean matchesAny(String text, List<String> patterns) {
+        if (text == null || text.isBlank() || patterns == null || patterns.isEmpty()) return false;
+        for (String pattern : patterns) {
+            if (pattern != null && !pattern.isBlank() && Pattern.compile(pattern).matcher(text).matches()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String normalize(String text) {

@@ -81,6 +81,10 @@ public final class KnowledgeModels {
                             List<String> retrievalSources) {
     }
 
+    public record Chunk(String chunkUid, int chunkIndex, String content, int tokenCount, Integer pageFrom,
+                        Integer pageTo, String sectionPath, Integer charStart, Integer charEnd, String status) {
+    }
+
     public record BindingRequest(List<String> include, List<String> exclude) {
     }
 
