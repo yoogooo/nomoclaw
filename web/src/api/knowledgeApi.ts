@@ -6,12 +6,15 @@ export type KnowledgeUploadOutcome = "ACCEPTED" | "DUPLICATE" | "REJECTED" | "FA
 export interface KnowledgeUploadItem { fileName: string; outcome: KnowledgeUploadOutcome; document?: KnowledgeDocument | null; errorCode: string; errorMessage: string; }
 export interface KnowledgeUploadResult { batchUid: string; documents: KnowledgeDocument[]; items: KnowledgeUploadItem[]; }
 export interface KnowledgeImportItem { itemUid: string; fileName: string; mode: "UPLOAD" | "REINDEX"; outcome: KnowledgeUploadOutcome; status: string; document?: KnowledgeDocument | null; errorCode: string; errorMessage: string; }
-export interface KnowledgePreprocessingConfig { enabled: boolean; pdf: { removeHeader: boolean; removeFooter: boolean; removeWatermark: boolean; }; }
-export interface KnowledgeImportBatch { batchUid: string; knowledgeBaseUid: string; status: "DRAFT" | "BUILDING" | "COMPLETED" | "CANCELLED"; parserMode: string; chunkSizeTokens: number; chunkOverlapTokens: number; embeddingProviderId: string; embeddingModelId: string; embeddingDimension: number; preprocessing: KnowledgePreprocessingConfig; items: KnowledgeImportItem[]; createdTime: string; updatedTime: string; }
+export interface KnowledgePreprocessingConfig { enabled: boolean; pdf: { removeHeader: boolean; removeFooter: boolean; removeWatermark: boolean; removeTableOfContents: boolean; }; }
+export type KnowledgeChunkStrategy = "TOKEN" | "SMART";
+export interface KnowledgeImportBatch { batchUid: string; knowledgeBaseUid: string; status: "DRAFT" | "BUILDING" | "COMPLETED" | "CANCELLED"; parserMode: string; chunkStrategy: KnowledgeChunkStrategy; chunkSizeTokens: number; chunkOverlapTokens: number; embeddingProviderId: string; embeddingModelId: string; embeddingDimension: number; preprocessing: KnowledgePreprocessingConfig; items: KnowledgeImportItem[]; createdTime: string; updatedTime: string; }
 export interface KnowledgeHit { citationId: string; documentName: string; pageFrom?: number; sectionPath: string; excerpt: string; score: number; rrfScore?: number | null; denseScore?: number | null; bm25Score?: number | null; rerankScore?: number | null; retrievalSources: string[]; }
 export interface KnowledgeSearchDiagnostic { code: string; }
 export interface KnowledgeSearchResponse { hits: KnowledgeHit[]; diagnostics: KnowledgeSearchDiagnostic[]; }
-export interface KnowledgeChunk { chunkUid: string; chunkIndex: number; content: string; tokenCount: number; pageFrom?: number | null; pageTo?: number | null; sectionPath: string; charStart?: number | null; charEnd?: number | null; status: string; }
+export interface KnowledgeChunkMetadata { documentNodeUid: string; document: string; chapter: string; title: string; section: string; sectionPath: string; pageFrom?: number | null; pageTo?: number | null; }
+export interface KnowledgeChunk { chunkUid: string; chunkIndex: number; content: string; tokenCount: number; pageFrom?: number | null; pageTo?: number | null; sectionPath: string; charStart?: number | null; charEnd?: number | null; status: string; metadata?: KnowledgeChunkMetadata | null; }
+export interface KnowledgeDocumentNode { nodeUid: string; parentNodeUid: string; type: string; level: number; code: string; title: string; sectionPath: string; pageFrom?: number | null; pageTo?: number | null; detectionSource: string; confidence: number; indexable: boolean; children: KnowledgeDocumentNode[]; }
 
 export const knowledgeApi = {
   list() { return requestJson<{ items: KnowledgeBase[]; total: number; vectorAvailable: boolean }>("/api/knowledge-bases/page"); },
@@ -19,11 +22,12 @@ export const knowledgeApi = {
   documents(uid: string) { return requestJson<{ items: KnowledgeDocument[]; total: number }>(`/api/knowledge-bases/${uid}/documents/page`); },
   document(uid: string, documentUid: string) { return requestJson<KnowledgeDocument>(`/api/knowledge-bases/${uid}/documents/${documentUid}`); },
   chunks(uid: string, documentUid: string) { return requestJson<{ items: KnowledgeChunk[]; total: number }>(`/api/knowledge-bases/${uid}/documents/${documentUid}/chunks`); },
+  structure(uid: string, documentUid: string) { return requestJson<{ items: KnowledgeDocumentNode[]; total: number }>(`/api/knowledge-bases/${uid}/documents/${documentUid}/structure`); },
   upload(uid: string, files: File[]) { const body = new FormData(); files.forEach(file => body.append("files", file)); return requestJson<KnowledgeUploadResult>(`/api/knowledge-bases/${uid}/documents`, { method: "POST", body }); },
   createImport(uid: string) { return requestJson<KnowledgeImportBatch>(`/api/knowledge-bases/${uid}/imports`, { method: "POST" }); },
   importBatch(uid: string, batchUid: string) { return requestJson<KnowledgeImportBatch>(`/api/knowledge-bases/${uid}/imports/${batchUid}`); },
   addImportFiles(uid: string, batchUid: string, files: File[]) { const body = new FormData(); files.forEach(file => body.append("files", file)); return requestJson<KnowledgeUploadResult>(`/api/knowledge-bases/${uid}/imports/${batchUid}/files`, { method: "POST", body }); },
-  buildImport(uid: string, batchUid: string, payload: { parserMode: string; chunkSizeTokens: number; chunkOverlapTokens: number; preprocessing: KnowledgePreprocessingConfig }) { return requestJson<KnowledgeImportBatch>(`/api/knowledge-bases/${uid}/imports/${batchUid}/build`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); },
+  buildImport(uid: string, batchUid: string, payload: { parserMode: string; chunkStrategy: KnowledgeChunkStrategy; chunkSizeTokens: number; chunkOverlapTokens: number; preprocessing: KnowledgePreprocessingConfig }) { return requestJson<KnowledgeImportBatch>(`/api/knowledge-bases/${uid}/imports/${batchUid}/build`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); },
   cancelImport(uid: string, batchUid: string) { return requestJson<{ status: string }>(`/api/knowledge-bases/${uid}/imports/${batchUid}`, { method: "DELETE" }); },
   deleteUploadedDocument(uid: string, documentUid: string) { return requestJson<{ status: string }>(`/api/knowledge-bases/${uid}/documents/${documentUid}`, { method: "DELETE" }); },
   reindexSession(uid: string, documentUid: string) { return requestJson<KnowledgeImportBatch>(`/api/knowledge-bases/${uid}/documents/${documentUid}/reindex-session`, { method: "POST" }); },

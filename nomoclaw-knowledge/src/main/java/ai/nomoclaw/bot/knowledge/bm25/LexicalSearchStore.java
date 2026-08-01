@@ -74,7 +74,12 @@ public interface LexicalSearchStore {
     /**
      * A chunk prepared for lexical indexing.
      */
-    record IndexedChunk(String chunkUid, String sectionPath, String content) {
+    record IndexedChunk(String chunkUid, String sectionPath, String content, String nodeUid, String chapterCode,
+                        String chapterTitle, String sectionCode, String sectionTitle, Integer pageFrom,
+                        Integer pageTo, String chunkStrategy) {
+        public IndexedChunk(String chunkUid, String sectionPath, String content) {
+            this(chunkUid, sectionPath, content, "", "", "", "", "", null, null, "TOKEN");
+        }
     }
 
     /**

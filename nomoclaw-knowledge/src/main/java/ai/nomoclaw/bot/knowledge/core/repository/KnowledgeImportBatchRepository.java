@@ -32,13 +32,15 @@ public class KnowledgeImportBatchRepository extends CrudRepository<KnowledgeImpo
     }
 
     /** Claims a draft batch for building with the selected configuration. */
-    public boolean claimBuilding(String batchUid, String parserMode, int chunkSizeTokens, int chunkOverlapTokens,
+    public boolean claimBuilding(String batchUid, String parserMode, String chunkStrategy,
+                                 int chunkSizeTokens, int chunkOverlapTokens,
                                  String providerId, String modelId, int dimension, String modelFingerprint,
                                  String preprocessingConfig, String configHash, LocalDateTime updatedTime) {
         return lambdaUpdate().eq(KnowledgeImportBatchEntity::getBatchUid, batchUid)
                 .eq(KnowledgeImportBatchEntity::getStatus, "DRAFT")
                 .set(KnowledgeImportBatchEntity::getStatus, "BUILDING")
                 .set(KnowledgeImportBatchEntity::getParserMode, parserMode)
+                .set(KnowledgeImportBatchEntity::getChunkStrategy, chunkStrategy)
                 .set(KnowledgeImportBatchEntity::getChunkSizeTokens, chunkSizeTokens)
                 .set(KnowledgeImportBatchEntity::getChunkOverlapTokens, chunkOverlapTokens)
                 .set(KnowledgeImportBatchEntity::getEmbeddingProviderId, providerId)

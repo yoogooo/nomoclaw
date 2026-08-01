@@ -32,10 +32,11 @@ public class TextCleaner {
             return pages(document, Set.of(), List.of(), config);
         }
         PdfPreprocessingOptions pdf = preprocessing.pdfOptions();
-        if (!pdf.removeHeader() && !pdf.removeFooter() && !pdf.removeWatermark()) {
+        if (!pdf.removeHeader() && !pdf.removeFooter() && !pdf.removeWatermark() && !pdf.removeTableOfContents()) {
             return pages(document, Set.of(), List.of(), config);
         }
         Set<String> removed = new HashSet<>();
+        List<String> warnings = new ArrayList<>();
         if (pdf.removeHeader()) {
             removed.addAll(marginElements(document, true, config));
         }
@@ -46,8 +47,53 @@ public class TextCleaner {
             removed.addAll(watermarkDetector.detect(document, config));
             removed.addAll(configuredWatermarkElements(document, config));
         }
-        List<String> warnings = removed.isEmpty() ? List.of() : List.of("PDF_PREPROCESSING_APPLIED");
-        return pages(document, removed, warnings, config);
+        Set<Integer> tableOfContentsPages = Set.of();
+        if (pdf.removeTableOfContents()) {
+            TableOfContentsDetection tableOfContents = detectTableOfContents(document);
+            tableOfContentsPages = tableOfContents.pages();
+            if (!tableOfContents.elements().isEmpty()) {
+                removed.addAll(tableOfContents.elements());
+                warnings.add("TABLE_OF_CONTENTS_FILTERED");
+            }
+        }
+        if (!removed.isEmpty()) warnings.add("PDF_PREPROCESSING_APPLIED");
+        return pages(document, removed, warnings, config, tableOfContentsPages);
+    }
+
+    private TableOfContentsDetection detectTableOfContents(PdfLoader.PdfDocument document) {
+        Set<String> removed = new HashSet<>();
+        Set<Integer> pages = new HashSet<>();
+        for (PdfLoader.PdfPage page : document.pages()) {
+            List<TextLine> lines = lines(page.elements());
+            if (lines.size() < 5) continue;
+            List<TextLine> entries = lines.stream().filter(this::looksLikeTableOfContentsEntry).toList();
+            if (entries.size() * 10 < lines.size() * 6) continue;
+            float rightEdge = entries.stream().map(this::rightEdge).sorted().skip(entries.size() / 2)
+                    .findFirst().orElse(0F);
+            long aligned = entries.stream().filter(line -> Math.abs(rightEdge(line) - rightEdge) <= 24F).count();
+            if (aligned * 10 < entries.size() * 7) continue;
+            page.elements().forEach(element -> removed.add(element.id()));
+            pages.add(page.number());
+        }
+        return new TableOfContentsDetection(Set.copyOf(removed), Set.copyOf(pages));
+    }
+
+    private boolean looksLikeTableOfContentsEntry(TextLine line) {
+        String text = normalize(line.text());
+        if (text.length() < 3 || text.length() > 160) return false;
+        int offset = text.length() - 1;
+        while (offset >= 0 && Character.isWhitespace(text.charAt(offset))) offset--;
+        int digits = 0;
+        while (offset >= 0 && Character.isDigit(text.charAt(offset))) {
+            digits++;
+            offset--;
+        }
+        return digits > 0 && offset >= 1;
+    }
+
+    private float rightEdge(TextLine line) {
+        return line.elements().stream().map(element -> element.x() + element.width())
+                .max(Float::compareTo).orElse(0F);
     }
 
     private Set<String> marginElements(PdfLoader.PdfDocument document, boolean header,
@@ -84,6 +130,12 @@ public class TextCleaner {
 
     private PdfCleanupResult pages(PdfLoader.PdfDocument document, Set<String> removed, List<String> warnings,
                                    KnowledgeProperties.PdfPreprocessing config) {
+        return pages(document, removed, warnings, config, Set.of());
+    }
+
+    private PdfCleanupResult pages(PdfLoader.PdfDocument document, Set<String> removed, List<String> warnings,
+                                   KnowledgeProperties.PdfPreprocessing config,
+                                   Set<Integer> tableOfContentsPages) {
         List<Page> pages = new ArrayList<>();
         int removedCount = 0;
         for (PdfLoader.PdfPage page : document.pages()) {
@@ -110,7 +162,8 @@ public class TextCleaner {
             pages.add(new Page(page.number(), "", normalize(pageText.toString())));
         }
         List<String> resultWarnings = removedCount == 0 ? List.of() : warnings;
-        return new PdfCleanupResult(pages, resultWarnings, removedCount);
+        return new PdfCleanupResult(pages, resultWarnings, removedCount,
+                tableOfContentsPages.stream().sorted().toList());
     }
 
     private List<PdfLoader.TextElement> sorted(List<PdfLoader.TextElement> elements) {
@@ -171,7 +224,14 @@ public class TextCleaner {
                 .replaceAll("[ \\t]+", " ").trim();
     }
 
-    public record PdfCleanupResult(List<Page> pages, List<String> warnings, int removedCount) {
+    public record PdfCleanupResult(List<Page> pages, List<String> warnings, int removedCount,
+                                   List<Integer> tableOfContentsPages) {
+        public PdfCleanupResult(List<Page> pages, List<String> warnings, int removedCount) {
+            this(pages, warnings, removedCount, List.of());
+        }
+    }
+
+    private record TableOfContentsDetection(Set<String> elements, Set<Integer> pages) {
     }
 
     private record TextLine(List<PdfLoader.TextElement> elements) {

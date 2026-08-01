@@ -8,6 +8,9 @@ import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
+import org.apache.pdfbox.pdmodel.interactive.documentnavigation.destination.PDPageFitDestination;
+import org.apache.pdfbox.pdmodel.interactive.documentnavigation.outline.PDDocumentOutline;
+import org.apache.pdfbox.pdmodel.interactive.documentnavigation.outline.PDOutlineItem;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -40,6 +43,9 @@ class DefaultDocumentParserTest {
                         DocumentParser.BlockType.CODE),
                 parsed.blocks().stream().map(DocumentParser.DocumentBlock::type).toList());
         assertEquals("Guide / Setup", parsed.blocks().get(3).sectionPath());
+        assertEquals(List.of("ROOT", "CHAPTER", "SECTION"),
+                parsed.nodes().stream().map(DocumentParser.StructureNode::type).toList());
+        assertEquals("node-2", parsed.blocks().get(3).nodeKey());
     }
 
     @Test
@@ -160,6 +166,39 @@ class DefaultDocumentParserTest {
 
         assertEquals(5, estimator.estimate("知识库导入"));
         assertEquals(2, estimator.estimate("abcdefgh"));
+    }
+
+    @Test
+    void prefersPdfOutlineForHeadingStructure() throws Exception {
+        Path file = directory.resolve("generated-outline.pdf");
+        try (PDDocument document = new PDDocument()) {
+            PDPage page = new PDPage();
+            document.addPage(page);
+            try (PDPageContentStream content = new PDPageContentStream(document, page)) {
+                content.beginText();
+                content.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 12);
+                content.newLineAtOffset(50, 700);
+                content.showText("Generated Topic");
+                content.newLineAtOffset(0, -40);
+                content.showText("Neutral generated body for parser verification.");
+                content.endText();
+            }
+            PDDocumentOutline outline = new PDDocumentOutline();
+            PDOutlineItem item = new PDOutlineItem();
+            item.setTitle("Generated Topic");
+            PDPageFitDestination destination = new PDPageFitDestination();
+            destination.setPage(page);
+            item.setDestination(destination);
+            outline.addLast(item);
+            document.getDocumentCatalog().setDocumentOutline(outline);
+            document.save(file.toFile());
+        }
+
+        DocumentParser.ParsedDocument parsed = new DefaultDocumentParser().parse(file);
+
+        assertEquals("PDF_OUTLINE", parsed.nodes().get(1).detectionSource());
+        assertEquals("Generated Topic", parsed.nodes().get(1).title());
+        assertEquals("node-1", parsed.blocks().get(1).nodeKey());
     }
 
     private void writePdf(Path file) throws Exception {

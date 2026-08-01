@@ -44,6 +44,9 @@ public class KnowledgeDocumentVersionEntity implements Serializable {
     @Schema(description = "解析模式")
     private String parserMode;
 
+    @Schema(description = "分块策略")
+    private String chunkStrategy;
+
     @Schema(description = "分块Token数")
     private Integer chunkSizeTokens;
 

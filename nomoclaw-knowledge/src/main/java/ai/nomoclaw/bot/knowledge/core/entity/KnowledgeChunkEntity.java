@@ -35,6 +35,9 @@ public class KnowledgeChunkEntity implements Serializable {
     @Schema(description = "所属文档版本ID")
     private String documentVersionUid;
 
+    @Schema(description = "所属文档结构节点ID")
+    private String documentNodeUid;
+
     @Schema(description = "文档内分块序号")
     private Integer chunkIndex;
 

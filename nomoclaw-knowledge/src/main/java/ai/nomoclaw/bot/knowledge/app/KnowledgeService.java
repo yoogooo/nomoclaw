@@ -27,6 +27,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -38,6 +39,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
 
 /**
  * Coordinates knowledge-base metadata, ingestion, bindings, and retrieval.
@@ -68,6 +70,15 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
     private final AgentKnowledgeBaseRelationRepository agentRelationRepository;
     private final KnowledgeAgentConversationRepository agentConversationRepository;
     private final KnowledgeIngestionMetrics ingestionMetrics;
+    private KnowledgeDocumentNodeRepository documentNodeRepository;
+
+    /**
+     * Supplies structured metadata persistence without breaking focused tests that construct this service directly.
+     */
+    @Autowired(required = false)
+    void setDocumentNodeRepository(KnowledgeDocumentNodeRepository documentNodeRepository) {
+        this.documentNodeRepository = documentNodeRepository;
+    }
 
     @Autowired
     public KnowledgeService(KnowledgeProperties properties,
@@ -308,9 +319,23 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
         if (document == null) throw new IllegalArgumentException("文档不存在");
         String versionUid = safe(document.getCurrentVersionUid());
         if (versionUid.isBlank()) return List.of();
+        Map<String, KnowledgeDocumentNodeEntity> nodes = documentNodeRepository == null ? Map.of()
+                : documentNodeRepository.listByVersion(versionUid).stream()
+                .collect(Collectors.toMap(KnowledgeDocumentNodeEntity::getNodeUid, node -> node));
         return chunkRepository.listReadyByDocumentVersion(documentUid, versionUid).stream()
-                .map(this::chunkModel)
+                .map(chunk -> chunkModel(chunk, document.getDisplayName(), nodes))
                 .toList();
+    }
+
+    public List<KnowledgeModels.DocumentNode> listDocumentStructure(String baseUid, String documentUid) {
+        KnowledgeDocumentEntity document = documentRepository.findByBaseAndUid(baseUid, documentUid);
+        if (document == null) throw new IllegalArgumentException("文档不存在");
+        String versionUid = safe(document.getCurrentVersionUid());
+        if (versionUid.isBlank() || documentNodeRepository == null) return List.of();
+        List<KnowledgeDocumentNodeEntity> nodes = documentNodeRepository.listByVersion(versionUid);
+        Map<String, List<KnowledgeDocumentNodeEntity>> children = nodes.stream()
+                .collect(Collectors.groupingBy(node -> safe(node.getParentNodeUid())));
+        return children.getOrDefault("", List.of()).stream().map(node -> documentNode(node, children)).toList();
     }
 
     public KnowledgeModels.ImportBatch getImportBatch(String baseUid, String batchUid) {
@@ -326,7 +351,8 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
                             item.getErrorCode(), item.getErrorMessage());
                 }).toList();
         return new KnowledgeModels.ImportBatch(batchUid, baseUid, batch.getStatus(),
-                batch.getParserMode(), zero(batch.getChunkSizeTokens()),
+                batch.getParserMode(), safe(batch.getChunkStrategy()).isBlank() ? "TOKEN" : batch.getChunkStrategy(),
+                zero(batch.getChunkSizeTokens()),
                 zero(batch.getChunkOverlapTokens()),
                 safe(batch.getEmbeddingProviderId()).isBlank() ? base.embeddingProviderId() : batch.getEmbeddingProviderId(),
                 safe(batch.getEmbeddingModelId()).isBlank() ? base.embeddingModelId() : batch.getEmbeddingModelId(),
@@ -342,9 +368,14 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
         String parserMode = request == null || request.parserMode() == null
                 ? "STRUCTURED" : request.parserMode().trim().toUpperCase(Locale.ROOT);
         require("STRUCTURED".equals(parserMode), "当前仅支持结构化解析");
-        int chunkSize = request == null || request.chunkSizeTokens() == null
+        String chunkStrategy = request == null || request.chunkStrategy() == null
+                ? "TOKEN" : request.chunkStrategy().trim().toUpperCase(Locale.ROOT);
+        require("TOKEN".equals(chunkStrategy) || "SMART".equals(chunkStrategy), "不支持的分块策略");
+        int chunkSize = "SMART".equals(chunkStrategy) ? 500
+                : request == null || request.chunkSizeTokens() == null
                 ? properties.getChunking().getDefaultSizeTokens() : request.chunkSizeTokens();
-        int overlap = request == null || request.chunkOverlapTokens() == null
+        int overlap = "SMART".equals(chunkStrategy) ? 80
+                : request == null || request.chunkOverlapTokens() == null
                 ? properties.getChunking().getDefaultOverlapTokens() : request.chunkOverlapTokens();
         require(chunkSize >= 100 && chunkSize <= 2000, "分块大小必须在 100 到 2000 tokens 之间");
         require(overlap >= 0 && overlap < chunkSize && overlap <= chunkSize / 2,
@@ -361,7 +392,7 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
         String modelFingerprint = safe(batch.getEmbeddingModelFingerprint()).isBlank()
                 ? embeddingProvider.fingerprint(providerId, modelId, dimension)
                 : batch.getEmbeddingModelFingerprint();
-        String configHash = sha256(parserMode + ":" + chunkSize + ":" + overlap + ":"
+        String configHash = sha256(parserMode + ":" + chunkStrategy + ":" + chunkSize + ":" + overlap + ":"
                 + preprocessingConfig + ":" + modelFingerprint);
         String currentStatus = batch.getStatus();
         if (!"DRAFT".equals(currentStatus)) {
@@ -370,7 +401,7 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
         }
         require(importItemRepository.countAcceptedByBatch(batchUid) > 0, "批次中没有可构建文件");
         LocalDateTime now = LocalDateTime.now();
-        boolean claimed = importBatchRepository.claimBuilding(batchUid, parserMode, chunkSize, overlap,
+        boolean claimed = importBatchRepository.claimBuilding(batchUid, parserMode, chunkStrategy, chunkSize, overlap,
                 providerId, modelId, dimension, modelFingerprint, preprocessingConfig, configHash, now);
         if (!claimed) {
             KnowledgeImportBatchEntity persisted = importBatchRepository.findByUid(batchUid);
@@ -391,9 +422,10 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
             version.setDocumentUid(documentUid);
             version.setVersionNo(versionNo);
             version.setChecksumSha256(document.getChecksumSha256());
-            version.setParserVersion("2");
-            version.setChunkerVersion("2");
+            version.setParserVersion("3");
+            version.setChunkerVersion("3");
             version.setParserMode(parserMode);
+            version.setChunkStrategy(chunkStrategy);
             version.setChunkSizeTokens(chunkSize);
             version.setChunkOverlapTokens(overlap);
             version.setPreprocessingConfig(preprocessingConfig);
@@ -504,6 +536,7 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
         entity.setKnowledgeBaseUid(baseUid);
         entity.setStatus("DRAFT");
         entity.setParserMode("STRUCTURED");
+        entity.setChunkStrategy("TOKEN");
         entity.setChunkSizeTokens(properties.getChunking().getDefaultSizeTokens());
         entity.setChunkOverlapTokens(properties.getChunking().getDefaultOverlapTokens());
         entity.setEmbeddingProviderId(base.embeddingProviderId());
@@ -589,6 +622,7 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
         List<String> chunkUids = chunkRepository.listChunkUidsByDocument(document.documentUid());
         citationRepository.deleteByChunkUids(chunkUids);
         chunkRepository.deleteByDocument(document.documentUid());
+        if (documentNodeRepository != null) documentNodeRepository.deleteByDocument(document.documentUid());
         ingestionJobRepository.deleteByDocument(document.documentUid());
         documentVersionRepository.deleteByDocument(document.documentUid());
         importItemRepository.deleteByDocument(document.documentUid());
@@ -648,6 +682,7 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
                 throw new LeaseLostException();
             }
             ingestionMetrics.parsedPages(parsed.pages().size());
+            Map<String, String> nodeUids = persistDocumentNodes(baseUid, documentUid, versionUid, parsed);
             stage(jobUid, leaseToken, documentUid, "CHUNKING", 20);
             int batchSize = properties.getIngestion().getEmbeddingBatchSize();
             List<DocumentChunker.Chunk> embeddingBatch = new ArrayList<>(batchSize);
@@ -657,18 +692,21 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
                 updateJob(jobUid, leaseToken, "EMBEDDING", 30, 0, 0);
                 chunker.split(parsed, zero(context.version().getChunkSizeTokens()),
                         zero(context.version().getChunkOverlapTokens()),
+                        safe(context.version().getChunkStrategy()).isBlank()
+                                ? "TOKEN" : context.version().getChunkStrategy(),
                         chunk -> {
                             embeddingBatch.add(chunk);
                             if (embeddingBatch.size() >= batchSize) {
                                 chunkCount[0] += processEmbeddingBatch(context, jobUid, leaseToken, documentUid,
                                         baseUid, versionUid, collection, embeddingBatch, lexicalSession,
-                                        chunkCount[0]);
+                                        chunkCount[0], nodeUids, parsed.nodes());
                                 embeddingBatch.clear();
                             }
                         });
                 if (!embeddingBatch.isEmpty()) {
                     chunkCount[0] += processEmbeddingBatch(context, jobUid, leaseToken, documentUid,
-                            baseUid, versionUid, collection, embeddingBatch, lexicalSession, chunkCount[0]);
+                            baseUid, versionUid, collection, embeddingBatch, lexicalSession, chunkCount[0],
+                            nodeUids, parsed.nodes());
                     embeddingBatch.clear();
                 }
                 if (chunkCount[0] == 0) {
@@ -895,9 +933,10 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
     }
 
     private void upsertStagedChunk(String chunkUid, String baseUid, String documentUid, String versionUid,
-                                   DocumentChunker.Chunk chunk, String contentHash) {
+                                   String documentNodeUid, DocumentChunker.Chunk chunk, String contentHash) {
         LocalDateTime now = LocalDateTime.now();
         KnowledgeChunkEntity entity = stagedChunk(chunkUid, baseUid, documentUid, versionUid, chunk, contentHash, now);
+        entity.setDocumentNodeUid(documentNodeUid);
         if (chunkRepository.updateStagedByUid(entity)) return;
         try {
             chunkRepository.save(entity);
@@ -916,10 +955,13 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
     private int processEmbeddingBatch(IngestionContext context, String jobUid, String leaseToken,
                                       String documentUid, String baseUid, String versionUid, String collection,
                                       List<DocumentChunker.Chunk> batch,
-                                      LexicalSearchStore.IndexSession lexicalSession, int processedBefore) {
+                                      LexicalSearchStore.IndexSession lexicalSession, int processedBefore,
+                                      Map<String, String> nodeUids,
+                                      List<DocumentParser.StructureNode> structureNodes) {
         assertLease(jobUid, leaseToken);
-        List<String> texts = batch.stream().map(chunk -> chunk.section().isBlank()
-                ? chunk.content() : chunk.section() + "\n" + chunk.content()).toList();
+        String documentName = safe(context.document().getDisplayName());
+        List<String> texts = batch.stream().map(chunk -> documentName + "\n"
+                + (chunk.section().isBlank() ? "" : chunk.section() + "\n") + chunk.content()).toList();
         List<List<Float>> vectors = cachedEmbeddings(jobUid, leaseToken, texts,
                 context.version().getEmbeddingProviderId(), context.version().getEmbeddingModelId(),
                 zero(context.version().getEmbeddingDimension()), context.version().getEmbeddingModelFingerprint());
@@ -927,19 +969,39 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
                 Math.min(90, 30 + processedBefore));
         List<VectorStore.Point> points = new ArrayList<>(batch.size());
         List<LexicalSearchStore.IndexedChunk> lexicalChunks = new ArrayList<>(batch.size());
+        Map<String, DocumentParser.StructureNode> nodesByKey = structureNodes.stream()
+                .collect(Collectors.toMap(DocumentParser.StructureNode::nodeKey, node -> node));
         for (int index = 0; index < batch.size(); index++) {
             DocumentChunker.Chunk chunk = batch.get(index);
             String contentHash = sha256(chunk.content());
             String chunkUid = UuidUtil.stableUuid(versionUid + ":" + chunk.index() + ":" + contentHash);
-            upsertStagedChunk(chunkUid, baseUid, documentUid, versionUid, chunk, contentHash);
-            points.add(new VectorStore.Point(chunkUid, vectors.get(index), Map.of(
-                    "knowledgeBaseUid", baseUid,
-                    "documentUid", documentUid,
-                    "documentVersionUid", versionUid,
-                    "chunkUid", chunkUid,
-                    "enabled", true)));
+            String nodeUid = nodeUids.getOrDefault(chunk.nodeKey(), nodeUids.getOrDefault("root", ""));
+            DocumentParser.StructureNode node = nodesByKey.getOrDefault(chunk.nodeKey(), nodesByKey.get("root"));
+            DocumentParser.StructureNode chapter = node;
+            while (chapter != null && chapter.level() > 1) chapter = nodesByKey.get(chapter.parentNodeKey());
+            upsertStagedChunk(chunkUid, baseUid, documentUid, versionUid, nodeUid, chunk, contentHash);
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("knowledgeBaseUid", baseUid);
+            payload.put("documentUid", documentUid);
+            payload.put("documentVersionUid", versionUid);
+            payload.put("chunkUid", chunkUid);
+            payload.put("nodeUid", nodeUid);
+            payload.put("sectionPath", chunk.section());
+            payload.put("chunkStrategy", safe(context.version().getChunkStrategy()).isBlank()
+                    ? "TOKEN" : context.version().getChunkStrategy());
+            payload.put("visibility", "INHERIT");
+            payload.put("departmentUids", List.of());
+            payload.put("principalUids", List.of());
+            payload.put("accessScopeVersion", 0);
+            payload.put("enabled", true);
+            points.add(new VectorStore.Point(chunkUid, vectors.get(index), payload));
             lexicalChunks.add(new LexicalSearchStore.IndexedChunk(
-                    chunkUid, chunk.section(), chunk.content()));
+                    chunkUid, chunk.section(), chunk.content(), nodeUid,
+                    chapter == null ? "" : chapter.code(), chapter == null ? "" : chapter.title(),
+                    node == null ? "" : node.code(), node == null ? "" : node.title(),
+                    chunk.pageFrom(), chunk.pageTo(),
+                    safe(context.version().getChunkStrategy()).isBlank()
+                            ? "TOKEN" : context.version().getChunkStrategy()));
         }
         vectorStore.upsert(collection, points);
         assertLease(jobUid, leaseToken);
@@ -948,6 +1010,41 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
         updateJob(jobUid, leaseToken, "VECTOR_INDEXING", Math.min(90, 30 + processed),
                 processed, processed + 1);
         return batch.size();
+    }
+
+    private Map<String, String> persistDocumentNodes(String baseUid, String documentUid, String versionUid,
+                                                     DocumentParser.ParsedDocument parsed) {
+        Map<String, String> nodeUids = new LinkedHashMap<>();
+        for (DocumentParser.StructureNode node : parsed.nodes()) {
+            nodeUids.put(node.nodeKey(), UuidUtil.stableUuid(versionUid + ":node:" + node.nodeKey()));
+        }
+        if (documentNodeRepository == null) return nodeUids;
+        documentNodeRepository.deleteByVersion(versionUid);
+        LocalDateTime now = LocalDateTime.now();
+        for (DocumentParser.StructureNode node : parsed.nodes()) {
+            KnowledgeDocumentNodeEntity entity = new KnowledgeDocumentNodeEntity();
+            entity.setNodeUid(nodeUids.get(node.nodeKey()));
+            entity.setKnowledgeBaseUid(baseUid);
+            entity.setDocumentUid(documentUid);
+            entity.setDocumentVersionUid(versionUid);
+            entity.setParentNodeUid(node.parentNodeKey().isBlank() ? null : nodeUids.get(node.parentNodeKey()));
+            entity.setNodeType(node.type());
+            entity.setLevel(node.level());
+            entity.setCode(safe(node.code()));
+            entity.setTitle(safe(node.title()));
+            entity.setSectionPath(safe(node.sectionPath()));
+            entity.setPageFrom(node.pageFrom());
+            entity.setPageTo(node.pageTo());
+            entity.setCharStart(node.charStart());
+            entity.setCharEnd(node.charEnd());
+            entity.setDetectionSource(node.detectionSource());
+            entity.setConfidence(BigDecimal.valueOf(node.confidence()));
+            entity.setIndexable(node.indexable());
+            entity.setMetadataJson(safe(node.metadataJson()));
+            entity.setCreatedTime(toDate(now));
+            documentNodeRepository.save(entity);
+        }
+        return nodeUids;
     }
 
     private List<List<Float>> cachedEmbeddings(String jobUid, String leaseToken, List<String> texts,
@@ -1062,6 +1159,7 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
                     documentUid, versionUid, cleanupException);
         }
         chunkRepository.deleteNonReadyByDocumentVersion(versionUid);
+        if (documentNodeRepository != null) documentNodeRepository.deleteByVersion(versionUid);
     }
 
     private void finalizeImportItem(String versionUid, String status, String errorCode, String errorMessage) {
@@ -1362,10 +1460,34 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
                 toLocalDateTime(document.getUpdatedTime()));
     }
 
-    private KnowledgeModels.Chunk chunkModel(KnowledgeChunkEntity chunk) {
+    private KnowledgeModels.Chunk chunkModel(KnowledgeChunkEntity chunk, String documentName,
+                                             Map<String, KnowledgeDocumentNodeEntity> nodes) {
+        KnowledgeDocumentNodeEntity node = nodes.get(chunk.getDocumentNodeUid());
+        KnowledgeDocumentNodeEntity chapter = node;
+        while (chapter != null && zero(chapter.getLevel()) > 1) chapter = nodes.get(chapter.getParentNodeUid());
+        String section = node == null || zero(node.getLevel()) <= 1 ? "" : displayNode(node);
+        KnowledgeModels.ChunkMetadata metadata = new KnowledgeModels.ChunkMetadata(chunk.getDocumentNodeUid(),
+                safe(documentName), chapter == null ? "" : safe(chapter.getCode()),
+                chapter == null ? "" : safe(chapter.getTitle()), section, safe(chunk.getSectionPath()),
+                chunk.getPageFrom(), chunk.getPageTo());
         return new KnowledgeModels.Chunk(chunk.getChunkUid(), zero(chunk.getChunkIndex()), safe(chunk.getContent()),
                 zero(chunk.getTokenCount()), chunk.getPageFrom(), chunk.getPageTo(), safe(chunk.getSectionPath()),
-                chunk.getCharStart(), chunk.getCharEnd(), safe(chunk.getStatus()));
+                chunk.getCharStart(), chunk.getCharEnd(), safe(chunk.getStatus()), metadata);
+    }
+
+    private String displayNode(KnowledgeDocumentNodeEntity node) {
+        return safe(node.getCode()).isBlank() ? safe(node.getTitle())
+                : node.getCode() + " " + safe(node.getTitle());
+    }
+
+    private KnowledgeModels.DocumentNode documentNode(KnowledgeDocumentNodeEntity node,
+                                                       Map<String, List<KnowledgeDocumentNodeEntity>> children) {
+        return new KnowledgeModels.DocumentNode(node.getNodeUid(), safe(node.getParentNodeUid()), node.getNodeType(),
+                zero(node.getLevel()), safe(node.getCode()), safe(node.getTitle()), safe(node.getSectionPath()),
+                node.getPageFrom(), node.getPageTo(), safe(node.getDetectionSource()),
+                node.getConfidence() == null ? 0D : node.getConfidence().doubleValue(),
+                Boolean.TRUE.equals(node.getIndexable()), children.getOrDefault(node.getNodeUid(), List.of()).stream()
+                .map(child -> documentNode(child, children)).toList());
     }
 
     private String originalFileName(MultipartFile file) {
@@ -1458,11 +1580,11 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
         return value == null ? 0 : value;
     }
 
-    private java.util.Date toDate(LocalDateTime value) {
+    private Date toDate(LocalDateTime value) {
         return value == null ? null : Timestamp.valueOf(value);
     }
 
-    private LocalDateTime toLocalDateTime(java.util.Date value) {
+    private LocalDateTime toLocalDateTime(Date value) {
         if (value == null) return null;
         if (value instanceof Timestamp timestamp) return timestamp.toLocalDateTime();
         return new Timestamp(value.getTime()).toLocalDateTime();
@@ -1487,7 +1609,8 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
                 new DocumentParser.PdfPreprocessingOptions(
                         Boolean.TRUE.equals(pdf.removeHeader()),
                         Boolean.TRUE.equals(pdf.removeFooter()),
-                        Boolean.TRUE.equals(pdf.removeWatermark())));
+                        Boolean.TRUE.equals(pdf.removeWatermark()),
+                        Boolean.TRUE.equals(pdf.removeTableOfContents())));
     }
 
     private KnowledgeModels.PreprocessingRequest normalizePreprocessing(
@@ -1496,9 +1619,11 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
         KnowledgeModels.PdfPreprocessingRequest normalizedPdf = new KnowledgeModels.PdfPreprocessingRequest(
                 pdf != null && Boolean.TRUE.equals(pdf.removeHeader()),
                 pdf != null && Boolean.TRUE.equals(pdf.removeFooter()),
-                pdf != null && Boolean.TRUE.equals(pdf.removeWatermark()));
+                pdf != null && Boolean.TRUE.equals(pdf.removeWatermark()),
+                pdf != null && Boolean.TRUE.equals(pdf.removeTableOfContents()));
         boolean enabled = request != null && Boolean.TRUE.equals(request.enabled());
-        if (!normalizedPdf.removeHeader() && !normalizedPdf.removeFooter() && !normalizedPdf.removeWatermark()) {
+        if (!normalizedPdf.removeHeader() && !normalizedPdf.removeFooter() && !normalizedPdf.removeWatermark()
+                && !normalizedPdf.removeTableOfContents()) {
             enabled = false;
         }
         return new KnowledgeModels.PreprocessingRequest(enabled, normalizedPdf);

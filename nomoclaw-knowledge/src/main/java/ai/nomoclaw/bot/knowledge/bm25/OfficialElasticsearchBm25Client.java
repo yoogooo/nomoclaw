@@ -3,6 +3,7 @@ package ai.nomoclaw.bot.knowledge.bm25;
 import ai.nomoclaw.bot.knowledge.bm25.ElasticsearchBm25Client.IndexDocument;
 import ai.nomoclaw.bot.knowledge.bm25.ElasticsearchBm25Client.QuerySpec;
 import ai.nomoclaw.bot.knowledge.bm25.ElasticsearchBm25Client.SearchDocumentHit;
+import ai.nomoclaw.bot.knowledge.util.JsonUtil;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.FieldValue;
 import co.elastic.clients.elasticsearch._types.Refresh;
@@ -59,7 +60,19 @@ public class OfficialElasticsearchBm25Client implements ElasticsearchBm25Client 
                             .properties("documentUid", keywordProperty())
                             .properties("documentVersionUid", keywordProperty())
                             .properties("documentName", textProperty())
+                            .properties("nodeUid", keywordProperty())
+                            .properties("chapterCode", keywordProperty())
+                            .properties("chapterTitle", textProperty())
+                            .properties("sectionCode", keywordProperty())
+                            .properties("sectionTitle", textProperty())
                             .properties("sectionPath", textProperty())
+                            .properties("pageFrom", integerProperty())
+                            .properties("pageTo", integerProperty())
+                            .properties("chunkStrategy", keywordProperty())
+                            .properties("visibility", keywordProperty())
+                            .properties("departmentUids", keywordProperty())
+                            .properties("principalUids", keywordProperty())
+                            .properties("accessScopeVersion", integerProperty())
                             .properties("content", textProperty())));
         } catch (Exception ex) {
             if (!indexAlreadyExists(ex)) {
@@ -105,7 +118,8 @@ public class OfficialElasticsearchBm25Client implements ElasticsearchBm25Client 
                             .source(source -> source.filter(filter -> filter.includes(sourceFields)))
                             .query(toQuery(new QuerySpec.BoolQuerySpec(
                                     List.of(new QuerySpec.MultiMatchQuerySpec(query, List.of(
-                                            "documentName^3", "sectionPath^2", "content"))),
+                                            "documentName^3", "sectionTitle^3", "chapterTitle^2.5",
+                                            "sectionPath^2", "content"))),
                                     List.of(new QuerySpec.TermsQuerySpec("knowledgeBaseUid", knowledgeBaseUids))))),
                     JsonNode.class);
             return response.hits().hits().stream()
@@ -183,9 +197,13 @@ public class OfficialElasticsearchBm25Client implements ElasticsearchBm25Client 
                 .searchAnalyzer("bm25_search_analyzer")));
     }
 
+    private Property integerProperty() {
+        return Property.of(property -> property.integer(integer -> integer));
+    }
+
     private JsonNode toJsonNode(Map<String, Object> source) {
         Map<String, Object> ordered = new LinkedHashMap<>(source);
-        return ai.nomoclaw.bot.knowledge.util.JsonUtil.mapper().valueToTree(ordered);
+        return JsonUtil.mapper().valueToTree(ordered);
     }
 
     private boolean indexAlreadyExists(Exception exception) {

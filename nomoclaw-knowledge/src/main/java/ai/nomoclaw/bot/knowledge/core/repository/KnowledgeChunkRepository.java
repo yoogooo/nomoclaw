@@ -74,6 +74,7 @@ public class KnowledgeChunkRepository extends CrudRepository<KnowledgeChunkMappe
     public boolean updateStagedByUid(KnowledgeChunkEntity chunk) {
         return lambdaUpdate().eq(KnowledgeChunkEntity::getChunkUid, chunk.getChunkUid())
                 .set(KnowledgeChunkEntity::getContent, chunk.getContent())
+                .set(KnowledgeChunkEntity::getDocumentNodeUid, chunk.getDocumentNodeUid())
                 .set(KnowledgeChunkEntity::getTokenCount, chunk.getTokenCount())
                 .set(KnowledgeChunkEntity::getContentHash, chunk.getContentHash())
                 .set(KnowledgeChunkEntity::getPageFrom, chunk.getPageFrom())

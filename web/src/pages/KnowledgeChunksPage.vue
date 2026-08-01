@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { ChevronLeft, Copy } from "lucide-vue-next";
-import { NButton, NCard, NEmpty, NSpin, NTag } from "naive-ui";
+import { NButton, NCard, NEmpty, NSpin, NTag, NTree } from "naive-ui";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import DirectoryRail from "@/components/chat/DirectoryRail.vue";
 import AppPageHeader from "@/components/layout/AppPageHeader.vue";
-import { knowledgeApi, type KnowledgeChunk, type KnowledgeDocument } from "@/api/knowledgeApi";
+import { knowledgeApi, type KnowledgeChunk, type KnowledgeDocument, type KnowledgeDocumentNode } from "@/api/knowledgeApi";
 import { message } from "@/discrete";
 
 const { t } = useI18n();
@@ -16,17 +16,32 @@ const baseUid = computed(() => String(route.params.knowledgeBaseUid || ""));
 const documentUid = computed(() => String(route.params.documentUid || ""));
 const document = ref<KnowledgeDocument | null>(null);
 const chunks = ref<KnowledgeChunk[]>([]);
+const structure = ref<KnowledgeDocumentNode[]>([]);
 const loading = ref(false);
+
+const structureOptions = computed(() => structure.value.map(toTreeOption));
+
+function toTreeOption(node: KnowledgeDocumentNode): { key: string; label: string; children?: ReturnType<typeof toTreeOption>[] } {
+  const heading = [node.code, node.title].filter(Boolean).join(" ") || node.type;
+  const filtered = node.indexable ? "" : ` · ${t("pages.knowledge.chunks.filtered")}`;
+  return {
+    key: node.nodeUid,
+    label: `${heading} · ${node.detectionSource} · ${Math.round(node.confidence * 100)}%${filtered}`,
+    children: node.children?.map(toTreeOption)
+  };
+}
 
 async function load() {
   loading.value = true;
   try {
-    const [documentResponse, chunksResponse] = await Promise.all([
+    const [documentResponse, chunksResponse, structureResponse] = await Promise.all([
       knowledgeApi.document(baseUid.value, documentUid.value),
-      knowledgeApi.chunks(baseUid.value, documentUid.value)
+      knowledgeApi.chunks(baseUid.value, documentUid.value),
+      knowledgeApi.structure(baseUid.value, documentUid.value)
     ]);
     document.value = documentResponse;
     chunks.value = chunksResponse.items;
+    structure.value = structureResponse.items;
   } finally {
     loading.value = false;
   }
@@ -72,6 +87,10 @@ onMounted(() => void load());
           </div>
         </NCard>
 
+        <NCard v-if="structure.length" class="structure-card" :title="t('pages.knowledge.chunks.structure')">
+          <NTree block-line :data="structureOptions" default-expand-all />
+        </NCard>
+
         <NEmpty v-if="!chunks.length" :description="t('pages.knowledge.chunks.empty')" />
         <div class="chunk-list">
           <NCard v-for="chunk in chunks" :key="chunk.chunkUid" class="chunk-card">
@@ -92,6 +111,7 @@ onMounted(() => void load());
             <div class="chunk-meta">
               <span>{{ chunk.chunkUid }}</span>
               <span>{{ chunk.charStart ?? "-" }}-{{ chunk.charEnd ?? "-" }}</span>
+              <span v-if="chunk.metadata?.documentNodeUid">node: {{ chunk.metadata.documentNodeUid }}</span>
               <span>{{ chunk.status }}</span>
             </div>
           </NCard>
@@ -107,6 +127,7 @@ onMounted(() => void load());
 .detail-back-btn{display:inline-flex;align-items:center;gap:var(--space-1);padding:0;border:0;background:transparent;color:var(--color-text-secondary);font-size:var(--text-body-size);cursor:pointer}
 .detail-back-btn:hover{color:var(--color-brand-400)}
 .summary-card{margin-bottom:var(--space-4)}
+.structure-card{margin-bottom:var(--space-4)}
 .summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--space-4)}
 .summary-grid div{display:flex;flex-direction:column;gap:var(--space-1)}
 .summary-grid span,.chunk-meta{color:var(--color-text-muted);font-size:var(--font-size-sm)}

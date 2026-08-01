@@ -42,17 +42,21 @@ public final class KnowledgeModels {
     public record UploadResult(String batchUid, List<Document> documents, List<UploadFileResult> items) {
     }
 
-    public record BuildRequest(String parserMode, Integer chunkSizeTokens, Integer chunkOverlapTokens,
+    public record BuildRequest(String parserMode, String chunkStrategy, Integer chunkSizeTokens, Integer chunkOverlapTokens,
                                PreprocessingRequest preprocessing) {
         public BuildRequest(String parserMode, Integer chunkSizeTokens, Integer chunkOverlapTokens) {
-            this(parserMode, chunkSizeTokens, chunkOverlapTokens, null);
+            this(parserMode, null, chunkSizeTokens, chunkOverlapTokens, null);
         }
     }
 
     public record PreprocessingRequest(Boolean enabled, PdfPreprocessingRequest pdf) {
     }
 
-    public record PdfPreprocessingRequest(Boolean removeHeader, Boolean removeFooter, Boolean removeWatermark) {
+    public record PdfPreprocessingRequest(Boolean removeHeader, Boolean removeFooter, Boolean removeWatermark,
+                                          Boolean removeTableOfContents) {
+        public PdfPreprocessingRequest(Boolean removeHeader, Boolean removeFooter, Boolean removeWatermark) {
+            this(removeHeader, removeFooter, removeWatermark, false);
+        }
     }
 
     public record ImportItem(String itemUid, String fileName, String mode, String outcome, String status,
@@ -60,6 +64,7 @@ public final class KnowledgeModels {
     }
 
     public record ImportBatch(String batchUid, String knowledgeBaseUid, String status, String parserMode,
+                              String chunkStrategy,
                               int chunkSizeTokens, int chunkOverlapTokens, String embeddingProviderId,
                               String embeddingModelId, int embeddingDimension, PreprocessingRequest preprocessing,
                               List<ImportItem> items, LocalDateTime createdTime, LocalDateTime updatedTime) {
@@ -82,7 +87,23 @@ public final class KnowledgeModels {
     }
 
     public record Chunk(String chunkUid, int chunkIndex, String content, int tokenCount, Integer pageFrom,
-                        Integer pageTo, String sectionPath, Integer charStart, Integer charEnd, String status) {
+                        Integer pageTo, String sectionPath, Integer charStart, Integer charEnd, String status,
+                        ChunkMetadata metadata) {
+        public Chunk(String chunkUid, int chunkIndex, String content, int tokenCount, Integer pageFrom,
+                     Integer pageTo, String sectionPath, Integer charStart, Integer charEnd, String status) {
+            this(chunkUid, chunkIndex, content, tokenCount, pageFrom, pageTo, sectionPath, charStart, charEnd,
+                    status, null);
+        }
+    }
+
+    public record ChunkMetadata(String documentNodeUid, String document, String chapter, String title,
+                                String section, String sectionPath, Integer pageFrom, Integer pageTo) {
+    }
+
+    public record DocumentNode(String nodeUid, String parentNodeUid, String type, int level, String code,
+                               String title, String sectionPath, Integer pageFrom, Integer pageTo,
+                               String detectionSource, double confidence, boolean indexable,
+                               List<DocumentNode> children) {
     }
 
     public record BindingRequest(List<String> include, List<String> exclude) {

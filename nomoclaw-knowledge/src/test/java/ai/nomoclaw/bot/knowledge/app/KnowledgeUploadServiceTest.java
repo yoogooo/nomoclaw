@@ -179,11 +179,28 @@ class KnowledgeUploadServiceTest {
                 new KnowledgeModels.BuildRequest("STRUCTURED", 500, 80));
 
         assertEquals("BUILDING", first.status());
+        assertEquals("TOKEN", first.chunkStrategy());
         assertEquals(first.batchUid(), repeated.batchUid());
         assertEquals(1L, knowledgeDocumentVersionMapper.selectCount(new LambdaQueryWrapper<>()));
         assertEquals(1L, knowledgeIngestionJobMapper.selectCount(new LambdaQueryWrapper<>()));
         assertThrows(Exception.class, () -> service.buildImportBatch("kb_test", upload.batchUid(),
                 new KnowledgeModels.BuildRequest("STRUCTURED", 800, 120)));
+    }
+
+    @Test
+    void smartStrategyUsesSystemManagedTokenGuardrails() {
+        KnowledgeModels.UploadResult upload = service.upload("kb_test", List.of(
+                new MockMultipartFile("files", "smart.txt", "text/plain", "content".getBytes())));
+
+        KnowledgeModels.ImportBatch batch = service.buildImportBatch("kb_test", upload.batchUid(),
+                new KnowledgeModels.BuildRequest("STRUCTURED", "SMART", 900, 300, null));
+        KnowledgeDocumentVersionEntity version = knowledgeDocumentVersionMapper.selectOne(
+                new LambdaQueryWrapper<KnowledgeDocumentVersionEntity>());
+
+        assertEquals("SMART", batch.chunkStrategy());
+        assertEquals(500, batch.chunkSizeTokens());
+        assertEquals(80, batch.chunkOverlapTokens());
+        assertEquals("SMART", version.getChunkStrategy());
     }
 
     @Test

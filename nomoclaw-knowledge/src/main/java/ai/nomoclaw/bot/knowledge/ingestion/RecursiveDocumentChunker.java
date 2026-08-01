@@ -5,7 +5,6 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -47,8 +46,8 @@ public class RecursiveDocumentChunker implements DocumentChunker {
                 String content = text.substring(start, end).trim();
                 if (content.length() >= 20 && seen.add(content)) {
                     consumer.accept(new Chunk(index++, content, tokenEstimator.estimate(content),
-                            source.pageAt(start), source.pageAt(end - 1), source.sectionPath(),
-                            source.charStart() + start, source.charStart() + end));
+                            source.pageAt(start), source.pageAt(end - 1), source.sectionPath(start, end),
+                            source.charStart() + start, source.charStart() + end, source.nodeKey(start, end)));
                 }
                 if (end >= text.length()) break;
                 start = Math.max(start + 1, overlapStart(text, start, end, overlapTokens));
@@ -57,7 +56,7 @@ public class RecursiveDocumentChunker implements DocumentChunker {
     }
 
     /**
-     * Joins consecutive structural blocks when they belong to the same section.
+     * Joins consecutive structural blocks without making section changes into token chunk boundaries.
      * Structural blocks are parsing hints, rather than hard chunk boundaries: treating every
      * PDF paragraph as a final chunk makes ordinary layout gaps produce tiny embeddings.
      * A paragraph can continue on a following PDF page, so page changes are retained as
@@ -66,32 +65,20 @@ public class RecursiveDocumentChunker implements DocumentChunker {
     private List<ChunkSource> mergeAdjacentBlocks(List<DocumentParser.DocumentBlock> blocks) {
         List<ChunkSource> sources = new ArrayList<>();
         StringBuilder text = new StringBuilder();
-        String sectionPath = "";
         int charStart = 0;
-        int nextCharStart = 0;
-        List<PageBoundary> pageBoundaries = new ArrayList<>();
+        List<ContextBoundary> boundaries = new ArrayList<>();
         for (DocumentParser.DocumentBlock block : blocks) {
             if (block.text() == null || block.text().isBlank()) continue;
-            if (!text.isEmpty() && !Objects.equals(sectionPath, block.sectionPath())) {
-                sources.add(new ChunkSource(sectionPath, text.toString(), charStart, List.copyOf(pageBoundaries)));
-                nextCharStart += text.length() + 2;
-                text.setLength(0);
-                pageBoundaries.clear();
-            }
             if (text.isEmpty()) {
-                sectionPath = block.sectionPath();
-                charStart = nextCharStart;
-                pageBoundaries.add(new PageBoundary(0, block.page()));
+                charStart = block.charStart();
             } else {
                 text.append("\n\n");
-                if (pageBoundaries.getLast().page() != block.page()) {
-                    pageBoundaries.add(new PageBoundary(text.length(), block.page()));
-                }
             }
+            boundaries.add(new ContextBoundary(text.length(), block.page(), block.sectionPath(), block.nodeKey()));
             text.append(block.text().trim());
         }
         if (!text.isEmpty()) {
-            sources.add(new ChunkSource(sectionPath, text.toString(), charStart, List.copyOf(pageBoundaries)));
+            sources.add(new ChunkSource(text.toString(), charStart, List.copyOf(boundaries)));
         }
         return sources;
     }
@@ -129,17 +116,37 @@ public class RecursiveDocumentChunker implements DocumentChunker {
         return best;
     }
 
-    private record ChunkSource(String sectionPath, String text, int charStart, List<PageBoundary> pageBoundaries) {
+    private record ChunkSource(String text, int charStart, List<ContextBoundary> boundaries) {
         private int pageAt(int offset) {
-            PageBoundary boundary = pageBoundaries.getFirst();
-            for (PageBoundary candidate : pageBoundaries) {
+            ContextBoundary boundary = boundaries.getFirst();
+            for (ContextBoundary candidate : boundaries) {
                 if (candidate.charStart() > offset) break;
                 boundary = candidate;
             }
             return boundary.page();
         }
+
+        private String nodeKey(int start, int end) {
+            ContextBoundary first = contextAt(start);
+            return boundaries.stream()
+                    .filter(boundary -> boundary.charStart() > start && boundary.charStart() < end)
+                    .allMatch(boundary -> boundary.nodeKey().equals(first.nodeKey())) ? first.nodeKey() : "root";
+        }
+
+        private String sectionPath(int start, int end) {
+            return "root".equals(nodeKey(start, end)) ? "" : contextAt(start).sectionPath();
+        }
+
+        private ContextBoundary contextAt(int offset) {
+            ContextBoundary result = boundaries.getFirst();
+            for (ContextBoundary boundary : boundaries) {
+                if (boundary.charStart() > offset) break;
+                result = boundary;
+            }
+            return result;
+        }
     }
 
-    private record PageBoundary(int charStart, int page) {
+    private record ContextBoundary(int charStart, int page, String sectionPath, String nodeKey) {
     }
 }

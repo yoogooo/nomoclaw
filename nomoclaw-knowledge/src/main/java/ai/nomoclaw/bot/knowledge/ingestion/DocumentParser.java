@@ -51,13 +51,46 @@ public interface DocumentParser {
         HEADING, PARAGRAPH, TABLE, LIST, CODE
     }
 
-    record DocumentBlock(BlockType type, int page, String sectionPath, String text) {
+    record DocumentBlock(BlockType type, int pageFrom, int pageTo, String sectionPath, String nodeKey, String text,
+                         int charStart, int charEnd, BlockStyle style, boolean crossPageContinuation) {
+        public DocumentBlock(BlockType type, int page, String sectionPath, String text) {
+            this(type, page, page, sectionPath, "root", text, 0, text == null ? 0 : text.length(),
+                    BlockStyle.empty(), false);
+        }
+
+        public int page() {
+            return pageFrom;
+        }
     }
 
-    record ParsedDocument(List<Page> pages, List<DocumentBlock> blocks, List<String> warnings) {
+    record ParsedDocument(List<Page> pages, List<DocumentBlock> blocks, List<StructureNode> nodes,
+                          List<String> warnings) {
+        public ParsedDocument(List<Page> pages, List<DocumentBlock> blocks, List<String> warnings) {
+            this(pages, blocks, List.of(StructureNode.root(pages)), warnings);
+        }
+
         public ParsedDocument(List<Page> pages) {
             this(pages, pages.stream().map(page -> new DocumentBlock(
-                    BlockType.PARAGRAPH, page.number(), page.section(), page.text())).toList(), List.of());
+                    BlockType.PARAGRAPH, page.number(), page.section(), page.text())).toList(),
+                    List.of(StructureNode.root(pages)), List.of());
+        }
+    }
+
+    record StructureNode(String nodeKey, String parentNodeKey, String type, int level, String code, String title,
+                         String sectionPath, int pageFrom, int pageTo, int charStart, int charEnd,
+                         String detectionSource, double confidence, boolean indexable, String metadataJson) {
+        public static StructureNode root(List<Page> pages) {
+            int pageFrom = pages == null || pages.isEmpty() ? 1 : pages.getFirst().number();
+            int pageTo = pages == null || pages.isEmpty() ? pageFrom : pages.getLast().number();
+            return new StructureNode("root", "", "ROOT", 0, "", "", "", pageFrom, pageTo,
+                    0, pages == null ? 0 : pages.stream().mapToInt(page -> page.text().length()).sum(),
+                    "FALLBACK", 0D, true, "{}");
+        }
+    }
+
+    record BlockStyle(float fontSize, boolean bold, float x, float y, float lineHeight) {
+        public static BlockStyle empty() {
+            return new BlockStyle(0F, false, 0F, 0F, 0F);
         }
     }
 
@@ -74,9 +107,14 @@ public interface DocumentParser {
         }
     }
 
-    record PdfPreprocessingOptions(boolean removeHeader, boolean removeFooter, boolean removeWatermark) {
+    record PdfPreprocessingOptions(boolean removeHeader, boolean removeFooter, boolean removeWatermark,
+                                   boolean removeTableOfContents) {
+        public PdfPreprocessingOptions(boolean removeHeader, boolean removeFooter, boolean removeWatermark) {
+            this(removeHeader, removeFooter, removeWatermark, false);
+        }
+
         public static PdfPreprocessingOptions disabled() {
-            return new PdfPreprocessingOptions(false, false, false);
+            return new PdfPreprocessingOptions(false, false, false, false);
         }
     }
 }

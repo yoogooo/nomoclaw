@@ -28,11 +28,12 @@ const advanced = ref(false);
 const fileInput = ref<HTMLInputElement>();
 const config = reactive({
   preset: "balanced",
+  chunkStrategy: "TOKEN" as "TOKEN" | "SMART",
   chunkSizeTokens: 500,
   chunkOverlapTokens: 80,
   preprocessing: {
     enabled: true,
-    pdf: { removeHeader: true, removeFooter: true, removeWatermark: true }
+    pdf: { removeHeader: true, removeFooter: true, removeWatermark: true, removeTableOfContents: false }
   }
 });
 let pollTimer: number | undefined;
@@ -49,9 +50,9 @@ const currentStepTitle = computed(() => t([
   "pages.knowledge.import.steps.confirm",
   "pages.knowledge.import.steps.build"
 ][step.value - 1] ?? "pages.knowledge.import.steps.files"));
-const validConfig = computed(() => config.chunkSizeTokens >= 100 && config.chunkSizeTokens <= 2000
+const validConfig = computed(() => config.chunkStrategy === "SMART" || (config.chunkSizeTokens >= 100 && config.chunkSizeTokens <= 2000
   && config.chunkOverlapTokens >= 0 && config.chunkOverlapTokens < config.chunkSizeTokens
-  && config.chunkOverlapTokens <= config.chunkSizeTokens / 2);
+  && config.chunkOverlapTokens <= config.chunkSizeTokens / 2));
 
 function applyPreset(value: string | number | boolean) {
   if (typeof value !== "string") return;
@@ -70,11 +71,13 @@ async function load() {
     if (batch.value.status !== "DRAFT") step.value = 4;
     config.chunkSizeTokens = batch.value.chunkSizeTokens;
     config.chunkOverlapTokens = batch.value.chunkOverlapTokens;
+    config.chunkStrategy = batch.value.chunkStrategy || "TOKEN";
     if (batch.value.preprocessing) {
       config.preprocessing.enabled = batch.value.preprocessing.enabled;
       config.preprocessing.pdf.removeHeader = batch.value.preprocessing.pdf.removeHeader;
       config.preprocessing.pdf.removeFooter = batch.value.preprocessing.pdf.removeFooter;
       config.preprocessing.pdf.removeWatermark = batch.value.preprocessing.pdf.removeWatermark;
+      config.preprocessing.pdf.removeTableOfContents = batch.value.preprocessing.pdf.removeTableOfContents;
     }
     schedulePoll();
   } finally {
@@ -115,6 +118,7 @@ async function startBuild() {
   try {
     batch.value = await knowledgeApi.buildImport(baseUid.value, batchUid.value, {
       parserMode: "STRUCTURED",
+      chunkStrategy: config.chunkStrategy,
       chunkSizeTokens: config.chunkSizeTokens,
       chunkOverlapTokens: config.chunkOverlapTokens,
       preprocessing: config.preprocessing
@@ -186,7 +190,11 @@ onBeforeUnmount(() => { if (pollTimer) window.clearTimeout(pollTimer); });
           <h2>{{ t("pages.knowledge.import.config.title") }}</h2>
           <p>{{ t("pages.knowledge.import.config.description") }}</p>
           <NAlert type="info" :title="t('pages.knowledge.import.config.ocrTitle')">{{ t("pages.knowledge.import.config.ocrDescription") }}</NAlert>
-          <NRadioGroup :value="config.preset" class="preset-grid" @update:value="applyPreset">
+          <NRadioGroup v-model:value="config.chunkStrategy" class="preset-grid">
+            <NRadio value="TOKEN"><strong>{{ t("pages.knowledge.import.strategies.token") }}</strong></NRadio>
+            <NRadio value="SMART"><strong>{{ t("pages.knowledge.import.strategies.smart") }}</strong><span>{{ t("pages.knowledge.import.strategies.smartHint") }}</span></NRadio>
+          </NRadioGroup>
+          <NRadioGroup v-if="config.chunkStrategy === 'TOKEN'" :value="config.preset" class="preset-grid" @update:value="applyPreset">
             <NRadio value="precise"><strong>{{ t("pages.knowledge.import.presets.precise") }}</strong><span>300 / 50</span></NRadio>
             <NRadio value="balanced"><strong>{{ t("pages.knowledge.import.presets.balanced") }}</strong><span>500 / 80</span></NRadio>
             <NRadio value="context"><strong>{{ t("pages.knowledge.import.presets.context") }}</strong><span>800 / 120</span></NRadio>
@@ -197,10 +205,11 @@ onBeforeUnmount(() => { if (pollTimer) window.clearTimeout(pollTimer); });
               <NCheckbox v-model:checked="config.preprocessing.pdf.removeHeader" :disabled="!config.preprocessing.enabled">{{ t("pages.knowledge.import.preprocessing.pdfHeader") }}</NCheckbox>
               <NCheckbox v-model:checked="config.preprocessing.pdf.removeFooter" :disabled="!config.preprocessing.enabled">{{ t("pages.knowledge.import.preprocessing.pdfFooter") }}</NCheckbox>
               <NCheckbox v-model:checked="config.preprocessing.pdf.removeWatermark" :disabled="!config.preprocessing.enabled">{{ t("pages.knowledge.import.preprocessing.pdfWatermark") }}</NCheckbox>
+              <NCheckbox v-model:checked="config.preprocessing.pdf.removeTableOfContents" :disabled="!config.preprocessing.enabled">{{ t("pages.knowledge.import.preprocessing.pdfTableOfContents") }}</NCheckbox>
             </div>
           </div>
-          <NButton text type="primary" @click="advanced = !advanced">{{ t("pages.knowledge.import.config.advanced") }}</NButton>
-          <div v-if="advanced" class="advanced-grid">
+          <NButton v-if="config.chunkStrategy === 'TOKEN'" text type="primary" @click="advanced = !advanced">{{ t("pages.knowledge.import.config.advanced") }}</NButton>
+          <div v-if="advanced && config.chunkStrategy === 'TOKEN'" class="advanced-grid">
             <label>{{ t("pages.knowledge.import.config.chunkSize") }}<NInputNumber v-model:value="config.chunkSizeTokens" :min="100" :max="2000" /></label>
             <label>{{ t("pages.knowledge.import.config.overlap") }}<NInputNumber v-model:value="config.chunkOverlapTokens" :min="0" :max="Math.floor(config.chunkSizeTokens / 2)" /></label>
           </div>
@@ -211,7 +220,7 @@ onBeforeUnmount(() => { if (pollTimer) window.clearTimeout(pollTimer); });
           <h2>{{ t("pages.knowledge.import.confirm.title") }}</h2>
           <div class="confirm-grid">
             <div class="summary-panel"><span>{{ t("pages.knowledge.import.confirm.files") }}</span><strong>{{ accepted.length }}</strong></div>
-            <div class="summary-panel"><span>{{ t("pages.knowledge.import.confirm.chunking") }}</span><strong>{{ config.chunkSizeTokens }} / {{ config.chunkOverlapTokens }}</strong></div>
+            <div class="summary-panel"><span>{{ t("pages.knowledge.import.confirm.chunking") }}</span><strong>{{ config.chunkStrategy === "SMART" ? t("pages.knowledge.import.strategies.smart") : `${config.chunkSizeTokens} / ${config.chunkOverlapTokens}` }}</strong></div>
             <div class="summary-panel"><span>{{ t("pages.knowledge.import.confirm.preprocessing") }}</span><strong>{{ config.preprocessing.enabled ? t("common.enabled") : t("common.disabled") }}</strong></div>
             <div class="summary-panel"><span>Embedding</span><strong>{{ batch.embeddingProviderId }} · {{ batch.embeddingModelId }} · {{ batch.embeddingDimension }}</strong></div>
           </div>

@@ -140,6 +140,15 @@ public class KnowledgeController {
     }
 
     /**
+     * Returns the detected structure tree for the document's published version.
+     */
+    @GetMapping("/knowledge-bases/{uid}/documents/{documentUid}/structure")
+    public Map<String, Object> structure(@PathVariable String uid, @PathVariable String documentUid) {
+        List<KnowledgeModels.DocumentNode> items = service.listDocumentStructure(uid, documentUid);
+        return Map.of("items", items, "total", items.size());
+    }
+
+    /**
      * Deletes an uploaded document that has not started building.
      */
     @DeleteMapping("/knowledge-bases/{uid}/documents/{documentUid}")

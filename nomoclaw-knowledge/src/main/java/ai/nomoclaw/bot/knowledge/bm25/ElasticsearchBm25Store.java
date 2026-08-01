@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +27,14 @@ public class ElasticsearchBm25Store implements LexicalSearchStore {
     private static final String FIELD_DOCUMENT_VERSION_UID = "documentVersionUid";
     private static final String FIELD_DOCUMENT_NAME = "documentName";
     private static final String FIELD_SECTION_PATH = "sectionPath";
+    private static final String FIELD_NODE_UID = "nodeUid";
+    private static final String FIELD_SECTION_CODE = "sectionCode";
+    private static final String FIELD_SECTION_TITLE = "sectionTitle";
+    private static final String FIELD_CHAPTER_CODE = "chapterCode";
+    private static final String FIELD_CHAPTER_TITLE = "chapterTitle";
+    private static final String FIELD_PAGE_FROM = "pageFrom";
+    private static final String FIELD_PAGE_TO = "pageTo";
+    private static final String FIELD_CHUNK_STRATEGY = "chunkStrategy";
     private static final String FIELD_CONTENT = "content";
 
     private final ElasticsearchBm25Client client;
@@ -125,6 +134,18 @@ public class ElasticsearchBm25Store implements LexicalSearchStore {
         body.put(FIELD_DOCUMENT_VERSION_UID, documentVersionUid);
         body.put(FIELD_DOCUMENT_NAME, safe(documentName));
         body.put(FIELD_SECTION_PATH, safe(chunk.sectionPath()));
+        body.put(FIELD_NODE_UID, safe(chunk.nodeUid()));
+        body.put(FIELD_CHAPTER_CODE, safe(chunk.chapterCode()));
+        body.put(FIELD_CHAPTER_TITLE, safe(chunk.chapterTitle()));
+        body.put(FIELD_SECTION_CODE, safe(chunk.sectionCode()));
+        body.put(FIELD_SECTION_TITLE, safe(chunk.sectionTitle()));
+        body.put(FIELD_PAGE_FROM, chunk.pageFrom());
+        body.put(FIELD_PAGE_TO, chunk.pageTo());
+        body.put(FIELD_CHUNK_STRATEGY, safe(chunk.chunkStrategy()));
+        body.put("visibility", "INHERIT");
+        body.put("departmentUids", List.of());
+        body.put("principalUids", List.of());
+        body.put("accessScopeVersion", 0);
         body.put(FIELD_CONTENT, safe(chunk.content()));
         return body;
     }
@@ -147,7 +168,7 @@ public class ElasticsearchBm25Store implements LexicalSearchStore {
             this.documentUid = documentUid;
             this.documentVersionUid = documentVersionUid;
             this.documentName = documentName;
-            buffered = new java.util.ArrayList<>();
+            buffered = new ArrayList<>();
         }
 
         @Override
