@@ -158,8 +158,8 @@ function buildUserFriendlyMessage(status: number, reason: string): string {
   }
   if (status === 413) {
     return tr("http.413", {
-      maxFileSize: "20MB",
-      maxRequestSize: "40MB"
+      maxFileSize: "100MB",
+      maxRequestSize: "200MB"
     });
   }
   if (status === 422) {

@@ -251,6 +251,9 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
 
     private KnowledgeModels.UploadFileResult uploadOne(KnowledgeModels.Base base, String batchUid,
                                                        MultipartFile file, String original) {
+        require(file != null, "文件不能为空");
+        require(file.getSize() <= properties.getUpload().getMaxFileSize().toBytes(),
+                "文件大小不能超过 " + properties.getUpload().getMaxFileSize().toMegabytes() + "MB");
         require(parser.supports(file.getContentType(), original), "不支持的文件格式: " + original);
         String documentUid = "doc_" + UuidUtil.newUuid();
         Path directory = properties.getStorageRoot().resolve(base.knowledgeBaseUid()).resolve("documents").toAbsolutePath().normalize();

@@ -188,7 +188,7 @@ knowledge:
   enabled: true
   storage-root: "${NOMOCLAW_ROOT_DIR:${user.home}/.nomoclaw}/knowledge"
   upload:
-    max-file-size: 50MB
+    max-file-size: 100MB
     max-request-size: 200MB
     max-files-per-request: 20
   ingestion:

@@ -1,6 +1,7 @@
 package ai.nomoclaw.bot.knowledge.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.util.unit.DataSize;
 
 import java.nio.file.Path;
 import java.time.Duration;
@@ -67,7 +68,16 @@ public class KnowledgeProperties {
     }
 
     public static class Upload {
+        private DataSize maxFileSize = DataSize.ofMegabytes(100);
         private int maxFilesPerRequest;
+
+        public DataSize getMaxFileSize() {
+            return maxFileSize;
+        }
+
+        public void setMaxFileSize(DataSize value) {
+            maxFileSize = value;
+        }
 
         public int getMaxFilesPerRequest() {
             return maxFilesPerRequest;

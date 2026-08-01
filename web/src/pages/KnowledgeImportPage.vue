@@ -42,8 +42,19 @@ const accepted = computed(() => batch.value?.items.filter(item => item.outcome =
 const skipped = computed(() => batch.value?.items.filter(item => item.outcome !== "ACCEPTED") || []);
 const building = computed(() => batch.value?.status === "BUILDING");
 const completed = computed(() => batch.value?.status === "COMPLETED");
-const terminalCount = computed(() => accepted.value.filter(item => ["READY", "FAILED"].includes(item.status)).length);
-const progress = computed(() => accepted.value.length ? Math.round(terminalCount.value * 100 / accepted.value.length) : 0);
+function documentProgress(item: KnowledgeImportItem): number {
+  const document = item.document;
+  if (!document) return 0;
+  if (["READY", "FAILED"].includes(item.status) || document.jobStatus === "COMPLETED") return 100;
+  const reported = Number.isFinite(document.progressPercent) ? document.progressPercent : 0;
+  if (document.stage === "PARSING" && document.totalPages > 0) {
+    return Math.max(reported, Math.min(19, Math.round(5 + 15 * document.processedPages / document.totalPages)));
+  }
+  return Math.max(0, Math.min(99, reported));
+}
+const progress = computed(() => accepted.value.length
+  ? Math.round(accepted.value.reduce((total, item) => total + documentProgress(item), 0) / accepted.value.length)
+  : 0);
 const currentStepTitle = computed(() => t([
   "pages.knowledge.import.steps.files",
   "pages.knowledge.import.steps.config",
@@ -232,16 +243,25 @@ onBeforeUnmount(() => { if (pollTimer) window.clearTimeout(pollTimer); });
           <NProgress type="line" :percentage="progress" />
           <div class="file-list">
             <div v-for="item in accepted" :key="item.itemUid" class="file-row progress-row">
-              <div class="file-info"><strong>{{ item.fileName }}</strong><span>{{ item.document?.stage ? t(`pages.knowledge.stages.${item.document.stage}`) : item.status }}</span></div>
-              <span v-if="item.document?.totalPages">{{ item.document.processedPages }}/{{ item.document.totalPages }} {{ t("pages.knowledge.units.pages") }}</span>
-              <span v-if="item.document?.totalChunks">{{ item.document.processedChunks }}/{{ item.document.totalChunks }} {{ t("pages.knowledge.units.chunks") }}</span>
-              <span v-if="item.document && (item.document.cacheHitChunks || item.document.cacheMissChunks)">{{ t("pages.knowledge.cacheSummary", { hits: item.document.cacheHitChunks, misses: item.document.cacheMissChunks }) }}</span>
-              <span v-if="item.document?.failureMessage" class="item-error">{{ item.document.failureMessage }}</span>
-              <span v-for="warning in item.document?.parseWarnings || []" :key="warning">{{ t(`pages.knowledge.parseWarnings.${warning}`) }}</span>
-              <span v-if="item.document && (item.document.attemptCount > 1 || item.document.jobStatus === 'FAILED')">{{ t("pages.knowledge.attempt", { current: item.document.attemptCount, max: item.document.maxAttempts }) }}</span>
-              <span v-if="item.document?.jobStatus === 'RETRY_WAIT' && item.document.nextRetryTime">{{ t("pages.knowledge.nextRetry", { time: formatDateTime(item.document.nextRetryTime) }) }}</span>
-              <NTag size="small" :type="itemTagType(item)">{{ t(`pages.knowledge.import.itemStatuses.${item.status}`) }}</NTag>
-              <NButton v-if="item.document?.jobStatus === 'FAILED'" size="small" @click="retryItem(item)">{{ t("pages.knowledge.retry") }}</NButton>
+              <div class="progress-header">
+                <div class="file-info"><strong>{{ item.fileName }}</strong><span>{{ item.document?.stage ? t(`pages.knowledge.stages.${item.document.stage}`) : item.status }}</span></div>
+                <div class="progress-summary">
+                  <strong>{{ documentProgress(item) }}%</strong>
+                  <NTag size="small" :type="itemTagType(item)">{{ t(`pages.knowledge.import.itemStatuses.${item.status}`) }}</NTag>
+                  <NButton v-if="item.document?.jobStatus === 'FAILED'" size="small" @click="retryItem(item)">{{ t("pages.knowledge.retry") }}</NButton>
+                </div>
+              </div>
+              <div class="progress-metrics">
+                <span v-if="item.document?.totalPages">{{ item.document.processedPages }}/{{ item.document.totalPages }} {{ t("pages.knowledge.units.pages") }}</span>
+                <span v-if="item.document?.totalChunks">{{ item.document.processedChunks }}/{{ item.document.totalChunks }} {{ t("pages.knowledge.units.chunks") }}</span>
+                <span v-if="item.document && (item.document.cacheHitChunks || item.document.cacheMissChunks)">{{ t("pages.knowledge.cacheSummary", { hits: item.document.cacheHitChunks, misses: item.document.cacheMissChunks }) }}</span>
+                <span v-if="item.document && (item.document.attemptCount > 1 || item.document.jobStatus === 'FAILED')">{{ t("pages.knowledge.attempt", { current: item.document.attemptCount, max: item.document.maxAttempts }) }}</span>
+                <span v-if="item.document?.jobStatus === 'RETRY_WAIT' && item.document.nextRetryTime">{{ t("pages.knowledge.nextRetry", { time: formatDateTime(item.document.nextRetryTime) }) }}</span>
+              </div>
+              <div v-if="item.document?.failureMessage || item.document?.parseWarnings?.length" class="progress-diagnostics">
+                <span v-if="item.document?.failureMessage" class="item-error">{{ item.document.failureMessage }}</span>
+                <span v-for="warning in item.document?.parseWarnings || []" :key="warning">{{ t(`pages.knowledge.parseWarnings.${warning}`) }}</span>
+              </div>
             </div>
           </div>
         </template>
@@ -259,5 +279,5 @@ onBeforeUnmount(() => { if (pollTimer) window.clearTimeout(pollTimer); });
 </template>
 
 <style scoped>
-.import-page{gap:var(--space-4)}.detail-back-row{display:flex;align-items:center}.detail-back-btn{display:inline-flex;align-items:center;gap:var(--space-1);padding:0;border:0;background:transparent;color:var(--color-text-secondary);font-size:var(--text-body-size);cursor:pointer}.detail-back-btn:hover{color:var(--color-brand-400)}.import-steps{max-width:900px;margin:0 auto;width:100%}.mobile-step{display:none}.wizard-card{max-width:1000px;margin:0 auto;min-height:420px}.section-heading,.file-row,.wizard-actions,.pipeline{display:flex;align-items:center;gap:var(--space-3)}.section-heading{justify-content:space-between}.section-heading h2,.section-heading p,.wizard-card h2{margin:0}.file-list{display:flex;flex-direction:column;margin:var(--space-4) 0}.file-row{padding:var(--space-3);border-bottom:1px solid var(--color-border-soft)}.file-row>.file-info{display:flex;min-width:0;flex:1;flex-direction:column;gap:var(--space-1)}.file-info strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.file-info>span,.progress-row>span{color:var(--color-text-muted);font-size:var(--font-size-sm)}.file-row>.outcome-tag{flex:0 0 auto;align-self:center}.file-row .item-error{color:var(--color-danger)}.preset-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--space-3);margin:var(--space-5) 0}.preset-grid :deep(.n-radio){padding:var(--space-4);border:1px solid var(--color-border-soft);border-radius:var(--radius-lg)}.preset-grid :deep(.n-radio__label){display:flex;flex-direction:column;gap:var(--space-1)}.preprocessing-panel{display:flex;flex-direction:column;gap:var(--space-3);padding:var(--space-4);margin-bottom:var(--space-4);border:1px solid var(--color-border-soft);border-radius:var(--radius-lg)}.preprocessing-options{display:flex;flex-wrap:wrap;gap:var(--space-4)}.preprocessing-options.disabled{opacity:.55}.advanced-grid,.confirm-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-4);margin:var(--space-4) 0}.advanced-grid label{display:flex;flex-direction:column;gap:var(--space-2)}.confirm-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.summary-panel{display:flex;min-height:110px;flex-direction:column;justify-content:space-between;padding:var(--space-4);border:1px solid var(--color-border-soft);border-radius:var(--radius-lg)}.pipeline{flex-wrap:wrap;margin-top:var(--space-5)}.pipeline span{display:flex;align-items:center;gap:var(--space-2)}.wizard-actions{max-width:1000px;width:100%;justify-content:flex-end;margin:0 auto}.wizard-actions>button:first-child:last-child{margin-left:auto}@media(max-width:760px){.import-steps{display:none}.mobile-step{display:block;padding:0 var(--space-2);color:var(--color-text-muted);font-size:var(--font-size-sm)}.preset-grid,.advanced-grid,.confirm-grid{grid-template-columns:1fr}.wizard-card{min-height:0}.wizard-actions{position:sticky;bottom:0;padding:var(--space-3);background:var(--color-bg-page);z-index:2}.progress-row{align-items:flex-start;flex-wrap:wrap}}
+.import-page{gap:var(--space-4)}.detail-back-row{display:flex;align-items:center}.detail-back-btn{display:inline-flex;align-items:center;gap:var(--space-1);padding:0;border:0;background:transparent;color:var(--color-text-secondary);font-size:var(--text-body-size);cursor:pointer}.detail-back-btn:hover{color:var(--color-brand-400)}.import-steps{max-width:900px;margin:0 auto;width:100%}.mobile-step{display:none}.wizard-card{max-width:1000px;margin:0 auto;min-height:420px}.section-heading,.file-row,.wizard-actions,.pipeline{display:flex;align-items:center;gap:var(--space-3)}.section-heading{justify-content:space-between}.section-heading h2,.section-heading p,.wizard-card h2{margin:0}.file-list{display:flex;flex-direction:column;margin:var(--space-4) 0}.file-row{padding:var(--space-3);border-bottom:1px solid var(--color-border-soft)}.file-row>.file-info{display:flex;min-width:0;flex:1;flex-direction:column;gap:var(--space-1)}.file-info strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.file-info>span,.progress-row>span{color:var(--color-text-muted);font-size:var(--font-size-sm)}.file-row>.outcome-tag{flex:0 0 auto;align-self:center}.file-row .item-error{color:var(--color-danger)}.progress-row{display:block}.progress-header{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3)}.progress-header>.file-info{min-width:0}.progress-summary{display:flex;align-items:center;flex:0 0 auto;gap:var(--space-2)}.progress-summary>strong{color:var(--color-text-primary)}.progress-metrics{display:flex;flex-wrap:wrap;gap:var(--space-2) var(--space-4);margin-top:var(--space-2);color:var(--color-text-muted);font-size:var(--font-size-sm)}.progress-diagnostics{display:flex;flex-direction:column;gap:var(--space-1);margin-top:var(--space-2);color:var(--color-text-secondary);font-size:var(--font-size-sm);line-height:1.5}.progress-diagnostics span{overflow-wrap:anywhere}.preset-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--space-3);margin:var(--space-5) 0}.preset-grid :deep(.n-radio){padding:var(--space-4);border:1px solid var(--color-border-soft);border-radius:var(--radius-lg)}.preset-grid :deep(.n-radio__label){display:flex;flex-direction:column;gap:var(--space-1)}.preprocessing-panel{display:flex;flex-direction:column;gap:var(--space-3);padding:var(--space-4);margin-bottom:var(--space-4);border:1px solid var(--color-border-soft);border-radius:var(--radius-lg)}.preprocessing-options{display:flex;flex-wrap:wrap;gap:var(--space-4)}.preprocessing-options.disabled{opacity:.55}.advanced-grid,.confirm-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-4);margin:var(--space-4) 0}.advanced-grid label{display:flex;flex-direction:column;gap:var(--space-2)}.confirm-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.summary-panel{display:flex;min-height:110px;flex-direction:column;justify-content:space-between;padding:var(--space-4);border:1px solid var(--color-border-soft);border-radius:var(--radius-lg)}.pipeline{flex-wrap:wrap;margin-top:var(--space-5)}.pipeline span{display:flex;align-items:center;gap:var(--space-2)}.wizard-actions{max-width:1000px;width:100%;justify-content:flex-end;margin:0 auto}.wizard-actions>button:first-child:last-child{margin-left:auto}@media(max-width:760px){.import-steps{display:none}.mobile-step{display:block;padding:0 var(--space-2);color:var(--color-text-muted);font-size:var(--font-size-sm)}.preset-grid,.advanced-grid,.confirm-grid{grid-template-columns:1fr}.wizard-card{min-height:0}.wizard-actions{position:sticky;bottom:0;padding:var(--space-3);background:var(--color-bg-page);z-index:2}.progress-row{align-items:flex-start;flex-wrap:wrap}.progress-header{align-items:flex-start;flex-direction:column}.progress-summary{width:100%;justify-content:flex-start}}
 </style>

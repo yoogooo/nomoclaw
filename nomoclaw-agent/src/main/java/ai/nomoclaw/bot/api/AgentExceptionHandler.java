@@ -19,10 +19,10 @@ import ai.nomoclaw.bot.util.LocalizedMessages;
 @Slf4j
 public class AgentExceptionHandler {
 
-    @Value("${spring.servlet.multipart.max-file-size:2MB}")
+    @Value("${spring.servlet.multipart.max-file-size:100MB}")
     private String maxFileSize;
 
-    @Value("${spring.servlet.multipart.max-request-size:40MB}")
+    @Value("${spring.servlet.multipart.max-request-size:200MB}")
     private String maxRequestSize;
 
     private final LocalizedMessages localizedMessages;
