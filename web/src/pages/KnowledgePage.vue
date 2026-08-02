@@ -136,11 +136,14 @@ onBeforeUnmount(() => { if (pollTimer) window.clearTimeout(pollTimer); });
           <template #actions>
             <div class="detail-header-actions">
               <NButton secondary @click="configDrawerVisible = true">{{ t("pages.knowledge.indexConfig.open") }}</NButton>
-              <NButton type="primary" @click="startImport"><template #icon><Upload/></template>{{ t("pages.knowledge.upload") }}</NButton>
             </div>
           </template>
         </AppPageHeader>
-        <div class="detail-grid"><NCard :title="t('pages.knowledge.documents')"><NEmpty v-if="!documents.length" :description="t('pages.knowledge.noDocuments')"/>
+        <div class="detail-grid"><NCard :title="t('pages.knowledge.documents')">
+          <template #header-extra>
+            <NButton type="primary" size="small" @click="startImport"><template #icon><Upload/></template>{{ t("pages.knowledge.upload") }}</NButton>
+          </template>
+          <NEmpty v-if="!documents.length" :description="t('pages.knowledge.noDocuments')"/>
           <KnowledgeDocumentRow v-for="document in documents" :key="document.documentUid" :document="document" @retry="retry(document)" @build="openBuild(document)" @reindex="reindex(document)" @remove="removeUploaded(document)" @details="openDocumentDetails(document)" @chunks="openChunks(document)" />
         </NCard><NCard :title="t('pages.knowledge.searchTest')"><div class="search-bar"><NInput v-model:value="searchQuery" :placeholder="t('pages.knowledge.searchPlaceholder')" :disabled="searching" @keyup.enter="search"/><NButton type="primary" :loading="searching" :disabled="!searchQuery.trim()" @click="search"><template v-if="!searching" #icon><Search/></template></NButton></div><NSpin :show="searching"><NAlert v-for="diagnostic in searchDiagnostics" :key="diagnostic.code" type="warning" closable class="search-diagnostic" @close="dismissSearchDiagnostic(diagnostic.code)">{{ searchDiagnosticLabel(diagnostic.code) }}</NAlert><NEmpty v-if="!hits.length" :description="t('pages.knowledge.noHits')"/><div v-for="hit in hits" :key="hit.citationId" class="hit"><strong>[{{ hit.citationId }}] {{ hit.documentName }}</strong><span>{{ hit.pageFrom ? `${t('pages.knowledge.page')} ${hit.pageFrom}` : '' }} {{ hit.sectionPath }}</span><p>{{ hit.excerpt }}</p><div class="hit-scores"><NTag size="small">{{ t('pages.knowledge.fusedScore') }} {{ (hit.rrfScore ?? hit.score).toFixed(3) }}</NTag><NTag v-if="hit.rerankScore != null" size="small" type="warning">{{ t('pages.knowledge.rerankScore') }} {{ hit.rerankScore.toFixed(3) }}</NTag><NTag v-if="hit.denseScore != null" size="small" type="info">{{ t('pages.knowledge.denseScore') }} {{ hit.denseScore.toFixed(3) }}</NTag><NTag v-if="hit.bm25Score != null" size="small" type="success">{{ t('pages.knowledge.bm25Score') }} {{ hit.bm25Score.toFixed(3) }}</NTag><NTag v-for="source in hit.retrievalSources" :key="source" size="small" :bordered="false">{{ retrievalSourceLabel(source) }}</NTag></div></div></NSpin></NCard></div>
       </template>

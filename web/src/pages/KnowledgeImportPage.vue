@@ -26,6 +26,10 @@ const submitting = ref(false);
 const step = ref(1);
 const advanced = ref(false);
 const fileInput = ref<HTMLInputElement>();
+const dragging = ref(false);
+const clientRejected = ref<string[]>([]);
+const maxUploadBytes = 100 * 1024 * 1024;
+const supportedExtensions = new Set(["pdf", "docx", "txt", "md"]);
 const config = reactive({
   preset: "balanced",
   chunkStrategy: "TOKEN" as "TOKEN" | "SMART",
@@ -102,13 +106,48 @@ function schedulePoll() {
 }
 
 function chooseFiles() { fileInput.value?.click(); }
-async function addFiles(event: Event) {
+function fileExtension(file: File): string {
+  return file.name.split(".").pop()?.toLowerCase() || "";
+}
+function validateFiles(files: File[]): File[] {
+  const existingNames = new Set(accepted.value.map(item => item.fileName.toLowerCase()));
+  const seenNames = new Set<string>();
+  const valid: File[] = [];
+  const rejected: string[] = [];
+  for (const file of files) {
+    const normalizedName = file.name.toLowerCase();
+    const extension = fileExtension(file);
+    if (!supportedExtensions.has(extension)) {
+      rejected.push(`${file.name} · ${t("pages.knowledge.import.files.invalidType")}`);
+    } else if (file.size > maxUploadBytes) {
+      rejected.push(`${file.name} · ${t("pages.knowledge.import.files.tooLarge")}`);
+    } else if (existingNames.has(normalizedName) || seenNames.has(normalizedName)) {
+      rejected.push(`${file.name} · ${t("pages.knowledge.import.files.duplicate")}`);
+    } else {
+      seenNames.add(normalizedName);
+      valid.push(file);
+    }
+  }
+  clientRejected.value = rejected;
+  return valid;
+}
+async function addFiles(files: File[]) {
+  const validFiles = validateFiles(files);
+  if (!validFiles.length) return;
+  await knowledgeApi.addImportFiles(baseUid.value, batchUid.value, validFiles);
+  await load();
+}
+async function addFilesFromInput(event: Event) {
   const input = event.target as HTMLInputElement;
   const files = Array.from(input.files || []);
   input.value = "";
   if (!files.length) return;
-  await knowledgeApi.addImportFiles(baseUid.value, batchUid.value, files);
-  await load();
+  await addFiles(files);
+}
+async function handleDrop(event: DragEvent) {
+  dragging.value = false;
+  const files = Array.from(event.dataTransfer?.files || []);
+  if (files.length) await addFiles(files);
 }
 
 async function removeItem(item: KnowledgeImportItem) {
@@ -183,7 +222,22 @@ onBeforeUnmount(() => { if (pollTimer) window.clearTimeout(pollTimer); });
       <NSpin :show="loading"><NCard class="wizard-card">
         <template v-if="step === 1">
           <div class="section-heading"><div><h2>{{ t("pages.knowledge.import.files.title") }}</h2><p>{{ t("pages.knowledge.import.files.description") }}</p></div><NButton @click="chooseFiles"><template #icon><FilePlus2 /></template>{{ t("pages.knowledge.import.files.add") }}</NButton></div>
-          <input ref="fileInput" hidden type="file" multiple accept=".pdf,.docx,.txt,.md" @change="addFiles">
+          <input ref="fileInput" hidden type="file" multiple accept=".pdf,.docx,.txt,.md" @change="addFilesFromInput">
+          <div
+            class="upload-dropzone"
+            :class="{ 'upload-dropzone--dragging': dragging }"
+            role="button"
+            tabindex="0"
+            @click="chooseFiles"
+            @keydown.enter="chooseFiles"
+            @dragenter.prevent="dragging = true"
+            @dragover.prevent="dragging = true"
+            @dragleave.prevent="dragging = false"
+            @drop.prevent="handleDrop"
+          >
+            <strong>{{ t("pages.knowledge.import.files.dropTitle") }}</strong>
+            <span>{{ t("pages.knowledge.import.files.dropHint") }}</span>
+          </div>
           <div class="file-list">
             <div v-for="item in accepted" :key="item.itemUid" class="file-row">
               <div class="file-info"><strong>{{ item.fileName }}</strong><span>{{ item.document?.contentType || "-" }}</span></div>
@@ -192,8 +246,9 @@ onBeforeUnmount(() => { if (pollTimer) window.clearTimeout(pollTimer); });
             </div>
           </div>
           <NEmpty v-if="!accepted.length" :description="t('pages.knowledge.import.files.empty')" />
-          <NAlert v-if="skipped.length" type="warning" :title="t('pages.knowledge.import.files.skippedTitle')">
+          <NAlert v-if="skipped.length || clientRejected.length" type="warning" :title="t('pages.knowledge.import.files.skippedTitle')">
             <div v-for="item in skipped" :key="item.itemUid">{{ item.fileName }} · {{ item.errorMessage || t(`pages.knowledge.uploadOutcomes.${item.outcome}`) }}</div>
+            <div v-for="item in clientRejected" :key="item">{{ item }}</div>
           </NAlert>
         </template>
 
@@ -279,5 +334,6 @@ onBeforeUnmount(() => { if (pollTimer) window.clearTimeout(pollTimer); });
 </template>
 
 <style scoped>
+.upload-dropzone{display:flex;flex-direction:column;align-items:center;gap:var(--space-2);padding:var(--space-5);margin:var(--space-4) 0;border:1px dashed var(--color-border-strong);border-radius:var(--radius-lg);color:var(--color-text-secondary);cursor:pointer;transition:border-color 140ms ease,background 140ms ease}.upload-dropzone strong{color:var(--color-text-primary)}.upload-dropzone:hover,.upload-dropzone--dragging{border-color:var(--color-brand-400);background:var(--color-bg-surface-soft)}
 .import-page{gap:var(--space-4)}.detail-back-row{display:flex;align-items:center}.detail-back-btn{display:inline-flex;align-items:center;gap:var(--space-1);padding:0;border:0;background:transparent;color:var(--color-text-secondary);font-size:var(--text-body-size);cursor:pointer}.detail-back-btn:hover{color:var(--color-brand-400)}.import-steps{max-width:900px;margin:0 auto;width:100%}.mobile-step{display:none}.wizard-card{max-width:1000px;margin:0 auto;min-height:420px}.section-heading,.file-row,.wizard-actions,.pipeline{display:flex;align-items:center;gap:var(--space-3)}.section-heading{justify-content:space-between}.section-heading h2,.section-heading p,.wizard-card h2{margin:0}.file-list{display:flex;flex-direction:column;margin:var(--space-4) 0}.file-row{padding:var(--space-3);border-bottom:1px solid var(--color-border-soft)}.file-row>.file-info{display:flex;min-width:0;flex:1;flex-direction:column;gap:var(--space-1)}.file-info strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.file-info>span,.progress-row>span{color:var(--color-text-muted);font-size:var(--font-size-sm)}.file-row>.outcome-tag{flex:0 0 auto;align-self:center}.file-row .item-error{color:var(--color-danger)}.progress-row{display:block}.progress-header{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3)}.progress-header>.file-info{min-width:0}.progress-summary{display:flex;align-items:center;flex:0 0 auto;gap:var(--space-2)}.progress-summary>strong{color:var(--color-text-primary)}.progress-metrics{display:flex;flex-wrap:wrap;gap:var(--space-2) var(--space-4);margin-top:var(--space-2);color:var(--color-text-muted);font-size:var(--font-size-sm)}.progress-diagnostics{display:flex;flex-direction:column;gap:var(--space-1);margin-top:var(--space-2);color:var(--color-text-secondary);font-size:var(--font-size-sm);line-height:1.5}.progress-diagnostics span{overflow-wrap:anywhere}.preset-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--space-3);margin:var(--space-5) 0}.preset-grid :deep(.n-radio){padding:var(--space-4);border:1px solid var(--color-border-soft);border-radius:var(--radius-lg)}.preset-grid :deep(.n-radio__label){display:flex;flex-direction:column;gap:var(--space-1)}.preprocessing-panel{display:flex;flex-direction:column;gap:var(--space-3);padding:var(--space-4);margin-bottom:var(--space-4);border:1px solid var(--color-border-soft);border-radius:var(--radius-lg)}.preprocessing-options{display:flex;flex-wrap:wrap;gap:var(--space-4)}.preprocessing-options.disabled{opacity:.55}.advanced-grid,.confirm-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-4);margin:var(--space-4) 0}.advanced-grid label{display:flex;flex-direction:column;gap:var(--space-2)}.confirm-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.summary-panel{display:flex;min-height:110px;flex-direction:column;justify-content:space-between;padding:var(--space-4);border:1px solid var(--color-border-soft);border-radius:var(--radius-lg)}.pipeline{flex-wrap:wrap;margin-top:var(--space-5)}.pipeline span{display:flex;align-items:center;gap:var(--space-2)}.wizard-actions{max-width:1000px;width:100%;justify-content:flex-end;margin:0 auto}.wizard-actions>button:first-child:last-child{margin-left:auto}@media(max-width:760px){.import-steps{display:none}.mobile-step{display:block;padding:0 var(--space-2);color:var(--color-text-muted);font-size:var(--font-size-sm)}.preset-grid,.advanced-grid,.confirm-grid{grid-template-columns:1fr}.wizard-card{min-height:0}.wizard-actions{position:sticky;bottom:0;padding:var(--space-3);background:var(--color-bg-page);z-index:2}.progress-row{align-items:flex-start;flex-wrap:wrap}.progress-header{align-items:flex-start;flex-direction:column}.progress-summary{width:100%;justify-content:flex-start}}
 </style>
