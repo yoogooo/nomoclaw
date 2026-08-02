@@ -134,7 +134,7 @@ function backToSettings() {
           <header class="settings-error-logs-header">
             <button class="settings-error-logs-back" type="button" @click="backToSettings">
               <n-icon :component="ChevronLeft" />
-              <span>{{ t("settings.title") }}</span>
+              <span>{{ t("settings.diagnosticsBack") }}</span>
             </button>
           </header>
 
