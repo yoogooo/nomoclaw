@@ -481,7 +481,7 @@ public class AgentApplicationService {
         if (root instanceof CodexUsageLimitException usageLimitException) {
             return formatCodexUsageLimitMessage(usageLimitException);
         }
-        if (root instanceof AuthenticationException) {
+        if (hasCauseOfType(throwable, AuthenticationException.class)) {
             return feedbackBuilder.messageFailedAuthentication();
         }
         if (root instanceof ConnectException || root instanceof ClosedChannelException) {
@@ -543,6 +543,20 @@ public class AgentApplicationService {
             current = current.getCause();
         }
         return current;
+    }
+
+    private boolean hasCauseOfType(Throwable throwable, Class<? extends Throwable> type) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (type.isInstance(current)) {
+                return true;
+            }
+            if (current.getCause() == current) {
+                break;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private RoundPlanningResult reasonNextAction(AgentMessage message,

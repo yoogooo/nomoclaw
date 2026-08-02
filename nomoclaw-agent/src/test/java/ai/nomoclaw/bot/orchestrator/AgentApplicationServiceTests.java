@@ -126,7 +126,10 @@ class AgentApplicationServiceTests {
 
         String friendlyMessage = (String) method.invoke(
                 service,
-                new AuthenticationException("Incorrect API key provided"),
+                new AuthenticationException(
+                        "Incorrect API key provided",
+                        new IllegalStateException("provider request failed")
+                ),
                 null
         );
 
