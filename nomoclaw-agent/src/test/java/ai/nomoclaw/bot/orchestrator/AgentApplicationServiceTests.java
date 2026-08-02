@@ -15,6 +15,7 @@ import ai.nomoclaw.bot.planner.Planner;
 import ai.nomoclaw.bot.policy.RiskPolicy;
 import ai.nomoclaw.bot.policy.tool.ToolPermissionPolicyService;
 import ai.nomoclaw.bot.store.AgentStore;
+import dev.langchain4j.exception.AuthenticationException;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 
@@ -24,6 +25,7 @@ import java.util.concurrent.CompletionException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class AgentApplicationServiceTests {
 
@@ -86,6 +88,50 @@ class AgentApplicationServiceTests {
 
         assertEquals(
                 "Codex 使用额度已用尽（套餐：plus），预计 2026-07-01 20:22:26 CST 后恢复。请稍后重试，或切换到可用的账号、套餐或模型提供商。",
+                friendlyMessage
+        );
+    }
+
+    @Test
+    void shouldFormatFriendlyMessageForAuthenticationFailure() throws Exception {
+        ExecutionFeedbackBuilder feedbackBuilder = mock(ExecutionFeedbackBuilder.class);
+        when(feedbackBuilder.messageFailedAuthentication()).thenReturn(
+                "模型服务认证失败，请检查 API Key 是否正确、是否已过期，以及模型服务地址配置是否匹配。"
+        );
+        AgentApplicationService service = new AgentApplicationService(
+                mock(AgentStore.class),
+                mock(Planner.class),
+                mock(RiskPolicy.class),
+                mock(AgentEventBus.class),
+                mock(MessageCancellationRegistry.class),
+                new AgentProperties(),
+                new LlmProperties(),
+                mock(ConversationAttachmentService.class),
+                mock(ToolExecutionPolicyGateway.class),
+                mock(ToolPermissionPolicyService.class),
+                mock(PermissionAppService.class),
+                feedbackBuilder,
+                mock(StepExecutionService.class),
+                mock(ExecutionScopeResolver.class),
+                mock(MessageExecutionOrchestrator.class),
+                mock(ApplicationEventPublisher.class),
+                mock(ConversationService.class)
+        );
+        Method method = AgentApplicationService.class.getDeclaredMethod(
+                "toUserFriendlyFailureMessage",
+                Throwable.class,
+                AgentMessage.class
+        );
+        method.setAccessible(true);
+
+        String friendlyMessage = (String) method.invoke(
+                service,
+                new AuthenticationException("Incorrect API key provided"),
+                null
+        );
+
+        assertEquals(
+                "模型服务认证失败，请检查 API Key 是否正确、是否已过期，以及模型服务地址配置是否匹配。",
                 friendlyMessage
         );
     }

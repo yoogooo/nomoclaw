@@ -75,6 +75,10 @@ public class ExecutionFeedbackBuilder {
         return i18n("agent.message.failed.approvalRejected");
     }
 
+    public String messageFailedAuthentication() {
+        return i18n("agent.message.failed.authentication");
+    }
+
     public String messageCompletedDefault() {
         return i18n("agent.message.completed");
     }

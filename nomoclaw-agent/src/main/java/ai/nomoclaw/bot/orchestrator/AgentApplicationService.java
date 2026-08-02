@@ -46,6 +46,7 @@ import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.exception.AuthenticationException;
 import dev.langchain4j.model.chat.request.ToolChoice;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.output.TokenUsage;
@@ -479,6 +480,9 @@ public class AgentApplicationService {
         Throwable root = rootCauseOf(throwable);
         if (root instanceof CodexUsageLimitException usageLimitException) {
             return formatCodexUsageLimitMessage(usageLimitException);
+        }
+        if (root instanceof AuthenticationException) {
+            return feedbackBuilder.messageFailedAuthentication();
         }
         if (root instanceof ConnectException || root instanceof ClosedChannelException) {
             String provider = agentMessage == null ? "" : nullToEmpty(agentMessage.provider()).trim();
