@@ -1,7 +1,7 @@
 import { createRouter, createWebHashHistory } from "vue-router";
 import ChatPage from "@/pages/ChatPage.vue";
 import CronPage from "@/pages/CronPage.vue";
-import CronExecutionHistoryPage from "@/pages/CronExecutionHistoryPage.vue";
+import CronExecutionHistoryPage from "@/pages/cron/CronExecutionHistoryPage.vue";
 import AgentsPage from "@/pages/AgentsPage.vue";
 import KnowledgePage from "@/pages/KnowledgePage.vue";
 import KnowledgeImportPage from "@/pages/KnowledgeImportPage.vue";
