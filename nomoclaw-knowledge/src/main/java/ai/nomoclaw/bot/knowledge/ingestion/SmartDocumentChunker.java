@@ -38,6 +38,8 @@ public class SmartDocumentChunker implements DocumentChunker {
         int[] index = {0};
         for (DocumentParser.DocumentBlock block : document.blocks()) {
             if (block.text() == null || block.text().isBlank()) continue;
+            if ("FRONT_MATTER".equals(block.nodeRole()) || "TABLE_OF_CONTENTS".equals(block.nodeRole())
+                    || "LOW_CONFIDENCE".equals(block.nodeRole())) continue;
             if (block.type() == DocumentParser.BlockType.HEADING) continue;
             if (nodeKey != null && !nodeKey.equals(block.nodeKey())) {
                 emitNode(pending, index, consumer);
@@ -51,11 +53,20 @@ public class SmartDocumentChunker implements DocumentChunker {
 
     private void emitNode(List<DocumentParser.DocumentBlock> blocks, int[] index, Consumer<Chunk> consumer) {
         if (blocks.isEmpty()) return;
+        int softLimit = (int) (TARGET_TOKENS * SOFT_OVERFLOW_RATIO);
+        int totalTokens = blocks.stream().mapToInt(block -> tokenEstimator.estimate(block.text())).sum();
+        boolean hasOversizedBlock = blocks.stream()
+                .anyMatch(block -> tokenEstimator.estimate(block.text()) > softLimit);
+        if (!hasOversizedBlock && totalTokens <= softLimit) {
+            emitBlocks(blocks, index, consumer);
+            return;
+        }
         List<DocumentParser.DocumentBlock> current = new ArrayList<>();
         int tokens = 0;
         for (DocumentParser.DocumentBlock block : blocks) {
             int blockTokens = tokenEstimator.estimate(block.text());
-            if (!current.isEmpty() && tokens + blockTokens > TARGET_TOKENS) {
+            if (!current.isEmpty() && tokens + blockTokens > TARGET_TOKENS
+                    && tokens + blockTokens > softLimit) {
                 emitBlocks(current, index, consumer);
                 current.clear();
                 tokens = 0;

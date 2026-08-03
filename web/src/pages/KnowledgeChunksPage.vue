@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { ChevronLeft, Copy } from "lucide-vue-next";
-import { NButton, NCard, NEmpty, NSpin, NTag, NTree } from "naive-ui";
+import { NButton, NCard, NEmpty, NSelect, NSpin, NTag, NTree } from "naive-ui";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import DirectoryRail from "@/components/chat/DirectoryRail.vue";
@@ -17,18 +17,45 @@ const documentUid = computed(() => String(route.params.documentUid || ""));
 const document = ref<KnowledgeDocument | null>(null);
 const chunks = ref<KnowledgeChunk[]>([]);
 const structure = ref<KnowledgeDocumentNode[]>([]);
+const structureFilter = ref<"VALID" | "DIAGNOSTIC" | "ALL">("VALID");
 const loading = ref(false);
 
-const structureOptions = computed(() => structure.value.map(toTreeOption));
+const structureStats = computed(() => {
+  const nodes = flatten(structure.value);
+  return {
+    total: nodes.length,
+    valid: nodes.filter(node => node.indexable).length,
+    diagnostic: nodes.filter(node => !node.indexable).length
+  };
+});
+const structureOptions = computed(() => structure.value.map(node => filterNode(node))
+  .filter((node): node is KnowledgeDocumentNode => node !== null).map(toTreeOption));
+const structureFilterOptions = computed(() => [
+  { label: t("pages.knowledge.chunks.validNodes"), value: "VALID" },
+  { label: t("pages.knowledge.chunks.diagnosticNodes"), value: "DIAGNOSTIC" },
+  { label: t("pages.knowledge.chunks.allNodes"), value: "ALL" }
+]);
 
 function toTreeOption(node: KnowledgeDocumentNode): { key: string; label: string; children?: ReturnType<typeof toTreeOption>[] } {
   const heading = [node.code, node.title].filter(Boolean).join(" ") || node.type;
   const filtered = node.indexable ? "" : ` · ${t("pages.knowledge.chunks.filtered")}`;
   return {
     key: node.nodeUid,
-    label: `${heading} · ${node.detectionSource} · ${Math.round(node.confidence * 100)}%${filtered}`,
+    label: `${heading} · ${node.nodeRole || node.type} · ${node.detectionSource} · ${Math.round(node.confidence * 100)}%${filtered}`,
     children: node.children?.map(toTreeOption)
   };
+}
+
+function flatten(nodes: KnowledgeDocumentNode[]): KnowledgeDocumentNode[] {
+  return nodes.flatMap(node => [node, ...flatten(node.children || [])]);
+}
+
+function filterNode(node: KnowledgeDocumentNode): KnowledgeDocumentNode | null {
+  const children = (node.children || []).map(child => filterNode(child)).filter(Boolean) as KnowledgeDocumentNode[];
+  const matches = structureFilter.value === "ALL"
+    || (structureFilter.value === "VALID" ? node.indexable : !node.indexable);
+  if (!matches && !children.length) return null;
+  return { ...node, children };
 }
 
 async function load() {
@@ -87,8 +114,19 @@ onMounted(() => void load());
           </div>
         </NCard>
 
-        <NCard v-if="structure.length" class="structure-card" :title="t('pages.knowledge.chunks.structure')">
-          <NTree block-line :data="structureOptions" default-expand-all />
+        <NCard v-if="structure.length" class="structure-card">
+          <template #header>
+            <div class="structure-header">
+              <strong>{{ t("pages.knowledge.chunks.structure") }}</strong>
+              <NSelect v-model:value="structureFilter" size="small" :options="structureFilterOptions" />
+            </div>
+          </template>
+          <div class="structure-stats">
+            <span>{{ t("pages.knowledge.chunks.totalNodes") }} {{ structureStats.total }}</span>
+            <span>{{ t("pages.knowledge.chunks.validNodesCount") }} {{ structureStats.valid }}</span>
+            <span>{{ t("pages.knowledge.chunks.diagnosticNodesCount") }} {{ structureStats.diagnostic }}</span>
+          </div>
+          <NTree block-line :data="structureOptions" />
         </NCard>
 
         <NEmpty v-if="!chunks.length" :description="t('pages.knowledge.chunks.empty')" />
@@ -128,6 +166,9 @@ onMounted(() => void load());
 .detail-back-btn:hover{color:var(--color-brand-400)}
 .summary-card{margin-bottom:var(--space-4)}
 .structure-card{margin-bottom:var(--space-4)}
+.structure-header{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3)}
+.structure-header .n-select{width:180px}
+.structure-stats{display:flex;flex-wrap:wrap;gap:var(--space-3);margin-bottom:var(--space-3);color:var(--color-text-muted);font-size:var(--font-size-sm)}
 .summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--space-4)}
 .summary-grid div{display:flex;flex-direction:column;gap:var(--space-1)}
 .summary-grid span,.chunk-meta{color:var(--color-text-muted);font-size:var(--font-size-sm)}

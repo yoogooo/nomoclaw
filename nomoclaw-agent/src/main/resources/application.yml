@@ -145,8 +145,8 @@ knowledge:
     max-attempts: 3
     embedding-batch-size: 32
   chunking:
-    default-size-tokens: 500
-    default-overlap-tokens: 80
+    default-size-tokens: 1000
+    default-overlap-tokens: 160
   parsing:
     pdf:
       preprocessing:

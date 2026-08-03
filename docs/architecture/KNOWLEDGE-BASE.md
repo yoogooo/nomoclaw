@@ -100,7 +100,7 @@ Qdrant payload 包含：`knowledgeBaseUid`、`documentUid`、`documentVersionUid
 - `EMPTY_DOCUMENT`：没有可索引文本。
 - `PARSE_FAILED` / `INGESTION_FAILED`：其他解析或索引失败。
 
-默认分块参数：500 tokens，80 tokens overlap。当前 token 估算使用每 4 个字符约 1 token 的保守近似；后续可替换为 provider 对应 tokenizer。
+默认分块参数：1000 tokens，160 tokens overlap。导入页同时提供 500/80、1000/160、2000/320 三档 Token 预设。当前 token 估算使用每 4 个字符约 1 token 的保守近似；后续可替换为 provider 对应 tokenizer。
 
 ## 5. Embedding 与 Qdrant
 
@@ -200,8 +200,8 @@ knowledge:
     max-attempts: 3
     embedding-batch-size: 32
   chunking:
-    default-size-tokens: 500
-    default-overlap-tokens: 80
+    default-size-tokens: 1000
+    default-overlap-tokens: 160
   retrieval:
     default-top-k: 8
     max-context-tokens: 6000

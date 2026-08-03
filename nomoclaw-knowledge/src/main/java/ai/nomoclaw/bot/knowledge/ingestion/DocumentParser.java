@@ -52,10 +52,17 @@ public interface DocumentParser {
     }
 
     record DocumentBlock(BlockType type, int pageFrom, int pageTo, String sectionPath, String nodeKey, String text,
-                         int charStart, int charEnd, BlockStyle style, boolean crossPageContinuation) {
+                         int charStart, int charEnd, BlockStyle style, boolean crossPageContinuation,
+                         String detectionSource, double structureConfidence, String nodeRole) {
+        public DocumentBlock(BlockType type, int pageFrom, int pageTo, String sectionPath, String nodeKey, String text,
+                             int charStart, int charEnd, BlockStyle style, boolean crossPageContinuation) {
+            this(type, pageFrom, pageTo, sectionPath, nodeKey, text, charStart, charEnd, style,
+                    crossPageContinuation, "", 0D, "");
+        }
+
         public DocumentBlock(BlockType type, int page, String sectionPath, String text) {
             this(type, page, page, sectionPath, "root", text, 0, text == null ? 0 : text.length(),
-                    BlockStyle.empty(), false);
+                    BlockStyle.empty(), false, "", 0D, "");
         }
 
         public int page() {
@@ -78,13 +85,32 @@ public interface DocumentParser {
 
     record StructureNode(String nodeKey, String parentNodeKey, String type, int level, String code, String title,
                          String sectionPath, int pageFrom, int pageTo, int charStart, int charEnd,
-                         String detectionSource, double confidence, boolean indexable, String metadataJson) {
+                         String detectionSource, double confidence, boolean indexable, String metadataJson,
+                         String nodeRole, int sourceOrder, double qualityScore, double parentConfidence,
+                         String indexableReason) {
+        public StructureNode(String nodeKey, String parentNodeKey, String type, int level, String code, String title,
+                             String sectionPath, int pageFrom, int pageTo, int charStart, int charEnd,
+                             String detectionSource, double confidence, boolean indexable, String metadataJson) {
+            this(nodeKey, parentNodeKey, type, level, code, title, sectionPath, pageFrom, pageTo, charStart, charEnd,
+                    detectionSource, confidence, indexable, metadataJson, type, 0, confidence, confidence,
+                    indexable ? "" : "STRUCTURE_FILTERED");
+        }
+
         public static StructureNode root(List<Page> pages) {
             int pageFrom = pages == null || pages.isEmpty() ? 1 : pages.getFirst().number();
             int pageTo = pages == null || pages.isEmpty() ? pageFrom : pages.getLast().number();
             return new StructureNode("root", "", "ROOT", 0, "", "", "", pageFrom, pageTo,
                     0, pages == null ? 0 : pages.stream().mapToInt(page -> page.text().length()).sum(),
-                    "FALLBACK", 0D, true, "{}");
+                    "FALLBACK", 0D, true, "{}", "ROOT", 0, 0D, 0D, "");
+        }
+    }
+
+    record StructureCandidate(String source, String title, int page, int level, double textMatchScore,
+                              double layoutScore, double pageContinuityScore, double titleQualityScore,
+                              boolean matchedBody) {
+        double qualityScore() {
+            return Math.min(1D, textMatchScore * .35D + layoutScore * .25D
+                    + pageContinuityScore * .15D + titleQualityScore * .25D);
         }
     }
 

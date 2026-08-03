@@ -14,7 +14,7 @@ export interface KnowledgeSearchDiagnostic { code: string; }
 export interface KnowledgeSearchResponse { hits: KnowledgeHit[]; diagnostics: KnowledgeSearchDiagnostic[]; }
 export interface KnowledgeChunkMetadata { documentNodeUid: string; document: string; chapter: string; title: string; section: string; sectionPath: string; pageFrom?: number | null; pageTo?: number | null; }
 export interface KnowledgeChunk { chunkUid: string; chunkIndex: number; content: string; tokenCount: number; pageFrom?: number | null; pageTo?: number | null; sectionPath: string; charStart?: number | null; charEnd?: number | null; status: string; metadata?: KnowledgeChunkMetadata | null; }
-export interface KnowledgeDocumentNode { nodeUid: string; parentNodeUid: string; type: string; level: number; code: string; title: string; sectionPath: string; pageFrom?: number | null; pageTo?: number | null; detectionSource: string; confidence: number; indexable: boolean; children: KnowledgeDocumentNode[]; }
+export interface KnowledgeDocumentNode { nodeUid: string; parentNodeUid: string; type: string; level: number; code: string; title: string; sectionPath: string; pageFrom?: number | null; pageTo?: number | null; detectionSource: string; confidence: number; indexable: boolean; nodeRole: string; sourceOrder: number; qualityScore: number; parentConfidence: number; indexableReason: string; children: KnowledgeDocumentNode[]; }
 
 export const knowledgeApi = {
   list() { return requestJson<{ items: KnowledgeBase[]; total: number; vectorAvailable: boolean }>("/api/knowledge-bases/page"); },
@@ -22,7 +22,7 @@ export const knowledgeApi = {
   documents(uid: string) { return requestJson<{ items: KnowledgeDocument[]; total: number }>(`/api/knowledge-bases/${uid}/documents/page`); },
   document(uid: string, documentUid: string) { return requestJson<KnowledgeDocument>(`/api/knowledge-bases/${uid}/documents/${documentUid}`); },
   chunks(uid: string, documentUid: string) { return requestJson<{ items: KnowledgeChunk[]; total: number }>(`/api/knowledge-bases/${uid}/documents/${documentUid}/chunks`); },
-  structure(uid: string, documentUid: string) { return requestJson<{ items: KnowledgeDocumentNode[]; total: number }>(`/api/knowledge-bases/${uid}/documents/${documentUid}/structure`); },
+  structure(uid: string, documentUid: string) { return requestJson<{ items: KnowledgeDocumentNode[]; total: number; validCount: number; diagnosticCount: number }>(`/api/knowledge-bases/${uid}/documents/${documentUid}/structure`); },
   upload(uid: string, files: File[]) { const body = new FormData(); files.forEach(file => body.append("files", file)); return requestJson<KnowledgeUploadResult>(`/api/knowledge-bases/${uid}/documents`, { method: "POST", body }); },
   createImport(uid: string) { return requestJson<KnowledgeImportBatch>(`/api/knowledge-bases/${uid}/imports`, { method: "POST" }); },
   importBatch(uid: string, batchUid: string) { return requestJson<KnowledgeImportBatch>(`/api/knowledge-bases/${uid}/imports/${batchUid}`); },

@@ -21,8 +21,8 @@ public final class KnowledgePropertiesTestSupport {
         properties.getIngestion().setMaxRetryDelay(Duration.ofMinutes(5));
         properties.getIngestion().setMaxAttempts(3);
         properties.getIngestion().setEmbeddingBatchSize(32);
-        properties.getChunking().setDefaultSizeTokens(500);
-        properties.getChunking().setDefaultOverlapTokens(80);
+        properties.getChunking().setDefaultSizeTokens(1000);
+        properties.getChunking().setDefaultOverlapTokens(160);
         properties.getParsing().getPdf().getPreprocessing().setMaxHeaderLines(2);
         properties.getParsing().getPdf().getPreprocessing().setMaxFooterLines(2);
         properties.getParsing().getPdf().getPreprocessing().setWatermarkRepeatedThresholdRatio(.5);

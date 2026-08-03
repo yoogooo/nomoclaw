@@ -40,6 +40,11 @@ public class KnowledgeDocumentNodeEntity implements Serializable {
     private String detectionSource;
     private BigDecimal confidence;
     private Boolean indexable;
+    private String nodeRole;
+    private Integer sourceOrder;
+    private BigDecimal qualityScore;
+    private BigDecimal parentConfidence;
+    private String indexableReason;
     private String metadataJson;
     private Date createdTime;
 }

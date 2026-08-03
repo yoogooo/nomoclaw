@@ -40,6 +40,9 @@ public final class TestDatabaseSupport {
                     + "section_path VARCHAR(2048) DEFAULT '' NOT NULL, page_from INT, page_to INT, char_start INT DEFAULT 0 NOT NULL, "
                     + "char_end INT DEFAULT 0 NOT NULL, detection_source VARCHAR(32) DEFAULT 'FALLBACK' NOT NULL, "
                     + "confidence DECIMAL(5,4) DEFAULT 0 NOT NULL, indexable BOOLEAN DEFAULT TRUE NOT NULL, "
+                    + "node_role VARCHAR(32) DEFAULT 'ROOT' NOT NULL, source_order INT DEFAULT 0 NOT NULL, "
+                    + "quality_score DECIMAL(5,4) DEFAULT 0 NOT NULL, parent_confidence DECIMAL(5,4) DEFAULT 0 NOT NULL, "
+                    + "indexable_reason VARCHAR(64) DEFAULT '' NOT NULL, "
                     + "metadata_json CLOB, created_time TIMESTAMP(3) NOT NULL)");
         } catch (SQLException ex) {
             throw new IllegalStateException("Unable to apply structured chunking test schema", ex);

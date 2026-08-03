@@ -39,6 +39,21 @@ class SmartDocumentChunkerTest {
     }
 
     @Test
+    void keepsSmallSectionTailWithPreviousChunkWithinSoftOverflowLimit() {
+        SmartDocumentChunker characterChunker = new SmartDocumentChunker(String::length);
+        DocumentParser.ParsedDocument document = document(List.of(
+                block("section-1", "3.1 Details", 1, 1, "a".repeat(481)),
+                block("section-1", "3.1 Details", 2, 2, "b".repeat(87))));
+
+        List<DocumentChunker.Chunk> chunks = characterChunker.split(document, 100, 20);
+
+        assertEquals(1, chunks.size());
+        assertEquals(570, chunks.getFirst().tokenCount());
+        assertEquals(1, chunks.getFirst().pageFrom());
+        assertEquals(2, chunks.getFirst().pageTo());
+    }
+
+    @Test
     void repeatsTableHeaderWhenRowsRequireMultipleChunks() {
         SmartDocumentChunker characterChunker = new SmartDocumentChunker(String::length);
         String header = "Column A | Column B";

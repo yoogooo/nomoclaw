@@ -33,7 +33,8 @@ public class TextCleaner {
         }
         PdfPreprocessingOptions pdf = preprocessing.pdfOptions();
         if (!pdf.removeHeader() && !pdf.removeFooter() && !pdf.removeWatermark() && !pdf.removeTableOfContents()) {
-            return pages(document, Set.of(), List.of(), config);
+            TableOfContentsDetection detected = detectTableOfContents(document);
+            return pages(document, Set.of(), List.of(), config, detected.pages());
         }
         Set<String> removed = new HashSet<>();
         List<String> warnings = new ArrayList<>();
@@ -47,14 +48,11 @@ public class TextCleaner {
             removed.addAll(watermarkDetector.detect(document, config));
             removed.addAll(configuredWatermarkElements(document, config));
         }
-        Set<Integer> tableOfContentsPages = Set.of();
-        if (pdf.removeTableOfContents()) {
-            TableOfContentsDetection tableOfContents = detectTableOfContents(document);
-            tableOfContentsPages = tableOfContents.pages();
-            if (!tableOfContents.elements().isEmpty()) {
+        TableOfContentsDetection tableOfContents = detectTableOfContents(document);
+        Set<Integer> tableOfContentsPages = tableOfContents.pages();
+        if (pdf.removeTableOfContents() && !tableOfContents.elements().isEmpty()) {
                 removed.addAll(tableOfContents.elements());
                 warnings.add("TABLE_OF_CONTENTS_FILTERED");
-            }
         }
         if (!removed.isEmpty()) warnings.add("PDF_PREPROCESSING_APPLIED");
         return pages(document, removed, warnings, config, tableOfContentsPages);

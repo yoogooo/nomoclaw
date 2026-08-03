@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -145,7 +146,23 @@ public class KnowledgeController {
     @GetMapping("/knowledge-bases/{uid}/documents/{documentUid}/structure")
     public Map<String, Object> structure(@PathVariable String uid, @PathVariable String documentUid) {
         List<KnowledgeModels.DocumentNode> items = service.listDocumentStructure(uid, documentUid);
-        return Map.of("items", items, "total", items.size());
+        List<KnowledgeModels.DocumentNode> all = flattenNodes(items);
+        long valid = all.stream().filter(KnowledgeModels.DocumentNode::indexable).count();
+        long diagnostic = all.size() - valid;
+        return Map.of("items", items, "total", all.size(), "validCount", valid,
+                "diagnosticCount", diagnostic);
+    }
+
+    /**
+     * Flattens a tree for structure summary counts without changing the tree response shape.
+     */
+    private List<KnowledgeModels.DocumentNode> flattenNodes(List<KnowledgeModels.DocumentNode> nodes) {
+        List<KnowledgeModels.DocumentNode> result = new ArrayList<>();
+        for (KnowledgeModels.DocumentNode node : nodes) {
+            result.add(node);
+            result.addAll(flattenNodes(node.children()));
+        }
+        return result;
     }
 
     /**

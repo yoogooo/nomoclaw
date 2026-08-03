@@ -1043,6 +1043,11 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
             entity.setDetectionSource(node.detectionSource());
             entity.setConfidence(BigDecimal.valueOf(node.confidence()));
             entity.setIndexable(node.indexable());
+            entity.setNodeRole(node.nodeRole());
+            entity.setSourceOrder(node.sourceOrder());
+            entity.setQualityScore(BigDecimal.valueOf(node.qualityScore()));
+            entity.setParentConfidence(BigDecimal.valueOf(node.parentConfidence()));
+            entity.setIndexableReason(node.indexableReason());
             entity.setMetadataJson(safe(node.metadataJson()));
             entity.setCreatedTime(toDate(now));
             documentNodeRepository.save(entity);
@@ -1489,7 +1494,10 @@ public class KnowledgeService implements KnowledgeIngestionRunner {
                 zero(node.getLevel()), safe(node.getCode()), safe(node.getTitle()), safe(node.getSectionPath()),
                 node.getPageFrom(), node.getPageTo(), safe(node.getDetectionSource()),
                 node.getConfidence() == null ? 0D : node.getConfidence().doubleValue(),
-                Boolean.TRUE.equals(node.getIndexable()), children.getOrDefault(node.getNodeUid(), List.of()).stream()
+                Boolean.TRUE.equals(node.getIndexable()), safe(node.getNodeRole()), zero(node.getSourceOrder()),
+                node.getQualityScore() == null ? 0D : node.getQualityScore().doubleValue(),
+                node.getParentConfidence() == null ? 0D : node.getParentConfidence().doubleValue(),
+                safe(node.getIndexableReason()), children.getOrDefault(node.getNodeUid(), List.of()).stream()
                 .map(child -> documentNode(child, children)).toList());
     }
 

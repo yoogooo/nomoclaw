@@ -33,13 +33,16 @@ const supportedExtensions = new Set(["pdf", "docx", "txt", "md"]);
 const config = reactive({
   preset: "balanced",
   chunkStrategy: "TOKEN" as "TOKEN" | "SMART",
-  chunkSizeTokens: 500,
-  chunkOverlapTokens: 80,
+  chunkSizeTokens: 1000,
+  chunkOverlapTokens: 160,
   preprocessing: {
     enabled: true,
     pdf: { removeHeader: true, removeFooter: true, removeWatermark: true, removeTableOfContents: false }
   }
 });
+const tokenPresets: Record<string, [number, number]> = {
+  precise: [500, 80], balanced: [1000, 160], context: [2000, 320]
+};
 let pollTimer: number | undefined;
 
 const accepted = computed(() => batch.value?.items.filter(item => item.outcome === "ACCEPTED" && item.status !== "REMOVED") || []);
@@ -72,11 +75,13 @@ const validConfig = computed(() => config.chunkStrategy === "SMART" || (config.c
 function applyPreset(value: string | number | boolean) {
   if (typeof value !== "string") return;
   config.preset = value;
-  const presets: Record<string, [number, number]> = {
-    precise: [300, 50], balanced: [500, 80], context: [800, 120]
-  };
-  const selected = presets[value];
+  const selected = tokenPresets[value];
   if (selected) [config.chunkSizeTokens, config.chunkOverlapTokens] = selected;
+}
+
+function presetForTokens(size: number, overlap: number): string {
+  return Object.entries(tokenPresets).find(([, values]) => values[0] === size && values[1] === overlap)?.[0]
+    || "balanced";
 }
 
 async function load() {
@@ -86,6 +91,7 @@ async function load() {
     if (batch.value.status !== "DRAFT") step.value = 4;
     config.chunkSizeTokens = batch.value.chunkSizeTokens;
     config.chunkOverlapTokens = batch.value.chunkOverlapTokens;
+    config.preset = presetForTokens(config.chunkSizeTokens, config.chunkOverlapTokens);
     config.chunkStrategy = batch.value.chunkStrategy || "TOKEN";
     if (batch.value.preprocessing) {
       config.preprocessing.enabled = batch.value.preprocessing.enabled;
@@ -261,9 +267,9 @@ onBeforeUnmount(() => { if (pollTimer) window.clearTimeout(pollTimer); });
             <NRadio value="SMART"><strong>{{ t("pages.knowledge.import.strategies.smart") }}</strong><span>{{ t("pages.knowledge.import.strategies.smartHint") }}</span></NRadio>
           </NRadioGroup>
           <NRadioGroup v-if="config.chunkStrategy === 'TOKEN'" :value="config.preset" class="preset-grid" @update:value="applyPreset">
-            <NRadio value="precise"><strong>{{ t("pages.knowledge.import.presets.precise") }}</strong><span>300 / 50</span></NRadio>
-            <NRadio value="balanced"><strong>{{ t("pages.knowledge.import.presets.balanced") }}</strong><span>500 / 80</span></NRadio>
-            <NRadio value="context"><strong>{{ t("pages.knowledge.import.presets.context") }}</strong><span>800 / 120</span></NRadio>
+            <NRadio value="precise"><strong>{{ t("pages.knowledge.import.presets.precise") }}</strong><span>500 / 80</span></NRadio>
+            <NRadio value="balanced"><strong>{{ t("pages.knowledge.import.presets.balanced") }}</strong><span>1000 / 160</span></NRadio>
+            <NRadio value="context"><strong>{{ t("pages.knowledge.import.presets.context") }}</strong><span>2000 / 320</span></NRadio>
           </NRadioGroup>
           <div class="preprocessing-panel">
             <NCheckbox v-model:checked="config.preprocessing.enabled">{{ t("pages.knowledge.import.preprocessing.enabled") }}</NCheckbox>

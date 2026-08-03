@@ -178,14 +178,14 @@ class DefaultDocumentParserTest {
                 content.beginText();
                 content.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 12);
                 content.newLineAtOffset(50, 700);
-                content.showText("Generated Topic");
+                content.showText("1 Generated Topic");
                 content.newLineAtOffset(0, -40);
                 content.showText("Neutral generated body for parser verification.");
                 content.endText();
             }
             PDDocumentOutline outline = new PDDocumentOutline();
             PDOutlineItem item = new PDOutlineItem();
-            item.setTitle("Generated Topic");
+            item.setTitle("1 Generated Topic");
             PDPageFitDestination destination = new PDPageFitDestination();
             destination.setPage(page);
             item.setDestination(destination);
@@ -199,6 +199,42 @@ class DefaultDocumentParserTest {
         assertEquals("PDF_OUTLINE", parsed.nodes().get(1).detectionSource());
         assertEquals("Generated Topic", parsed.nodes().get(1).title());
         assertEquals("node-1", parsed.blocks().get(1).nodeKey());
+    }
+
+    @Test
+    void rejectsOversegmentedOutlineAndFallsBackToLayout() throws Exception {
+        Path file = directory.resolve("generated-oversegmented-outline.pdf");
+        try (PDDocument document = new PDDocument()) {
+            PDPage page = new PDPage();
+            document.addPage(page);
+            try (PDPageContentStream content = new PDPageContentStream(document, page)) {
+                content.beginText();
+                content.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 12);
+                content.newLineAtOffset(50, 700);
+                for (int index = 0; index < 12; index++) {
+                    content.showText("Generated paragraph " + index + " with neutral content.");
+                    content.newLineAtOffset(0, -30);
+                }
+                content.endText();
+            }
+            PDDocumentOutline outline = new PDDocumentOutline();
+            for (int index = 0; index < 20; index++) {
+                PDOutlineItem item = new PDOutlineItem();
+                item.setTitle("Generated paragraph " + index + " with neutral content.");
+                PDPageFitDestination destination = new PDPageFitDestination();
+                destination.setPage(page);
+                item.setDestination(destination);
+                outline.addLast(item);
+            }
+            document.getDocumentCatalog().setDocumentOutline(outline);
+            document.save(file.toFile());
+        }
+
+        DocumentParser.ParsedDocument parsed = new DefaultDocumentParser().parse(file);
+
+        assertTrue(parsed.warnings().contains("PDF_OUTLINE_REJECTED"));
+        assertTrue(parsed.warnings().contains("STRUCTURE_OVERSEGMENTED"));
+        assertTrue(parsed.nodes().stream().noneMatch(node -> "PDF_OUTLINE".equals(node.detectionSource())));
     }
 
     private void writePdf(Path file) throws Exception {

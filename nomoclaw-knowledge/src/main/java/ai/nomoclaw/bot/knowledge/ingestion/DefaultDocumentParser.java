@@ -25,9 +25,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -97,6 +99,7 @@ public class DefaultDocumentParser implements DocumentParser {
             if (document.isEncrypted()) throw new KnowledgeParseException("ENCRYPTED_PDF", "不支持加密 PDF");
             PdfLoader.PdfDocument pdf = pdfLoader.load(document, progress);
             List<DocumentBlock> blocks = new ArrayList<>();
+            List<PdfTextBlock> extracted = new ArrayList<>();
             List<String> warnings = new ArrayList<>();
             int characters = pdf.elements().stream().mapToInt(element -> normalize(element.text()).length()).sum();
             if (characters < 20)
@@ -105,7 +108,7 @@ public class DefaultDocumentParser implements DocumentParser {
                     properties.getParsing().getPdf().getPreprocessing());
             List<Page> cleanedPages = cleanup.pages();
             warnings.addAll(cleanup.warnings());
-            Map<String, OutlineHeading> outlineHeadings = pdfOutline(document);
+            List<OutlineHeading> outlineHeadings = pdfOutline(document);
             int emptyPages = 0;
             for (Page page : cleanedPages) {
                 if (page.text().isBlank()) {
@@ -117,44 +120,56 @@ public class DefaultDocumentParser implements DocumentParser {
                     for (String logicalParagraph : value.split("\\n\\s*\\n")) {
                         String normalized = normalize(logicalParagraph);
                         if (!normalized.isBlank()) {
-                            float fontSize = pdfFontSize(pdf, page.number(), normalized);
-                            OutlineHeading outline = outlineHeadings.get(outlineKey(page.number(), normalized));
-                            BlockType type = outline != null || isPdfHeading(normalized, fontSize, medianPdfFontSize(pdf))
-                                    ? BlockType.HEADING : BlockType.PARAGRAPH;
-                            BlockStyle style = outline == null
-                                    ? new BlockStyle(fontSize, false, 0F, 0F, 0F)
-                                    : new BlockStyle(outline.level(), true, 0F, 0F, 0F);
-                            blocks.add(new DocumentBlock(type, page.number(), page.number(), "", "root", normalized,
-                                    0, normalized.length(), style, false));
+                            extracted.add(new PdfTextBlock(normalized, page.number(),
+                                    pdfFontSize(pdf, page.number(), normalized)));
                         }
                     }
                 }
             }
             if (emptyPages > 0) warnings.add("PARTIAL_TEXT_EXTRACTION");
-            ParsedDocument parsed = structured(cleanedPages, blocks, warnings,
-                    outlineHeadings.isEmpty() ? "LAYOUT" : "PDF_OUTLINE");
+            OutlineAssessment assessment = assessOutline(outlineHeadings, extracted);
+            warnings.addAll(assessment.warnings());
+            float medianFontSize = medianPdfFontSize(pdf);
+            for (int index = 0; index < extracted.size(); index++) {
+                PdfTextBlock extractedBlock = extracted.get(index);
+                OutlineHeading outline = assessment.matches().get(index);
+                double layoutScore = pdfHeadingScore(extractedBlock.text(), extractedBlock.fontSize(), medianFontSize);
+                boolean layoutHeading = layoutScore >= .70D;
+                boolean heading = outline != null || layoutHeading;
+                String source = outline != null ? "PDF_OUTLINE" : layoutHeading
+                        ? (headingCode(extractedBlock.text()).isBlank() ? "LAYOUT" : "NUMBERING") : "";
+                double confidence = outline == null ? layoutScore
+                        : Math.min(1D, .55D + outline.qualityScore() * .35D + layoutScore * .10D);
+                int level = outline == null ? 0 : outline.level();
+                BlockStyle style = outline == null
+                        ? new BlockStyle(extractedBlock.fontSize(), false, 0F, 0F, 0F)
+                        : new BlockStyle(Math.max(1, Math.min(6, level)), true, 0F, 0F, 0F);
+                String role = classifyPdfRole(extractedBlock, heading, cleanup.tableOfContentsPages());
+                blocks.add(new DocumentBlock(heading ? BlockType.HEADING : BlockType.PARAGRAPH,
+                        extractedBlock.page(), extractedBlock.page(), "", "root", extractedBlock.text(),
+                        0, extractedBlock.text().length(), style, false, source, confidence, role));
+            }
+            ParsedDocument parsed = structured(cleanedPages, blocks, warnings, "LAYOUT");
             return addFilteredTableOfContentsNodes(parsed, cleanup.tableOfContentsPages());
         }
     }
 
-    private Map<String, OutlineHeading> pdfOutline(PDDocument document) throws Exception {
+    private List<OutlineHeading> pdfOutline(PDDocument document) throws Exception {
         PDDocumentOutline outline = document.getDocumentCatalog().getDocumentOutline();
-        if (outline == null) return Map.of();
-        Map<String, OutlineHeading> headings = new LinkedHashMap<>();
+        if (outline == null) return List.of();
+        List<OutlineHeading> headings = new ArrayList<>();
         collectOutline(document, outline.getFirstChild(), 1, headings);
         return headings;
     }
 
     private void collectOutline(PDDocument document, PDOutlineItem item, int level,
-                                Map<String, OutlineHeading> headings) throws Exception {
+                                List<OutlineHeading> headings) throws Exception {
         PDOutlineItem current = item;
         while (current != null) {
             PDPage destination = current.findDestinationPage(document);
             int page = destination == null ? 0 : document.getPages().indexOf(destination) + 1;
             String title = normalize(current.getTitle());
-            if (page > 0 && !title.isBlank()) {
-                headings.putIfAbsent(outlineKey(page, title), new OutlineHeading(level));
-            }
+            if (page > 0 && !title.isBlank()) headings.add(new OutlineHeading(title, page, level, headings.size()));
             collectOutline(document, current.getFirstChild(), level + 1, headings);
             current = current.getNextSibling();
         }
@@ -170,7 +185,8 @@ public class DefaultDocumentParser implements DocumentParser {
         for (Integer pageNumber : pageNumbers) {
             nodes.add(new StructureNode("toc-page-" + pageNumber, "root", "SECTION", 1, "", "",
                     "", pageNumber, pageNumber, 0, 0, "LAYOUT", .9D, false,
-                    "{\"kind\":\"TABLE_OF_CONTENTS\"}"));
+                    "{\"kind\":\"TABLE_OF_CONTENTS\"}", "TABLE_OF_CONTENTS", 0, .9D, 0D,
+                    "TABLE_OF_CONTENTS"));
         }
         return new ParsedDocument(parsed.pages(), parsed.blocks(), List.copyOf(nodes), parsed.warnings());
     }
@@ -291,6 +307,7 @@ public class DefaultDocumentParser implements DocumentParser {
         Map<Integer, StructureNode> hierarchy = new LinkedHashMap<>();
         String currentNodeKey = "root";
         String currentPath = "";
+        String currentRole = "";
         int charOffset = 0;
         int nodeIndex = 0;
         for (DocumentBlock block : input) {
@@ -304,16 +321,34 @@ public class DefaultDocumentParser implements DocumentParser {
                 currentPath = hierarchy.values().stream().map(node -> displayHeading(node.code(), node.title()))
                         .reduce((left, right) -> left + " / " + right).map(value -> value + " / ").orElse("")
                         + displayHeading(code, title);
+                String source = block.detectionSource().isBlank() ? detectionSource : block.detectionSource();
+                double confidence = block.structureConfidence() > 0D ? block.structureConfidence()
+                        : ("LAYOUT".equals(source) ? .72D : .98D);
+                String role = block.nodeRole().isBlank() ? nodeType(level) : block.nodeRole();
+                boolean indexable = !"FRONT_MATTER".equals(role) && !"TABLE_OF_CONTENTS".equals(role)
+                        && confidence >= .70D;
+                String reason = indexable ? "" : "FRONT_MATTER".equals(role) ? "FRONT_MATTER"
+                        : "TABLE_OF_CONTENTS".equals(role) ? "TABLE_OF_CONTENTS" : "LOW_CONFIDENCE";
                 StructureNode node = new StructureNode(nodeKey, parent == null ? "root" : parent.nodeKey(),
                         nodeType(level), level, code, title, currentPath, block.pageFrom(), block.pageTo(),
-                        charOffset, charOffset + block.text().length(), detectionSource,
-                        "LAYOUT".equals(detectionSource) ? .72D : .98D, true, "{}");
+                        charOffset, charOffset + block.text().length(), source, confidence, indexable, "{}",
+                        role, nodeIndex, confidence, parent == null ? confidence : parent.confidence(), reason);
                 nodes.add(node);
-                hierarchy.put(level, node);
-                currentNodeKey = nodeKey;
-                blocks.add(copyBlock(block, currentPath, currentNodeKey, charOffset));
+                if (indexable) {
+                    hierarchy.put(level, node);
+                    currentNodeKey = nodeKey;
+                    currentRole = role;
+                } else {
+                    hierarchy.remove(level);
+                    currentNodeKey = parent == null ? "root" : parent.nodeKey();
+                    currentRole = parent == null ? role : parent.nodeRole();
+                }
+                String blockPath = indexable ? currentPath : parent == null ? "" : parent.sectionPath();
+                currentPath = blockPath;
+                blocks.add(copyBlock(block, blockPath, nodeKey, charOffset,
+                        indexable ? role : "LOW_CONFIDENCE"));
             } else {
-                blocks.add(copyBlock(block, currentPath, currentNodeKey, charOffset));
+                blocks.add(copyBlock(block, currentPath, currentNodeKey, charOffset, currentRole));
             }
             charOffset += block.text().length() + 2;
         }
@@ -338,7 +373,8 @@ public class DefaultDocumentParser implements DocumentParser {
                     nodeBlocks.stream().mapToInt(DocumentBlock::pageTo).max().orElse(node.pageTo()),
                     nodeBlocks.stream().mapToInt(DocumentBlock::charStart).min().orElse(node.charStart()),
                     nodeBlocks.stream().mapToInt(DocumentBlock::charEnd).max().orElse(node.charEnd()),
-                    node.detectionSource(), node.confidence(), node.indexable(), node.metadataJson());
+                    node.detectionSource(), node.confidence(), node.indexable(), node.metadataJson(), node.nodeRole(),
+                    node.sourceOrder(), node.qualityScore(), node.parentConfidence(), node.indexableReason());
         }).toList();
     }
 
@@ -354,8 +390,14 @@ public class DefaultDocumentParser implements DocumentParser {
     }
 
     private DocumentBlock copyBlock(DocumentBlock block, String sectionPath, String nodeKey, int charOffset) {
+        return copyBlock(block, sectionPath, nodeKey, charOffset, block.nodeRole());
+    }
+
+    private DocumentBlock copyBlock(DocumentBlock block, String sectionPath, String nodeKey, int charOffset,
+                                    String nodeRole) {
         return new DocumentBlock(block.type(), block.pageFrom(), block.pageTo(), sectionPath, nodeKey, block.text(),
-                charOffset, charOffset + block.text().length(), block.style(), block.crossPageContinuation());
+                charOffset, charOffset + block.text().length(), block.style(), block.crossPageContinuation(),
+                block.detectionSource(), block.structureConfidence(), nodeRole);
     }
 
     private int headingLevel(DocumentBlock block) {
@@ -416,11 +458,91 @@ public class DefaultDocumentParser implements DocumentParser {
                 .orElse(0F);
     }
 
-    private boolean isPdfHeading(String text, float fontSize, float medianFontSize) {
-        if (text == null || text.isBlank() || text.length() > 120 || medianFontSize <= 0F) return false;
-        boolean visuallyProminent = fontSize >= medianFontSize * 1.15F;
-        boolean numberedCandidate = !headingCode(text).isBlank() && fontSize >= medianFontSize;
-        return visuallyProminent || numberedCandidate;
+    private double pdfHeadingScore(String text, float fontSize, float medianFontSize) {
+        if (text == null || text.isBlank() || text.length() > 120 || medianFontSize <= 0F) return 0D;
+        double score = 0D;
+        if (fontSize >= medianFontSize * 1.25F) score += .42D;
+        else if (fontSize >= medianFontSize * 1.12F) score += .25D;
+        if (!headingCode(text).isBlank() && fontSize >= medianFontSize * 1.03F) score += .35D;
+        if (!endsLikeSentence(text)) score += text.length() <= 40 ? .25D : text.length() <= 80 ? .12D : 0D;
+        if (text.contains("电话") || text.contains("邮箱") || text.contains("联系人")) score -= .35D;
+        return Math.max(0D, Math.min(1D, score));
+    }
+
+    private boolean endsLikeSentence(String text) {
+        if (text == null || text.isBlank()) return true;
+        char last = text.charAt(text.length() - 1);
+        return "。！？；;.!?,，:：".indexOf(last) >= 0;
+    }
+
+    private String classifyPdfRole(PdfTextBlock block, boolean heading, List<Integer> tocPages) {
+        if (tocPages.contains(block.page())) return "TABLE_OF_CONTENTS";
+        if (heading && block.page() <= 3 && headingCode(block.text()).isBlank()) return "FRONT_MATTER";
+        return "";
+    }
+
+    private OutlineAssessment assessOutline(List<OutlineHeading> outlines, List<PdfTextBlock> blocks) {
+        if (outlines.isEmpty()) return new OutlineAssessment(Map.of(), List.of());
+        Map<Integer, OutlineHeading> matches = new LinkedHashMap<>();
+        Set<Integer> used = new LinkedHashSet<>();
+        int matched = 0;
+        int lowQuality = 0;
+        int pageOrderErrors = 0;
+        int previousPage = 0;
+        for (OutlineHeading outline : outlines) {
+            if (outline.page() < previousPage) pageOrderErrors++;
+            previousPage = Math.max(previousPage, outline.page());
+            double bestScore = 0D;
+            int bestIndex = -1;
+            for (int index = 0; index < blocks.size(); index++) {
+                if (used.contains(index)) continue;
+                PdfTextBlock block = blocks.get(index);
+                if (Math.abs(block.page() - outline.page()) > 1) continue;
+                double score = textSimilarity(outline.title(), block.text());
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestIndex = index;
+                }
+            }
+            double titleQuality = titleQuality(outline.title());
+            if (titleQuality < .5D) lowQuality++;
+            if (bestIndex >= 0 && bestScore >= .82D && titleQuality >= .5D) {
+                matches.put(bestIndex, outline.withQuality(Math.min(1D, bestScore * .7D + titleQuality * .3D)));
+                used.add(bestIndex);
+                matched++;
+            }
+        }
+        double matchRatio = (double) matched / outlines.size();
+        double lowQualityRatio = (double) lowQuality / outlines.size();
+        boolean oversegmented = outlines.size() > 10 && outlines.size() * 4 > blocks.size() * 3;
+        boolean accepted = matchRatio >= .70D && ((double) pageOrderErrors / outlines.size()) <= .10D
+                && lowQualityRatio <= .20D && !oversegmented;
+        if (accepted) return new OutlineAssessment(matches, List.of());
+        List<String> warnings = new ArrayList<>();
+        warnings.add("PDF_OUTLINE_REJECTED");
+        if (oversegmented) warnings.add("STRUCTURE_OVERSEGMENTED");
+        return new OutlineAssessment(Map.of(), List.copyOf(warnings));
+    }
+
+    private double textSimilarity(String left, String right) {
+        String normalizedLeft = normalizeForMatch(left);
+        String normalizedRight = normalizeForMatch(right);
+        if (normalizedLeft.equals(normalizedRight)) return 1D;
+        if (normalizedLeft.contains(normalizedRight) || normalizedRight.contains(normalizedLeft)) return .88D;
+        return 0D;
+    }
+
+    private String normalizeForMatch(String value) {
+        return safe(value).replaceAll("[\\s\\p{Punct}、，。！？：；（）【】《》]", "").toLowerCase(Locale.ROOT);
+    }
+
+    private double titleQuality(String title) {
+        if (title == null || title.isBlank() || title.length() > 120 || endsLikeSentence(title)) return .2D;
+        return title.length() <= 80 ? 1D : .65D;
+    }
+
+    private String safe(String value) {
+        return value == null ? "" : value;
     }
 
     private int headingLevel(String style) {
@@ -505,7 +627,20 @@ public class DefaultDocumentParser implements DocumentParser {
         return (value >= 'A' && value <= 'Z') || (value >= 'a' && value <= 'z') || (value >= '0' && value <= '9');
     }
 
-    private record OutlineHeading(int level) {
+    private record PdfTextBlock(String text, int page, float fontSize) {
+    }
+
+    private record OutlineHeading(String title, int page, int level, int sourceOrder, double qualityScore) {
+        private OutlineHeading(String title, int page, int level, int sourceOrder) {
+            this(title, page, level, sourceOrder, 0D);
+        }
+
+        private OutlineHeading withQuality(double quality) {
+            return new OutlineHeading(title, page, level, sourceOrder, quality);
+        }
+    }
+
+    private record OutlineAssessment(Map<Integer, OutlineHeading> matches, List<String> warnings) {
     }
 
     /**

@@ -1084,7 +1084,7 @@ const enUS = {
       documentStatuses: { UPLOADED: "Awaiting build", awaitingBuild: "Waiting for build configuration" },
       actions: { configureBuild: "Configure and build", reindex: "Rebuild index", more: "More actions", viewDetails: "View details", viewChunks: "View chunks" },
       documentDetail: { status: "Status", stage: "Stage", pages: "Page progress", chunks: "Chunk progress", attempts: "Attempts", nextRetry: "Next retry", failure: "Failure reason", warnings: "Warnings" },
-      chunks: { title: "Document chunks", subtitle: "Inspect every chunk generated for the current document version.", empty: "No chunks yet", copy: "Copy chunk content", copied: "Chunk content copied", structure: "Document structure", filtered: "not indexed" },
+      chunks: { title: "Document chunks", subtitle: "Inspect every chunk generated for the current document version.", empty: "No chunks yet", copy: "Copy chunk content", copied: "Chunk content copied", structure: "Document structure", filtered: "not indexed", validNodes: "Valid nodes", diagnosticNodes: "Diagnostic nodes", allNodes: "All nodes", totalNodes: "Total nodes", validNodesCount: "Indexable", diagnosticNodesCount: "Filtered" },
       parseWarnings: {
         PARTIAL_TEXT_EXTRACTION: "Some PDF pages have no text layer. OCR is not available in this phase, so those pages were not indexed.",
         PDF_PREPROCESSING_APPLIED: "PDF preprocessing was applied.",

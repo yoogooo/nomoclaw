@@ -103,7 +103,17 @@ public final class KnowledgeModels {
     public record DocumentNode(String nodeUid, String parentNodeUid, String type, int level, String code,
                                String title, String sectionPath, Integer pageFrom, Integer pageTo,
                                String detectionSource, double confidence, boolean indexable,
+                               String nodeRole, int sourceOrder, double qualityScore, double parentConfidence,
+                               String indexableReason,
                                List<DocumentNode> children) {
+        public DocumentNode(String nodeUid, String parentNodeUid, String type, int level, String code,
+                            String title, String sectionPath, Integer pageFrom, Integer pageTo,
+                            String detectionSource, double confidence, boolean indexable,
+                            List<DocumentNode> children) {
+            this(nodeUid, parentNodeUid, type, level, code, title, sectionPath, pageFrom, pageTo,
+                    detectionSource, confidence, indexable, type, 0, confidence, confidence,
+                    indexable ? "" : "STRUCTURE_FILTERED", children);
+        }
     }
 
     public record BindingRequest(List<String> include, List<String> exclude) {
