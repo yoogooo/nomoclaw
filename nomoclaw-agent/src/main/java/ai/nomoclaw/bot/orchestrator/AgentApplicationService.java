@@ -727,29 +727,26 @@ public class AgentApplicationService {
         if (toolCalls == null || toolCalls.isEmpty()) {
             return steps;
         }
-        if (toolCalls.size() > 1) {
-            log.info("[Reasoning] multi tool calls trimmed to single step messageUid={} round={} originalCount={}",
-                    messageUid, roundIndex, toolCalls.size());
+        for (int index = 0; index < toolCalls.size(); index++) {
+            ToolExecutionRequest toolCall = toolCalls.get(index);
+            JsonNode toolArgs = parseToolArgs(toolCall);
+            RiskLevel riskLevel = riskPolicy.evaluateRisk(toolCall.name(), toolArgs);
+            steps.add(new PlanStep(
+                    UuidUtil.newUuid(),
+                    roundIndex,
+                    index + 1,
+                    feedbackBuilder.buildStepTitle(toolCall.name(), toolArgs),
+                    toolCall.name(),
+                    toolArgs,
+                    riskLevel,
+                    "",
+                    StepStatus.CREATED,
+                    0,
+                    null,
+                    null,
+                    ApprovalStatus.NONE
+            ));
         }
-        int stepIndex = 1;
-        ToolExecutionRequest toolCall = toolCalls.get(0);
-        JsonNode toolArgs = parseToolArgs(toolCall);
-        RiskLevel riskLevel = riskPolicy.evaluateRisk(toolCall.name(), toolArgs);
-        steps.add(new PlanStep(
-                UuidUtil.newUuid(),
-                roundIndex,
-                stepIndex,
-                feedbackBuilder.buildStepTitle(toolCall.name(), toolArgs),
-                toolCall.name(),
-                toolArgs,
-                riskLevel,
-                "",
-                StepStatus.CREATED,
-                0,
-                null,
-                null,
-                ApprovalStatus.NONE
-        ));
         log.info("[Reasoning] tool calls planned messageUid={} round={} count={}", messageUid, roundIndex, steps.size());
         return steps;
     }

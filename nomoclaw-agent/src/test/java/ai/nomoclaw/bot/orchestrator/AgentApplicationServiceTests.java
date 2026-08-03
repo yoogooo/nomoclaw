@@ -7,6 +7,7 @@ import ai.nomoclaw.bot.domain.AgentMessage;
 import ai.nomoclaw.bot.llm.codex.CodexUsageLimitException;
 import ai.nomoclaw.bot.llm.config.LlmProperties;
 import ai.nomoclaw.bot.model.MessageStatus;
+import ai.nomoclaw.bot.model.PlanStep;
 import ai.nomoclaw.bot.orchestrator.execution.ExecutionScopeResolver;
 import ai.nomoclaw.bot.orchestrator.execution.MessageExecutionOrchestrator;
 import ai.nomoclaw.bot.orchestrator.execution.StepExecutionService;
@@ -15,12 +16,14 @@ import ai.nomoclaw.bot.planner.Planner;
 import ai.nomoclaw.bot.policy.RiskPolicy;
 import ai.nomoclaw.bot.policy.tool.ToolPermissionPolicyService;
 import ai.nomoclaw.bot.store.AgentStore;
+import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.exception.AuthenticationException;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.lang.reflect.Method;
 import java.time.Instant;
+import java.util.List;
 import java.util.concurrent.CompletionException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -28,6 +31,44 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class AgentApplicationServiceTests {
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldCreateOnePlanStepForEachToolCall() throws Exception {
+        RiskPolicy riskPolicy = mock(RiskPolicy.class);
+        AgentApplicationService service = new AgentApplicationService(
+                mock(AgentStore.class),
+                mock(Planner.class),
+                riskPolicy,
+                mock(AgentEventBus.class),
+                mock(MessageCancellationRegistry.class),
+                new AgentProperties(),
+                new LlmProperties(),
+                mock(ConversationAttachmentService.class),
+                mock(ToolExecutionPolicyGateway.class),
+                mock(ToolPermissionPolicyService.class),
+                mock(PermissionAppService.class),
+                mock(ExecutionFeedbackBuilder.class),
+                mock(StepExecutionService.class),
+                mock(ExecutionScopeResolver.class),
+                mock(MessageExecutionOrchestrator.class),
+                mock(ApplicationEventPublisher.class),
+                mock(ConversationService.class)
+        );
+        Method method = AgentApplicationService.class.getDeclaredMethod("toPlanSteps", String.class, int.class, List.class);
+        method.setAccessible(true);
+
+        List<PlanStep> steps = (List<PlanStep>) method.invoke(service, "msg-1", 3, List.of(
+                ToolExecutionRequest.builder().id("call-1").name("BrowserTool").arguments("{\"action\":\"extract_text\"}").build(),
+                ToolExecutionRequest.builder().id("call-2").name("BrowserTool").arguments("{\"action\":\"screenshot\"}").build()
+        ));
+
+        assertEquals(2, steps.size());
+        assertEquals(1, steps.get(0).stepIndex());
+        assertEquals(2, steps.get(1).stepIndex());
+        assertEquals("call-1", steps.get(0).toolArgs().path("_toolCallId").asString());
+        assertEquals("call-2", steps.get(1).toolArgs().path("_toolCallId").asString());
+    }
 
     @Test
     void shouldFormatFriendlyMessageForCodexUsageLimit() throws Exception {
