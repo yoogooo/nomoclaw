@@ -4,6 +4,8 @@ import ai.nomoclaw.bot.util.UuidUtil;
 
 import ai.nomoclaw.bot.llm.config.LlmProperties;
 import ai.nomoclaw.bot.llm.debug.LlmDebugLogger;
+import ai.nomoclaw.bot.model.TokenUsageScene;
+import ai.nomoclaw.bot.orchestrator.TokenUsageRecorder;
 import ai.nomoclaw.bot.prompt.PromptLoader;
 import ai.nomoclaw.bot.prompt.SkillPromptLoader;
 import dev.langchain4j.agent.tool.ToolSpecification;
@@ -16,6 +18,7 @@ import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import dev.langchain4j.model.output.TokenUsage;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.EOFException;
@@ -39,15 +42,26 @@ public class TaskPlanner implements Planner {
     private final RuntimeChatModelResolver runtimeChatModelResolver;
     private final SkillPromptLoader skillPromptLoader;
     private final LlmDebugLogger llmDebugLogger;
+    private final TokenUsageRecorder tokenUsageRecorder;
+
+    @Autowired
+    public TaskPlanner(LlmProperties llmProperties,
+                       RuntimeChatModelResolver runtimeChatModelResolver,
+                       SkillPromptLoader skillPromptLoader,
+                       LlmDebugLogger llmDebugLogger,
+                       TokenUsageRecorder tokenUsageRecorder) {
+        this.llmProperties = llmProperties;
+        this.runtimeChatModelResolver = runtimeChatModelResolver;
+        this.skillPromptLoader = skillPromptLoader;
+        this.llmDebugLogger = llmDebugLogger;
+        this.tokenUsageRecorder = tokenUsageRecorder;
+    }
 
     public TaskPlanner(LlmProperties llmProperties,
                        RuntimeChatModelResolver runtimeChatModelResolver,
                        SkillPromptLoader skillPromptLoader,
                        LlmDebugLogger llmDebugLogger) {
-        this.llmProperties = llmProperties;
-        this.runtimeChatModelResolver = runtimeChatModelResolver;
-        this.skillPromptLoader = skillPromptLoader;
-        this.llmDebugLogger = llmDebugLogger;
+        this(llmProperties, runtimeChatModelResolver, skillPromptLoader, llmDebugLogger, null);
     }
 
     @Override
@@ -55,6 +69,14 @@ public class TaskPlanner implements Planner {
                                List<ToolSpecification> toolSpecifications,
                                ToolChoice toolChoice,
                                PromptLoader.PromptContext promptContext) {
+        return reason(memory, toolSpecifications, toolChoice, promptContext, TokenUsageScene.CHAT_REASONING);
+    }
+
+    private ChatResponse reason(List<ChatMessage> memory,
+                                List<ToolSpecification> toolSpecifications,
+                                ToolChoice toolChoice,
+                                PromptLoader.PromptContext promptContext,
+                                TokenUsageScene usageScene) {
         PreparedRequest preparedRequest = buildRequest(memory, toolSpecifications, toolChoice, promptContext);
         ChatRequest request = preparedRequest.request();
         RuntimeChatModelResolver.ResolvedModel resolvedModel = runtimeChatModelResolver.resolve(promptContext);
@@ -80,6 +102,7 @@ public class TaskPlanner implements Planner {
             );
             llmDebugLogger.logResponse(requestId, "task_reason", resolvedModel.providerId(), resolvedModel.modelId(),
                     promptContext, response, elapsedMillis(startNanos));
+            recordUsage(usageScene, resolvedModel, promptContext, response);
             logReasonFinish(response);
             return response;
         } catch (Exception ex) {
@@ -124,6 +147,7 @@ public class TaskPlanner implements Planner {
                 );
                 llmDebugLogger.logResponse(requestId, "task_reason", resolvedModel.providerId(), resolvedModel.modelId(),
                         promptContext, response, elapsedMillis(startNanos));
+                recordUsage(TokenUsageScene.CHAT_REASONING, resolvedModel, promptContext, response);
                 String text = response.aiMessage() == null ? "" : response.aiMessage().text();
                 logReasonFinish(response);
                 return new StreamReasonResult(response, text == null ? "" : text, false);
@@ -146,6 +170,7 @@ public class TaskPlanner implements Planner {
             }
             llmDebugLogger.logResponse(requestId, "task_reason", resolvedModel.providerId(), resolvedModel.modelId(),
                     promptContext, response, elapsedMillis(startNanos));
+            recordUsage(TokenUsageScene.CHAT_REASONING, resolvedModel, promptContext, response);
             logReasonFinish(response);
             return new StreamReasonResult(response, streamed.accumulatedText(), streamed.streamed());
         } catch (Exception ex) {
@@ -207,6 +232,18 @@ public class TaskPlanner implements Planner {
                 text);
     }
 
+    private void recordUsage(TokenUsageScene scene,
+                             RuntimeChatModelResolver.ResolvedModel resolvedModel,
+                             PromptLoader.PromptContext promptContext,
+                             ChatResponse response) {
+        if (tokenUsageRecorder == null) {
+            return;
+        }
+        tokenUsageRecorder.record(scene, resolvedModel.providerId(), resolvedModel.modelId(),
+                promptContext == null ? "" : promptContext.sessionId(),
+                promptContext == null ? "" : promptContext.messageUid(), response);
+    }
+
     @Override
     public SummaryResult summarize(List<ChatMessage> memory,
                                    String stopReason,
@@ -225,7 +262,7 @@ public class TaskPlanner implements Planner {
                 + "停止原因=" + stopReason + "，已执行轮次=" + roundsUsed + "/" + maxRounds + "。"
         ));
 
-        ChatResponse response = reason(summaryMessages, toolSpecifications, ToolChoice.NONE, promptContext);
+        ChatResponse response = reason(summaryMessages, toolSpecifications, ToolChoice.NONE, promptContext, TokenUsageScene.CHAT_SUMMARY);
         String answer = response.aiMessage() == null ? "" : nullToEmpty(response.aiMessage().text());
         if (!answer.isBlank()) {
             return new SummaryResult(answer.trim(), response);

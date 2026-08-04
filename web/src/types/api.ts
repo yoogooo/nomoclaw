@@ -20,6 +20,18 @@ export interface AgentCatalogAgent {
   primary: boolean;
 }
 
+export interface TokenUsageBreakdown { key: string; totalTokens: number; invocationCount: number; }
+export interface TokenUsageOverview {
+  inputTokens: number; cachedInputTokens: number; outputTokens: number; totalTokens: number;
+  invocationCount: number; unavailableUsageCount: number;
+  byDay: TokenUsageBreakdown[]; byModel: TokenUsageBreakdown[]; byScene: TokenUsageBreakdown[];
+}
+export interface TokenUsageRecord {
+  recordUid: string; scene: string; provider: string; modelName: string; conversationUid: string; messageUid: string;
+  inputTokens: number; cachedInputTokens: number; outputTokens: number; totalTokens: number; usageAvailable: boolean; occurredTime: string;
+}
+export interface TokenUsageRecordPage { items: TokenUsageRecord[]; total: number; page: number; pageSize: number; totalPages: number; }
+
 export interface AgentSkill {
   skillKey: string;
   displayName: string;

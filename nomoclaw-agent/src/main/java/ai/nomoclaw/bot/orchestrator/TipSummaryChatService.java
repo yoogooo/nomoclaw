@@ -3,6 +3,7 @@ package ai.nomoclaw.bot.orchestrator;
 import ai.nomoclaw.bot.util.UuidUtil;
 
 import ai.nomoclaw.bot.llm.debug.LlmDebugLogger;
+import ai.nomoclaw.bot.model.TokenUsageScene;
 import ai.nomoclaw.bot.planner.RuntimeChatModelResolver;
 import ai.nomoclaw.bot.prompt.PromptLoader;
 import ai.nomoclaw.bot.prompt.PromptTemplateService;
@@ -13,6 +14,7 @@ import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.request.ToolChoice;
 import dev.langchain4j.model.chat.response.ChatResponse;
+import dev.langchain4j.model.output.TokenUsage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -65,18 +67,27 @@ public class TipSummaryChatService {
     private final RuntimeChatModelResolver runtimeChatModelResolver;
     private final PromptTemplateService promptTemplateService;
     private final LlmDebugLogger llmDebugLogger;
+    private final TokenUsageRecorder tokenUsageRecorder;
 
     protected TipSummaryChatService(RuntimeChatModelResolver runtimeChatModelResolver) {
-        this(runtimeChatModelResolver, null, new NoopLlmDebugLogger());
+        this(runtimeChatModelResolver, null, new NoopLlmDebugLogger(), null);
     }
 
     @Autowired
     public TipSummaryChatService(RuntimeChatModelResolver runtimeChatModelResolver,
                                  PromptTemplateService promptTemplateService,
-                                 LlmDebugLogger llmDebugLogger) {
+                                 LlmDebugLogger llmDebugLogger,
+                                 TokenUsageRecorder tokenUsageRecorder) {
         this.runtimeChatModelResolver = runtimeChatModelResolver;
         this.promptTemplateService = promptTemplateService;
         this.llmDebugLogger = llmDebugLogger;
+        this.tokenUsageRecorder = tokenUsageRecorder;
+    }
+
+    public TipSummaryChatService(RuntimeChatModelResolver runtimeChatModelResolver,
+                                 PromptTemplateService promptTemplateService,
+                                 LlmDebugLogger llmDebugLogger) {
+        this(runtimeChatModelResolver, promptTemplateService, llmDebugLogger, null);
     }
 
     public TipEvaluationResult evaluate(PromptLoader.PromptContext promptContext,
@@ -121,11 +132,25 @@ public class TipSummaryChatService {
             ChatResponse response = resolvedModel.model().chat(request);
             llmDebugLogger.logResponse(requestId, "tip_summary", resolvedModel.providerId(), resolvedModel.modelId(),
                     promptContext, response, elapsedMillis(startNanos));
+            if (tokenUsageRecorder != null) {
+                tokenUsageRecorder.record(TokenUsageScene.TIP_SUMMARY, resolvedModel.providerId(), resolvedModel.modelId(),
+                        promptContext == null ? "" : promptContext.sessionId(),
+                        promptContext == null ? "" : promptContext.messageUid(), response);
+            }
             String output = response.aiMessage() == null ? "" : response.aiMessage().text();
-            log.info("[TipSummaryChat] finish provider={} model={} outputLength={}",
+            TokenUsage usage = response.metadata() == null ? null : response.metadata().tokenUsage();
+            Integer inputTokens = usage == null ? null : usage.inputTokenCount();
+            Integer cachedInputTokens = TokenUsageCacheTokenExtractor.extractCachedInputTokens(usage);
+            Integer outputTokens = usage == null ? null : usage.outputTokenCount();
+            Integer totalTokens = usage == null ? null : usage.totalTokenCount();
+            log.info("[TipSummaryChat] finish provider={} model={} outputLength={} inputTokens={} cachedInputTokens={} outputTokens={} totalTokens={}",
                     resolvedModel.providerId(),
                     resolvedModel.modelId(),
-                    output == null ? 0 : output.length());
+                    output == null ? 0 : output.length(),
+                    inputTokens,
+                    cachedInputTokens,
+                    outputTokens,
+                    totalTokens);
             return parseEvaluationResult(output, recentMessages, steps, finalResult);
         } catch (Exception ex) {
             llmDebugLogger.logError(requestId, "tip_summary", resolvedModel.providerId(), resolvedModel.modelId(),

@@ -9,6 +9,7 @@ import KnowledgeChunksPage from "@/pages/KnowledgeChunksPage.vue";
 import SkillsPage from "@/pages/SkillsPage.vue";
 import SettingsPage from "@/pages/SettingsPage.vue";
 import SettingsErrorLogsPage from "@/pages/SettingsErrorLogsPage.vue";
+import TokenUsagePage from "@/pages/TokenUsagePage.vue";
 import ChannelsPage from "@/pages/ChannelsPage.vue";
 import ModelsPage from "@/pages/ModelsPage.vue";
 import McpPage from "@/pages/McpPage.vue";
@@ -95,6 +96,11 @@ export const router = createRouter({
       path: "/settings/error-logs",
       name: "settings-error-logs",
       component: SettingsErrorLogsPage
+    },
+    {
+      path: "/settings/token-usage",
+      name: "settings-token-usage",
+      component: TokenUsagePage
     },
     {
       path: "/channels",

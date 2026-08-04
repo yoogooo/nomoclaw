@@ -47,6 +47,10 @@ function openDiagnosticsPage() {
   void router.push({ name: "settings-error-logs" });
 }
 
+function openTokenUsagePage() {
+  void router.push({ name: "settings-token-usage" });
+}
+
 async function loadDiagnosticsSummary() {
   diagnosticsLoading.value = true;
   try {
@@ -185,6 +189,11 @@ async function loadDiagnosticsSummary() {
                   {{ t("settings.diagnosticsViewLogs") }}
                 </n-button>
               </div>
+            </section>
+            <section class="surface-card">
+              <div class="surface-card-title">Token 用量</div>
+              <div class="settings-diagnostics-subtitle">查看聊天和锦囊总结的模型 token 消耗及调用明细。</div>
+              <div class="settings-diagnostics-actions"><n-button tertiary size="small" @click="openTokenUsagePage">查看 Token 用量</n-button></div>
             </section>
           </div>
         </div>
