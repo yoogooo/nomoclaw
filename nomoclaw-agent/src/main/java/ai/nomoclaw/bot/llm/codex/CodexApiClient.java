@@ -408,7 +408,7 @@ final class CodexApiClient {
         JsonNode root = JsonUtil.fromJson(payload, JsonNode.class);
         String type = firstNonBlank(trim(event), text(root.path("type")));
         if ("response.output_text.delta".equals(type) || "response.refusal.delta".equals(type)) {
-            String delta = firstNonBlank(text(root.path("delta")), text(root.path("text")));
+            String delta = firstNonBlankPreserving(text(root.path("delta")), text(root.path("text")));
             if (!delta.isBlank()) {
                 fullText.append(delta);
                 handler.onPartialResponse(delta);
@@ -438,7 +438,7 @@ final class CodexApiClient {
                 completed[0] = chatResponse(
                         responseWithMaybeTools.id(),
                         modelName,
-                        firstNonBlank(responseWithMaybeTools.aiMessage().text(), fullText.toString()),
+                        firstNonBlankPreserving(responseWithMaybeTools.aiMessage().text(), fullText.toString()),
                         toolExecutionRequests,
                         responseWithMaybeTools.tokenUsage(),
                         finishReason(toolExecutionRequests)
@@ -455,7 +455,7 @@ final class CodexApiClient {
 
     private ChatResponse toChatResponse(JsonNode root, String modelName, String fallbackText) {
         String id = text(root.path("id"));
-        String outputText = firstNonBlank(text(root.path("output_text")), extractOutputText(root), fallbackText);
+        String outputText = firstNonBlankPreserving(text(root.path("output_text")), extractOutputText(root), fallbackText);
         List<ToolExecutionRequest> toolExecutionRequests = extractToolExecutionRequests(root);
         JsonNode usageNode = root.path("usage");
         if (!usageNode.isMissingNode() && !usageNode.isNull()) {
@@ -535,7 +535,7 @@ final class CodexApiClient {
                 continue;
             }
             for (JsonNode part : content) {
-                String text = firstNonBlank(text(part.path("text")), text(part.path("content")));
+                String text = firstNonBlankPreserving(text(part.path("text")), text(part.path("content")));
                 if (!text.isBlank()) {
                     builder.append(text);
                 }
@@ -703,6 +703,15 @@ final class CodexApiClient {
             String trimmed = trim(value);
             if (!trimmed.isBlank()) {
                 return trimmed;
+            }
+        }
+        return "";
+    }
+
+    private String firstNonBlankPreserving(String... values) {
+        for (String value : values) {
+            if (!trim(value).isBlank()) {
+                return value == null ? "" : value;
             }
         }
         return "";

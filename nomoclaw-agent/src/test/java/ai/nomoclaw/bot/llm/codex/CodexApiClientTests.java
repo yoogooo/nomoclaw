@@ -70,4 +70,55 @@ class CodexApiClientTests {
         assertEquals(1782908546L, exception.resetAtEpochSecond());
         assertEquals(10271L, exception.resetsInSeconds());
     }
+
+    @Test
+    void streamShouldPreserveModelTextWithoutTrimming() throws Exception {
+        HttpClient httpClient = mock(HttpClient.class);
+        CodexTokenProvider tokenProvider = mock(CodexTokenProvider.class);
+        when(tokenProvider.accessToken()).thenReturn("test-token");
+        when(tokenProvider.installationId()).thenReturn("installation-1");
+        when(tokenProvider.accountId()).thenReturn("");
+
+        String modelText = "  # Heading\n\nBody  ";
+        String sse = """
+                event: response.output_text.delta
+                data: {"type":"response.output_text.delta","delta":"  # Heading\\n\\nBody  "}
+
+                event: response.completed
+                data: {"type":"response.completed","response":{"id":"resp-1","output":[{"type":"message","content":[{"type":"output_text","text":"  # Heading\\n\\nBody  "}]}]}}
+
+                """;
+        HttpResponse<InputStream> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(200);
+        when(response.body()).thenReturn(new ByteArrayInputStream(sse.getBytes(StandardCharsets.UTF_8)));
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(response);
+
+        CodexApiClient client = new CodexApiClient(httpClient, tokenProvider, "", Duration.ofSeconds(5));
+        AtomicReference<String> streamedText = new AtomicReference<>("");
+        AtomicReference<ChatResponse> completedResponse = new AtomicReference<>();
+
+        client.stream(
+                ChatRequest.builder().messages(List.of(UserMessage.from("hello"))).build(),
+                "gpt-5.5",
+                new StreamingChatResponseHandler() {
+                    @Override
+                    public void onPartialResponse(String partialResponse) {
+                        streamedText.updateAndGet(text -> text + partialResponse);
+                    }
+
+                    @Override
+                    public void onCompleteResponse(ChatResponse completeResponse) {
+                        completedResponse.set(completeResponse);
+                    }
+
+                    @Override
+                    public void onError(Throwable throwable) {
+                        throw new AssertionError(throwable);
+                    }
+                }
+        );
+
+        assertEquals(modelText, streamedText.get());
+        assertEquals(modelText, completedResponse.get().aiMessage().text());
+    }
 }

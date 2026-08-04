@@ -615,9 +615,9 @@ public class AgentApplicationService {
         }
 
         if (!aiMessage.hasToolExecutionRequests()) {
-            String answer = nullToEmpty(streamedResult.accumulatedText()).trim();
+            String answer = nullToEmpty(streamedResult.accumulatedText());
             if (answer.isBlank()) {
-                answer = nullToEmpty(aiMessage.text()).trim();
+                answer = nullToEmpty(aiMessage.text());
             }
             if (answer.isBlank()) {
                 Planner.SummaryResult summaryResult = planner.summarize(
@@ -629,7 +629,7 @@ public class AgentApplicationService {
                         executionScope.availableTools()
                 );
                 recordRoundTokenUsage(message, summaryResult.response(), state.currentRound());
-                answer = nullToEmpty(summaryResult.answer()).trim();
+                answer = nullToEmpty(summaryResult.answer());
             }
             if (streamedResult.streamed() && !answer.isBlank() && !cancellationRegistry.isCanceled(message.messageUid())) {
                 publishMessageDelta(message, roundIndex, "", answer, true);
@@ -771,7 +771,7 @@ public class AgentApplicationService {
     }
 
     private void completeMessage(AgentMessage message, String answer, int roundsUsed) {
-        String finalAnswer = answer == null || answer.isBlank() ? feedbackBuilder.messageCompletedDefault() : answer.trim();
+        String finalAnswer = answer == null || answer.isBlank() ? feedbackBuilder.messageCompletedDefault() : answer;
         store.updateMessageStatus(message.messageUid(), MessageStatus.COMPLETED);
         persistAssistantReply(message, finalAnswer);
         ObjectNode payload = basePayload("message completed");
@@ -819,7 +819,7 @@ public class AgentApplicationService {
 
     private void failMessage(AgentMessage message, String answer, String stopReason) {
         store.updateMessageStatus(message.messageUid(), MessageStatus.FAILED);
-        String finalAnswer = answer == null || answer.isBlank() ? feedbackBuilder.messageFailedDefault() : answer.trim();
+        String finalAnswer = answer == null || answer.isBlank() ? feedbackBuilder.messageFailedDefault() : answer;
         persistAssistantReply(message, finalAnswer);
         ObjectNode payload = basePayload(finalAnswer);
         payload.put("status", MessageStatus.FAILED.name());
@@ -973,6 +973,8 @@ public class AgentApplicationService {
         if (content == null || content.isBlank()) {
             return;
         }
+        log.info("[Agent] assistant raw content begin messageUid={} chars={}\n{}\n[Agent] assistant raw content end messageUid={}",
+                parentMessage.messageUid(), content.length(), content, parentMessage.messageUid());
         store.createAssistantMessage(UuidUtil.newUuid(), parentMessage.conversationUid(), parentMessage.messageUid(), content);
     }
 
