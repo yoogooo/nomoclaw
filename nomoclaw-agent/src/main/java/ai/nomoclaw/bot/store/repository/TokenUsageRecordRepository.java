@@ -4,6 +4,7 @@ import ai.nomoclaw.bot.store.entity.TokenUsageRecordEntity;
 import ai.nomoclaw.bot.store.mapper.TokenUsageRecordMapper;
 import com.baomidou.mybatisplus.extension.repository.CrudRepository;
 import org.springframework.stereotype.Repository;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -22,18 +23,10 @@ public class TokenUsageRecordRepository extends CrudRepository<TokenUsageRecordM
         return lambdaQuery()
                 .ge(from != null, TokenUsageRecordEntity::getOccurredTime, from)
                 .le(to != null, TokenUsageRecordEntity::getOccurredTime, to)
-                .eq(hasText(provider), TokenUsageRecordEntity::getProvider, normalize(provider))
-                .eq(hasText(modelName), TokenUsageRecordEntity::getModelName, normalize(modelName))
-                .eq(hasText(scene), TokenUsageRecordEntity::getScene, normalize(scene))
+                .eq(StringUtils.hasText(provider), TokenUsageRecordEntity::getProvider, StringUtils.trimWhitespace(provider))
+                .eq(StringUtils.hasText(modelName), TokenUsageRecordEntity::getModelName, StringUtils.trimWhitespace(modelName))
+                .eq(StringUtils.hasText(scene), TokenUsageRecordEntity::getScene, StringUtils.trimWhitespace(scene))
                 .orderByDesc(TokenUsageRecordEntity::getOccurredTime)
                 .list();
-    }
-
-    private boolean hasText(String value) {
-        return value != null && !value.isBlank();
-    }
-
-    private String normalize(String value) {
-        return value == null ? "" : value.trim();
     }
 }
