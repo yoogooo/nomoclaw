@@ -217,6 +217,8 @@ const enUS = {
       saveTipRejectedNoReusableFlow: "This reply is closer to a one-off result display and does not yet contain a reusable method, workflow, or troubleshooting experience, so it is not a good tip candidate.",
       saveTipRejectedUnavailable: "This message cannot be turned into a tip right now. Try again later or save a more complete assistant reply.",
       copy: "Copy",
+      outputTokens: "Output tokens",
+      inputTokens: "Input tokens",
       saveTip: "Save as Tip",
       tipSaved: "Tip saved",
       saveTipConfirm: "Save as tip?",

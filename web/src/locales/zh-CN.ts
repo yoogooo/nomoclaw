@@ -217,6 +217,8 @@ const zhCN = {
       saveTipRejectedNoReusableFlow: "这条内容更像一次结果展示，还没有沉淀出可复用的方法、流程或排错经验，暂时不建议保存为锦囊。",
       saveTipRejectedUnavailable: "当前这条消息暂时无法提炼为锦囊，请稍后重试或换一条完整回复再保存。",
       copy: "复制",
+      outputTokens: "输出 token",
+      inputTokens: "输入 token",
       saveTip: "保存为锦囊",
       tipSaved: "锦囊已保存",
       saveTipConfirm: "保存为锦囊？",

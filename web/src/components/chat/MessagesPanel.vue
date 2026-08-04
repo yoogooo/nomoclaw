@@ -1045,12 +1045,16 @@ onMounted(() => {
             <div class="message-time">{{ formatMessageTime(message.createdTime) }}</div>
             <div v-if="resolveMessageTokenUsage(message)" class="message-token-inline">
               <span class="message-token-item">
-                <ArrowDown :size="12" />
-                <span>{{ resolveMessageTokenUsage(message)?.input ?? 0 }}</span>
+                <UiInstantTooltip :content="t('chat.messages.outputTokens')">
+                  <ArrowDown :size="12" />
+                  <span>{{ resolveMessageTokenUsage(message)?.output ?? 0 }}</span>
+                </UiInstantTooltip>
               </span>
               <span class="message-token-item">
-                <ArrowUp :size="12" />
-                <span>{{ resolveMessageTokenUsage(message)?.output ?? 0 }}</span>
+                <UiInstantTooltip :content="t('chat.messages.inputTokens')">
+                  <ArrowUp :size="12" />
+                  <span>{{ resolveMessageTokenUsage(message)?.input ?? 0 }}</span>
+                </UiInstantTooltip>
               </span>
               <span
                 v-if="(resolveMessageTokenUsage(message)?.cachedInput ?? 0) > 0"
