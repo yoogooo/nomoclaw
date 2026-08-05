@@ -454,6 +454,7 @@
   --color-text-body-muted: #ADB2BB;
   --color-text-cool-gray: #AEB4BD;
   --color-text-slate-700: #C7CBD2;
+  --color-text-danger-strong: #FFB09A;
   --color-text-danger-body: #F1F2F4;
   --color-text-heading-deep: #F2F3F5;
   --color-text-steel: #9197A1;
@@ -534,6 +535,8 @@
   --color-overlay-gray-92: rgba(20, 21, 24, 0.92);
   --color-gradient-agent-active: linear-gradient(180deg, rgba(54, 203, 181, 0.12) 0%, rgba(54, 203, 181, 0.08) 100%);
   --color-gradient-agent-sticky: linear-gradient(180deg, rgba(14, 20, 26, 0.96) 72%, rgba(14, 20, 26, 0));
+  --color-gradient-forbidden-bg: linear-gradient(160deg, #17191D 0%, #131517 44%, #101214 100%);
+  --color-gradient-forbidden-panel: linear-gradient(145deg, #292C32 0%, #202226 100%);
   --color-gradient-cron-panel: linear-gradient(180deg, rgba(30, 31, 35, 0.92) 0%, rgba(24, 25, 28, 0.96) 42%, #18191C 100%);
   --color-bg-overlay-light: rgba(36, 37, 41, 0.84);
   --color-bg-overlay-strong: rgba(29, 30, 34, 0.96);

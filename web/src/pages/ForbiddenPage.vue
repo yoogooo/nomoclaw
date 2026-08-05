@@ -44,9 +44,7 @@ const detailMessage = computed(() => {
   display: grid;
   place-items: center;
   padding: var(--space-8);
-  background:
-    radial-gradient(circle at top, var(--color-overlay-danger-soft), transparent 36%),
-    var(--color-gradient-forbidden-bg);
+  background: var(--color-bg-page);
 }
 
 .forbidden-shell {
@@ -61,7 +59,7 @@ const detailMessage = computed(() => {
 
 .forbidden-title {
   margin: var(--space-4_5) 0 0;
-  font-size: clamp(2.625rem, 8vw, 4.5rem);
+  font-size: clamp(2.25rem, 6vw, 3.75rem);
   line-height: 0.95;
   letter-spacing: -0.06em;
   color: var(--color-text-primary);
@@ -79,7 +77,7 @@ const detailMessage = computed(() => {
   margin-top: var(--space-7);
   padding: var(--space-5_5) var(--space-6);
   border-radius: var(--radius-xl);
-  background: var(--color-gradient-forbidden-panel);
+  background: var(--color-bg-surface-soft);
   border: var(--size-1) solid var(--color-border-danger-soft);
 }
 

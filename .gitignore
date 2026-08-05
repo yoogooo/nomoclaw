@@ -112,3 +112,6 @@ desktop/tauri/src-tauri/resources/backend/*
 #.idea/
 
 logs
+.m2-local
+.pnpm-store
+.mvn
