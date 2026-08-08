@@ -98,15 +98,21 @@ export const useConversationStore = defineStore("conversation", () => {
       .filter((provider) => isProviderConfigured(provider))
       .map((provider) => ({
         ...provider,
-        models: provider.models.filter((model) => {
-          if (!model.id?.trim()) {
-            return false;
-          }
-          if (provider.local && isEmbeddingModel(model)) {
-            return false;
-          }
-          return true;
-        })
+        models: provider.models
+          .filter((model) => {
+            if (!model.id?.trim()) {
+              return false;
+            }
+            if (isEmbeddingModel(model)) {
+              return false;
+            }
+            return true;
+          })
+          .sort((left, right) => {
+            const leftName = (left.name || left.id).trim();
+            const rightName = (right.name || right.id).trim();
+            return leftName.localeCompare(rightName, undefined, { numeric: true, sensitivity: "base" });
+          })
       }))
       .filter((provider) => provider.models.length)
   );
