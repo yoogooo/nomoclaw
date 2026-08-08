@@ -3,6 +3,7 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { Bot } from "lucide-vue-next";
 import { NButton, NForm, NFormItem, NInput, NSelect } from "naive-ui";
+import AgentIconPicker from "@/components/agents/AgentIconPicker.vue";
 import type { AvatarIconOption, BasicFormModel, ManagedAgent } from "@/components/agents/agentManagementTypes";
 
 const props = defineProps<{
@@ -109,18 +110,11 @@ const isCodexAgent = computed(() => props.basicForm.agentType === "codex");
           </div>
           <div class="ui-avatar-selector-group">
             <div class="ui-avatar-section-title">{{ t("agents.basic.iconStyle") }}</div>
-            <div class="ui-avatar-icon-grid">
-              <button
-                v-for="item in avatarIconOptions"
-                :key="item.key"
-                type="button"
-                class="ui-avatar-icon-btn"
-                :class="{ active: basicForm.avatar === item.key }"
-                @click="emit('update:avatar', item.key)"
-              >
-                <component :is="item.icon" :size="16" />
-              </button>
-            </div>
+            <AgentIconPicker
+              :model-value="basicForm.avatar"
+              :options="avatarIconOptions"
+              @update:model-value="emit('update:avatar', $event)"
+            />
             <div class="ui-avatar-section-title">{{ t("agents.basic.themeColor") }}</div>
             <div class="ui-avatar-color-grid">
               <button

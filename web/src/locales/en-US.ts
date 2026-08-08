@@ -739,7 +739,7 @@ const enUS = {
       reportDir: "Report Directory",
       tmpDir: "Temp Directory",
       iconSelect: "Icon",
-      preview: "Live Preview",
+      preview: "Preview",
       iconStyle: "Icon Style",
       themeColor: "Theme Color"
     },

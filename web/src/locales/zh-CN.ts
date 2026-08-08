@@ -739,7 +739,7 @@ const zhCN = {
       reportDir: "产出目录",
       tmpDir: "临时目录",
       iconSelect: "Icon 选择",
-      preview: "实时预览",
+      preview: "预览",
       iconStyle: "图标样式",
       themeColor: "主题色"
     },

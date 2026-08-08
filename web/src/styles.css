@@ -605,6 +605,7 @@ a {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  aspect-ratio: 1;
   gap: var(--space-2);
   padding: var(--space-3);
   border: var(--size-1) solid var(--color-border-strong);
