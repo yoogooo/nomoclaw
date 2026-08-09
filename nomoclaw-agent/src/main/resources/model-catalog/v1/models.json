@@ -8,7 +8,7 @@
         "deepseek"
       ],
       "modelId": "deepseek-v4-pro",
-      "displayName": "DeepSeek-V4-Pro",
+      "displayName": "DeepSeek V4 Pro",
       "aliases": [],
       "inputModalities": [
         "text"
@@ -43,7 +43,7 @@
         "deepseek"
       ],
       "modelId": "deepseek-v4-flash",
-      "displayName": "DeepSeek-V4-Flash",
+      "displayName": "DeepSeek V4 Flash",
       "aliases": [
         "deepseek-chat",
         "deepseek-reasoner"

@@ -42,8 +42,8 @@ public final class ModelProviderDefaults {
                         "",
                         "deepseek-v4-flash",
                         List.of(
-                                model("deepseek-v4-pro", "DeepSeek-V4-Pro", List.of("text"), true, 1048576, 0, 393216, disabledUpload()),
-                                model("deepseek-v4-flash", "DeepSeek-V4-Flash", List.of("text"), true, 1048576, 0, 393216, disabledUpload())
+                                model("deepseek-v4-pro", "DeepSeek V4 Pro", List.of("text"), true, 1048576, 0, 393216, disabledUpload()),
+                                model("deepseek-v4-flash", "DeepSeek V4 Flash", List.of("text"), true, 1048576, 0, 393216, disabledUpload())
                         )
                 ),
                 provider(
