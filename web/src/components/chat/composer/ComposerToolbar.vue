@@ -66,6 +66,7 @@ function onApprovalModeSelect(key: string) {
         class="composer-model-select"
         :value="selectedModelKey"
         :options="modelOptions"
+        :consistent-menu-width="false"
         size="small"
         :placeholder="t('chat.composer.modelPlaceholder')"
         :disabled="switchingContext"

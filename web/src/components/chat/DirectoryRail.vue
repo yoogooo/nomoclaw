@@ -124,7 +124,7 @@ function toggleThemeMode() {
   <aside class="directory-rail">
     <div class="rail-top">
       <button class="rail-brand" type="button" aria-label="NomoClaw">
-        <span class="rail-brand-mark">N</span>
+        <img class="rail-brand-logo" src="/nomoclaw-theme-logo.png" alt="" />
       </button>
     </div>
 
@@ -249,15 +249,16 @@ function toggleThemeMode() {
 .rail-brand {
   width: var(--size-48);
   height: var(--size-48);
-  border: var(--size-1) solid var(--color-border-rail-brand);
-  background: var(--color-bg-rail-brand);
-  color: var(--color-text-rail-brand);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
 }
 
-.rail-brand-mark {
-  font-size: var(--size-24);
-  font-weight: 800;
-  letter-spacing: 0.04em;
+.rail-brand-logo {
+  width: 88%;
+  height: 88%;
+  object-fit: contain;
 }
 
 .rail-item.active {
@@ -374,8 +375,5 @@ function toggleThemeMode() {
     border-radius: var(--radius-md);
   }
 
-  .rail-brand-mark {
-    font-size: var(--size-20);
-  }
 }
 </style>

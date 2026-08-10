@@ -198,14 +198,26 @@ function renderModelLabel(option: any) {
   if (Array.isArray(option.children)) {
     return h("span", { style: "font-weight: 800;" }, option.label || "");
   }
-  return displayModelName(option.label || "");
+  const configuredOption = conversationStore.availableModelOptions
+    .flatMap((group) => group.children || [])
+    .find((item) => item.value === option.value);
+  return displayModelName(configuredOption?.label || option.label || option.value || "");
 }
 
 function renderModelOption(params: any) {
   if (Array.isArray(params?.option?.children)) {
     return params?.node;
   }
-  return h("div", { style: "padding-left:14px;" }, [params?.node]);
+  const modelName = displayModelName(params?.option?.label || "");
+  return h(
+    "div",
+    {
+      title: modelName,
+      style:
+        "display:block; max-width:min(32rem, calc(100vw - 72px)); padding-left:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
+    },
+    [params?.node]
+  );
 }
 
 onMounted(() => {
