@@ -325,32 +325,43 @@ public class ConversationAttachmentService {
 
     private void validateAttachments(ModelConfigDto.UploadPolicy policy,
                                      List<PendingAttachment> incoming) {
-        if (!policy.enabled()) {
-            throw new IllegalArgumentException(localizedMessages.get("api.error.uploadDisabled"));
-        }
         long totalBytes = incoming.stream().mapToLong(PendingAttachment::sizeBytes).sum();
+        LinkedHashSet<String> groups = incoming.stream().map(PendingAttachment::mimeGroup).collect(Collectors.toCollection(LinkedHashSet::new));
+        Set<String> modelGroups = groups.stream()
+                .filter(group -> !"text".equals(group))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        boolean textOnly = modelGroups.isEmpty();
         long maxTotalBytes = sanitizeNonNegative(policy.maxTotalBytes());
-        long effectiveMaxTotalBytes = maxTotalBytes > 0 ? maxTotalBytes : maxChatUploadRequestBytes;
+        long effectiveMaxTotalBytes = textOnly || maxTotalBytes <= 0 ? maxChatUploadRequestBytes : maxTotalBytes;
         if (totalBytes > effectiveMaxTotalBytes) {
             throw new IllegalArgumentException(localizedMessages.get("api.error.uploadTotalSizeExceeded", formatBytes(effectiveMaxTotalBytes)));
         }
         long policyMaxFileBytes = sanitizeNonNegative(policy.maxFileBytes());
-        long effectiveMaxFileBytes = minPositive(policyMaxFileBytes, maxChatUploadFileBytes);
+        long effectiveMaxFileBytes = textOnly
+                ? maxChatUploadFileBytes
+                : minPositive(policyMaxFileBytes, maxChatUploadFileBytes);
         if (effectiveMaxFileBytes > 0 && incoming.stream().anyMatch(item -> item.sizeBytes() > effectiveMaxFileBytes)) {
             throw new IllegalArgumentException(localizedMessages.get("api.error.uploadFileSizeExceeded", formatBytes(effectiveMaxFileBytes)));
         }
         if (incoming.isEmpty()) {
             return;
         }
-        LinkedHashSet<String> groups = incoming.stream().map(PendingAttachment::mimeGroup).collect(Collectors.toCollection(LinkedHashSet::new));
-        if (policy.singleMimeGroupOnly() && groups.size() > 1) {
+        if (textOnly) {
+            return;
+        }
+        if (!policy.enabled()) {
+            throw new IllegalArgumentException(localizedMessages.get("api.error.uploadDisabled"));
+        }
+        if (policy.singleMimeGroupOnly() && modelGroups.size() > 1) {
             throw new IllegalArgumentException(localizedMessages.get("api.error.uploadSingleMimeGroupOnly"));
         }
-        if (!policy.allowedMimeGroups().isEmpty() && groups.stream().anyMatch(group -> !policy.allowedMimeGroups().contains(group))) {
+        if (!policy.allowedMimeGroups().isEmpty() && modelGroups.stream().anyMatch(group -> !policy.allowedMimeGroups().contains(group))) {
             throw new IllegalArgumentException(localizedMessages.get("api.error.uploadMimeGroupNotAllowed"));
         }
         long imageCount = incoming.stream().filter(item -> "image".equals(item.mimeGroup())).count();
-        long nonImageCount = incoming.size() - imageCount;
+        long nonImageCount = incoming.stream()
+                .filter(item -> !"text".equals(item.mimeGroup()) && !"image".equals(item.mimeGroup()))
+                .count();
         if (imageCount > 0 && nonImageCount > 0 && !policy.allowMixedImageAndFile()) {
             throw new IllegalArgumentException(localizedMessages.get("api.error.uploadMixedImageAndFileNotAllowed"));
         }

@@ -266,6 +266,7 @@ const enUS = {
       uploadHintUploading: "Uploading files...",
       removeTip: "Remove tip",
       uploadDisabled: "The current model does not support file upload",
+      textUploadAlwaysAvailable: "Text files can always be uploaded; other files depend on model capabilities",
       singleTypeOnly: "Only one file type can be uploaded per message",
       unsupportedType: "This file type is not supported by the current model",
       mixedTypeNotAllowed: "Images and other files cannot be mixed",
@@ -283,6 +284,7 @@ const enUS = {
       attachmentPreview: "Attachment preview",
       previewImageAttachment: "Preview image {name}",
       removeAttachment: "Remove attachment {name}",
+      showInTextField: "Show in text field",
       permissionMode: {
         label: "Permission mode",
         default: "Default permissions",

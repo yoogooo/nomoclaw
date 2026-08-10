@@ -65,9 +65,6 @@ export function validateFilesAgainstPolicy(
   files: File[],
   translate: (key: string, params?: Record<string, any>) => string
 ) {
-  if (!policy.enabled) {
-    throw new Error(translate("chat.composer.uploadDisabled"));
-  }
   const combinedGroups = new Set<string>([
     ...existing.map((item) => item.mimeGroup),
     ...files.map((file) => resolveMimeGroup(file))
@@ -75,10 +72,28 @@ export function validateFilesAgainstPolicy(
   if (!combinedGroups.size) {
     return;
   }
-  if (policy.singleMimeGroupOnly && combinedGroups.size > 1) {
+  const modelGroups = [...combinedGroups].filter((group) => group !== "text");
+  const textOnly = modelGroups.length === 0;
+  if (!policy.enabled && !textOnly) {
+    throw new Error(translate("chat.composer.uploadDisabled"));
+  }
+
+  const maxFileBytes = policy.maxFileBytes || 0;
+  if (!textOnly && maxFileBytes > 0 && files.some((file) => file.size > maxFileBytes)) {
+    throw new Error(translate("chat.composer.maxFileSize", { size: formatBytes(maxFileBytes) }));
+  }
+  const totalBytes = existing.reduce((sum, item) => sum + item.sizeBytes, 0) + files.reduce((sum, file) => sum + file.size, 0);
+  const maxTotalBytes = policy.maxTotalBytes || 0;
+  if (!textOnly && maxTotalBytes > 0 && totalBytes > maxTotalBytes) {
+    throw new Error(translate("chat.composer.maxTotalSize", { size: formatBytes(maxTotalBytes) }));
+  }
+  if (textOnly) {
+    return;
+  }
+  if (policy.singleMimeGroupOnly && modelGroups.length > 1) {
     throw new Error(translate("chat.composer.singleTypeOnly"));
   }
-  const unsupportedGroup = [...combinedGroups].find((group) =>
+  const unsupportedGroup = modelGroups.find((group) =>
     policy.allowedMimeGroups.length && !policy.allowedMimeGroups.includes(group)
   );
   if (unsupportedGroup) {
@@ -88,18 +103,9 @@ export function validateFilesAgainstPolicy(
   const existingImageCount = existing.filter((item) => item.mimeGroup === "image").length;
   const incomingImageCount = files.filter((file) => resolveMimeGroup(file) === "image").length;
   const imageCount = existingImageCount + incomingImageCount;
-  const totalCount = existing.length + files.length;
-  const nonImageCount = totalCount - imageCount;
-  const maxFileBytes = policy.maxFileBytes || 0;
-  if (maxFileBytes > 0 && files.some((file) => file.size > maxFileBytes)) {
-    throw new Error(translate("chat.composer.maxFileSize", { size: formatBytes(maxFileBytes) }));
-  }
-  const totalBytes = existing.reduce((sum, item) => sum + item.sizeBytes, 0) + files.reduce((sum, file) => sum + file.size, 0);
-  const maxTotalBytes = policy.maxTotalBytes || 0;
-  if (maxTotalBytes > 0 && totalBytes > maxTotalBytes) {
-    throw new Error(translate("chat.composer.maxTotalSize", { size: formatBytes(maxTotalBytes) }));
-  }
-
+  const existingNonTextCount = existing.filter((item) => item.mimeGroup !== "text").length;
+  const incomingNonTextCount = files.filter((file) => resolveMimeGroup(file) !== "text").length;
+  const nonImageCount = existingNonTextCount + incomingNonTextCount - imageCount;
   if (imageCount > 0 && nonImageCount > 0 && !policy.allowMixedImageAndFile) {
     throw new Error(translate("chat.composer.mixedTypeNotAllowed"));
   }

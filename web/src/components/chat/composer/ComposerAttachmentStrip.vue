@@ -1,15 +1,12 @@
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
-import { FileText, X } from "lucide-vue-next";
+import { FileText, ScanText, X } from "lucide-vue-next";
 import type { ConversationAttachment } from "@/types/api";
-
-defineProps<{
-  attachments: ConversationAttachment[];
-}>();
 
 const emit = defineEmits<{
   (e: "preview", fileUrl: string): void;
   (e: "remove", fileUrl: string): void;
+  (e: "show-text", fileUrl: string): void;
 }>();
 const { t } = useI18n();
 
@@ -26,6 +23,11 @@ function formatFileSize(sizeBytes: number) {
 function isImageAttachment(attachment: ConversationAttachment) {
   return attachment.mimeGroup === "image" && attachment.previewable;
 }
+
+const props = defineProps<{
+  attachments: ConversationAttachment[];
+  textContents: Record<string, string>;
+}>();
 </script>
 
 <template>
@@ -49,10 +51,17 @@ function isImageAttachment(attachment: ConversationAttachment) {
           class="composer-attachment-preview"
         />
       </button>
+      <div v-else-if="props.textContents[attachment.fileUrl] !== undefined" class="composer-text-attachment-card">
+        <span class="composer-text-attachment-icon"><ScanText :size="25" /></span>
+        <div class="composer-text-attachment-content">
+          <span class="composer-text-attachment-title">{{ props.textContents[attachment.fileUrl].slice(0, 18) || attachment.name }}...</span>
+          <button class="composer-text-attachment-show" type="button" @click="emit('show-text', attachment.fileUrl)">
+            {{ t('chat.composer.showInTextField') }} <span aria-hidden="true">›</span>
+          </button>
+        </div>
+      </div>
       <div v-else class="composer-attachment-file-pill">
-        <span class="composer-attachment-icon">
-          <FileText :size="14" />
-        </span>
+        <span class="composer-attachment-icon"><FileText :size="14" /></span>
         <span class="composer-attachment-name">{{ attachment.name }}</span>
       </div>
       <button class="composer-attachment-remove" type="button" :aria-label="t('chat.composer.removeAttachment', { name: attachment.name })" @click="emit('remove', attachment.fileUrl)">
@@ -108,6 +117,56 @@ function isImageAttachment(attachment: ConversationAttachment) {
   border: var(--size-1) solid var(--color-border-soft);
   border-radius: var(--radius-pill);
   background: var(--color-bg-surface-soft);
+}
+
+.composer-text-attachment-card {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2_5);
+  width: min(450px, calc(100vw - 96px));
+  min-height: 82px;
+  padding: var(--space-2_5) var(--space-3);
+  border: var(--size-1) solid var(--color-border-soft);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-bg-surface-soft) 86%, var(--color-bg-surface));
+}
+
+.composer-text-attachment-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  flex: none;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface-mute);
+  color: var(--color-text-subtle);
+}
+
+.composer-text-attachment-content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.composer-text-attachment-title {
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: var(--text-body-size);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-text-attachment-show {
+  width: fit-content;
+  padding: 0;
+  border: 0;
+  border-bottom: var(--size-1) solid currentColor;
+  background: transparent;
+  color: var(--color-text-subtle);
+  font: inherit;
+  cursor: pointer;
 }
 
 .composer-attachment-icon {

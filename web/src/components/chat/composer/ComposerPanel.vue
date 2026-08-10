@@ -21,6 +21,7 @@ const fileInputRef = ref<HTMLInputElement | null>(null);
 const isDragActive = ref(false);
 const previewImageUrl = ref("");
 const isImeComposing = ref(false);
+const largePasteThreshold = 5000;
 
 const isRunningCurrentConversation = computed(() =>
   (() => {
@@ -31,10 +32,11 @@ const isRunningCurrentConversation = computed(() =>
 const isMessageEmpty = computed(() => conversationStore.draftMessage.trim().length === 0);
 const isSubmitDisabled = computed(() => !isRunningCurrentConversation.value && isMessageEmpty.value);
 const appliedJinnang = computed(() => jinnangStore.tips.find((item) => item.id === appliedJinnangId.value) || null);
+const pastedTextByAttachmentUrl = ref<Record<string, string>>({});
 const uploadHint = computed(() => {
   const policy = conversationStore.currentUploadPolicy;
   if (!policy.enabled) {
-    return conversationStore.uploadDisabledReason || t("chat.composer.uploadDisabled");
+    return t("chat.composer.textUploadAlwaysAvailable");
   }
   const sameTypeHint = policy.singleMimeGroupOnly ? t("chat.composer.sameTypeOnlyHint") : t("chat.composer.mixedTypeHint");
   return t("chat.composer.uploadLimitHint", {
@@ -87,10 +89,6 @@ function triggerFilePicker() {
     conversationStore.guideToModelSetup();
     return;
   }
-  if (conversationStore.uploadDisabledReason) {
-    discreteMessage.info(conversationStore.uploadDisabledReason);
-    return;
-  }
   fileInputRef.value?.click();
 }
 
@@ -137,10 +135,6 @@ async function onDrop(event: DragEvent) {
     conversationStore.guideToModelSetup();
     return;
   }
-  if (conversationStore.uploadDisabledReason) {
-    discreteMessage.info(conversationStore.uploadDisabledReason);
-    return;
-  }
   const files = Array.from(event.dataTransfer?.files || []);
   if (files.length) {
     try {
@@ -164,6 +158,48 @@ async function onFileChange(event: Event) {
     // Always reset so selecting the same file again will trigger change.
     target.value = "";
   }
+}
+
+function restorePastedText(text: string, event: ClipboardEvent) {
+  const textarea = event.target instanceof HTMLTextAreaElement ? event.target : null;
+  const start = textarea?.selectionStart ?? conversationStore.draftMessage.length;
+  const end = textarea?.selectionEnd ?? start;
+  const current = textarea?.value ?? conversationStore.draftMessage;
+  conversationStore.draftMessage = `${current.slice(0, start)}${text}${current.slice(end)}`;
+}
+
+async function onPaste(event: ClipboardEvent) {
+  const text = event.clipboardData?.getData("text/plain") || "";
+  if (text.length <= largePasteThreshold) {
+    return;
+  }
+
+  event.preventDefault();
+  const file = new File([text], `pasted-text-${Date.now()}.txt`, { type: "text/plain" });
+  try {
+    const uploaded = await conversationStore.uploadFiles([file]);
+    if (!uploaded.length) {
+      restorePastedText(text, event);
+      return;
+    }
+    for (const attachment of uploaded) {
+      pastedTextByAttachmentUrl.value[attachment.fileUrl] = text;
+    }
+  } catch {
+    restorePastedText(text, event);
+  }
+}
+
+function removeDraftAttachment(fileUrl: string) {
+  delete pastedTextByAttachmentUrl.value[fileUrl];
+  conversationStore.removeDraftAttachment(fileUrl);
+}
+
+function showTextAttachment(fileUrl: string) {
+  const text = pastedTextByAttachmentUrl.value[fileUrl];
+  if (text === undefined) return;
+  conversationStore.draftMessage = `${conversationStore.draftMessage}${conversationStore.draftMessage ? "\n" : ""}${text}`;
+  removeDraftAttachment(fileUrl);
 }
 
 function onModelChange(value: string) {
@@ -245,6 +281,7 @@ onBeforeUnmount(() => {
       <ComposerTextarea
         :model-value="conversationStore.draftMessage"
         @update:model-value="conversationStore.draftMessage = $event"
+        @paste="onPaste"
         @keydown="onKeydown"
         @compositionstart="onCompositionStart"
         @compositionend="onCompositionEnd"
@@ -252,8 +289,10 @@ onBeforeUnmount(() => {
 
       <ComposerAttachmentStrip
         :attachments="conversationStore.draftAttachments"
+        :text-contents="pastedTextByAttachmentUrl"
         @preview="openImagePreview"
-        @remove="conversationStore.removeDraftAttachment($event)"
+        @remove="removeDraftAttachment"
+        @show-text="showTextAttachment"
       />
 
       <JinnangPicker
@@ -278,7 +317,7 @@ onBeforeUnmount(() => {
           :model-options="conversationStore.availableModelOptions"
           :approval-mode="conversationStore.approvalMode"
           :show-jinnang-picker="showJinnangPicker"
-          :upload-disabled="Boolean(conversationStore.uploadDisabledReason)"
+          :upload-disabled="false"
           :uploading-files="conversationStore.uploadingFiles"
           :switching-context="conversationStore.loading"
           :is-running-current-conversation="isRunningCurrentConversation"

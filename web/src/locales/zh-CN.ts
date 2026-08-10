@@ -266,6 +266,7 @@ const zhCN = {
       uploadHintUploading: "文件上传中...",
       removeTip: "删除锦囊",
       uploadDisabled: "当前模型不支持上传文件",
+      textUploadAlwaysAvailable: "文本文件可直接上传；图片等文件仍受模型能力限制",
       singleTypeOnly: "同一条消息只能上传同一类型的文件",
       unsupportedType: "当前模型不支持该类型文件",
       mixedTypeNotAllowed: "图片和其他文件不能混合上传",
@@ -283,6 +284,7 @@ const zhCN = {
       attachmentPreview: "附件预览",
       previewImageAttachment: "预览图片 {name}",
       removeAttachment: "移除附件 {name}",
+      showInTextField: "显示到文本框",
       permissionMode: {
         label: "权限模式",
         default: "默认权限",

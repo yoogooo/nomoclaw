@@ -8,6 +8,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: "update:modelValue", value: string): void;
+  (e: "paste", event: ClipboardEvent): void;
   (e: "keydown", event: KeyboardEvent): void;
   (e: "compositionstart"): void;
   (e: "compositionend"): void;
@@ -70,6 +71,7 @@ watch(
     class="composer-textarea"
     :placeholder="t('chat.composer.placeholder')"
     @input="onInput"
+    @paste="emit('paste', $event)"
     @keydown="emit('keydown', $event)"
     @compositionstart="emit('compositionstart')"
     @compositionend="emit('compositionend')"

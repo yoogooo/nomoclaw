@@ -144,17 +144,17 @@ export function createConversationComposerModule(
   async function uploadFiles(fileList: FileList | File[]) {
     const files = Array.from(fileList || []).filter(Boolean);
     if (!files.length) {
-      return;
+      return [];
     }
     if (!state.hasAnyConfiguredModel.value) {
       await guideToModelSetup();
-      return;
+      return [];
     }
     try {
       validateFilesAgainstPolicy(state.currentUploadPolicy.value, state.draftAttachments.value, files, storeDeps.tr);
     } catch (error) {
       storeDeps.message.error(error instanceof Error ? error.message : storeDeps.tr("toast.uploadRuleNotMatch"));
-      return;
+      return [];
     }
     const lockedProvider = state.selectedModelProvider.value;
     const lockedModelName = state.selectedModelName.value;
@@ -173,6 +173,7 @@ export function createConversationComposerModule(
         modelName: effectiveModelName
       });
       state.draftAttachments.value = [...state.draftAttachments.value, ...uploaded.items];
+      return uploaded.items;
     } finally {
       state.uploadingFiles.value = false;
     }
