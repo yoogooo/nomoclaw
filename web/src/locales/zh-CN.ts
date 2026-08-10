@@ -976,7 +976,6 @@ const zhCN = {
       urlPolicy: "URL 策略",
       urlPolicyFixed: "固定官方端点",
       urlPolicyCustom: "允许自定义",
-      uploadPolicyTitle: "文件上传策略",
       uploadEnabled: "允许上传",
       singleMimeGroupOnly: "仅允许单一类型",
       allowMixedImageAndFile: "允许图片与文件混传",

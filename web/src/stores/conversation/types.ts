@@ -25,7 +25,7 @@ import type {
   ConversationSummaryPage,
   ModelConfig,
   ModelProviderOption,
-  UploadPolicy
+  ModelCapabilities
 } from "@/types/api";
 
 export interface ApprovalState {
@@ -100,7 +100,7 @@ export interface ConversationStoreStateRefs {
   hasAnyConfiguredModel: ComputedRef<boolean>;
   currentModelOption: ComputedRef<ModelProviderOption | null>;
   selectedModelKey: ComputedRef<string>;
-  currentUploadPolicy: ComputedRef<UploadPolicy>;
+  currentCapabilities: ComputedRef<ModelCapabilities>;
   uploadDisabledReason: ComputedRef<string>;
 }
 

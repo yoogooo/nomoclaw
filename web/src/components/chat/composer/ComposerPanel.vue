@@ -34,16 +34,10 @@ const isSubmitDisabled = computed(() => !isRunningCurrentConversation.value && i
 const appliedJinnang = computed(() => jinnangStore.tips.find((item) => item.id === appliedJinnangId.value) || null);
 const pastedTextByAttachmentUrl = ref<Record<string, string>>({});
 const uploadHint = computed(() => {
-  const policy = conversationStore.currentUploadPolicy;
-  if (!policy.enabled) {
-    return t("chat.composer.textUploadAlwaysAvailable");
-  }
-  const sameTypeHint = policy.singleMimeGroupOnly ? t("chat.composer.sameTypeOnlyHint") : t("chat.composer.mixedTypeHint");
-  return t("chat.composer.uploadLimitHint", {
-    maxImages: policy.maxImagesPerMessage,
-    maxFiles: policy.maxFilesPerMessage,
-    sameTypeHint
-  });
+  const capabilities = conversationStore.currentCapabilities;
+  const media = [capabilities.imageRecognition && "图片", capabilities.audioRecognition && "音频", capabilities.videoRecognition && "视频"]
+    .filter(Boolean).join("、");
+  return media ? `支持文本、PDF 和${media}附件` : "支持文本和 PDF 附件";
 });
 
 function onKeydown(event: KeyboardEvent) {

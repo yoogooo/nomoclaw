@@ -13,7 +13,7 @@ import { useModelGateStore } from "@/stores/modelGate";
 import { useRuntimeLogStore } from "@/stores/runtimeLog";
 import { resolveApprovalFromPayload, resolveApprovalFromStep } from "@/utils/approvalRenderer";
 import { buildModelKey, isEmbeddingModel, isProviderConfigured } from "./modelSelection";
-import { normalizeUploadPolicy } from "./uploadPolicy";
+import { normalizeCapabilities } from "./attachmentCapabilities";
 import { createConversationComposerModule } from "./composer";
 import { createConversationEventsModule } from "./events";
 import { createConversationListModule } from "./list";
@@ -121,17 +121,17 @@ export const useConversationStore = defineStore("conversation", () => {
       .map((provider) => ({
         label: provider.name,
         key: provider.id,
-        children: provider.models.map((model) => ({
+        children: provider.models.filter((model) => model.modelType === "TEXT_GENERATION").map((model) => ({
           label: model.name || model.id,
           value: buildModelKey(provider.id, model.id),
           providerId: provider.id,
           providerLabel: provider.name,
-          capabilityTags: model.capabilities || []
+          capabilityTags: model.capabilities
         }))
       }))
       .filter((group) => group.children.length)
   );
-  const hasAnyConfiguredModel = computed(() => configuredProviders.value.length > 0);
+  const hasAnyConfiguredModel = computed(() => availableModelOptions.value.length > 0);
   const currentModelOption = computed<ModelProviderOption | null>(() => {
     if (!selectedModelProvider.value || !selectedModelName.value) {
       return null;
@@ -144,13 +144,10 @@ export const useConversationStore = defineStore("conversation", () => {
       ? buildModelKey(selectedModelProvider.value, selectedModelName.value)
       : ""
   );
-  const currentUploadPolicy = computed(() => normalizeUploadPolicy(currentModelOption.value?.uploadPolicy));
+  const currentCapabilities = computed(() => normalizeCapabilities(currentModelOption.value?.capabilities));
   const uploadDisabledReason = computed(() => {
     if (!selectedModelProvider.value || !selectedModelName.value) {
       return tr("toast.chooseModelFirst");
-    }
-    if (!currentUploadPolicy.value.enabled) {
-      return tr("chat.composer.uploadDisabled");
     }
     return "";
   });
@@ -197,7 +194,7 @@ export const useConversationStore = defineStore("conversation", () => {
       hasAnyConfiguredModel,
       currentModelOption,
       selectedModelKey,
-      currentUploadPolicy,
+      currentCapabilities,
       uploadDisabledReason
     },
     deps: {
@@ -361,7 +358,7 @@ export const useConversationStore = defineStore("conversation", () => {
     approvalMode,
     setApprovalMode: runtimeModule.setApprovalMode,
     selectedModelKey,
-    currentUploadPolicy,
+    currentCapabilities,
     uploadDisabledReason,
     hasAnyConfiguredModel,
     guideToModelSetup: composerModule.guideToModelSetup,

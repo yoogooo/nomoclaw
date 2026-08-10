@@ -976,7 +976,6 @@ const enUS = {
       urlPolicy: "URL Policy",
       urlPolicyFixed: "Official endpoint only",
       urlPolicyCustom: "Customizable",
-      uploadPolicyTitle: "File Upload Policy",
       uploadEnabled: "Upload Enabled",
       singleMimeGroupOnly: "Single type only",
       allowMixedImageAndFile: "Allow mixed image and file",

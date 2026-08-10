@@ -27,26 +27,24 @@ public record ModelConfigDto(
             String id,
             String name,
             String modelType,
-            List<String> capabilities,
-            boolean reasoning,
+            ModelCapabilities capabilities,
             Integer contextWindow,
             Integer maxInputTokens,
             Integer maxOutputTokens,
-            UploadPolicy uploadPolicy,
             boolean catalogMatched,
             String catalogSource
     ) {
     }
 
-    public record UploadPolicy(
-            boolean enabled,
-            List<String> allowedMimeGroups,
-            Integer maxFilesPerMessage,
-            Integer maxImagesPerMessage,
-            Long maxFileBytes,
-            Long maxTotalBytes,
-            boolean singleMimeGroupOnly,
-            boolean allowMixedImageAndFile
+    public record ModelCapabilities(
+            boolean toolCalling,
+            boolean imageRecognition,
+            boolean audioRecognition,
+            boolean videoRecognition,
+            boolean reasoning
     ) {
+        public static ModelCapabilities none() {
+            return new ModelCapabilities(false, false, false, false, false);
+        }
     }
 }

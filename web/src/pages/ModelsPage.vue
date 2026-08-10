@@ -9,6 +9,7 @@ import {
   NForm,
   NFormItem,
   NInput,
+  NCheckbox,
   NSelect,
   NTag
 } from "naive-ui";
@@ -17,9 +18,10 @@ import AppPageHeader from "@/components/layout/AppPageHeader.vue";
 import { modelApi } from "@/api/modelApi";
 import { message } from "@/discrete";
 import { useModelGateStore } from "@/stores/modelGate";
-import type { ModelConfig, ModelProvider, ModelProviderOption } from "@/types/api";
+import type { ModelCapabilities, ModelConfig, ModelProvider, ModelProviderOption } from "@/types/api";
 
 type ProviderStatusType = "success" | "warning";
+const modelTypeOptions = ["TEXT_GENERATION", "IMAGE_GENERATION", "VIDEO_GENERATION", "AUDIO_GENERATION", "AUDIO_TRANSCRIPTION", "EMBEDDING", "REALTIME"].map((value) => ({ label: value, value }));
 const { t } = useI18n();
 
 const loading = ref(false);
@@ -77,25 +79,19 @@ function normalizeModel(model: ModelProviderOption): ModelProviderOption {
   return {
     id: model.id ?? "",
     name: model.name ?? "",
-    modelType: model.modelType ?? "CHAT",
-    capabilities: Array.isArray(model.capabilities) ? model.capabilities.filter(Boolean) : [],
-    reasoning: Boolean(model.reasoning),
+    modelType: model.modelType ?? "TEXT_GENERATION",
+    capabilities: normalizeCapabilities(model.capabilities),
     contextWindow: Number.isFinite(model.contextWindow) ? model.contextWindow : 0,
     maxInputTokens: Number.isFinite(model.maxInputTokens) ? model.maxInputTokens : 0,
     maxOutputTokens: Number.isFinite(model.maxOutputTokens) ? model.maxOutputTokens : 0,
-    uploadPolicy: {
-      enabled: Boolean(model.uploadPolicy?.enabled),
-      allowedMimeGroups: Array.isArray(model.uploadPolicy?.allowedMimeGroups) ? model.uploadPolicy?.allowedMimeGroups.filter(Boolean) : [],
-      maxFilesPerMessage: Number.isFinite(model.uploadPolicy?.maxFilesPerMessage) ? model.uploadPolicy!.maxFilesPerMessage : 0,
-      maxImagesPerMessage: Number.isFinite(model.uploadPolicy?.maxImagesPerMessage) ? model.uploadPolicy!.maxImagesPerMessage : 0,
-      maxFileBytes: Number.isFinite(model.uploadPolicy?.maxFileBytes) ? model.uploadPolicy!.maxFileBytes : 0,
-      maxTotalBytes: Number.isFinite(model.uploadPolicy?.maxTotalBytes) ? model.uploadPolicy!.maxTotalBytes : 0,
-      singleMimeGroupOnly: Boolean(model.uploadPolicy?.singleMimeGroupOnly),
-      allowMixedImageAndFile: Boolean(model.uploadPolicy?.allowMixedImageAndFile)
-    },
     catalogMatched: Boolean(model.catalogMatched),
     catalogSource: model.catalogSource ?? ""
   };
+}
+
+function normalizeCapabilities(capabilities?: Partial<ModelCapabilities> | null): ModelCapabilities {
+  return { toolCalling: Boolean(capabilities?.toolCalling), imageRecognition: Boolean(capabilities?.imageRecognition),
+    audioRecognition: Boolean(capabilities?.audioRecognition), videoRecognition: Boolean(capabilities?.videoRecognition), reasoning: Boolean(capabilities?.reasoning) };
 }
 
 function normalizeProvider(provider: ModelProvider): ModelProvider {
@@ -150,22 +146,11 @@ async function addModel() {
   provider.models.push({
     id: "",
     name: "",
-    modelType: "CHAT",
-    capabilities: [],
-    reasoning: false,
+    modelType: "TEXT_GENERATION",
+    capabilities: normalizeCapabilities(),
     contextWindow: 0,
     maxInputTokens: 0,
     maxOutputTokens: 0,
-    uploadPolicy: {
-      enabled: false,
-      allowedMimeGroups: [],
-      maxFilesPerMessage: 0,
-      maxImagesPerMessage: 0,
-      maxFileBytes: 0,
-      maxTotalBytes: 0,
-      singleMimeGroupOnly: false,
-      allowMixedImageAndFile: false
-    },
     catalogMatched: false,
     catalogSource: ""
   });
@@ -212,22 +197,11 @@ async function saveEditor() {
     provider.models = provider.models.map((item) => ({
       id: item.id.trim(),
       name: item.name.trim() || item.id.trim(),
-      modelType: item.modelType || "CHAT",
-      capabilities: [],
-      reasoning: false,
+      modelType: item.modelType || "TEXT_GENERATION",
+      capabilities: normalizeCapabilities(item.capabilities),
       contextWindow: 0,
       maxInputTokens: 0,
       maxOutputTokens: 0,
-      uploadPolicy: {
-        enabled: false,
-        allowedMimeGroups: [],
-        maxFilesPerMessage: 0,
-        maxImagesPerMessage: 0,
-        maxFileBytes: 0,
-        maxTotalBytes: 0,
-        singleMimeGroupOnly: false,
-        allowMixedImageAndFile: false
-      },
       catalogMatched: false,
       catalogSource: "request"
     }));
@@ -243,29 +217,6 @@ async function saveEditor() {
   } finally {
     saving.value = false;
   }
-}
-
-function modelCapabilityTags(model: ModelProviderOption) {
-  const tags: string[] = [];
-  if (model.capabilities?.includes("image")) tags.push("Image");
-  if (model.capabilities?.includes("pdf")) tags.push("PDF");
-  if (model.capabilities?.includes("audio")) tags.push("Audio");
-  if (model.capabilities?.includes("video")) tags.push("Video");
-  if (!tags.length) tags.push("Text");
-  return tags;
-}
-
-function uploadSummary(model: ModelProviderOption) {
-  const policy = model.uploadPolicy;
-  if (!policy?.enabled) {
-    return t("models.labels.uploadAutoDisabled");
-  }
-  const groups = policy.allowedMimeGroups.length ? policy.allowedMimeGroups.join(" / ") : "any";
-  return t("models.labels.uploadAutoSummary", {
-    types: groups,
-    maxImages: policy.maxImagesPerMessage,
-    maxFiles: policy.maxFilesPerMessage
-  });
 }
 
 function isCodexProvider(provider: ModelProvider) {
@@ -515,25 +466,17 @@ onMounted(() => {
             <n-form-item :label="t('models.labels.displayName')">
               <n-input v-model:value="model.name" placeholder="GPT-5.4" />
             </n-form-item>
-            <div class="model-auto-meta">
-              <div class="model-auto-row">
-                <span>{{ t("models.labels.catalogMatch") }}</span>
-                <n-tag :type="model.catalogMatched ? 'success' : 'warning'" size="small">
-                  {{ model.catalogMatched ? t("models.labels.catalogMatched") : t("models.labels.catalogUnknown") }}
-                </n-tag>
-              </div>
-              <div class="model-tag-row">
-                <n-tag v-for="capability in modelCapabilityTags(model)" :key="capability" size="small">
-                  {{ capability }}
-                </n-tag>
-              </div>
-              <div class="model-auto-row">
-                <span>{{ t("models.labels.uploadPolicyTitle") }}</span>
-                <span>{{ uploadSummary(model) }}</span>
-              </div>
-              <div class="model-auto-row">
-                <span>{{ t("models.labels.catalogSource") }}</span>
-                <span>{{ model.catalogSource || "-" }}</span>
+            <n-form-item label="Model Type">
+              <n-select v-model:value="model.modelType" :options="modelTypeOptions" />
+            </n-form-item>
+            <div class="model-capability-section">
+              <div class="model-capability-title">支持功能</div>
+              <div class="model-capabilities">
+                <n-checkbox v-model:checked="model.capabilities.toolCalling">工具调用</n-checkbox>
+                <n-checkbox v-model:checked="model.capabilities.imageRecognition">图片识别</n-checkbox>
+                <n-checkbox v-model:checked="model.capabilities.audioRecognition">音频识别</n-checkbox>
+                <n-checkbox v-model:checked="model.capabilities.videoRecognition">视频识别</n-checkbox>
+                <n-checkbox v-model:checked="model.capabilities.reasoning">思考模式</n-checkbox>
               </div>
             </div>
           </section>
@@ -607,7 +550,6 @@ onMounted(() => {
   justify-content: space-between;
   margin: var(--space-4) 0;
   padding: var(--space-2) 0;
-  background: var(--color-bg-surface);
   border-bottom: var(--size-1) solid var(--color-border-soft);
 }
 
@@ -648,32 +590,22 @@ onMounted(() => {
   gap: var(--space-2_5);
 }
 
-.model-auto-meta {
+.model-capability-section {
   display: grid;
   gap: var(--space-2);
-  padding: var(--space-3);
-  border: var(--size-1) solid var(--color-border-soft);
-  border-radius: var(--radius-lg);
-  background: var(--color-bg-surface);
+  margin-top: var(--space-2);
 }
 
-.model-auto-row {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-3);
-  color: var(--color-text-secondary);
-  font-size: var(--text-caption-size);
+.model-capability-title {
+  color: var(--color-text-primary);
+  font-weight: 600;
 }
 
-.model-auto-row span:last-child {
-  text-align: right;
-  word-break: break-word;
-}
-
-.model-tag-row {
+.model-capabilities {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-1_5);
+  gap: var(--space-3);
+  margin-top: var(--space-1);
 }
 
 .provider-form :deep(.n-form-item) {

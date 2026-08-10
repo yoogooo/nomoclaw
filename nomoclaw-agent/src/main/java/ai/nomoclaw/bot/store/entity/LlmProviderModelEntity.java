@@ -16,11 +16,9 @@ public class LlmProviderModelEntity {
     private String modelName;
     private String modelType;
     private String capabilitiesJson;
-    private Integer reasoning;
     private Integer contextWindow;
     private Integer maxInputTokens;
     private Integer maxOutputTokens;
-    private String uploadPolicyJson;
     private Integer sortIndex;
     private String status;
     private LocalDateTime createdTime;
@@ -74,14 +72,6 @@ public class LlmProviderModelEntity {
         this.capabilitiesJson = capabilitiesJson;
     }
 
-    public Integer getReasoning() {
-        return reasoning;
-    }
-
-    public void setReasoning(Integer reasoning) {
-        this.reasoning = reasoning;
-    }
-
     public Integer getContextWindow() {
         return contextWindow;
     }
@@ -104,14 +94,6 @@ public class LlmProviderModelEntity {
 
     public void setMaxInputTokens(Integer maxInputTokens) {
         this.maxInputTokens = maxInputTokens;
-    }
-
-    public String getUploadPolicyJson() {
-        return uploadPolicyJson;
-    }
-
-    public void setUploadPolicyJson(String uploadPolicyJson) {
-        this.uploadPolicyJson = uploadPolicyJson;
     }
 
     public Integer getSortIndex() {

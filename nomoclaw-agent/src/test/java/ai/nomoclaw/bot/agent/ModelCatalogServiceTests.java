@@ -37,10 +37,8 @@ class ModelCatalogServiceTests {
         var metadata = service.resolve("openai", "gpt-4.1");
 
         assertThat(metadata.matched()).isTrue();
-        assertThat(metadata.modelType()).isEqualTo("CHAT");
-        assertThat(metadata.inputModalities()).contains("text", "image");
-        assertThat(metadata.uploadPolicy().enabled()).isTrue();
-        assertThat(metadata.uploadPolicy().maxImagesPerMessage()).isEqualTo(1500);
+        assertThat(metadata.modelType()).isEqualTo("TEXT_GENERATION");
+        assertThat(metadata.capabilities().imageRecognition()).isTrue();
     }
 
     @Test
@@ -60,11 +58,10 @@ class ModelCatalogServiceTests {
         assertThat(qwenMax.contextWindowTokens()).isEqualTo(1000000);
         assertThat(qwenMax.maxOutputTokens()).isEqualTo(65536);
         assertThat(qwen.displayName()).isEqualTo("Qwen3.7 Plus");
-        assertThat(qwen.inputModalities()).contains("text", "image", "video");
+        assertThat(qwen.capabilities().imageRecognition()).isTrue();
+        assertThat(qwen.capabilities().videoRecognition()).isTrue();
         assertThat(qwen.contextWindowTokens()).isEqualTo(1000000);
         assertThat(qwen.maxOutputTokens()).isEqualTo(65536);
-        assertThat(qwen.uploadPolicy().enabled()).isTrue();
-        assertThat(qwen.uploadPolicy().maxImagesPerMessage()).isEqualTo(2048);
         assertThat(global.source()).isEqualTo("bundled");
     }
 
@@ -76,9 +73,8 @@ class ModelCatalogServiceTests {
         var metadata = service.resolve("openai", "unknown-model");
 
         assertThat(metadata.matched()).isFalse();
-        assertThat(metadata.modelType()).isEqualTo("CHAT");
-        assertThat(metadata.inputModalities()).containsExactly("text");
-        assertThat(metadata.uploadPolicy().enabled()).isFalse();
+        assertThat(metadata.modelType()).isEqualTo("TEXT_GENERATION");
+        assertThat(metadata.capabilities().imageRecognition()).isFalse();
         assertThat(metadata.source()).isEqualTo("fallback");
     }
 
@@ -90,8 +86,7 @@ class ModelCatalogServiceTests {
         var metadata = service.resolve("openai", "gpt-5.2");
 
         assertThat(metadata.matched()).isFalse();
-        assertThat(metadata.inputModalities()).containsExactly("text");
-        assertThat(metadata.uploadPolicy().enabled()).isFalse();
+        assertThat(metadata.capabilities().imageRecognition()).isFalse();
         assertThat(metadata.source()).isEqualTo("fallback");
     }
 
@@ -130,24 +125,14 @@ class ModelCatalogServiceTests {
                       "providerIds": ["openai"],
                       "modelId": "gpt-4.1",
                       "displayName": "Custom GPT-4.1",
-                      "modelType": "CHAT",
+                      "modelType": "TEXT_GENERATION",
                       "aliases": [],
                       "inputModalities": ["text"],
                       "outputModalities": ["text"],
-                      "reasoning": true,
+                      "capabilities": {"toolCalling": false, "imageRecognition": false, "audioRecognition": false, "videoRecognition": false, "reasoning": true},
                       "contextWindowTokens": 123,
                       "maxInputTokens": 0,
                       "maxOutputTokens": 0,
-                      "uploadPolicy": {
-                        "enabled": false,
-                        "allowedMimeGroups": [],
-                        "maxFilesPerMessage": 0,
-                        "maxImagesPerMessage": 0,
-                        "maxFileBytes": 0,
-                        "maxTotalBytes": 0,
-                        "singleMimeGroupOnly": false,
-                        "allowMixedImageAndFile": false
-                      },
                       "sourceRefs": [],
                       "lastVerifiedAt": "2026-04-15",
                       "confidence": "high"
@@ -162,7 +147,7 @@ class ModelCatalogServiceTests {
         assertThat(metadata.matched()).isTrue();
         assertThat(metadata.displayName()).isEqualTo("Custom GPT-4.1");
         assertThat(metadata.contextWindowTokens()).isEqualTo(123);
-        assertThat(metadata.uploadPolicy().enabled()).isFalse();
+        assertThat(metadata.capabilities().reasoning()).isTrue();
         assertThat(metadata.source()).contains("custom");
     }
 }

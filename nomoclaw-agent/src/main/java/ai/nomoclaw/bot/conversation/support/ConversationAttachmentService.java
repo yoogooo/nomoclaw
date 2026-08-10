@@ -6,8 +6,9 @@ import ai.nomoclaw.bot.conversation.model.ConversationAttachmentDto;
 import ai.nomoclaw.bot.modelconfig.model.ModelConfigDto;
 import ai.nomoclaw.bot.modelconfig.ModelCatalogService;
 import ai.nomoclaw.bot.modelconfig.ModelConfigAppService;
-import ai.nomoclaw.bot.modelconfig.ModelMetadata;
+import ai.nomoclaw.bot.modelconfig.ModelTypes;
 import ai.nomoclaw.bot.store.AgentStore;
+import ai.nomoclaw.bot.knowledge.ingestion.DocumentParser;
 import ai.nomoclaw.bot.store.entity.AgentMessageAttachmentEntity;
 import ai.nomoclaw.bot.store.repository.AgentMessageAttachmentRepository;
 import ai.nomoclaw.bot.util.LocalizedMessages;
@@ -42,25 +43,28 @@ public class ConversationAttachmentService {
     private final AgentStore store;
     private final AgentMessageAttachmentRepository attachmentRepository;
     private final ModelConfigAppService modelConfigAppService;
-    private final ModelCatalogService modelCatalogService;
     private final LocalizedMessages localizedMessages;
+    private final DocumentParser documentParser;
     private final long maxChatUploadFileBytes;
     private final long maxChatUploadRequestBytes;
+    private final int maxChatUploadFilesPerMessage;
 
     public ConversationAttachmentService(AgentStore store,
                                             AgentMessageAttachmentRepository attachmentRepository,
                                             ModelConfigAppService modelConfigAppService,
-                                            ModelCatalogService modelCatalogService,
                                             LocalizedMessages localizedMessages,
+                                            DocumentParser documentParser,
                                             @Value("${agent.api.chat-upload.max-file-size:2MB}") DataSize maxChatUploadFileSize,
-                                            @Value("${agent.api.chat-upload.max-request-size:100MB}") DataSize maxChatUploadRequestSize) {
+                                            @Value("${agent.api.chat-upload.max-request-size:100MB}") DataSize maxChatUploadRequestSize,
+                                            @Value("${agent.api.chat-upload.max-files-per-message:10}") int maxChatUploadFilesPerMessage) {
         this.store = store;
         this.attachmentRepository = attachmentRepository;
         this.modelConfigAppService = modelConfigAppService;
-        this.modelCatalogService = modelCatalogService;
         this.localizedMessages = localizedMessages;
+        this.documentParser = documentParser;
         this.maxChatUploadFileBytes = maxChatUploadFileSize.toBytes();
         this.maxChatUploadRequestBytes = maxChatUploadRequestSize.toBytes();
+        this.maxChatUploadFilesPerMessage = Math.max(1, maxChatUploadFilesPerMessage);
     }
 
     public List<ConversationAttachmentDto> uploadFiles(String conversationUid,
@@ -75,9 +79,9 @@ public class ConversationAttachmentService {
         if (normalizedFiles.isEmpty()) {
             throw new IllegalArgumentException("at least one file is required");
         }
-        ModelConfigDto.UploadPolicy policy = resolveUploadPolicy(modelProvider, modelName);
+        ModelConfigDto.Model model = resolveModel(modelProvider, modelName);
         List<PendingAttachment> incoming = normalizedFiles.stream().map(this::toPendingAttachment).toList();
-        validateAttachments(policy, incoming);
+        validateAttachments(model, incoming);
 
         Path uploadRoot = ensureConversationUploadRoot(conversationUid);
         LocalDateTime now = LocalDateTime.now();
@@ -122,7 +126,7 @@ public class ConversationAttachmentService {
         if (urls.isEmpty()) {
             return;
         }
-        ModelConfigDto.UploadPolicy policy = resolveUploadPolicy(modelProvider, modelName);
+        ModelConfigDto.Model model = resolveModel(modelProvider, modelName);
         List<PendingAttachment> selected = new ArrayList<>();
         LocalDateTime now = LocalDateTime.now();
         for (String url : urls) {
@@ -136,7 +140,7 @@ public class ConversationAttachmentService {
             }
             selected.add(PendingAttachment.fromEntity(entity));
         }
-        validateAttachments(policy, selected);
+        validateAttachments(model, selected);
         for (String url : urls) {
             String uploadUid = extractUploadUid(conversationUid, url);
             attachmentRepository.update(new LambdaUpdateWrapper<AgentMessageAttachmentEntity>()
@@ -199,14 +203,15 @@ public class ConversationAttachmentService {
         }
     }
 
-    public List<Content> buildContentsForMessage(String messageText, String messageUid) {
+    public List<Content> buildContentsForMessage(String messageText, String messageUid, String modelProvider, String modelName) {
         List<Content> contents = new ArrayList<>();
         String normalizedText = messageText == null ? "" : messageText.trim();
         if (!normalizedText.isBlank()) {
             contents.add(TextContent.from(normalizedText));
         }
+        ModelConfigDto.Model model = resolveModel(modelProvider, modelName);
         for (AgentMessageAttachmentEntity attachment : attachmentRepository.listByMessageUid(messageUid)) {
-            contents.add(toContent(attachment));
+            contents.add(toContent(attachment, model));
         }
         return contents;
     }
@@ -306,13 +311,17 @@ public class ConversationAttachmentService {
     }
 
     private Content toContent(AgentMessageAttachmentEntity attachment) {
+        return toContent(attachment, null);
+    }
+
+    private Content toContent(AgentMessageAttachmentEntity attachment, ModelConfigDto.Model model) {
         Path path = Path.of(attachment.getFilePath()).toAbsolutePath().normalize();
         String mimeGroup = normalizeMimeGroup(attachment.getMimeGroup());
         String contentType = normalizeContentType(attachment.getContentType());
         try {
             return switch (mimeGroup) {
                 case "image" -> ImageContent.from(path, contentType);
-                case "pdf" -> PdfFileContent.from(path);
+                case "pdf" -> TextContent.from(pdfText(attachment, path));
                 case "audio" -> AudioContent.from(path, contentType);
                 case "video" -> VideoContent.from(path, contentType);
                 case "text" -> TextContent.from("文件(" + attachment.getOriginalName() + "):\n" + Files.readString(path, StandardCharsets.UTF_8));
@@ -323,53 +332,22 @@ public class ConversationAttachmentService {
         }
     }
 
-    private void validateAttachments(ModelConfigDto.UploadPolicy policy,
-                                     List<PendingAttachment> incoming) {
-        long totalBytes = incoming.stream().mapToLong(PendingAttachment::sizeBytes).sum();
-        LinkedHashSet<String> groups = incoming.stream().map(PendingAttachment::mimeGroup).collect(Collectors.toCollection(LinkedHashSet::new));
-        Set<String> modelGroups = groups.stream()
-                .filter(group -> !"text".equals(group))
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-        boolean textOnly = modelGroups.isEmpty();
-        long maxTotalBytes = sanitizeNonNegative(policy.maxTotalBytes());
-        long effectiveMaxTotalBytes = textOnly || maxTotalBytes <= 0 ? maxChatUploadRequestBytes : maxTotalBytes;
-        if (totalBytes > effectiveMaxTotalBytes) {
-            throw new IllegalArgumentException(localizedMessages.get("api.error.uploadTotalSizeExceeded", formatBytes(effectiveMaxTotalBytes)));
-        }
-        long policyMaxFileBytes = sanitizeNonNegative(policy.maxFileBytes());
-        long effectiveMaxFileBytes = textOnly
-                ? maxChatUploadFileBytes
-                : minPositive(policyMaxFileBytes, maxChatUploadFileBytes);
-        if (effectiveMaxFileBytes > 0 && incoming.stream().anyMatch(item -> item.sizeBytes() > effectiveMaxFileBytes)) {
-            throw new IllegalArgumentException(localizedMessages.get("api.error.uploadFileSizeExceeded", formatBytes(effectiveMaxFileBytes)));
-        }
-        if (incoming.isEmpty()) {
-            return;
-        }
-        if (textOnly) {
-            return;
-        }
-        if (!policy.enabled()) {
+    private void validateAttachments(ModelConfigDto.Model model, List<PendingAttachment> incoming) {
+        if (!ModelTypes.TEXT_GENERATION.equals(model.modelType())) {
             throw new IllegalArgumentException(localizedMessages.get("api.error.uploadDisabled"));
         }
-        if (policy.singleMimeGroupOnly() && modelGroups.size() > 1) {
-            throw new IllegalArgumentException(localizedMessages.get("api.error.uploadSingleMimeGroupOnly"));
+        if (incoming.size() > maxChatUploadFilesPerMessage) {
+            throw new IllegalArgumentException("Too many attachments: maximum " + maxChatUploadFilesPerMessage);
         }
-        if (!policy.allowedMimeGroups().isEmpty() && modelGroups.stream().anyMatch(group -> !policy.allowedMimeGroups().contains(group))) {
+        long totalBytes = incoming.stream().mapToLong(PendingAttachment::sizeBytes).sum();
+        if (totalBytes > maxChatUploadRequestBytes) {
+            throw new IllegalArgumentException(localizedMessages.get("api.error.uploadTotalSizeExceeded", formatBytes(maxChatUploadRequestBytes)));
+        }
+        if (maxChatUploadFileBytes > 0 && incoming.stream().anyMatch(item -> item.sizeBytes() > maxChatUploadFileBytes)) {
+            throw new IllegalArgumentException(localizedMessages.get("api.error.uploadFileSizeExceeded", formatBytes(maxChatUploadFileBytes)));
+        }
+        if (incoming.stream().anyMatch(item -> !isSupportedByModel(model.capabilities(), item.mimeGroup()))) {
             throw new IllegalArgumentException(localizedMessages.get("api.error.uploadMimeGroupNotAllowed"));
-        }
-        long imageCount = incoming.stream().filter(item -> "image".equals(item.mimeGroup())).count();
-        long nonImageCount = incoming.stream()
-                .filter(item -> !"text".equals(item.mimeGroup()) && !"image".equals(item.mimeGroup()))
-                .count();
-        if (imageCount > 0 && nonImageCount > 0 && !policy.allowMixedImageAndFile()) {
-            throw new IllegalArgumentException(localizedMessages.get("api.error.uploadMixedImageAndFileNotAllowed"));
-        }
-        if (imageCount > sanitizeNonNegative(policy.maxImagesPerMessage())) {
-            throw new IllegalArgumentException(localizedMessages.get("api.error.uploadTooManyImages"));
-        }
-        if (nonImageCount > sanitizeNonNegative(policy.maxFilesPerMessage())) {
-            throw new IllegalArgumentException(localizedMessages.get("api.error.uploadTooManyFiles"));
         }
     }
 
@@ -391,7 +369,7 @@ public class ConversationAttachmentService {
         );
     }
 
-    private ModelConfigDto.UploadPolicy resolveUploadPolicy(String modelProvider, String modelName) {
+    private ModelConfigDto.Model resolveModel(String modelProvider, String modelName) {
         ModelConfigDto config = modelConfigAppService.getModelConfig();
         for (ModelConfigDto.Provider provider : config.providers()) {
             if (!provider.id().equals(trim(modelProvider))) {
@@ -399,21 +377,31 @@ public class ConversationAttachmentService {
             }
             for (ModelConfigDto.Model model : provider.models()) {
                 if (model.id().equals(trim(modelName))) {
-                    ModelMetadata metadata = modelCatalogService.resolve(provider.id(), model.id());
-                    if (metadata.matched()) {
-                        return metadata.uploadPolicy() == null
-                                ? disabledUploadPolicy()
-                                : metadata.uploadPolicy();
-                    }
-                    return model.uploadPolicy() == null ? disabledUploadPolicy() : model.uploadPolicy();
+                    return model;
                 }
             }
         }
         throw new IllegalArgumentException("model not configured: " + modelProvider + "/" + modelName);
     }
 
-    private ModelConfigDto.UploadPolicy disabledUploadPolicy() {
-        return new ModelConfigDto.UploadPolicy(false, List.of(), 0, 0, 0L, 0L, false, false);
+    private boolean isSupportedByModel(ModelConfigDto.ModelCapabilities capabilities, String mimeGroup) {
+        ModelConfigDto.ModelCapabilities normalized = capabilities == null ? ModelConfigDto.ModelCapabilities.none() : capabilities;
+        return switch (mimeGroup) {
+            case "text", "pdf" -> true;
+            case "image" -> normalized.imageRecognition();
+            case "audio" -> normalized.audioRecognition();
+            case "video" -> normalized.videoRecognition();
+            default -> false;
+        };
+    }
+
+    private String pdfText(AgentMessageAttachmentEntity attachment, Path path) {
+        DocumentParser.ParsedDocument parsed = documentParser.parse(path);
+        String text = parsed.pages().stream().map(DocumentParser.Page::text).collect(Collectors.joining("\n\n")).trim();
+        if (text.isBlank()) {
+            throw new IllegalArgumentException("PDF contains no extractable text: " + attachment.getOriginalName());
+        }
+        return "文件(" + attachment.getOriginalName() + "):\n" + text;
     }
 
     private String formatBytes(long bytes) {

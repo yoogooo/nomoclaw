@@ -74,6 +74,7 @@ agent:
     chat-upload:
       max-file-size: 10MB
       max-request-size: 100MB
+      max-files-per-message: 10
   web-search:
     endpoints:
       - "https://www.bing.com/search?q={query}&setlang=zh-Hans"

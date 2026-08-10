@@ -12,7 +12,6 @@ import ai.nomoclaw.bot.util.JsonUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.JsonNode;
 
 import java.net.URI;
@@ -173,15 +172,14 @@ public class ModelConfigAppService {
                 entity.setProviderId(normalizedProviderId);
                 entity.setModelId(modelId);
                 entity.setModelName(modelId);
-                entity.setCapabilitiesJson(JsonUtil.toJson(List.of("text")));
-                entity.setReasoning(0);
+                entity.setCapabilitiesJson(JsonUtil.toJson(metadata.matched()
+                        ? metadata.capabilities() : ModelConfigDto.ModelCapabilities.none()));
                 entity.setContextWindow(0);
                 entity.setMaxInputTokens(0);
                 entity.setMaxOutputTokens(0);
-                entity.setUploadPolicyJson(JsonUtil.toJson(new ModelConfigDto.UploadPolicy(false, List.of(), 0, 0, 0L, 0L, false, false)));
                 entity.setCreatedTime(now);
             }
-            entity.setModelType(metadata.matched() ? metadata.modelType() : ModelTypes.CHAT);
+            entity.setModelType(metadata.matched() ? metadata.modelType() : ModelTypes.TEXT_GENERATION);
             entity.setSortIndex(i);
             entity.setStatus("ACTIVE");
             entity.setUpdatedTime(now);
@@ -407,55 +405,33 @@ public class ModelConfigAppService {
             if (id.isBlank()) {
                 continue;
             }
-            deduped.put(id, userConfiguredModel(id, trim(model.name()).isBlank() ? id : trim(model.name()), model.modelType()));
+            deduped.put(id, userConfiguredModel(id, trim(model.name()).isBlank() ? id : trim(model.name()),
+                    model.modelType(), model.capabilities()));
         }
         return List.copyOf(deduped.values());
     }
 
-    private ModelConfigDto.Model userConfiguredModel(String id, String name, String modelType) {
+    private ModelConfigDto.Model userConfiguredModel(String id, String name, String modelType,
+                                                     ModelConfigDto.ModelCapabilities capabilities) {
         return new ModelConfigDto.Model(
                 id,
                 trim(name).isBlank() ? id : trim(name),
                 sanitizeModelType(modelType),
-                List.of(),
-                false,
+                sanitizeCapabilities(capabilities),
                 0,
                 0,
                 0,
-                new ModelConfigDto.UploadPolicy(false, List.of(), 0, 0, 0L, 0L, false, false),
                 false,
                 "user"
         );
     }
 
-    private ModelConfigDto.UploadPolicy sanitizeUploadPolicy(ModelConfigDto.UploadPolicy uploadPolicy) {
-        if (uploadPolicy == null) {
-            return new ModelConfigDto.UploadPolicy(false, List.of(), 0, 0, 0L, 0L, false, false);
+    private ModelConfigDto.ModelCapabilities sanitizeCapabilities(ModelConfigDto.ModelCapabilities capabilities) {
+        if (capabilities == null) {
+            return ModelConfigDto.ModelCapabilities.none();
         }
-        return new ModelConfigDto.UploadPolicy(
-                uploadPolicy.enabled(),
-                sanitizeCapabilities(uploadPolicy.allowedMimeGroups()),
-                sanitizeNonNegative(uploadPolicy.maxFilesPerMessage()),
-                sanitizeNonNegative(uploadPolicy.maxImagesPerMessage()),
-                sanitizeNonNegative(uploadPolicy.maxFileBytes()),
-                sanitizeNonNegative(uploadPolicy.maxTotalBytes()),
-                uploadPolicy.singleMimeGroupOnly(),
-                uploadPolicy.allowMixedImageAndFile()
-        );
-    }
-
-    private List<String> sanitizeCapabilities(List<String> capabilities) {
-        if (capabilities == null || capabilities.isEmpty()) {
-            return List.of();
-        }
-        Set<String> sanitized = new LinkedHashSet<>();
-        for (String capability : capabilities) {
-            String value = trim(capability).toLowerCase();
-            if (!value.isBlank()) {
-                sanitized.add(value);
-            }
-        }
-        return List.copyOf(sanitized);
+        return new ModelConfigDto.ModelCapabilities(capabilities.toolCalling(), capabilities.imageRecognition(),
+                capabilities.audioRecognition(), capabilities.videoRecognition(), capabilities.reasoning());
     }
 
     private String sanitizeModelType(String modelType) {
@@ -533,24 +509,16 @@ public class ModelConfigAppService {
                                                  ModelConfigDto.Model model,
                                                  int sortIndex,
                                                  LocalDateTime now) {
-        ModelMetadata metadata = modelCatalogService.resolve(providerId, model.id());
-        List<String> inputModalities = metadata.matched()
-                ? metadata.inputModalities()
-                : sanitizeCapabilities(model.capabilities()).isEmpty() ? metadata.inputModalities() : sanitizeCapabilities(model.capabilities());
-        ModelConfigDto.UploadPolicy uploadPolicy = metadata.matched()
-                ? metadata.uploadPolicy()
-                : model.uploadPolicy() == null ? metadata.uploadPolicy() : model.uploadPolicy();
+        ModelConfigDto.ModelCapabilities capabilities = sanitizeCapabilities(model.capabilities());
         LlmProviderModelEntity entity = new LlmProviderModelEntity();
         entity.setProviderId(providerId);
         entity.setModelId(model.id());
         entity.setModelName(model.name());
-        entity.setModelType(metadata.matched() ? metadata.modelType() : sanitizeModelType(model.modelType()));
-        entity.setCapabilitiesJson(JsonUtil.toJson(inputModalities));
-        entity.setReasoning((metadata.matched() ? metadata.reasoning() : model.reasoning()) ? 1 : 0);
-        entity.setContextWindow(sanitizeNonNegative(metadata.matched() ? metadata.contextWindowTokens() : model.contextWindow()));
-        entity.setMaxInputTokens(sanitizeNonNegative(metadata.matched() ? metadata.maxInputTokens() : model.maxInputTokens()));
-        entity.setMaxOutputTokens(sanitizeNonNegative(metadata.matched() ? metadata.maxOutputTokens() : model.maxOutputTokens()));
-        entity.setUploadPolicyJson(JsonUtil.toJson(sanitizeUploadPolicy(uploadPolicy)));
+        entity.setModelType(sanitizeModelType(model.modelType()));
+        entity.setCapabilitiesJson(JsonUtil.toJson(capabilities));
+        entity.setContextWindow(sanitizeNonNegative(model.contextWindow()));
+        entity.setMaxInputTokens(sanitizeNonNegative(model.maxInputTokens()));
+        entity.setMaxOutputTokens(sanitizeNonNegative(model.maxOutputTokens()));
         entity.setSortIndex(sortIndex);
         entity.setStatus("ACTIVE");
         entity.setCreatedTime(now);
@@ -614,62 +582,27 @@ public class ModelConfigAppService {
 
     private ModelConfigDto.Model toModelDto(String providerId, LlmProviderModelEntity entity) {
         ModelMetadata metadata = modelCatalogService.resolve(providerId, entity.getModelId());
-        ModelConfigDto.Model builtin = builtinModel(providerId, entity.getModelId());
         String name = trim(entity.getModelName()).isBlank()
                 ? trim(metadata.displayName()).isBlank() ? entity.getModelId() : metadata.displayName()
                 : entity.getModelName();
-        List<String> capabilities = metadata.matched()
-                ? metadata.inputModalities()
-                : builtin == null ? storedCapabilities(entity) : builtin.capabilities();
-        ModelConfigDto.UploadPolicy uploadPolicy = metadata.matched()
-                ? metadata.uploadPolicy()
-                : builtin == null ? storedUploadPolicy(entity) : builtin.uploadPolicy();
+        ModelConfigDto.ModelCapabilities capabilities = storedCapabilities(entity);
         return new ModelConfigDto.Model(
                 entity.getModelId(),
                 name,
-                metadata.matched() ? metadata.modelType() : builtin == null ? sanitizeModelType(entity.getModelType()) : sanitizeModelType(builtin.modelType()),
+                sanitizeModelType(entity.getModelType()),
                 capabilities,
-                metadata.matched() ? metadata.reasoning() : builtin == null ? entity.getReasoning() != null && entity.getReasoning() == 1 : builtin.reasoning(),
-                metadata.matched() ? metadata.contextWindowTokens() : builtin == null ? sanitizeNonNegative(entity.getContextWindow()) : builtin.contextWindow(),
-                metadata.matched() ? metadata.maxInputTokens() : builtin == null ? sanitizeNonNegative(entity.getMaxInputTokens()) : builtin.maxInputTokens(),
-                metadata.matched() ? metadata.maxOutputTokens() : builtin == null ? sanitizeNonNegative(entity.getMaxOutputTokens()) : builtin.maxOutputTokens(),
-                uploadPolicy,
+                sanitizeNonNegative(entity.getContextWindow()),
+                sanitizeNonNegative(entity.getMaxInputTokens()),
+                sanitizeNonNegative(entity.getMaxOutputTokens()),
                 metadata.matched(),
                 metadata.source()
         );
     }
 
-    private ModelConfigDto.Model builtinModel(String providerId, String modelId) {
-        for (ModelConfigDto.Provider provider : ModelProviderDefaults.providers()) {
-            if (!provider.id().equals(trim(providerId))) {
-                continue;
-            }
-            for (ModelConfigDto.Model model : provider.models()) {
-                if (model.id().equals(trim(modelId))) {
-                    return model;
-                }
-            }
-        }
-        return null;
-    }
-
-    private List<String> storedCapabilities(LlmProviderModelEntity entity) {
-        List<String> capabilities = JsonUtil.fromJsonQuietly(
-                defaultString(entity.getCapabilitiesJson()),
-                new TypeReference<List<String>>() {}
-        ).orElse(List.of());
-        List<String> sanitized = sanitizeCapabilities(capabilities);
-        return sanitized.isEmpty() ? List.of("text") : sanitized;
-    }
-
-    private ModelConfigDto.UploadPolicy storedUploadPolicy(LlmProviderModelEntity entity) {
-        return JsonUtil.fromJsonQuietly(defaultString(entity.getUploadPolicyJson()), ModelConfigDto.UploadPolicy.class)
-                .map(this::sanitizeUploadPolicy)
-                .orElseGet(this::disabledUploadPolicy);
-    }
-
-    private ModelConfigDto.UploadPolicy disabledUploadPolicy() {
-        return new ModelConfigDto.UploadPolicy(false, List.of(), 0, 0, 0L, 0L, false, false);
+    private ModelConfigDto.ModelCapabilities storedCapabilities(LlmProviderModelEntity entity) {
+        return JsonUtil.fromJsonQuietly(defaultString(entity.getCapabilitiesJson()), ModelConfigDto.ModelCapabilities.class)
+                .map(this::sanitizeCapabilities)
+                .orElseGet(ModelConfigDto.ModelCapabilities::none);
     }
 
     private Map<String, Integer> providerSortOrder(List<ModelConfigDto.Provider> defaults) {

@@ -86,10 +86,7 @@ public class ImageLoaderContextService {
                 if (!normalizedModel.equals(model.id())) {
                     continue;
                 }
-                return model.capabilities() != null
-                        && model.capabilities().stream()
-                        .map(capability -> capability == null ? "" : capability.trim().toLowerCase(Locale.ROOT))
-                        .anyMatch("image"::equals);
+                return model.capabilities() != null && model.capabilities().imageRecognition();
             }
         }
         return false;

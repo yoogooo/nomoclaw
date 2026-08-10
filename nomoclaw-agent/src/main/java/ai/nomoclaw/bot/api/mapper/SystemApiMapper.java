@@ -234,12 +234,10 @@ public final class SystemApiMapper {
                                                 model.id(),
                                                 model.name(),
                                                 model.modelType(),
-                                                model.capabilities(),
-                                                model.reasoning(),
+                                                toCapabilities(model.capabilities()),
                                                 model.contextWindow(),
                                                 model.maxInputTokens(),
                                                 model.maxOutputTokens(),
-                                                toUploadPolicy(model.uploadPolicy()),
                                                 model.catalogMatched(),
                                                 model.catalogSource()
                                         ))
@@ -273,12 +271,10 @@ public final class SystemApiMapper {
                                                 model.id(),
                                                 model.name(),
                                                 model.modelType(),
-                                                model.capabilities(),
-                                                model.reasoning(),
+                                                toCapabilities(model.capabilities()),
                                                 model.contextWindow(),
                                                 model.maxInputTokens(),
                                                 model.maxOutputTokens(),
-                                                toUploadPolicy(model.uploadPolicy()),
                                                 false,
                                                 "request"
                                         ))
@@ -479,35 +475,18 @@ public final class SystemApiMapper {
         );
     }
 
-    private static ModelConfigResponse.UploadPolicy toUploadPolicy(ModelConfigDto.UploadPolicy policy) {
-        if (policy == null) {
-            return null;
-        }
-        return new ModelConfigResponse.UploadPolicy(
-                policy.enabled(),
-                policy.allowedMimeGroups(),
-                policy.maxFilesPerMessage(),
-                policy.maxImagesPerMessage(),
-                policy.maxFileBytes(),
-                policy.maxTotalBytes(),
-                policy.singleMimeGroupOnly(),
-                policy.allowMixedImageAndFile()
-        );
+    private static ModelConfigResponse.ModelCapabilities toCapabilities(ModelConfigDto.ModelCapabilities capabilities) {
+        ModelConfigDto.ModelCapabilities normalized = capabilities == null
+                ? ModelConfigDto.ModelCapabilities.none() : capabilities;
+        return new ModelConfigResponse.ModelCapabilities(normalized.toolCalling(), normalized.imageRecognition(),
+                normalized.audioRecognition(), normalized.videoRecognition(), normalized.reasoning());
     }
 
-    private static ModelConfigDto.UploadPolicy toUploadPolicy(UpdateModelConfigRequest.UploadPolicy policy) {
-        if (policy == null) {
-            return null;
+    private static ModelConfigDto.ModelCapabilities toCapabilities(UpdateModelConfigRequest.ModelCapabilities capabilities) {
+        if (capabilities == null) {
+            return ModelConfigDto.ModelCapabilities.none();
         }
-        return new ModelConfigDto.UploadPolicy(
-                policy.enabled(),
-                policy.allowedMimeGroups(),
-                policy.maxFilesPerMessage(),
-                policy.maxImagesPerMessage(),
-                policy.maxFileBytes(),
-                policy.maxTotalBytes(),
-                policy.singleMimeGroupOnly(),
-                policy.allowMixedImageAndFile()
-        );
+        return new ModelConfigDto.ModelCapabilities(capabilities.toolCalling(), capabilities.imageRecognition(),
+                capabilities.audioRecognition(), capabilities.videoRecognition(), capabilities.reasoning());
     }
 }

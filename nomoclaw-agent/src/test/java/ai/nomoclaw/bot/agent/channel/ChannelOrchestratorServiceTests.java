@@ -289,13 +289,11 @@ class ChannelOrchestratorServiceTests {
                         List.of(new ModelConfigDto.Model(
                                 modelId,
                                 modelId,
-                                "CHAT",
-                                List.of("text"),
-                                false,
+                                "TEXT_GENERATION",
+                                ModelConfigDto.ModelCapabilities.none(),
                                 0,
                                 0,
                                 0,
-                                new ModelConfigDto.UploadPolicy(false, List.of(), 0, 0, 0L, 0L, false, false),
                                 true,
                                 ""
                         ))

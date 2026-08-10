@@ -1,4 +1,4 @@
-import { normalizeUploadPolicy, validateFilesAgainstPolicy } from "./uploadPolicy";
+import { normalizeCapabilities, validateFilesAgainstCapabilities } from "./attachmentCapabilities";
 import { findAgentDefaultModel, findLatestMessageModelSelection, splitModelKey } from "./modelSelection";
 import type {
   ConversationEventsModule,
@@ -123,11 +123,11 @@ export function createConversationComposerModule(
     const nextOption = state.configuredProviders.value
       .find((provider) => provider.id === modelProvider)
       ?.models.find((model: any) => model.id === modelName);
-    const nextPolicy = normalizeUploadPolicy(nextOption?.uploadPolicy);
+    const nextCapabilities = normalizeCapabilities(nextOption?.capabilities);
     if (state.draftAttachments.value.length) {
       const existingFits = (() => {
         try {
-          validateFilesAgainstPolicy(nextPolicy, state.draftAttachments.value, [], storeDeps.tr);
+          validateFilesAgainstCapabilities(nextCapabilities, state.draftAttachments.value, [], storeDeps.tr);
           return true;
         } catch {
           return false;
@@ -151,7 +151,7 @@ export function createConversationComposerModule(
       return [];
     }
     try {
-      validateFilesAgainstPolicy(state.currentUploadPolicy.value, state.draftAttachments.value, files, storeDeps.tr);
+      validateFilesAgainstCapabilities(state.currentCapabilities.value, state.draftAttachments.value, files, storeDeps.tr);
     } catch (error) {
       storeDeps.message.error(error instanceof Error ? error.message : storeDeps.tr("toast.uploadRuleNotMatch"));
       return [];

@@ -37,8 +37,6 @@ public class ModelCatalogService {
     private static final Duration STALE_AFTER = Duration.ofDays(30);
     private static final Duration REFRESH_INTERVAL = Duration.ofHours(24);
     private static final String BUNDLED_RESOURCE = "model-catalog/v1/models.json";
-    private static final ModelConfigDto.UploadPolicy DISABLED_UPLOAD =
-            new ModelConfigDto.UploadPolicy(false, List.of(), 0, 0, 0L, 0L, false, false);
 
     private final HttpClient httpClient;
     private final String remoteUrl;
@@ -245,21 +243,15 @@ public class ModelCatalogService {
     }
 
     private ModelMetadata toMetadata(String providerId, String requestedModelId, CatalogModel model, String source) {
-        CatalogUploadPolicy upload = model.uploadPolicy() == null ? CatalogUploadPolicy.disabled() : model.uploadPolicy();
         return new ModelMetadata(
                 providerId,
                 requestedModelId,
                 trim(model.displayName()).isBlank() ? requestedModelId : trim(model.displayName()),
-                ModelTypes.sanitize(trim(model.modelType()).isBlank()
-                        ? ModelTypes.inferFromModalities(model.inputModalities(), model.outputModalities())
-                        : model.modelType()),
-                sanitize(model.inputModalities()).isEmpty() ? List.of("text") : sanitize(model.inputModalities()),
-                sanitize(model.outputModalities()).isEmpty() ? List.of("text") : sanitize(model.outputModalities()),
-                model.reasoning(),
+                ModelTypes.sanitize(trim(model.modelType()).isBlank() ? ModelTypes.TEXT_GENERATION : model.modelType()),
+                capabilities(model),
                 sanitizeNonNegative(model.contextWindowTokens()),
                 sanitizeNonNegative(model.maxInputTokens()),
                 sanitizeNonNegative(model.maxOutputTokens()),
-                toUploadPolicy(upload),
                 true,
                 source,
                 trim(model.confidence()).isBlank() ? "medium" : trim(model.confidence())
@@ -271,31 +263,26 @@ public class ModelCatalogService {
                 providerId,
                 modelId,
                 trim(modelId).isBlank() ? "" : trim(modelId),
-                ModelTypes.CHAT,
-                List.of("text"),
-                List.of("text"),
-                false,
+                ModelTypes.TEXT_GENERATION,
+                ModelConfigDto.ModelCapabilities.none(),
                 0,
                 0,
                 0,
-                DISABLED_UPLOAD,
                 false,
                 "fallback",
                 "low"
         );
     }
 
-    private ModelConfigDto.UploadPolicy toUploadPolicy(CatalogUploadPolicy upload) {
-        return new ModelConfigDto.UploadPolicy(
-                upload.enabled(),
-                sanitize(upload.allowedMimeGroups()),
-                sanitizeNonNegative(upload.maxFilesPerMessage()),
-                sanitizeNonNegative(upload.maxImagesPerMessage()),
-                sanitizeNonNegativeLong(upload.maxFileBytes()),
-                sanitizeNonNegativeLong(upload.maxTotalBytes()),
-                upload.singleMimeGroupOnly(),
-                upload.allowMixedImageAndFile()
-        );
+    private ModelConfigDto.ModelCapabilities capabilities(CatalogModel model) {
+        CatalogCapabilities capabilities = model.capabilities();
+        if (capabilities != null) {
+            return new ModelConfigDto.ModelCapabilities(capabilities.toolCalling(), capabilities.imageRecognition(),
+                    capabilities.audioRecognition(), capabilities.videoRecognition(), capabilities.reasoning());
+        }
+        List<String> modalities = sanitize(model.inputModalities());
+        return new ModelConfigDto.ModelCapabilities(false, modalities.contains("image"), modalities.contains("audio"),
+                modalities.contains("video"), model.reasoning());
     }
 
     private boolean isStale(String generatedAt) {
@@ -404,29 +391,23 @@ public class ModelCatalogService {
             List<String> aliases,
             List<String> inputModalities,
             List<String> outputModalities,
+            CatalogCapabilities capabilities,
             boolean reasoning,
             Integer contextWindowTokens,
             Integer maxInputTokens,
             Integer maxOutputTokens,
-            CatalogUploadPolicy uploadPolicy,
             List<String> sourceRefs,
             String lastVerifiedAt,
             String confidence
     ) {
     }
 
-    public record CatalogUploadPolicy(
-            boolean enabled,
-            List<String> allowedMimeGroups,
-            Integer maxFilesPerMessage,
-            Integer maxImagesPerMessage,
-            Long maxFileBytes,
-            Long maxTotalBytes,
-            boolean singleMimeGroupOnly,
-            boolean allowMixedImageAndFile
+    public record CatalogCapabilities(
+            boolean toolCalling,
+            boolean imageRecognition,
+            boolean audioRecognition,
+            boolean videoRecognition,
+            boolean reasoning
     ) {
-        public static CatalogUploadPolicy disabled() {
-            return new CatalogUploadPolicy(false, List.of(), 0, 0, 0L, 0L, false, false);
-        }
     }
 }

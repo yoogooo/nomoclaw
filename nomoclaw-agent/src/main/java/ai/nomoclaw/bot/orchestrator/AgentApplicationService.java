@@ -1093,7 +1093,9 @@ public class AgentApplicationService {
     private UserMessage toUserMessage(AgentMessage message) {
         List<dev.langchain4j.data.message.Content> contents = conversationAttachmentAppService.buildContentsForMessage(
                 message.content(),
-                message.messageUid()
+                message.messageUid(),
+                message.provider(),
+                message.modelName()
         );
         if (contents.isEmpty()) {
             return UserMessage.from(message.content());

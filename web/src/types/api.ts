@@ -355,12 +355,10 @@ export interface ModelProviderOption {
   id: string;
   name: string;
   modelType: string;
-  capabilities: string[];
-  reasoning: boolean;
+  capabilities: ModelCapabilities;
   contextWindow: number;
   maxInputTokens: number;
   maxOutputTokens: number;
-  uploadPolicy?: UploadPolicy;
   catalogMatched?: boolean;
   catalogSource?: string;
 }
@@ -396,15 +394,12 @@ export interface ModelProviderTestResult {
   message: string;
 }
 
-export interface UploadPolicy {
-  enabled: boolean;
-  allowedMimeGroups: string[];
-  maxFilesPerMessage: number;
-  maxImagesPerMessage: number;
-  maxFileBytes?: number;
-  maxTotalBytes?: number;
-  singleMimeGroupOnly: boolean;
-  allowMixedImageAndFile: boolean;
+export interface ModelCapabilities {
+  toolCalling: boolean;
+  imageRecognition: boolean;
+  audioRecognition: boolean;
+  videoRecognition: boolean;
+  reasoning: boolean;
 }
 
 export interface PermissionRulePayload {
