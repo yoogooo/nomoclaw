@@ -28,6 +28,7 @@ import java.net.http.HttpTimeoutException;
 import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.function.Consumer;
@@ -485,7 +486,22 @@ public class TaskPlanner implements Planner {
                 || throwable instanceof ConnectException
                 || throwable instanceof ClosedChannelException
                 || throwable instanceof SocketTimeoutException
-                || throwable instanceof HttpTimeoutException;
+                || throwable instanceof HttpTimeoutException
+                || isRetryableToolCallParsingError(throwable);
+    }
+
+    private boolean isRetryableToolCallParsingError(Throwable throwable) {
+        if (throwable == null || throwable.getMessage() == null) {
+            return false;
+        }
+        String message = throwable.getMessage().toLowerCase(Locale.ROOT);
+        boolean toolCallError = message.contains("tool call") || message.contains("tool_call");
+        boolean parsingError = message.contains("parsing")
+                || message.contains("parse")
+                || message.contains("invalid json")
+                || message.contains("invalid character")
+                || message.contains("malformed json");
+        return toolCallError && parsingError;
     }
 
     private Throwable rootCause(Throwable throwable) {

@@ -207,4 +207,67 @@ class TaskPlannerTests {
         assertEquals("retry success", result.accumulatedText());
         assertEquals(true, result.streamed());
     }
+
+    @Test
+    void reasonStreamShouldRetryWhenToolCallJsonCannotBeParsed() {
+        LlmProperties llmProperties = new LlmProperties();
+        llmProperties.setSystemPrompt("test system prompt");
+        llmProperties.setMaxRetries(1);
+
+        RuntimeChatModelResolver runtimeChatModelResolver = mock(RuntimeChatModelResolver.class);
+        SkillPromptLoader skillPromptLoader = mock(SkillPromptLoader.class);
+        LlmDebugLogger llmDebugLogger = mock(LlmDebugLogger.class);
+        when(skillPromptLoader.buildAgentSkillPrompt(any())).thenReturn("");
+
+        ChatModel chatModel = mock(ChatModel.class);
+        StreamingChatModel streamingChatModel = mock(StreamingChatModel.class);
+        ChatResponse chatResponse = mock(ChatResponse.class);
+        AiMessage aiMessage = mock(AiMessage.class);
+        when(aiMessage.text()).thenReturn("retry success");
+        when(chatResponse.aiMessage()).thenReturn(aiMessage);
+
+        AtomicInteger attempts = new AtomicInteger();
+        doAnswer(invocation -> {
+            StreamingChatResponseHandler handler = invocation.getArgument(1);
+            if (attempts.incrementAndGet() == 1) {
+                handler.onError(new IllegalArgumentException("error parsing tool call: invalid character '~' in string escape code"));
+            } else {
+                handler.onPartialResponse("retry success");
+                handler.onCompleteResponse(chatResponse);
+            }
+            return null;
+        }).when(streamingChatModel).chat(any(ChatRequest.class), any(StreamingChatResponseHandler.class));
+
+        RuntimeChatModelResolver.ResolvedModel resolvedModel = new RuntimeChatModelResolver.ResolvedModel(
+                "ollama",
+                "qwen3:8b",
+                chatModel,
+                streamingChatModel
+        );
+        when(runtimeChatModelResolver.resolve(any())).thenReturn(resolvedModel);
+
+        TaskPlanner taskPlanner = new TaskPlanner(llmProperties, runtimeChatModelResolver, skillPromptLoader, llmDebugLogger);
+        PromptLoader.PromptContext promptContext = PromptLoader.PromptContext.forAgent(
+                "session-1",
+                "message-1",
+                "web",
+                "",
+                "general_assistant",
+                tempDir
+        );
+
+        Planner.StreamReasonResult result = taskPlanner.reasonStream(
+                List.of(UserMessage.from("请继续")),
+                List.of(),
+                ToolChoice.AUTO,
+                promptContext,
+                null,
+                null,
+                null
+        );
+
+        assertEquals(2, attempts.get());
+        assertEquals("retry success", result.accumulatedText());
+        assertEquals(true, result.streamed());
+    }
 }
