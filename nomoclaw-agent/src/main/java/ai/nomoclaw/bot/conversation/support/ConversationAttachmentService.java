@@ -204,16 +204,35 @@ public class ConversationAttachmentService {
     }
 
     public List<Content> buildContentsForMessage(String messageText, String messageUid, String modelProvider, String modelName) {
-        List<Content> contents = new ArrayList<>();
-        String normalizedText = messageText == null ? "" : messageText.trim();
-        if (!normalizedText.isBlank()) {
-            contents.add(TextContent.from(normalizedText));
-        }
+        StringBuilder text = new StringBuilder();
+        List<Content> mediaContents = new ArrayList<>();
         ModelConfigDto.Model model = resolveModel(modelProvider, modelName);
         for (AgentMessageAttachmentEntity attachment : attachmentRepository.listByMessageUid(messageUid)) {
-            contents.add(toContent(attachment, model));
+            Content content = toContent(attachment, model);
+            if (content instanceof TextContent textContent) {
+                appendText(text, textContent.text());
+            } else {
+                mediaContents.add(content);
+            }
         }
+        appendText(text, messageText);
+
+        List<Content> contents = new ArrayList<>();
+        if (!text.isEmpty()) {
+            contents.add(TextContent.from(text.toString()));
+        }
+        contents.addAll(mediaContents);
         return contents;
+    }
+
+    private void appendText(StringBuilder target, String value) {
+        if (value == null || value.isBlank()) {
+            return;
+        }
+        if (!target.isEmpty()) {
+            target.append("\n\n");
+        }
+        target.append(value.trim());
     }
 
     public List<Content> attachExistingImageFilesToMessage(String conversationUid,
@@ -324,7 +343,7 @@ public class ConversationAttachmentService {
                 case "pdf" -> TextContent.from(pdfText(attachment, path));
                 case "audio" -> AudioContent.from(path, contentType);
                 case "video" -> VideoContent.from(path, contentType);
-                case "text" -> TextContent.from("文件(" + attachment.getOriginalName() + "):\n" + Files.readString(path, StandardCharsets.UTF_8));
+                case "text" -> TextContent.from(textFileContent(attachment, path));
                 default -> throw new IllegalArgumentException("unsupported attachment type: " + attachment.getOriginalName());
             };
         } catch (IOException ex) {
@@ -349,6 +368,14 @@ public class ConversationAttachmentService {
         if (incoming.stream().anyMatch(item -> !isSupportedByModel(model.capabilities(), item.mimeGroup()))) {
             throw new IllegalArgumentException(localizedMessages.get("api.error.uploadMimeGroupNotAllowed"));
         }
+    }
+
+    private String textFileContent(AgentMessageAttachmentEntity attachment, Path path) throws IOException {
+        String text = Files.readString(path, StandardCharsets.UTF_8);
+        if (text.isBlank()) {
+            return "";
+        }
+        return "文件(" + attachment.getOriginalName() + "):\n" + text;
     }
 
     private PendingAttachment toPendingAttachment(MultipartFile file) {
