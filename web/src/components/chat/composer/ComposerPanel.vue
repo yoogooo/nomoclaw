@@ -20,6 +20,7 @@ const appliedJinnangId = ref("");
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const isDragActive = ref(false);
 const previewImageUrl = ref("");
+const previewText = ref("");
 const isImeComposing = ref(false);
 const largePasteThreshold = 5000;
 
@@ -205,12 +206,17 @@ function openImagePreview(fileUrl: string) {
   previewImageUrl.value = fileUrl;
 }
 
+function openTextPreview(fileUrl: string) {
+  previewText.value = pastedTextByAttachmentUrl.value[fileUrl] || "";
+}
+
 function closeImagePreview() {
   previewImageUrl.value = "";
+  previewText.value = "";
 }
 
 function onPreviewKeydown(event: KeyboardEvent) {
-  if (event.key === "Escape" && previewImageUrl.value) {
+  if (event.key === "Escape" && (previewImageUrl.value || previewText.value)) {
     closeImagePreview();
   }
 }
@@ -272,6 +278,15 @@ onBeforeUnmount(() => {
     <ComposerDropMask v-if="isDragActive">{{ uploadHint }}</ComposerDropMask>
 
     <div class="composer-input-shell">
+      <ComposerAttachmentStrip
+        :attachments="conversationStore.draftAttachments"
+        :text-contents="pastedTextByAttachmentUrl"
+        @preview="openImagePreview"
+        @preview-text="openTextPreview"
+        @remove="removeDraftAttachment"
+        @show-text="showTextAttachment"
+      />
+
       <ComposerTextarea
         :model-value="conversationStore.draftMessage"
         @update:model-value="conversationStore.draftMessage = $event"
@@ -279,14 +294,6 @@ onBeforeUnmount(() => {
         @keydown="onKeydown"
         @compositionstart="onCompositionStart"
         @compositionend="onCompositionEnd"
-      />
-
-      <ComposerAttachmentStrip
-        :attachments="conversationStore.draftAttachments"
-        :text-contents="pastedTextByAttachmentUrl"
-        @preview="openImagePreview"
-        @remove="removeDraftAttachment"
-        @show-text="showTextAttachment"
       />
 
       <JinnangPicker
@@ -328,8 +335,9 @@ onBeforeUnmount(() => {
     </div>
 
     <ComposerPreviewOverlay
-      v-if="previewImageUrl"
+      v-if="previewImageUrl || previewText"
       :image-url="previewImageUrl"
+      :text="previewText"
       @close="closeImagePreview"
     />
 

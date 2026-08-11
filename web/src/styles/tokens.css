@@ -76,6 +76,10 @@
   --color-bg-overlay-mask: rgba(15, 23, 42, 0.26);
   --color-bg-overlay-control: rgba(255, 255, 255, 0.82);
   --color-bg-overlay-control-hover: rgba(255, 255, 255, 0.96);
+  --color-composer-preview-close-bg: #F1F4F7;
+  --color-composer-preview-close-bg-hover: #E4E9EE;
+  --color-composer-preview-close-border: #D5DDE5;
+  --color-composer-preview-close-text: #1F2937;
   --color-bg-panel-soft: #0B0D10;
   --color-bg-rail: #F8FAFC;
   --color-bg-rail-active: #060D28;
@@ -89,6 +93,18 @@
   --color-bg-code-block: rgba(255, 255, 255, 0.06);
   --color-chat-bubble-assistant-bg: var(--color-bg-canvas);
   --color-chat-bubble-user-bg: var(--color-accent-brand);
+  --color-chat-attachment-bg: #F4F7FA;
+  --color-chat-attachment-border: #D6E0EA;
+  --color-chat-attachment-file-bg: var(--color-bg-brand-soft);
+  --color-chat-attachment-file-text: var(--color-text-brand);
+  --color-chat-attachment-text: var(--color-text-primary);
+  --color-chat-attachment-muted: var(--color-text-muted);
+  --shadow-composer-attachment-remove: none;
+  --color-composer-attachment-bg: #FFFFFF;
+  --color-composer-attachment-bg-hover: #F5F8FB;
+  --color-composer-attachment-border: #D5E0EA;
+  --color-composer-attachment-border-hover: #B8C9D8;
+  --color-composer-attachment-icon-bg: #EAF1F4;
 
   /* Text */
   --color-text-primary: #142338;
@@ -435,6 +451,18 @@
   --color-run-code-bg: #111214;
   --color-chat-bubble-assistant-bg: #222327;
   --color-chat-bubble-user-bg: #1D6B58;
+  --color-chat-attachment-bg: #AEB6BD;
+  --color-chat-attachment-border: rgba(255, 255, 255, 0.24);
+  --color-chat-attachment-file-bg: #8F9FA0;
+  --color-chat-attachment-file-text: #124F47;
+  --color-chat-attachment-text: #20252B;
+  --color-chat-attachment-muted: #52606B;
+  --shadow-composer-attachment-remove: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --color-composer-attachment-bg: #23262A;
+  --color-composer-attachment-bg-hover: #292D32;
+  --color-composer-attachment-border: rgba(255, 255, 255, 0.2);
+  --color-composer-attachment-border-hover: rgba(255, 255, 255, 0.34);
+  --color-composer-attachment-icon-bg: #202327;
   --color-text-primary: #F2F3F5;
   --color-text-heading: #F2F3F5;
   --color-text-secondary: #C2C5CA;
@@ -547,6 +575,10 @@
   --color-bg-overlay-mask: rgba(4, 6, 9, 0.72);
   --color-bg-overlay-control: rgba(255, 255, 255, 0.08);
   --color-bg-overlay-control-hover: rgba(255, 255, 255, 0.14);
+  --color-composer-preview-close-bg: #2A2D32;
+  --color-composer-preview-close-bg-hover: #383C43;
+  --color-composer-preview-close-border: rgba(255, 255, 255, 0.16);
+  --color-composer-preview-close-text: #F2F4F7;
   --color-border-overlay: rgba(255, 255, 255, 0.12);
   --color-border-overlay-strong: rgba(255, 255, 255, 0.2);
   --color-shadow-overlay: 0 28px 72px rgba(0, 0, 0, 0.52);

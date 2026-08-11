@@ -3,7 +3,8 @@ import { useI18n } from "vue-i18n";
 import { X } from "lucide-vue-next";
 
 defineProps<{
-  imageUrl: string;
+  imageUrl?: string;
+  text?: string;
 }>();
 
 const emit = defineEmits<{
@@ -16,10 +17,18 @@ const { t } = useI18n();
 <template>
   <div class="composer-preview-backdrop" @click="emit('close')">
     <div class="composer-preview-dialog" @click.stop>
-      <button class="composer-preview-close" type="button" :aria-label="t('chat.composer.closePreview')" @click="emit('close')">
-        <X :size="16" />
-      </button>
-      <img :src="imageUrl" :alt="t('chat.composer.attachmentPreview')" class="composer-preview-image" />
+      <header class="composer-preview-header">
+        <h2 class="composer-preview-title">{{ t('chat.composer.attachmentPreview') }}</h2>
+        <button class="composer-preview-close" type="button" :aria-label="t('chat.composer.closePreview')" @click="emit('close')">
+          <X :size="22" />
+        </button>
+      </header>
+      <div class="composer-preview-content">
+        <div class="composer-preview-surface">
+          <img v-if="imageUrl" :src="imageUrl" :alt="t('chat.composer.attachmentPreview')" class="composer-preview-image" />
+          <pre v-else class="composer-preview-text">{{ text }}</pre>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -38,8 +47,10 @@ const { t } = useI18n();
 
 .composer-preview-dialog {
   position: relative;
-  max-width: min(88vw, var(--size-900));
-  max-height: 84vh;
+  display: flex;
+  flex-direction: column;
+  width: min(90vw, var(--size-900));
+  max-height: 88vh;
   border-radius: var(--radius-xl);
   overflow: hidden;
   background: var(--color-bg-overlay-panel);
@@ -47,25 +58,65 @@ const { t } = useI18n();
   box-shadow: var(--color-shadow-overlay);
 }
 
+.composer-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex: none;
+  padding: var(--space-4) var(--space-6) var(--space-3_5);
+  background: var(--color-bg-overlay-panel);
+}
+
+.composer-preview-title {
+  margin: 0;
+  color: var(--color-text-heading);
+  font-size: var(--text-title-md-size);
+  line-height: 1.3;
+}
+
+.composer-preview-content {
+  min-height: 0;
+  padding: 0 var(--space-6) var(--space-6);
+  background: var(--color-bg-overlay-panel);
+}
+
+.composer-preview-surface {
+  max-height: 72vh;
+  overflow: auto;
+  border: var(--size-1) solid var(--color-border-overlay);
+  border-radius: var(--radius-xl);
+  background: var(--color-bg-surface-soft);
+}
+
 .composer-preview-image {
   display: block;
   max-width: 100%;
-  max-height: 84vh;
+  max-height: 72vh;
+  margin: 0 auto;
   object-fit: contain;
 }
 
+.composer-preview-text {
+  min-height: 240px;
+  margin: 0;
+  padding: var(--space-6);
+  color: var(--color-text-primary);
+  font: inherit;
+  line-height: 1;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .composer-preview-close {
-  position: absolute;
-  top: var(--space-2);
-  right: var(--space-2);
-  z-index: 1;
-  width: var(--size-28);
-  height: var(--size-28);
-  border: 0;
+  width: var(--size-36);
+  height: var(--size-36);
+  flex: none;
+  padding: 0;
   border-radius: var(--radius-pill);
-  background: var(--color-bg-overlay-control);
-  border: var(--size-1) solid var(--color-border-overlay);
-  color: var(--color-text-inverse);
+  background: transparent;
+  border: 0;
+  color: var(--color-composer-preview-close-text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -73,6 +124,6 @@ const { t } = useI18n();
 }
 
 .composer-preview-close:hover {
-  background: var(--color-bg-overlay-control-hover);
+  background: var(--color-composer-preview-close-bg-hover);
 }
 </style>

@@ -979,25 +979,6 @@ onMounted(() => {
               'is-user-collapsed': message.role === 'user' && shouldShowUserMessageToggle(message) && !isUserMessageExpanded(message)
             }"
           >
-            <div
-              class="message-html"
-              :class="{
-                'is-collapsed': shouldShowUserMessageToggle(message) && !isUserMessageExpanded(message),
-                'is-user-collapsed': message.role === 'user' && shouldShowUserMessageToggle(message) && !isUserMessageExpanded(message)
-              }"
-              v-html="renderMarkdown(message.content)"
-            />
-            <button
-              v-if="shouldShowUserMessageToggle(message)"
-              class="message-expand-btn"
-              type="button"
-              :aria-expanded="isUserMessageExpanded(message)"
-              @click="toggleUserMessageExpanded(message)"
-            >
-              <ChevronUp v-if="isUserMessageExpanded(message)" :size="14" />
-              <ChevronDown v-else :size="14" />
-              <span>{{ isUserMessageExpanded(message) ? t("chat.messages.collapseMessage") : t("chat.messages.expandMessage") }}</span>
-            </button>
             <div v-if="messageDisplayAttachments(message).length" class="message-attachments">
               <button
                 v-for="attachment in messageDisplayAttachments(message)"
@@ -1021,6 +1002,25 @@ onMounted(() => {
                 </div>
               </button>
             </div>
+            <div
+              class="message-html"
+              :class="{
+                'is-collapsed': shouldShowUserMessageToggle(message) && !isUserMessageExpanded(message),
+                'is-user-collapsed': message.role === 'user' && shouldShowUserMessageToggle(message) && !isUserMessageExpanded(message)
+              }"
+              v-html="renderMarkdown(message.content)"
+            />
+            <button
+              v-if="shouldShowUserMessageToggle(message)"
+              class="message-expand-btn"
+              type="button"
+              :aria-expanded="isUserMessageExpanded(message)"
+              @click="toggleUserMessageExpanded(message)"
+            >
+              <ChevronUp v-if="isUserMessageExpanded(message)" :size="14" />
+              <ChevronDown v-else :size="14" />
+              <span>{{ isUserMessageExpanded(message) ? t("chat.messages.collapseMessage") : t("chat.messages.expandMessage") }}</span>
+            </button>
             <n-flex v-if="messageDisplayFileLinks(message).length" wrap :size="8" class="message-file-links">
               <n-button
                 v-for="fileLink in messageDisplayFileLinks(message)"
@@ -1511,11 +1511,12 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: var(--space-3);
-  margin-top: var(--space-3);
+  margin-bottom: var(--space-3);
 }
 
 .run-step-inline-attachments {
   margin-top: var(--space-4);
+  margin-bottom: 0;
 }
 
 .message-attachment-card {
@@ -1524,9 +1525,10 @@ onMounted(() => {
   gap: var(--space-3);
   width: 100%;
   padding: var(--space-3);
-  border: var(--size-1) solid color-mix(in srgb, var(--color-border-soft) 88%, transparent);
+  border: var(--size-1) solid var(--color-chat-attachment-border);
   border-radius: var(--radius-xl);
-  background: color-mix(in srgb, var(--color-bg-surface-soft) 92%, white);
+  background: var(--color-chat-attachment-bg);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   text-align: left;
   cursor: pointer;
 }
@@ -1547,8 +1549,8 @@ onMounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-bg-brand-soft);
-  color: var(--color-text-brand);
+  background: var(--color-chat-attachment-file-bg);
+  color: var(--color-chat-attachment-file-text);
   font-size: var(--text-caption-size);
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -1561,7 +1563,7 @@ onMounted(() => {
 .message-attachment-name {
   font-size: var(--text-body-size);
   font-weight: 700;
-  color: inherit;
+  color: var(--color-chat-attachment-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1570,7 +1572,7 @@ onMounted(() => {
 .message-attachment-subtitle {
   margin-top: var(--space-1);
   font-size: var(--text-caption-size);
-  color: var(--color-text-muted);
+  color: var(--color-chat-attachment-muted);
 }
 
 .message-time {

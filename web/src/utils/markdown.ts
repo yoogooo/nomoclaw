@@ -5,9 +5,6 @@ import texmath from "markdown-it-texmath";
 import "katex/dist/katex.min.css";
 import "markdown-it-texmath/css/texmath.css";
 
-const cjkStrongBoundaryMarker = "mdCjkStrongBoundary9x";
-const protectedMarkdownSegmentPattern = /(`{3,}[\s\S]*?`{3,}|~{3,}[\s\S]*?~{3,}|`[^`\n]*`|\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\]|(?<!\\)\$(?!\$)(?:\\.|[^$\\\n])+(?<!\\)\$)/g;
-
 const markdown = new MarkdownIt({
   breaks: true,
   linkify: true,
@@ -24,30 +21,58 @@ markdown.use(texmath, {
   }
 });
 
-function normalizeCjkStrongBoundaries(content: string) {
-  let normalized = "";
-  let cursor = 0;
+function cjkStrongBoundaryPlugin(md: MarkdownIt) {
+  const punctuationAtEnd = /\p{P}$/u;
+  const cjkCharacter = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\u3000-\u303f]/u;
 
-  for (const match of content.matchAll(protectedMarkdownSegmentPattern)) {
-    const segmentStart = match.index ?? 0;
-    normalized += normalizePlainMarkdownSegment(content.slice(cursor, segmentStart));
-    normalized += match[0];
-    cursor = segmentStart + match[0].length;
-  }
+  md.inline.ruler.before("emphasis", "cjk_strong_boundary", (state: any, silent: boolean) => {
+    const start = state.pos;
+    if (state.src.slice(start, start + 2) !== "**") {
+      return false;
+    }
 
-  return normalized + normalizePlainMarkdownSegment(content.slice(cursor));
+    let end = start + 2;
+    while ((end = state.src.indexOf("**", end)) !== -1) {
+      const inner = state.src.slice(start + 2, end);
+      const nextCharacter = state.src[end + 2] || "";
+      const isEscaped = state.src[end - 1] === "\\";
+      if (
+        inner
+        && !inner.includes("\n")
+        && !isEscaped
+        && punctuationAtEnd.test(inner)
+        && cjkCharacter.test(nextCharacter)
+      ) {
+        if (silent) {
+          state.pos = end + 2;
+          return true;
+        }
+
+        const baseLevel = state.level;
+        const open = state.push("strong_open", "strong", 1);
+        open.markup = "**";
+
+        const children: any[] = [];
+        state.md.inline.parse(inner, state.md, state.env, children);
+        for (const child of children) {
+          child.level += baseLevel + 1;
+          state.tokens.push(child);
+          state.tokens_meta.push(null);
+        }
+
+        const close = state.push("strong_close", "strong", -1);
+        close.markup = "**";
+        state.pos = end + 2;
+        return true;
+      }
+      end += 2;
+    }
+
+    return false;
+  });
 }
 
-function normalizePlainMarkdownSegment(content: string) {
-  // markdown-it does not recognize a closing strong delimiter when the
-  // strong content ends in CJK punctuation such as "）" and is followed by
-  // another CJK character. Add a temporary ASCII character inside the strong
-  // span so its delimiter rules can match, then remove it after rendering.
-  return content.replace(
-    /\*\*([^*\n]*\p{P})\*\*(?=[\p{Script=Han}\u3000-\u303f])/gu,
-    `**$1${cjkStrongBoundaryMarker}**`
-  );
-}
+markdown.use(cjkStrongBoundaryPlugin);
 
 const defaultLinkOpenRenderer = markdown.renderer.rules.link_open
   ?? ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options));
@@ -71,8 +96,7 @@ markdown.renderer.rules.link_open = (tokens, idx, options, env, self) => {
 };
 
 export function renderMarkdown(content: string) {
-  const rendered = markdown.render(normalizeCjkStrongBoundaries(content || ""));
-  return DOMPurify.sanitize(rendered.replaceAll(cjkStrongBoundaryMarker, ""), {
+  return DOMPurify.sanitize(markdown.render(content || ""), {
     ADD_ATTR: ["target", "rel"]
   });
 }
