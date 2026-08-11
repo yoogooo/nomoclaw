@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, h, nextTick, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronUp, Copy, Sparkles } from "lucide-vue-next";
+import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronUp, Copy, File, FileArchive, FileAudio, FileImage, FileText, FileType2, FileVideo, Sparkles } from "lucide-vue-next";
 import { NButton, NCard, NCollapse, NCollapseItem, NFlex, NTag } from "naive-ui";
 import ApprovalBanner from "./ApprovalBanner.vue";
 import MessageCopyButton from "./MessageCopyButton.vue";
 import ComposerPanel from "./composer/ComposerPanel.vue";
+import ComposerPreviewOverlay from "./composer/ComposerPreviewOverlay.vue";
 import UiInstantTooltip from "@/components/UiInstantTooltip.vue";
 import UiSpinner from "@/components/UiSpinner.vue";
 import { message as discreteMessage } from "@/discrete";
@@ -54,6 +55,8 @@ const expandedUserMessageMap = ref<Record<string, boolean>>({});
 const expandedRunOutputMap = ref<Record<string, boolean>>({});
 const copiedRunCommandMap = ref<Record<string, boolean>>({});
 const messageListRef = ref<HTMLElement | null>(null);
+const previewAttachmentImageUrl = ref("");
+const previewAttachmentText = ref("");
 const shouldScrollToBottomOnNextRender = ref(true);
 const userMessageCollapseLineLimit = 10;
 const runOutputCollapsedLineLimit = 20;
@@ -581,6 +584,25 @@ function isImageAttachment(contentType?: string, mimeGroup?: string) {
   return mimeGroup === "image" || Boolean(contentType?.startsWith("image/"));
 }
 
+function attachmentIcon(attachment: ConversationAttachment) {
+  switch (attachment.mimeGroup) {
+    case "image":
+      return FileImage;
+    case "audio":
+      return FileAudio;
+    case "video":
+      return FileVideo;
+    case "pdf":
+      return FileType2;
+    case "text":
+      return FileText;
+    case "application":
+      return FileArchive;
+    default:
+      return File;
+  }
+}
+
 function basenameFromPathLike(value: string) {
   const normalized = (value || "").trim().replace(/\\/g, "/");
   if (!normalized) return "";
@@ -754,6 +776,32 @@ function inlineStepFileLinks(messageUid: string | undefined, step: ConversationR
 
 function openAttachment(fileUrl: string) {
   window.open(fileUrl, "_blank", "noopener,noreferrer");
+}
+
+async function previewMessageAttachment(attachment: ConversationAttachment) {
+  previewAttachmentImageUrl.value = "";
+  previewAttachmentText.value = "";
+  if (isImageAttachment(attachment.contentType, attachment.mimeGroup)) {
+    previewAttachmentImageUrl.value = attachment.fileUrl;
+    return;
+  }
+  if (attachment.mimeGroup === "text") {
+    try {
+      const response = await fetch(attachment.fileUrl);
+      if (!response.ok) throw new Error(`Failed to load attachment: ${response.status}`);
+      previewAttachmentText.value = await response.text();
+      return;
+    } catch {
+      openAttachment(attachment.fileUrl);
+      return;
+    }
+  }
+  openAttachment(attachment.fileUrl);
+}
+
+function closeAttachmentPreview() {
+  previewAttachmentImageUrl.value = "";
+  previewAttachmentText.value = "";
 }
 
 function resolveMessageTokenUsage(messageItem: ConversationMessage) {
@@ -985,7 +1033,7 @@ onMounted(() => {
                 :key="attachment.fileUrl"
                 type="button"
                 class="message-attachment-card"
-                @click="openAttachment(attachment.fileUrl)"
+                @click="previewMessageAttachment(attachment)"
               >
                 <img
                   v-if="isImageAttachment(attachment.contentType, attachment.mimeGroup)"
@@ -993,7 +1041,9 @@ onMounted(() => {
                   :alt="attachment.name"
                   class="message-attachment-image"
                 />
-                <div v-else class="message-attachment-file">FILE</div>
+                <div v-else class="message-attachment-file">
+                  <component :is="attachmentIcon(attachment)" :size="28" :stroke-width="1.8" />
+                </div>
                 <div class="message-attachment-meta">
                   <div class="message-attachment-name">{{ attachment.name }}</div>
                   <div class="message-attachment-subtitle">
@@ -1283,6 +1333,12 @@ onMounted(() => {
         </div>
       </template>
     </div>
+    <ComposerPreviewOverlay
+      v-if="previewAttachmentImageUrl || previewAttachmentText"
+      :image-url="previewAttachmentImageUrl"
+      :text="previewAttachmentText"
+      @close="closeAttachmentPreview"
+    />
     <ComposerPanel v-if="!props.hideComposer" />
   </section>
 </template>
