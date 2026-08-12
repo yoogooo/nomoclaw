@@ -408,8 +408,10 @@ final class CodexApiClient {
         JsonNode root = JsonUtil.fromJson(payload, JsonNode.class);
         String type = firstNonBlank(trim(event), text(root.path("type")));
         if ("response.output_text.delta".equals(type) || "response.refusal.delta".equals(type)) {
-            String delta = firstNonBlankPreserving(text(root.path("delta")), text(root.path("text")));
-            if (!delta.isBlank()) {
+            String delta = root.hasNonNull("delta")
+                    ? text(root.path("delta"))
+                    : text(root.path("text"));
+            if (!delta.isEmpty()) {
                 fullText.append(delta);
                 handler.onPartialResponse(delta);
             }

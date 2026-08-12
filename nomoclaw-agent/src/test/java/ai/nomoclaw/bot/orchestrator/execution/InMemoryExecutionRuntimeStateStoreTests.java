@@ -37,4 +37,18 @@ class InMemoryExecutionRuntimeStateStoreTests {
         assertEquals("", store.getBufferedAnswer("msg-1"));
         assertEquals(1, store.currentRound("msg-1", 1));
     }
+
+    @Test
+    void shouldPreserveWhitespaceOnlyStreamingDeltas() {
+        InMemoryExecutionRuntimeStateStore store = new InMemoryExecutionRuntimeStateStore();
+
+        store.appendDelta("msg-1", "heading");
+        store.appendDelta("msg-1", "\n\n");
+        store.appendDelta("msg-1", "\t");
+        store.appendDelta("msg-1", " ");
+        store.appendDelta("msg-1", null);
+        store.appendDelta("msg-1", "");
+
+        assertEquals("heading\n\n\t ", store.getBufferedAnswer("msg-1"));
+    }
 }

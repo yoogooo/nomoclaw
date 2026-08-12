@@ -574,7 +574,7 @@ public class AgentApplicationService {
                 executionScope.promptContext(),
                 roundIndex,
                 textDelta -> {
-                    if (textDelta == null || textDelta.isBlank()) {
+                    if (textDelta == null || textDelta.isEmpty()) {
                         return;
                     }
                     streamedText.append(textDelta);

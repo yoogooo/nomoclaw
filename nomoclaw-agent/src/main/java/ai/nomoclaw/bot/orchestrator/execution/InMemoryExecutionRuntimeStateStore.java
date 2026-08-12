@@ -50,7 +50,7 @@ public class InMemoryExecutionRuntimeStateStore implements ExecutionRuntimeState
 
     @Override
     public void appendDelta(String messageUid, String delta) {
-        if (delta == null || delta.isBlank()) {
+        if (delta == null || delta.isEmpty()) {
             return;
         }
         streamingAnswerBuffers.computeIfAbsent(messageUid, ignored -> new StringBuilder()).append(delta);
