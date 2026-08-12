@@ -571,6 +571,42 @@ export interface ConversationMessageRun {
   steps: ConversationRunStep[];
 }
 
+export interface LlmTraceSummary {
+  traceUid: string;
+  requestUid: string;
+  scene: string;
+  roundIndex: number;
+  attemptIndex: number;
+  provider: string;
+  modelName: string;
+  status: string;
+  latencyMs: number;
+  inputTokens: number;
+  cachedInputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  usageAvailable: boolean;
+  requestStartedTime: string;
+  responseFinishedTime?: string | null;
+  responsePreview: string;
+  errorMessage: string;
+}
+
+export interface LlmTraceDetail extends LlmTraceSummary {
+  conversationUid: string;
+  messageUid: string;
+  systemPrompt: string;
+  requestMessages: string;
+  toolSpecifications: string;
+  toolChoice: string;
+  requestMetadata: string;
+  responseContent: string;
+  responseThinking: string;
+  responseToolCalls: string;
+  finishReason: string;
+  errorType: string;
+}
+
 export interface CronJob {
   jobUid: string;
   agentUid: string;

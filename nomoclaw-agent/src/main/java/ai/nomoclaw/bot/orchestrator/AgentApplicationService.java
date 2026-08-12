@@ -572,6 +572,7 @@ public class AgentApplicationService {
                 executionScope.availableTools(),
                 ToolChoice.AUTO,
                 executionScope.promptContext(),
+                roundIndex,
                 textDelta -> {
                     if (textDelta == null || textDelta.isBlank()) {
                         return;

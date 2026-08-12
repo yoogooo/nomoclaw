@@ -10,6 +10,8 @@ import ai.nomoclaw.bot.api.dto.conversation.response.ConversationSearchPageRespo
 import ai.nomoclaw.bot.api.dto.conversation.response.ConversationSearchResultResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.ConversationSummaryResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.ConversationSummaryPageResponse;
+import ai.nomoclaw.bot.api.dto.conversation.response.LlmTraceDetailResponse;
+import ai.nomoclaw.bot.api.dto.conversation.response.LlmTraceSummaryResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.MessageFileLinkResponse;
 import ai.nomoclaw.bot.conversation.model.ConversationAttachmentDto;
 import ai.nomoclaw.bot.conversation.model.ConversationMessageAnchorDto;
@@ -22,6 +24,8 @@ import ai.nomoclaw.bot.conversation.model.ConversationRunStepDto;
 import ai.nomoclaw.bot.conversation.model.ConversationSummaryDto;
 import ai.nomoclaw.bot.conversation.model.ConversationSummaryPageDto;
 import ai.nomoclaw.bot.conversation.model.MessageFileLinkDto;
+import ai.nomoclaw.bot.conversation.model.LlmTraceDetailDto;
+import ai.nomoclaw.bot.conversation.model.LlmTraceSummaryDto;
 
 import java.util.List;
 
@@ -153,6 +157,26 @@ public final class ConversationApiMapper {
                 dto.updatedTime(),
                 dto.steps().stream().map(ConversationApiMapper::toRunStep).toList()
         );
+    }
+
+    public static List<LlmTraceSummaryResponse> toLlmTraceSummaries(List<LlmTraceSummaryDto> dtos) {
+        return dtos.stream().map(ConversationApiMapper::toLlmTraceSummary).toList();
+    }
+
+    public static LlmTraceSummaryResponse toLlmTraceSummary(LlmTraceSummaryDto dto) {
+        return new LlmTraceSummaryResponse(dto.traceUid(), dto.requestUid(), dto.scene(), dto.roundIndex(), dto.attemptIndex(),
+                dto.provider(), dto.modelName(), dto.status(), dto.latencyMs(), dto.inputTokens(), dto.cachedInputTokens(),
+                dto.outputTokens(), dto.totalTokens(), dto.usageAvailable(), dto.requestStartedTime(), dto.responseFinishedTime(),
+                dto.responsePreview(), dto.errorMessage());
+    }
+
+    public static LlmTraceDetailResponse toLlmTraceDetail(LlmTraceDetailDto dto) {
+        return new LlmTraceDetailResponse(dto.traceUid(), dto.requestUid(), dto.conversationUid(), dto.messageUid(), dto.scene(),
+                dto.roundIndex(), dto.attemptIndex(), dto.provider(), dto.modelName(), dto.status(), dto.requestStartedTime(),
+                dto.responseFinishedTime(), dto.latencyMs(), dto.systemPrompt(), dto.requestMessages(), dto.toolSpecifications(),
+                dto.toolChoice(), dto.requestMetadata(), dto.responseContent(), dto.responseThinking(), dto.responseToolCalls(), dto.finishReason(),
+                dto.inputTokens(), dto.cachedInputTokens(), dto.outputTokens(), dto.totalTokens(), dto.usageAvailable(),
+                dto.errorType(), dto.errorMessage());
     }
 
     public static ConversationRunStepResponse toRunStep(ConversationRunStepDto dto) {

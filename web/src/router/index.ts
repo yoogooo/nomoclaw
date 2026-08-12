@@ -15,6 +15,7 @@ import ModelsPage from "@/pages/ModelsPage.vue";
 import McpPage from "@/pages/McpPage.vue";
 import ForbiddenPage from "@/pages/ForbiddenPage.vue";
 import DesignSystemPage from "@/pages/design-system/DesignSystemPage.vue";
+import LlmTracePage from "@/pages/LlmTracePage.vue";
 
 export const router = createRouter({
   history: createWebHashHistory(import.meta.env.BASE_URL),
@@ -27,6 +28,11 @@ export const router = createRouter({
     {
       path: "/index.html",
       redirect: "/"
+    },
+    {
+      path: "/trace",
+      name: "llm-trace",
+      component: LlmTracePage
     },
     {
       path: "/cron",

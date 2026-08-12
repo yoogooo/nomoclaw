@@ -16,6 +16,7 @@ public class TokenUsageRecordEntity {
     private String modelName;
     private String conversationUid;
     private String messageUid;
+    private String traceUid;
     private Integer inputTokens;
     private Integer cachedInputTokens;
     private Integer outputTokens;
@@ -37,6 +38,8 @@ public class TokenUsageRecordEntity {
     public void setConversationUid(String conversationUid) { this.conversationUid = conversationUid; }
     public String getMessageUid() { return messageUid; }
     public void setMessageUid(String messageUid) { this.messageUid = messageUid; }
+    public String getTraceUid() { return traceUid; }
+    public void setTraceUid(String traceUid) { this.traceUid = traceUid; }
     public Integer getInputTokens() { return inputTokens; }
     public void setInputTokens(Integer inputTokens) { this.inputTokens = inputTokens; }
     public Integer getCachedInputTokens() { return cachedInputTokens; }

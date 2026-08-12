@@ -33,6 +33,17 @@ public interface Planner {
                                     Runnable onRetryReset,
                                     Consumer<RetryNotice> onRetry);
 
+    default StreamReasonResult reasonStream(List<ChatMessage> memory,
+                                             List<ToolSpecification> toolSpecifications,
+                                             ToolChoice toolChoice,
+                                             PromptLoader.PromptContext promptContext,
+                                             int roundIndex,
+                                             Consumer<String> onDelta,
+                                             Runnable onRetryReset,
+                                             Consumer<RetryNotice> onRetry) {
+        return reasonStream(memory, toolSpecifications, toolChoice, promptContext, onDelta, onRetryReset, onRetry);
+    }
+
     SummaryResult summarize(List<ChatMessage> memory,
                             String stopReason,
                             int roundsUsed,

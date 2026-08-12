@@ -4,6 +4,7 @@ import ai.nomoclaw.bot.util.UuidUtil;
 
 import ai.nomoclaw.bot.llm.config.LlmProperties;
 import ai.nomoclaw.bot.llm.debug.LlmDebugLogger;
+import ai.nomoclaw.bot.llm.debug.LlmTraceRecorder;
 import ai.nomoclaw.bot.model.TokenUsageScene;
 import ai.nomoclaw.bot.orchestrator.TokenUsageRecorder;
 import ai.nomoclaw.bot.prompt.PromptLoader;
@@ -44,25 +45,28 @@ public class TaskPlanner implements Planner {
     private final SkillPromptLoader skillPromptLoader;
     private final LlmDebugLogger llmDebugLogger;
     private final TokenUsageRecorder tokenUsageRecorder;
+    private final LlmTraceRecorder llmTraceRecorder;
 
     @Autowired
     public TaskPlanner(LlmProperties llmProperties,
                        RuntimeChatModelResolver runtimeChatModelResolver,
                        SkillPromptLoader skillPromptLoader,
                        LlmDebugLogger llmDebugLogger,
-                       TokenUsageRecorder tokenUsageRecorder) {
+                       TokenUsageRecorder tokenUsageRecorder,
+                       LlmTraceRecorder llmTraceRecorder) {
         this.llmProperties = llmProperties;
         this.runtimeChatModelResolver = runtimeChatModelResolver;
         this.skillPromptLoader = skillPromptLoader;
         this.llmDebugLogger = llmDebugLogger;
         this.tokenUsageRecorder = tokenUsageRecorder;
+        this.llmTraceRecorder = llmTraceRecorder;
     }
 
     public TaskPlanner(LlmProperties llmProperties,
                        RuntimeChatModelResolver runtimeChatModelResolver,
                        SkillPromptLoader skillPromptLoader,
                        LlmDebugLogger llmDebugLogger) {
-        this(llmProperties, runtimeChatModelResolver, skillPromptLoader, llmDebugLogger, null);
+        this(llmProperties, runtimeChatModelResolver, skillPromptLoader, llmDebugLogger, null, null);
     }
 
     @Override
@@ -70,14 +74,15 @@ public class TaskPlanner implements Planner {
                                List<ToolSpecification> toolSpecifications,
                                ToolChoice toolChoice,
                                PromptLoader.PromptContext promptContext) {
-        return reason(memory, toolSpecifications, toolChoice, promptContext, TokenUsageScene.CHAT_REASONING);
+        return reason(memory, toolSpecifications, toolChoice, promptContext, TokenUsageScene.CHAT_REASONING, 1);
     }
 
     private ChatResponse reason(List<ChatMessage> memory,
                                 List<ToolSpecification> toolSpecifications,
                                 ToolChoice toolChoice,
                                 PromptLoader.PromptContext promptContext,
-                                TokenUsageScene usageScene) {
+                                TokenUsageScene usageScene,
+                                int roundIndex) {
         PreparedRequest preparedRequest = buildRequest(memory, toolSpecifications, toolChoice, promptContext);
         ChatRequest request = preparedRequest.request();
         RuntimeChatModelResolver.ResolvedModel resolvedModel = runtimeChatModelResolver.resolve(promptContext);
@@ -94,6 +99,7 @@ public class TaskPlanner implements Planner {
                 toolChoice,
                 extractToolNames(toolSpecifications)
         );
+        LlmTraceRecorder.TraceHandle trace = startTrace("task_reason", resolvedModel, promptContext, preparedRequest, toolChoice, toolSpecifications, roundIndex, 1);
         logReasonStart(resolvedModel, memory, toolSpecifications, toolChoice, preparedRequest.systemPrompt());
         try {
             ChatResponse response = executeWithRetries(
@@ -103,12 +109,14 @@ public class TaskPlanner implements Planner {
             );
             llmDebugLogger.logResponse(requestId, "task_reason", resolvedModel.providerId(), resolvedModel.modelId(),
                     promptContext, response, elapsedMillis(startNanos));
-            recordUsage(usageScene, resolvedModel, promptContext, response);
+            llmTraceRecorder.complete(trace, response);
+            recordUsage(usageScene, resolvedModel, promptContext, response, trace);
             logReasonFinish(response);
             return response;
         } catch (Exception ex) {
             llmDebugLogger.logError(requestId, "task_reason", resolvedModel.providerId(), resolvedModel.modelId(),
                     promptContext, ex, elapsedMillis(startNanos));
+            llmTraceRecorder.fail(trace, ex);
             throw ex;
         }
     }
@@ -118,6 +126,18 @@ public class TaskPlanner implements Planner {
                                            List<ToolSpecification> toolSpecifications,
                                            ToolChoice toolChoice,
                                            PromptLoader.PromptContext promptContext,
+                                           Consumer<String> onDelta,
+                                           Runnable onRetryReset,
+                                           Consumer<RetryNotice> onRetry) {
+        return reasonStream(memory, toolSpecifications, toolChoice, promptContext, 1, onDelta, onRetryReset, onRetry);
+    }
+
+    @Override
+    public StreamReasonResult reasonStream(List<ChatMessage> memory,
+                                           List<ToolSpecification> toolSpecifications,
+                                           ToolChoice toolChoice,
+                                           PromptLoader.PromptContext promptContext,
+                                           int roundIndex,
                                            Consumer<String> onDelta,
                                            Runnable onRetryReset,
                                            Consumer<RetryNotice> onRetry) {
@@ -137,6 +157,7 @@ public class TaskPlanner implements Planner {
                 toolChoice,
                 extractToolNames(toolSpecifications)
         );
+        LlmTraceRecorder.TraceHandle trace = startTrace("task_reason", resolvedModel, promptContext, preparedRequest, toolChoice, toolSpecifications, roundIndex, 1);
         logReasonStart(resolvedModel, memory, toolSpecifications, toolChoice, preparedRequest.systemPrompt());
         if (!resolvedModel.supportsStreaming()) {
             log.info("[Reasoning] stream fallback disabled provider={} model={}", resolvedModel.providerId(), resolvedModel.modelId());
@@ -148,13 +169,15 @@ public class TaskPlanner implements Planner {
                 );
                 llmDebugLogger.logResponse(requestId, "task_reason", resolvedModel.providerId(), resolvedModel.modelId(),
                         promptContext, response, elapsedMillis(startNanos));
-                recordUsage(TokenUsageScene.CHAT_REASONING, resolvedModel, promptContext, response);
+                llmTraceRecorder.complete(trace, response);
+                recordUsage(TokenUsageScene.CHAT_REASONING, resolvedModel, promptContext, response, trace);
                 String text = response.aiMessage() == null ? "" : response.aiMessage().text();
                 logReasonFinish(response);
                 return new StreamReasonResult(response, text == null ? "" : text, false);
             } catch (Exception ex) {
                 llmDebugLogger.logError(requestId, "task_reason", resolvedModel.providerId(), resolvedModel.modelId(),
                         promptContext, ex, elapsedMillis(startNanos));
+                llmTraceRecorder.fail(trace, ex);
                 throw ex;
             }
         }
@@ -171,13 +194,15 @@ public class TaskPlanner implements Planner {
             }
             llmDebugLogger.logResponse(requestId, "task_reason", resolvedModel.providerId(), resolvedModel.modelId(),
                     promptContext, response, elapsedMillis(startNanos));
-            recordUsage(TokenUsageScene.CHAT_REASONING, resolvedModel, promptContext, response);
+            llmTraceRecorder.complete(trace, response);
+            recordUsage(TokenUsageScene.CHAT_REASONING, resolvedModel, promptContext, response, trace);
             logReasonFinish(response);
             return new StreamReasonResult(response, streamed.accumulatedText(), streamed.streamed());
         } catch (Exception ex) {
             Throwable cause = ex.getCause() == null ? ex : ex.getCause();
             llmDebugLogger.logError(requestId, "task_reason", resolvedModel.providerId(), resolvedModel.modelId(),
                     promptContext, cause, elapsedMillis(startNanos));
+            llmTraceRecorder.fail(trace, cause);
             throw ex;
         }
     }
@@ -236,13 +261,15 @@ public class TaskPlanner implements Planner {
     private void recordUsage(TokenUsageScene scene,
                              RuntimeChatModelResolver.ResolvedModel resolvedModel,
                              PromptLoader.PromptContext promptContext,
-                             ChatResponse response) {
+                             ChatResponse response,
+                             LlmTraceRecorder.TraceHandle trace) {
         if (tokenUsageRecorder == null) {
             return;
         }
         tokenUsageRecorder.record(scene, resolvedModel.providerId(), resolvedModel.modelId(),
                 promptContext == null ? "" : promptContext.sessionId(),
-                promptContext == null ? "" : promptContext.messageUid(), response);
+                promptContext == null ? "" : promptContext.messageUid(),
+                trace == null ? "" : trace.traceUid(), response);
     }
 
     @Override
@@ -263,12 +290,25 @@ public class TaskPlanner implements Planner {
                 + "停止原因=" + stopReason + "，已执行轮次=" + roundsUsed + "/" + maxRounds + "。"
         ));
 
-        ChatResponse response = reason(summaryMessages, toolSpecifications, ToolChoice.NONE, promptContext, TokenUsageScene.CHAT_SUMMARY);
+        ChatResponse response = reason(summaryMessages, toolSpecifications, ToolChoice.NONE, promptContext, TokenUsageScene.CHAT_SUMMARY, Math.max(1, roundsUsed));
         String answer = response.aiMessage() == null ? "" : nullToEmpty(response.aiMessage().text());
         if (!answer.isBlank()) {
             return new SummaryResult(answer.trim(), response);
         }
         return new SummaryResult("任务已停止。停止原因=" + stopReason + "，已执行轮次=" + roundsUsed + "/" + maxRounds + "。", response);
+    }
+
+    private LlmTraceRecorder.TraceHandle startTrace(String scene,
+                                                     RuntimeChatModelResolver.ResolvedModel resolvedModel,
+                                                     PromptLoader.PromptContext promptContext,
+                                                     PreparedRequest preparedRequest,
+                                                     ToolChoice toolChoice,
+                                                     List<ToolSpecification> toolSpecifications,
+                                                     int roundIndex,
+                                                     int attemptIndex) {
+        return llmTraceRecorder == null ? null : llmTraceRecorder.start(scene, resolvedModel.providerId(), resolvedModel.modelId(),
+                promptContext, preparedRequest.systemPrompt(), preparedRequest.request(), toolChoice, toolSpecifications,
+                roundIndex, attemptIndex);
     }
 
     private String nullToEmpty(String value) {

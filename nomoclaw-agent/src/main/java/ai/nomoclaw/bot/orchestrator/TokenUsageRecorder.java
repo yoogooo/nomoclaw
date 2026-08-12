@@ -23,6 +23,11 @@ public class TokenUsageRecorder {
 
     public void record(TokenUsageScene scene, String provider, String modelName,
                        String conversationUid, String messageUid, ChatResponse response) {
+        record(scene, provider, modelName, conversationUid, messageUid, "", response);
+    }
+
+    public void record(TokenUsageScene scene, String provider, String modelName,
+                       String conversationUid, String messageUid, String traceUid, ChatResponse response) {
         TokenUsage usage = response == null || response.metadata() == null ? null : response.metadata().tokenUsage();
         Integer input = usage == null ? null : usage.inputTokenCount();
         Integer output = usage == null ? null : usage.outputTokenCount();
@@ -35,6 +40,7 @@ public class TokenUsageRecorder {
         entity.setModelName(safe(modelName));
         entity.setConversationUid(safe(conversationUid));
         entity.setMessageUid(safe(messageUid));
+        entity.setTraceUid(safe(traceUid));
         entity.setInputTokens(nonNegative(input));
         entity.setCachedInputTokens(TokenUsageCacheTokenExtractor.extractCachedInputTokens(usage));
         entity.setOutputTokens(nonNegative(output));

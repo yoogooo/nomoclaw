@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, h, nextTick, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
 import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronUp, Copy, File, FileArchive, FileAudio, FileImage, FileText, FileType2, FileVideo, Sparkles } from "lucide-vue-next";
 import { NButton, NCard, NCollapse, NCollapseItem, NFlex, NTag } from "naive-ui";
 import ApprovalBanner from "./ApprovalBanner.vue";
@@ -48,6 +49,7 @@ const conversationRunsStore = useConversationRunsStore();
 const agentCatalogStore = useAgentCatalogStore();
 const jinnangStore = useJinnangStore();
 const { t } = useI18n();
+const router = useRouter();
 const copiedMessageMap = ref<Record<string, boolean>>({});
 const savingTipMap = ref<Record<string, boolean>>({});
 const savedTipMap = ref<Record<string, boolean>>({});
@@ -837,6 +839,17 @@ function messageTokenUsageText(messageItem: ConversationMessage) {
   return `Total ${usage.total}`;
 }
 
+function openLlmTrace(messageItem: ConversationMessage) {
+  const conversationUid = conversationStore.currentConversationUid;
+  const messageUid = String(messageItem.messageUid || "").trim();
+  if (!conversationUid || !messageUid) return;
+  const traceRoute = router.resolve({
+    path: "/trace",
+    query: { conversationUid, messageUid }
+  });
+  window.open(traceRoute.href, "_blank", "noopener,noreferrer");
+}
+
 function isTipSaved(messageItem: ConversationMessage) {
   if (savedTipMap.value[messageActionKey(messageItem)]) {
     return true;
@@ -1169,6 +1182,13 @@ onMounted(() => {
                 <template #header>
                   <div class="run-header">
                     <div class="run-title">{{ t("chat.messages.runTitle") }}</div>
+                    <button
+                      class="run-trace-button"
+                      type="button"
+                      @click.stop="openLlmTrace(message)"
+                    >
+                      {{ t("chat.trace.title") }}
+                    </button>
                   </div>
                 </template>
                 <div class="run-summary">{{ runProgressText(message.messageUid || "") }}</div>
@@ -1842,6 +1862,20 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
+}
+
+.run-trace-button {
+  border: 0;
+  border-radius: 6px;
+  padding: 4px 8px;
+  background: color-mix(in srgb, var(--color-primary, #0f766e) 12%, transparent);
+  color: var(--color-primary, #0f766e);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.run-trace-button:hover {
+  background: color-mix(in srgb, var(--color-primary, #0f766e) 20%, transparent);
 }
 
 .run-summary {

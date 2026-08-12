@@ -12,6 +12,10 @@ import java.util.List;
 @Repository
 public class TokenUsageRecordRepository extends CrudRepository<TokenUsageRecordMapper, TokenUsageRecordEntity> {
 
+    public void deleteByConversationUid(String conversationUid) {
+        lambdaUpdate().eq(TokenUsageRecordEntity::getConversationUid, conversationUid).remove();
+    }
+
     /**
      * Returns usage records matching the optional dashboard filters.
      */

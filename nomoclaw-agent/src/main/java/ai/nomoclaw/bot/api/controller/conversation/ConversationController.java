@@ -18,11 +18,14 @@ import ai.nomoclaw.bot.api.dto.conversation.response.ConversationSummaryPageResp
 import ai.nomoclaw.bot.api.dto.conversation.response.CreateConversationResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.MessageResponse;
 import ai.nomoclaw.bot.api.dto.conversation.response.UploadFilesResponse;
+import ai.nomoclaw.bot.api.dto.conversation.response.LlmTraceDetailResponse;
+import ai.nomoclaw.bot.api.dto.conversation.response.LlmTraceSummaryResponse;
 import ai.nomoclaw.bot.api.mapper.ConversationApiMapper;
 import ai.nomoclaw.bot.orchestrator.approval.ApprovalAppService;
 import ai.nomoclaw.bot.conversation.app.ConversationAppService;
 import ai.nomoclaw.bot.conversation.support.ConversationAttachmentService;
 import ai.nomoclaw.bot.conversation.app.MessageRunAppService;
+import ai.nomoclaw.bot.conversation.service.LlmTraceService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.FileSystemResource;
@@ -58,15 +61,18 @@ public class ConversationController {
     private final ConversationAttachmentService conversationAttachmentAppService;
     private final MessageRunAppService messageRunAppService;
     private final ApprovalAppService approvalAppService;
+    private final LlmTraceService llmTraceService;
 
     public ConversationController(ConversationAppService conversationAppService,
                                   ConversationAttachmentService conversationAttachmentAppService,
                                   MessageRunAppService messageRunAppService,
-                                  ApprovalAppService approvalAppService) {
+                                  ApprovalAppService approvalAppService,
+                                  LlmTraceService llmTraceService) {
         this.conversationAppService = conversationAppService;
         this.conversationAttachmentAppService = conversationAttachmentAppService;
         this.messageRunAppService = messageRunAppService;
         this.approvalAppService = approvalAppService;
+        this.llmTraceService = llmTraceService;
     }
 
     @PostMapping("/conversations")
@@ -172,6 +178,24 @@ public class ConversationController {
     public List<ConversationMessageRunResponse> listMessageRuns(@PathVariable String conversationUid) {
         log.info("[AgentAPI] listMessageRuns conversationUid={}", conversationUid);
         return ConversationApiMapper.toMessageRuns(conversationAppService.listMessageRuns(conversationUid));
+    }
+
+    /**
+     * Lists the LLM calls belonging to one user message.
+     */
+    @GetMapping("/conversations/{conversationUid}/messages/{messageUid}/traces")
+    public List<LlmTraceSummaryResponse> listLlmTraces(@PathVariable String conversationUid,
+                                                       @PathVariable String messageUid) {
+        return ConversationApiMapper.toLlmTraceSummaries(llmTraceService.list(conversationUid, messageUid));
+    }
+
+    /**
+     * Reads one complete LLM request/response trace after ownership validation.
+     */
+    @GetMapping("/conversations/{conversationUid}/traces/{traceUid}")
+    public LlmTraceDetailResponse getLlmTrace(@PathVariable String conversationUid,
+                                              @PathVariable String traceUid) {
+        return ConversationApiMapper.toLlmTraceDetail(llmTraceService.get(conversationUid, traceUid));
     }
 
     @PostMapping("/conversations/{conversationUid}/messages")

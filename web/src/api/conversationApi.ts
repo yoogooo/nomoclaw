@@ -13,6 +13,8 @@ import type {
   ConversationMessageAnchor,
   ConversationMessagePage,
   ConversationMessageRun,
+  LlmTraceSummary,
+  LlmTraceDetail,
   ConversationSearchPage,
   ConversationSummaryPage,
   ConversationSummary,
@@ -292,6 +294,12 @@ export const conversationApi = {
   },
   listMessageRuns(conversationUid: string) {
     return requestJson<ConversationMessageRun[]>(`/api/conversations/${conversationUid}/message-runs`);
+  },
+  listLlmTraces(conversationUid: string, messageUid: string) {
+    return requestJson<LlmTraceSummary[]>(`/api/conversations/${conversationUid}/messages/${messageUid}/traces`);
+  },
+  getLlmTrace(conversationUid: string, traceUid: string) {
+    return requestJson<LlmTraceDetail>(`/api/conversations/${conversationUid}/traces/${traceUid}`);
   },
   uploadConversationFiles(conversationUid: string, payload: {
     files: File[];
