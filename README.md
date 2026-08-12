@@ -22,7 +22,7 @@
 
 - 下载对应平台的桌面安装包并安装。
 - macOS 使用 `.dmg`，Windows 使用 `.msi`。
-- 安装后可一键启动，无需手动配置 JDK、Node.js 或 MySQL。
+- 安装后可一键启动，无需手动配置 JDK、Node.js 或 MySQL。首次启动时可选择 H2 或 SQLite；选择会保存在本机，两个数据库的数据文件互不影响。
 
 本地打包：
 
@@ -108,6 +108,14 @@ SPRING_PROFILES_ACTIVE=h2 ./mvnw spring-boot:run
 
 - H2 数据文件默认位于：`${NOMOCLAW_ROOT_DIR}/data/nomoclaw`
 - 本模式用于开发/测试兼容验证，不作为生产主库建议
+
+使用 SQLite file 模式：
+
+```bash
+SPRING_PROFILES_ACTIVE=sqlite ./mvnw spring-boot:run
+```
+
+- SQLite 数据文件默认位于：`${NOMOCLAW_ROOT_DIR}/data/nomoclaw.db`
 
 ## 1 分钟体验
 

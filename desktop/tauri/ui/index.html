@@ -41,7 +41,10 @@
         const raw = Object.assign({}, fallback, input || {});
         const normalized = {
           themeMode: normalizeThemeMode(raw.themeMode),
-          locale: normalizeLocale(raw.locale)
+          locale: normalizeLocale(raw.locale),
+          databaseProfile: raw.databaseProfile === "sqlite" || raw.databaseProfile === "h2"
+            ? raw.databaseProfile
+            : null
         };
         const persistToStorage = options && options.persistToStorage !== false;
 
@@ -66,6 +69,44 @@
       }
 
       window.__NOMOCLAW_APPLY_BOOTSTRAP_PREFS__ = applyBootstrapPrefs;
+
+      function startBackend() {
+        if (window.__TAURI_INTERNALS__?.invoke) {
+          window.__TAURI_INTERNALS__.invoke("start_backend");
+        }
+      }
+
+      function showDatabaseProfileSelector() {
+        const prefs = window.__NOMOCLAW_BOOTSTRAP_PREFS__ || {};
+        if (prefs.databaseProfile) {
+          startBackend();
+          return;
+        }
+        const mount = document.createElement("div");
+        mount.className = "database-profile-selector";
+        mount.innerHTML = [
+          '<div class="database-profile-card">',
+          '<h1>选择本地数据库</h1>',
+          '<p>H2 与 SQLite 都保存在本机。选择后会用于后续启动。</p>',
+          '<label><input type="radio" name="databaseProfile" value="h2" checked> <strong>H2</strong><span>兼容现有桌面版数据（推荐）</span></label>',
+          '<label><input type="radio" name="databaseProfile" value="sqlite"> <strong>SQLite</strong><span>单文件数据库，便于备份和迁移</span></label>',
+          '<button type="button">继续</button>',
+          '</div>'
+        ].join("");
+        mount.querySelector("button").addEventListener("click", async function () {
+          const selected = mount.querySelector('input[name="databaseProfile"]:checked').value;
+          try {
+            await window.__TAURI_INTERNALS__.invoke("save_database_profile", {
+              payload: { databaseProfile: selected }
+            });
+            mount.remove();
+            startBackend();
+          } catch (error) {
+            window.alert("无法保存数据库设置：" + error);
+          }
+        });
+        document.body.appendChild(mount);
+      }
       const fromBridge = window.__NOMOCLAW_BOOTSTRAP_PREFS__ || null;
       let fromStorage = null;
       try {
@@ -82,6 +123,7 @@
         applyBootstrapPrefs(window.__NOMOCLAW_BOOTSTRAP_PREFS__, {
           persistToStorage: false
         });
+        showDatabaseProfileSelector();
       }, { once: true });
     })();
   </script>
@@ -241,6 +283,33 @@
       color: rgba(203, 213, 225, 0.6);
       text-align: center;
     }
+
+    .database-profile-selector {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: rgba(15, 23, 42, 0.72);
+      backdrop-filter: blur(8px);
+    }
+
+    .database-profile-card {
+      width: min(440px, 100%);
+      padding: 28px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      border-radius: 16px;
+      background: #1f2937;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+      text-align: left;
+    }
+
+    .database-profile-card h1 { margin: 0 0 8px; font-size: 22px; }
+    .database-profile-card p { margin: 0 0 18px; color: #cbd5e1; line-height: 1.55; }
+    .database-profile-card label { display: block; margin: 10px 0; padding: 12px; border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 10px; cursor: pointer; }
+    .database-profile-card label span { display: block; margin: 5px 0 0 25px; color: #cbd5e1; font-size: 13px; }
+    .database-profile-card button { width: 100%; margin-top: 14px; padding: 11px; border: 0; border-radius: 8px; color: #fff; background: #2563eb; cursor: pointer; font: inherit; }
 
     :root[data-theme="light"] .loader-label {
       color: rgba(60, 78, 100, 0.62);

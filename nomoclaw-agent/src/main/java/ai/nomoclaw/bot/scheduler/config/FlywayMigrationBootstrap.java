@@ -40,6 +40,10 @@ public class FlywayMigrationBootstrap implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         String databaseProduct = detectDatabaseProduct();
+        if (databaseProduct.contains("sqlite")) {
+            log.info("[Flyway] SQLite schema is maintained by the embedded schema initializer");
+            return;
+        }
         boolean useProgrammaticFlyway = false;
         Flyway flyway = flywayProvider.getIfAvailable();
         if (flyway == null) {

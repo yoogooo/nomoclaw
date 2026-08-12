@@ -16,6 +16,7 @@ public class QuartzSchemaInitializer {
 
     private static final String MYSQL_SCHEMA_RESOURCE = "org/quartz/impl/jdbcjobstore/tables_mysql_innodb.sql";
     private static final String H2_SCHEMA_RESOURCE = "org/quartz/impl/jdbcjobstore/tables_h2.sql";
+    private static final String SQLITE_SCHEMA_RESOURCE = "org/quartz/impl/jdbcjobstore/tables_hsqldb.sql";
 
     private final DataSource dataSource;
 
@@ -58,6 +59,9 @@ public class QuartzSchemaInitializer {
         }
         if (normalized.contains("h2")) {
             return H2_SCHEMA_RESOURCE;
+        }
+        if (normalized.contains("sqlite")) {
+            return SQLITE_SCHEMA_RESOURCE;
         }
         return null;
     }

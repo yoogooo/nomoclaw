@@ -166,6 +166,8 @@ struct UpdaterStatePayload {
 struct BootstrapPrefs {
     theme_mode: String,
     locale: String,
+    #[serde(default)]
+    database_profile: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -173,6 +175,12 @@ struct BootstrapPrefs {
 struct SaveBootstrapPrefsPayload {
     theme_mode: String,
     locale: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SaveDatabaseProfilePayload {
+    database_profile: String,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -199,6 +207,7 @@ impl Default for BootstrapPrefs {
         Self {
             theme_mode: DEFAULT_THEME_MODE.to_string(),
             locale: DEFAULT_LOCALE.to_string(),
+            database_profile: None,
         }
     }
 }
@@ -213,7 +222,12 @@ impl BootstrapPrefs {
             value if value.starts_with("en") => "en-US".to_string(),
             _ => "zh-CN".to_string(),
         };
-        Self { theme_mode, locale }
+        let database_profile = match self.database_profile.as_deref().map(str::trim) {
+            Some(value) if value.eq_ignore_ascii_case("sqlite") => Some("sqlite".to_string()),
+            Some(value) if value.eq_ignore_ascii_case("h2") => Some("h2".to_string()),
+            _ => None,
+        };
+        Self { theme_mode, locale, database_profile }
     }
 }
 
@@ -365,6 +379,8 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             save_bootstrap_prefs,
+            save_database_profile,
+            start_backend,
             updater_get_state,
             updater_install_downloaded,
             updater_check_now
@@ -380,7 +396,6 @@ fn main() {
             register_tray(app)?;
             install_window_behavior(app)?;
             show_loading_window(app)?;
-            bootstrap_backend_async(app.handle().clone());
             install_backend_watchdog(app)?;
             install_updater_watchdog(app)?;
             request_updater_check(app.handle().clone(), "startup");
@@ -1023,14 +1038,34 @@ fn install_updater_watchdog<R: Runtime>(app: &tauri::App<R>) -> Result<()> {
 // ===== tauri command handlers =====
 #[tauri::command]
 fn save_bootstrap_prefs(app: AppHandle, payload: SaveBootstrapPrefsPayload) -> std::result::Result<(), String> {
+    let database_profile = read_bootstrap_prefs(&app)
+        .unwrap_or_default()
+        .database_profile;
     let normalized = BootstrapPrefs {
         theme_mode: payload.theme_mode,
         locale: payload.locale,
+        database_profile,
     }
     .normalized();
     write_bootstrap_prefs(&app, normalized.clone()).map_err(|error| error.to_string())?;
     refresh_tray_menu_for_locale(&app, &normalized.locale);
     Ok(())
+}
+
+#[tauri::command]
+fn save_database_profile(app: AppHandle, payload: SaveDatabaseProfilePayload) -> std::result::Result<(), String> {
+    let mut prefs = read_bootstrap_prefs(&app).map_err(|error| error.to_string())?;
+    prefs.database_profile = Some(payload.database_profile);
+    let normalized = prefs.normalized();
+    if normalized.database_profile.is_none() {
+        return Err("database profile must be h2 or sqlite".to_string());
+    }
+    write_bootstrap_prefs(&app, normalized).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn start_backend(app: AppHandle) {
+    bootstrap_backend_async(app);
 }
 
 #[tauri::command]
@@ -1235,8 +1270,12 @@ fn write_bootstrap_prefs<R: Runtime>(app: &AppHandle<R>, prefs: BootstrapPrefs) 
 fn inject_bootstrap_prefs<R: Runtime>(window: &tauri::WebviewWindow<R>, prefs: &BootstrapPrefs) -> Result<()> {
     let theme_mode = js_escape(&prefs.theme_mode);
     let locale = js_escape(&prefs.locale);
+    let database_profile = prefs.database_profile.as_deref().map(js_escape);
+    let database_profile = database_profile
+        .map(|value| format!("\"{value}\""))
+        .unwrap_or_else(|| "null".to_string());
     let script = format!(
-        "const prefs = {{ themeMode: \"{theme_mode}\", locale: \"{locale}\" }};\n\
+        "const prefs = {{ themeMode: \"{theme_mode}\", locale: \"{locale}\", databaseProfile: {database_profile} }};\n\
          window.__NOMOCLAW_BOOTSTRAP_PREFS__ = prefs;\n\
          if (typeof window.__NOMOCLAW_APPLY_BOOTSTRAP_PREFS__ === \"function\") {{\n\
            window.__NOMOCLAW_APPLY_BOOTSTRAP_PREFS__(prefs, {{ persistToStorage: true }});\n\
@@ -1293,6 +1332,10 @@ fn start_backend_process<R: Runtime>(app: &AppHandle<R>, preferred_port: u16) ->
     #[cfg(windows)]
     let jar_path = windows_compatible_path(&jar_path);
     let log_path = ensure_log_file_path(app)?;
+    let database_profile = read_bootstrap_prefs(app)
+        .unwrap_or_default()
+        .database_profile
+        .unwrap_or_else(|| "h2".to_string());
 
     let mut log_file = File::options()
         .create(true)
@@ -1321,7 +1364,7 @@ fn start_backend_process<R: Runtime>(app: &AppHandle<R>, preferred_port: u16) ->
         let jar_path_quoted = shell_quote(&jar_path.to_string_lossy());
         let script = format!(
             "{java} \
-            -Dspring.profiles.active=h2 \
+            -Dspring.profiles.active={database_profile} \
             -Dnomoclaw.desktop.open-browser-on-startup=false \
             -Dfile.encoding=UTF-8 \
             -Dsun.stdout.encoding=UTF-8 \
@@ -1339,6 +1382,7 @@ fn start_backend_process<R: Runtime>(app: &AppHandle<R>, preferred_port: u16) ->
             java = java_bin_quoted,
             jar = jar_path_quoted,
             port = port,
+            database_profile = database_profile,
             parent_pid = parent_pid
         );
 
@@ -1376,7 +1420,7 @@ fn start_backend_process<R: Runtime>(app: &AppHandle<R>, preferred_port: u16) ->
     #[cfg(windows)]
     {
         let child = Command::new(&java_bin)
-            .arg("-Dspring.profiles.active=h2")
+            .arg(format!("-Dspring.profiles.active={database_profile}"))
             .arg("-Dnomoclaw.desktop.open-browser-on-startup=false")
             .arg("-Dnomoclaw.h2.auto-server=false")
             .arg("-Dspring.quartz.startup-delay-seconds=10")

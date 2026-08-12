@@ -22,7 +22,7 @@ Use the desktop app first when possible. Use Docker for a quick local run. Use s
 
 - Download and install the desktop package for your platform.
 - Use `.dmg` on macOS and `.msi` on Windows.
-- The desktop app launches directly without manually setting up JDK, Node.js, or MySQL.
+- The desktop app launches directly without manually setting up JDK, Node.js, or MySQL. On first launch, choose either H2 or SQLite; the choice is stored locally and each database keeps separate data files.
 
 Build locally:
 
@@ -108,6 +108,14 @@ SPRING_PROFILES_ACTIVE=h2 ./mvnw spring-boot:run
 
 - Default H2 file path: `${NOMOCLAW_ROOT_DIR}/data/nomoclaw`
 - This mode is intended for development/testing compatibility, not as the recommended production primary database
+
+Run with SQLite file mode:
+
+```bash
+SPRING_PROFILES_ACTIVE=sqlite ./mvnw spring-boot:run
+```
+
+- Default SQLite file path: `${NOMOCLAW_ROOT_DIR}/data/nomoclaw.db`
 
 ## 1-Minute Demo
 

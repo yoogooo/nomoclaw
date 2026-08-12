@@ -2,19 +2,38 @@ package ai.nomoclaw.bot.scheduler.config;
 
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.springframework.stereotype.Component;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.ResultSet;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
+/** Initializes the application schema for embedded H2 and SQLite databases. */
 @Component
 @Slf4j
 public class H2SchemaInitializer {
 
     private static final String H2_SCHEMA_RESOURCE = "db/schema-h2.sql";
+    private static final String SQLITE_SCHEMA_RESOURCE = "db/schema-h2.sql";
+    private static final Pattern INLINE_INDEX = Pattern.compile("(?m)^(\\s*)INDEX\\s+(\\w+)\\s+\\(([^\\r\\n]+)\\)(,?)$");
+    private static final Pattern PRIMARY_KEY = Pattern.compile("(?m)^\\s*PRIMARY KEY \\(id\\),?\\s*$");
+    private static final List<String> SQLITE_MIGRATIONS = List.of(
+            "V2__knowledge_base.sql", "V4__knowledge_base_vector_collection.sql",
+            "V5__rename_agent_knowledge_relations.sql", "V6__knowledge_ingestion_reliability.sql",
+            "V7__knowledge_import_builder.sql", "V8__knowledge_pdf_preprocessing.sql",
+            "V10__knowledge_structured_chunking.sql", "V11__knowledge_structure_quality.sql",
+            "V15__llm_trace.sql",
+            "V16__llm_trace_response_thinking.sql");
 
     private final DataSource dataSource;
 
@@ -26,23 +45,98 @@ public class H2SchemaInitializer {
     public void initializeIfNeeded() {
         try (Connection connection = dataSource.getConnection()) {
             String databaseProductName = connection.getMetaData().getDatabaseProductName();
-            if (databaseProductName == null || !databaseProductName.toLowerCase().contains("h2")) {
+            if (!isEmbeddedDatabase(databaseProductName)) {
                 return;
             }
             if (hasTable(connection, "agent_definition")) {
                 log.info("[H2Schema] schema already initialized");
                 return;
             }
-            ResourceDatabasePopulator populator = new ResourceDatabasePopulator(new ClassPathResource(H2_SCHEMA_RESOURCE));
-            populator.setContinueOnError(false);
-            populator.setIgnoreFailedDrops(true);
-            populator.setCommentPrefixes("#", "--");
-            populator.setSeparator(";");
-            populator.execute(dataSource);
-            log.info("[H2Schema] schema initialized from {}", H2_SCHEMA_RESOURCE);
+            if (isSqlite(databaseProductName)) {
+                populate(sqliteSchema(), "SQLite schema");
+                for (String migration : SQLITE_MIGRATIONS) {
+                    populate(sqliteMigration(migration), "SQLite migration " + migration);
+                }
+                log.info("[SQLiteSchema] schema initialized from {} and {} migrations", SQLITE_SCHEMA_RESOURCE, SQLITE_MIGRATIONS.size());
+            } else {
+                populate(new ClassPathResource(H2_SCHEMA_RESOURCE), "H2 schema");
+                log.info("[H2Schema] schema initialized from {}", H2_SCHEMA_RESOURCE);
+            }
         } catch (Exception ex) {
             throw new IllegalStateException("failed to initialize H2 schema", ex);
         }
+    }
+
+    private boolean isEmbeddedDatabase(String databaseProductName) {
+        return databaseProductName != null && (databaseProductName.toLowerCase(Locale.ROOT).contains("h2") || isSqlite(databaseProductName));
+    }
+
+    private boolean isSqlite(String databaseProductName) {
+        return databaseProductName != null && databaseProductName.toLowerCase(Locale.ROOT).contains("sqlite");
+    }
+
+    private void populate(Resource resource, String description) {
+        ResourceDatabasePopulator populator = new ResourceDatabasePopulator(resource);
+        populator.setContinueOnError(false);
+        populator.setIgnoreFailedDrops(true);
+        populator.setCommentPrefixes("#", "--");
+        populator.setSeparator(";");
+        populator.execute(dataSource);
+        log.debug("[Schema] applied {}", description);
+    }
+
+    private ByteArrayResource sqliteSchema() {
+        String source = readResource(SQLITE_SCHEMA_RESOURCE);
+        List<String> indexes = new ArrayList<>();
+        Matcher matcher = INLINE_INDEX.matcher(source);
+        StringBuffer converted = new StringBuffer();
+        while (matcher.find()) {
+            String tableName = tableNameBefore(source, matcher.start());
+            indexes.add("CREATE INDEX IF NOT EXISTS " + matcher.group(2) + " ON " + tableName + "(" + matcher.group(3).trim() + ");");
+            matcher.appendReplacement(converted, "");
+        }
+        matcher.appendTail(converted);
+        String sql = converted.toString()
+                .replaceAll(",\\s*\\n\\s*\\)", "\\n)")
+                .replaceAll("BIGINT GENERATED BY DEFAULT AS IDENTITY NOT NULL", "INTEGER PRIMARY KEY AUTOINCREMENT")
+                .replaceAll("BIGINT GENERATED BY DEFAULT AS IDENTITY", "INTEGER PRIMARY KEY AUTOINCREMENT");
+        sql = PRIMARY_KEY.matcher(sql).replaceAll("");
+        return resource(sql + "\n" + String.join("\n", indexes));
+    }
+
+    private ByteArrayResource sqliteMigration(String migration) {
+        String sql = readResource("db/migration/h2/" + migration)
+                .replaceAll("(?m)^COMMENT ON .+;\\R?", "")
+                .replace("BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY", "INTEGER PRIMARY KEY AUTOINCREMENT")
+                .replace("BIGINT AUTO_INCREMENT PRIMARY KEY", "INTEGER PRIMARY KEY AUTOINCREMENT")
+                .replace("ADD COLUMN IF NOT EXISTS", "ADD COLUMN")
+                .replaceAll("UPDATE (\\w+) (\\w+)\\s+SET", "UPDATE $1 AS $2 SET")
+                .replaceAll(" AFTER \\w+", "");
+        return resource(sql);
+    }
+
+    private String tableNameBefore(String source, int position) {
+        Matcher matcher = Pattern.compile("CREATE TABLE IF NOT EXISTS (\\w+)").matcher(source.substring(0, position));
+        String tableName = null;
+        while (matcher.find()) {
+            tableName = matcher.group(1);
+        }
+        if (tableName == null) {
+            throw new IllegalStateException("could not determine table name for SQLite index");
+        }
+        return tableName;
+    }
+
+    private String readResource(String path) {
+        try {
+            return new ClassPathResource(path).getContentAsString(StandardCharsets.UTF_8);
+        } catch (Exception ex) {
+            throw new IllegalStateException("failed to read schema resource " + path, ex);
+        }
+    }
+
+    private ByteArrayResource resource(String sql) {
+        return new ByteArrayResource(sql.getBytes(StandardCharsets.UTF_8));
     }
 
     private boolean hasTable(Connection connection, String tableName) throws Exception {

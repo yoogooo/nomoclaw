@@ -40,7 +40,9 @@ public class QuartzConfig {
         copyQuartzProperty(environment, properties, "org.quartz.scheduler.instanceName");
         copyQuartzProperty(environment, properties, "org.quartz.scheduler.instanceId");
         copyQuartzProperty(environment, properties, "org.quartz.jobStore.isClustered");
+        copyQuartzProperty(environment, properties, "org.quartz.jobStore.driverDelegateClass");
         copyQuartzProperty(environment, properties, "org.quartz.jobStore.misfireThreshold");
+        copyQuartzProperty(environment, properties, "org.quartz.jobStore.selectWithLockSQL");
         copyQuartzProperty(environment, properties, "org.quartz.threadPool.threadCount");
         if (!properties.containsKey("org.quartz.threadPool.threadCount")) {
             properties.setProperty("org.quartz.threadPool.threadCount", "3");
