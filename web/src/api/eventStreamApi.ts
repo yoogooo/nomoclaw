@@ -2,6 +2,8 @@ import type { AgentEvent } from "@/types/api";
 
 const EVENT_NAMES = [
   "message_delta",
+  "message_reasoning",
+  "message_retrying",
   "plan_created",
   "step_started",
   "step_waiting_approval",

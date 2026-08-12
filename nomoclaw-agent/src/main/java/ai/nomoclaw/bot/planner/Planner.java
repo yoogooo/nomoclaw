@@ -17,7 +17,7 @@ public interface Planner {
     record StreamReasonResult(ChatResponse response, String accumulatedText, boolean streamed) {
     }
 
-    record RetryNotice(int retryIndex, int maxRetries, String reason) {
+    record RetryNotice(int retryIndex, int maxRetries, long retryDelaySeconds, String reason) {
     }
 
     ChatResponse reason(List<ChatMessage> memory,

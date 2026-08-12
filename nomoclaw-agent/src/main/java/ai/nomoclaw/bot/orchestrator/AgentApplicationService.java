@@ -75,6 +75,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import javax.net.ssl.SSLException;
 
 import static org.apache.commons.lang3.StringUtils.abbreviate;
 
@@ -484,8 +485,12 @@ public class AgentApplicationService {
         if (hasCauseOfType(throwable, AuthenticationException.class)) {
             return feedbackBuilder.messageFailedAuthentication();
         }
+        String provider = agentMessage == null ? "" : nullToEmpty(agentMessage.provider()).trim();
+        if (hasCauseMessage(throwable, "Codex API request failed")
+                || ("codex".equalsIgnoreCase(provider) && root instanceof SSLException)) {
+            return feedbackBuilder.messageFailedCodexConnection();
+        }
         if (root instanceof ConnectException || root instanceof ClosedChannelException) {
-            String provider = agentMessage == null ? "" : nullToEmpty(agentMessage.provider()).trim();
             return connectFailureHintByProvider(provider);
         }
         if (root instanceof SocketTimeoutException) {
@@ -499,6 +504,20 @@ public class AgentApplicationService {
             return "任务执行失败，请稍后重试。";
         }
         return message;
+    }
+
+    private boolean hasCauseMessage(Throwable throwable, String expectedMessage) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (expectedMessage.equals(current.getMessage())) {
+                return true;
+            }
+            if (current.getCause() == current) {
+                break;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private String formatCodexUsageLimitMessage(CodexUsageLimitException exception) {
@@ -931,16 +950,17 @@ public class AgentApplicationService {
     }
 
     private void publishReasoningRetry(AgentMessage message, int roundIndex, Planner.RetryNotice retryNotice) {
-        ObjectNode payload = basePayload("message reasoning retry");
+        ObjectNode payload = basePayload("message retrying");
         payload.put("roundIndex", roundIndex);
         payload.put("status", "running");
-        payload.put("displayTitle", "思考过程 / Reasoning");
-        payload.put("displaySummary", "网络重试 " + retryNotice.retryIndex() + "/" + retryNotice.maxRetries());
-        String reason = nullToEmpty(retryNotice.reason()).trim();
-        payload.put("displayDetails", reason.isBlank()
-                ? "模型服务连接不稳定，正在重新发起请求。"
-                : "模型服务连接不稳定，正在重新发起请求。\n原因: " + abbreviate(reason, 300));
-        publishTransientEvent(AgentEventType.MESSAGE_REASONING, message.conversationUid(), message.messageUid(), null, payload);
+        payload.put("retryIndex", retryNotice.retryIndex());
+        payload.put("maxRetries", retryNotice.maxRetries());
+        payload.put("retryDelaySeconds", retryNotice.retryDelaySeconds());
+        String retryDelay = retryNotice.retryDelaySeconds() > 0
+                ? retryNotice.retryDelaySeconds() + " 秒后重试。"
+                : "即将重试。";
+        payload.put("message", "网络连接不稳定，" + retryDelay + "请稍候。");
+        publishTransientEvent(AgentEventType.MESSAGE_RETRYING, message.conversationUid(), message.messageUid(), null, payload);
     }
 
     private void publishEvent(AgentEventType type, String conversationUid, String messageUid, String stepUid, ObjectNode payload) {

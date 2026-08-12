@@ -27,6 +27,7 @@ import java.net.ConnectException;
 import java.net.SocketTimeoutException;
 import java.net.http.HttpTimeoutException;
 import java.nio.channels.ClosedChannelException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -103,20 +104,20 @@ public class TaskPlanner implements Planner {
         logReasonStart(resolvedModel, memory, toolSpecifications, toolChoice, preparedRequest.systemPrompt());
         try {
             ChatResponse response = executeWithRetries(
-                    () -> resolvedModel.model().chat(request),
+                    () -> chatWithTrace(trace, () -> resolvedModel.model().chat(request)),
                     resolvedModel,
                     "non-stream"
             );
             llmDebugLogger.logResponse(requestId, "task_reason", resolvedModel.providerId(), resolvedModel.modelId(),
                     promptContext, response, elapsedMillis(startNanos));
-            llmTraceRecorder.complete(trace, response);
+            if (llmTraceRecorder != null) llmTraceRecorder.complete(trace, response);
             recordUsage(usageScene, resolvedModel, promptContext, response, trace);
             logReasonFinish(response);
             return response;
         } catch (Exception ex) {
             llmDebugLogger.logError(requestId, "task_reason", resolvedModel.providerId(), resolvedModel.modelId(),
                     promptContext, ex, elapsedMillis(startNanos));
-            llmTraceRecorder.fail(trace, ex);
+            if (llmTraceRecorder != null) llmTraceRecorder.fail(trace, ex);
             throw ex;
         }
     }
@@ -163,13 +164,13 @@ public class TaskPlanner implements Planner {
             log.info("[Reasoning] stream fallback disabled provider={} model={}", resolvedModel.providerId(), resolvedModel.modelId());
             try {
                 ChatResponse response = executeWithRetries(
-                        () -> resolvedModel.model().chat(request),
+                        () -> chatWithTrace(trace, () -> resolvedModel.model().chat(request)),
                         resolvedModel,
                         "non-stream"
                 );
                 llmDebugLogger.logResponse(requestId, "task_reason", resolvedModel.providerId(), resolvedModel.modelId(),
                         promptContext, response, elapsedMillis(startNanos));
-                llmTraceRecorder.complete(trace, response);
+                if (llmTraceRecorder != null) llmTraceRecorder.complete(trace, response);
                 recordUsage(TokenUsageScene.CHAT_REASONING, resolvedModel, promptContext, response, trace);
                 String text = response.aiMessage() == null ? "" : response.aiMessage().text();
                 logReasonFinish(response);
@@ -177,13 +178,13 @@ public class TaskPlanner implements Planner {
             } catch (Exception ex) {
                 llmDebugLogger.logError(requestId, "task_reason", resolvedModel.providerId(), resolvedModel.modelId(),
                         promptContext, ex, elapsedMillis(startNanos));
-                llmTraceRecorder.fail(trace, ex);
+                if (llmTraceRecorder != null) llmTraceRecorder.fail(trace, ex);
                 throw ex;
             }
         }
 
         try {
-            StreamAttemptResult streamed = executeStreamingWithRecovery(request, resolvedModel, onDelta, onRetryReset, onRetry);
+            StreamAttemptResult streamed = executeStreamingWithRecovery(request, resolvedModel, trace, onDelta, onRetryReset, onRetry);
             ChatResponse response = streamed.response();
             if (streamed.streamed()) {
                 log.info("[Reasoning] stream completed provider={} model={} deltas={} chars={}",
@@ -194,7 +195,7 @@ public class TaskPlanner implements Planner {
             }
             llmDebugLogger.logResponse(requestId, "task_reason", resolvedModel.providerId(), resolvedModel.modelId(),
                     promptContext, response, elapsedMillis(startNanos));
-            llmTraceRecorder.complete(trace, response);
+            if (llmTraceRecorder != null) llmTraceRecorder.complete(trace, response);
             recordUsage(TokenUsageScene.CHAT_REASONING, resolvedModel, promptContext, response, trace);
             logReasonFinish(response);
             return new StreamReasonResult(response, streamed.accumulatedText(), streamed.streamed());
@@ -202,7 +203,7 @@ public class TaskPlanner implements Planner {
             Throwable cause = ex.getCause() == null ? ex : ex.getCause();
             llmDebugLogger.logError(requestId, "task_reason", resolvedModel.providerId(), resolvedModel.modelId(),
                     promptContext, cause, elapsedMillis(startNanos));
-            llmTraceRecorder.fail(trace, cause);
+            if (llmTraceRecorder != null) llmTraceRecorder.fail(trace, cause);
             throw ex;
         }
     }
@@ -404,14 +405,23 @@ public class TaskPlanner implements Planner {
                         attempt,
                         maxAttempts,
                         root.getMessage());
-                sleepBeforeRetry(attempt);
+                long retryDelaySeconds = retryDelaySeconds(attempt);
+                sleepBeforeRetry(retryDelaySeconds);
             }
         }
         throw last == null ? new IllegalStateException("reasoning failed without exception") : new IllegalStateException(last);
     }
 
+    private <T> T chatWithTrace(LlmTraceRecorder.TraceHandle trace, Supplier<T> action) {
+        if (llmTraceRecorder == null || trace == null) return action.get();
+        try (LlmTraceRecorder.TraceScope ignored = llmTraceRecorder.activate(trace)) {
+            return action.get();
+        }
+    }
+
     private StreamAttemptResult executeStreamingWithRecovery(ChatRequest request,
                                                              RuntimeChatModelResolver.ResolvedModel resolvedModel,
+                                                             LlmTraceRecorder.TraceHandle trace,
                                                              Consumer<String> onDelta,
                                                              Runnable onRetryReset,
                                                              Consumer<RetryNotice> onRetry) {
@@ -421,7 +431,8 @@ public class TaskPlanner implements Planner {
             StringBuilder buffer = new StringBuilder();
             final int[] deltaCount = {0};
             CompletableFuture<ChatResponse> completion = new CompletableFuture<>();
-            resolvedModel.streamingModel().chat(request, new StreamingChatResponseHandler() {
+            chatWithTrace(trace, () -> {
+                resolvedModel.streamingModel().chat(request, new StreamingChatResponseHandler() {
                 @Override
                 public void onPartialResponse(String partialResponse) {
                     if (partialResponse == null || partialResponse.isEmpty()) {
@@ -443,6 +454,8 @@ public class TaskPlanner implements Planner {
                 public void onError(Throwable error) {
                     completion.completeExceptionally(error);
                 }
+                });
+                return null;
             });
 
             try {
@@ -461,8 +474,9 @@ public class TaskPlanner implements Planner {
                     if (attempt >= maxAttempts) {
                         break;
                     }
-                    publishRetryNotice(onRetry, attempt, maxAttempts - 1, root);
-                    sleepBeforeRetry(attempt);
+                    long retryDelaySeconds = retryDelaySeconds(attempt);
+                    publishRetryNotice(onRetry, attempt, maxAttempts - 1, retryDelaySeconds, root);
+                    sleepBeforeRetry(retryDelaySeconds);
                     continue;
                 }
                 last = ex;
@@ -475,15 +489,16 @@ public class TaskPlanner implements Planner {
                         attempt,
                         maxAttempts,
                         root.getMessage());
-                publishRetryNotice(onRetry, attempt, maxAttempts - 1, root);
-                sleepBeforeRetry(attempt);
+                long retryDelaySeconds = retryDelaySeconds(attempt);
+                publishRetryNotice(onRetry, attempt, maxAttempts - 1, retryDelaySeconds, root);
+                sleepBeforeRetry(retryDelaySeconds);
             }
         }
 
         Throwable root = rootCause(last);
         if (isRetryableTransportError(root)) {
             ChatResponse response = executeWithRetries(
-                    () -> resolvedModel.model().chat(request),
+                    () -> chatWithTrace(trace, () -> resolvedModel.model().chat(request)),
                     resolvedModel,
                     "stream-fallback"
             );
@@ -506,12 +521,13 @@ public class TaskPlanner implements Planner {
     private void publishRetryNotice(Consumer<RetryNotice> onRetry,
                                     int retryIndex,
                                     int maxRetries,
+                                    long retryDelaySeconds,
                                     Throwable throwable) {
         if (onRetry == null) {
             return;
         }
         String reason = throwable == null || throwable.getMessage() == null ? "" : throwable.getMessage().trim();
-        onRetry.accept(new RetryNotice(retryIndex, maxRetries, reason));
+        onRetry.accept(new RetryNotice(retryIndex, maxRetries, retryDelaySeconds, reason));
     }
 
     private int maxRetryAttempts() {
@@ -555,8 +571,14 @@ public class TaskPlanner implements Planner {
         return throwable;
     }
 
-    private void sleepBeforeRetry(int attempt) {
-        long delayMillis = Math.min(2_000L, 250L * attempt);
+    private long retryDelaySeconds(int attempt) {
+        Duration configured = llmProperties.getRetryInterval();
+        long baseSeconds = configured == null ? 5L : Math.max(0L, configured.toSeconds());
+        return baseSeconds * Math.max(1, attempt);
+    }
+
+    private void sleepBeforeRetry(long delaySeconds) {
+        long delayMillis = Math.min(300_000L, delaySeconds * 1_000L);
         try {
             Thread.sleep(delayMillis);
         } catch (InterruptedException interruptedException) {

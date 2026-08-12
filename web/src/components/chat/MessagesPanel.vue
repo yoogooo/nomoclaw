@@ -2,7 +2,7 @@
 import { computed, h, nextTick, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronUp, Copy, File, FileArchive, FileAudio, FileImage, FileText, FileType2, FileVideo, Sparkles } from "lucide-vue-next";
+import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronUp, Copy, File, FileArchive, FileAudio, FileImage, FileText, FileType2, FileVideo, Sparkles, WifiOff } from "lucide-vue-next";
 import { NButton, NCard, NCollapse, NCollapseItem, NFlex, NTag } from "naive-ui";
 import ApprovalBanner from "./ApprovalBanner.vue";
 import MessageCopyButton from "./MessageCopyButton.vue";
@@ -116,6 +116,11 @@ const shouldShowTypingIndicator = computed(() => {
   if (props.disableAutoTypingIndicator) return false;
   return isRunningCurrentConversation.value && !hasWaitingApprovalInCurrentConversation.value;
 });
+const currentMessageRetry = computed(() => {
+  const items = conversationStore.messages;
+  const latestUserMessage = [...items].reverse().find((item) => item.role === "user" && item.messageUid);
+  return latestUserMessage?.messageUid ? conversationStore.messageRetries[latestUserMessage.messageUid] : null;
+});
 const starterTemplates = computed(() => [
   {
     id: "project-plan",
@@ -161,7 +166,7 @@ function isReasoningRetryStep(step: ConversationRunStep) {
   }
   const summary = String(step.displaySummary || "").trim();
   const details = String(step.displayDetails || "").trim();
-  return /网络重试|reconnect|reconnecting|retry/i.test(`${summary}\n${details}`);
+  return /网络重试|网络连接|重新连接|reconnect|reconnecting|retry/i.test(`${summary}\n${details}`);
 }
 
 function reasoningRetryTitle(step: ConversationRunStep) {
@@ -1203,6 +1208,7 @@ onMounted(() => {
                         v-if="isReasoningRetryStep(step)"
                         class="run-retry-notice"
                       >
+                        <span class="run-retry-notice-spinner" aria-hidden="true"></span>
                         <div class="run-retry-notice-title">{{ reasoningRetryTitle(step) }}</div>
                         <div v-if="reasoningRetryDetails(step)" class="run-retry-notice-details">
                           {{ reasoningRetryDetails(step) }}
@@ -1346,6 +1352,17 @@ onMounted(() => {
           </div>
         </div>
 
+        <div v-if="currentMessageRetry" class="message-wrap">
+          <div class="message-retry-status" role="status">
+            <WifiOff :size="18" aria-hidden="true" />
+            <div>
+              <div class="message-retry-status-title">
+                正在重新连接 {{ currentMessageRetry.retryIndex }}/{{ currentMessageRetry.maxRetries }}
+              </div>
+              <div class="message-retry-status-details">{{ currentMessageRetry.message }}</div>
+            </div>
+          </div>
+        </div>
         <div v-if="conversationStore.currentConversationUid && shouldShowTypingIndicator" class="message-wrap">
           <div class="typing-indicator">
             <span v-for="index in 3" :key="index" />
@@ -1897,10 +1914,28 @@ onMounted(() => {
 
 .run-retry-notice {
   display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: var(--space-1_5);
   width: 100%;
   min-width: 0;
   padding: var(--space-1) 0;
+}
+
+.run-retry-notice-spinner {
+  grid-row: 1 / span 2;
+  align-self: center;
+  width: 0.8rem;
+  height: 0.8rem;
+  border: 2px solid color-mix(in srgb, var(--color-text-secondary) 35%, transparent);
+  border-top-color: var(--color-text-primary);
+  border-radius: 50%;
+  animation: run-retry-spin 0.8s linear infinite;
+}
+
+@keyframes run-retry-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .run-retry-notice-title {
@@ -2102,6 +2137,30 @@ onMounted(() => {
   padding: var(--space-4) var(--space-4_5);
   border-radius: var(--radius-xl) var(--radius-xl) var(--radius-xl) var(--control-radius-md);
   background: var(--color-chat-bubble-assistant-bg);
+}
+
+.message-retry-status {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2_5);
+  max-width: min(34rem, 88%);
+  padding: var(--space-3) var(--space-4);
+  border: var(--size-1) solid color-mix(in srgb, var(--warning) 38%, var(--color-border-soft));
+  border-radius: var(--radius-xl) var(--radius-xl) var(--radius-xl) var(--control-radius-md);
+  color: var(--color-text-secondary);
+  background: color-mix(in srgb, var(--warning) 7%, var(--color-chat-bubble-assistant-bg));
+}
+
+.message-retry-status-title {
+  color: var(--color-text-primary);
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.message-retry-status-details {
+  margin-top: var(--space-1);
+  font-size: var(--text-caption-size);
+  line-height: 1.5;
 }
 
 .typing-indicator span {

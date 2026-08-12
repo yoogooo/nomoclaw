@@ -10,7 +10,9 @@ public record LlmTraceDetailResponse(
         String scene, int roundIndex, int attemptIndex, String provider, String modelName,
         String status, Instant requestStartedTime, Instant responseFinishedTime, long latencyMs,
         String systemPrompt, String requestMessages, String toolSpecifications, String toolChoice,
-        String requestMetadata, String responseContent, String responseThinking, String responseToolCalls, String finishReason,
+        String requestMetadata, String protocolType, String requestUrl, String requestMethod, String requestHeaders,
+        String rawRequestJson, Integer responseStatus, String rawResponseJson, String rawStreamEvents,
+        String responseContent, String responseThinking, String responseToolCalls, String finishReason,
         int inputTokens, int cachedInputTokens, int outputTokens, int totalTokens,
         boolean usageAvailable, String errorType, String errorMessage
 ) {

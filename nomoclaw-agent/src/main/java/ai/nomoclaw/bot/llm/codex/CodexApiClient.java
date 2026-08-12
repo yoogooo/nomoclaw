@@ -1,6 +1,7 @@
 package ai.nomoclaw.bot.llm.codex;
 
 import ai.nomoclaw.bot.util.JsonUtil;
+import ai.nomoclaw.bot.llm.debug.LlmTraceRecorder;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.image.Image;
@@ -41,15 +42,25 @@ final class CodexApiClient {
     private final CodexTokenProvider tokenProvider;
     private final String baseUrl;
     private final Duration timeout;
+    private final LlmTraceRecorder traceRecorder;
 
     CodexApiClient(HttpClient httpClient,
                    CodexTokenProvider tokenProvider,
                    String baseUrl,
                    Duration timeout) {
+        this(httpClient, tokenProvider, baseUrl, timeout, null);
+    }
+
+    CodexApiClient(HttpClient httpClient,
+                   CodexTokenProvider tokenProvider,
+                   String baseUrl,
+                   Duration timeout,
+                   LlmTraceRecorder traceRecorder) {
         this.httpClient = httpClient;
         this.tokenProvider = tokenProvider;
         this.baseUrl = trim(baseUrl).isBlank() ? DEFAULT_BASE_URL : trim(baseUrl);
         this.timeout = timeout == null ? Duration.ofSeconds(180) : timeout;
+        this.traceRecorder = traceRecorder;
     }
 
     ChatResponse chat(ChatRequest request, String modelName) {
@@ -81,15 +92,23 @@ final class CodexApiClient {
     }
 
     void stream(ChatRequest request, String modelName, StreamingChatResponseHandler handler) {
-        HttpRequest httpRequest = request(request, modelName, true, "text/event-stream");
+        Map<String, Object> payload = toCodexRequest(request, modelName, true);
+        HttpRequest httpRequest = request(payload, "text/event-stream");
+        LlmTraceRecorder.TraceHandle trace = traceRecorder == null ? null : traceRecorder.activeTrace();
+        if (traceRecorder != null) {
+            traceRecorder.recordRawRequest(trace, "codex-responses", httpRequest.uri().toString(), httpRequest.method(),
+                    httpRequest.headers().map(), JsonUtil.toJson(payload));
+        }
         StringBuilder fullText = new StringBuilder();
         List<ToolExecutionRequest> toolExecutionRequests = new ArrayList<>();
         ChatResponse[] completed = new ChatResponse[1];
 
         try {
             HttpResponse<InputStream> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofInputStream());
+            if (traceRecorder != null) traceRecorder.recordRawResponse(trace, response.statusCode(), "");
             if (!isSuccess(response.statusCode())) {
                 String body = new String(response.body().readAllBytes(), StandardCharsets.UTF_8);
+                if (traceRecorder != null) traceRecorder.recordRawResponse(trace, response.statusCode(), body);
                 throw buildApiException(response.statusCode(), body);
             }
 
@@ -99,6 +118,7 @@ final class CodexApiClient {
                 StringBuilder data = new StringBuilder();
                 while ((line = reader.readLine()) != null) {
                     if (line.isBlank()) {
+                        recordSseEvent(trace, event, data.toString());
                         handleSseEvent(event, data.toString(), modelName, handler, fullText, toolExecutionRequests, completed);
                         event = "";
                         data.setLength(0);
@@ -114,6 +134,7 @@ final class CodexApiClient {
                     }
                 }
                 if (!data.isEmpty()) {
+                    recordSseEvent(trace, event, data.toString());
                     handleSseEvent(event, data.toString(), modelName, handler, fullText, toolExecutionRequests, completed);
                 }
             }
@@ -146,7 +167,11 @@ final class CodexApiClient {
         return new IllegalStateException("Codex streaming API failed: status=" + statusCode + ", body=" + safeBody(body));
     }
 
-    private HttpRequest request(ChatRequest request, String modelName, boolean stream, String accept) {
+    private void recordSseEvent(LlmTraceRecorder.TraceHandle trace, String event, String data) {
+        if (traceRecorder != null) traceRecorder.appendRawStreamEvent(trace, event, data);
+    }
+
+    private HttpRequest request(Map<String, Object> payload, String accept) {
         String accessToken = trim(tokenProvider.accessToken());
         if (accessToken.isBlank()) {
             throw new IllegalStateException("Codex login token is missing. Please run `codex login` first.");
@@ -158,7 +183,7 @@ final class CodexApiClient {
                 .header("Content-Type", "application/json")
                 .header("Authorization", "Bearer " + accessToken)
                 .header("x-codex-installation-id", trim(tokenProvider.installationId()))
-                .POST(HttpRequest.BodyPublishers.ofString(JsonUtil.toJson(toCodexRequest(request, modelName, stream))));
+                .POST(HttpRequest.BodyPublishers.ofString(JsonUtil.toJson(payload)));
 
         String accountId = trim(tokenProvider.accountId());
         if (!accountId.isBlank()) {

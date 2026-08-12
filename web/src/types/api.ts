@@ -600,6 +600,14 @@ export interface LlmTraceDetail extends LlmTraceSummary {
   toolSpecifications: string;
   toolChoice: string;
   requestMetadata: string;
+  protocolType: string;
+  requestUrl: string;
+  requestMethod: string;
+  requestHeaders: string;
+  rawRequestJson: string;
+  responseStatus?: number | null;
+  rawResponseJson: string;
+  rawStreamEvents: string;
   responseContent: string;
   responseThinking: string;
   responseToolCalls: string;

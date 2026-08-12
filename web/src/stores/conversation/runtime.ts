@@ -1,5 +1,5 @@
 import type { AgentEvent, ApprovalMode, ConversationMessageRun, ConversationRunStep } from "@/types/api";
-import type { ApprovalState, BrowserRuntimeOverlayState, ConversationStoreContext, ConversationRuntimeModule } from "./types";
+import type { ApprovalState, BrowserRuntimeOverlayState, ConversationStoreContext, ConversationRuntimeModule, MessageRetryState } from "./types";
 
 const APPROVAL_MODE_STORAGE_KEY = "chat:approval-mode-by-conversation";
 
@@ -95,6 +95,15 @@ export function createConversationRuntimeModule(ctx: ConversationStoreContext): 
 
   function clearBrowserRuntimeOverlay() {
     state.browserRuntimeOverlay.value = createEmptyBrowserRuntimeOverlayState();
+  }
+
+  function clearMessageRetry(messageUid?: string) {
+    if (!messageUid) {
+      state.messageRetries.value = {};
+      return;
+    }
+    const { [messageUid]: removed, ...remaining } = state.messageRetries.value;
+    state.messageRetries.value = remaining;
   }
 
   function buildBrowserDownloadingDetails(currentArtifact: string, retryCount: number) {
@@ -288,6 +297,7 @@ export function createConversationRuntimeModule(ctx: ConversationStoreContext): 
     deps.conversationRunsStore.clear();
     clearApproval();
     clearBrowserRuntimeOverlay();
+    clearMessageRetry();
     clearStreamingAssistantDraft();
   }
 
@@ -371,6 +381,20 @@ export function createConversationRuntimeModule(ctx: ConversationStoreContext): 
     });
   }
 
+  function handleMessageRetryEvent(event: AgentEvent) {
+    if (!event.messageUid) return;
+    const retryIndex = Math.max(1, Number(event.payload.retryIndex || 1));
+    const maxRetries = Math.max(retryIndex, Number(event.payload.maxRetries || retryIndex));
+    const retryDelaySeconds = Math.max(0, Number(event.payload.retryDelaySeconds || 0));
+    const retry: MessageRetryState = {
+      retryIndex,
+      maxRetries,
+      retryDelaySeconds,
+      message: String(event.payload.message || "网络连接不稳定，正在重新连接。")
+    };
+    state.messageRetries.value = { ...state.messageRetries.value, [event.messageUid]: retry };
+  }
+
   function showApprovalAlert(event: AgentEvent) {
     const rendered = deps.resolveApprovalFromPayload(event.payload || {});
     state.approval.value = {
@@ -404,6 +428,7 @@ export function createConversationRuntimeModule(ctx: ConversationStoreContext): 
     setApprovalMode,
     clearApproval,
     clearBrowserRuntimeOverlay,
+    clearMessageRetry,
     restoreApprovalModeForConversation,
     restoreApprovalFromRuns,
     updateBrowserRuntimeOverlayFromStepEvent,
@@ -413,6 +438,7 @@ export function createConversationRuntimeModule(ctx: ConversationStoreContext): 
     handlePlanCreated,
     handleRunStepEvent,
     handleReasoningEvent,
+    handleMessageRetryEvent,
     showApprovalAlert,
     renderPlanSteps
   };

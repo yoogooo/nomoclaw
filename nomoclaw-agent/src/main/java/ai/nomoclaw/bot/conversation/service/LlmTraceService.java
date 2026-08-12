@@ -57,7 +57,9 @@ public class LlmTraceService {
                 value(item.getScene()), value(item.getRoundIndex()), value(item.getAttemptIndex()), value(item.getProvider()), value(item.getModelName()),
                 value(item.getStatus()), instant(item.getRequestStartedTime()), instant(item.getResponseFinishedTime()), value(item.getLatencyMs()),
                 value(item.getSystemPrompt()), value(item.getRequestMessages()), value(item.getToolSpecifications()), value(item.getToolChoice()),
-                value(item.getRequestMetadata()), value(item.getResponseContent()), value(item.getResponseThinking()), value(item.getResponseToolCalls()), value(item.getFinishReason()),
+                value(item.getRequestMetadata()), value(item.getProtocolType()), value(item.getRequestUrl()), value(item.getRequestMethod()),
+                value(item.getRequestHeaders()), value(item.getRawRequestJson()), item.getResponseStatus(), value(item.getRawResponseJson()),
+                value(item.getRawStreamEvents()), value(item.getResponseContent()), value(item.getResponseThinking()), value(item.getResponseToolCalls()), value(item.getFinishReason()),
                 value(item.getInputTokens()), value(item.getCachedInputTokens()), value(item.getOutputTokens()), value(item.getTotalTokens()),
                 Boolean.TRUE.equals(item.getUsageAvailable()), value(item.getErrorType()), value(item.getErrorMessage()));
     }

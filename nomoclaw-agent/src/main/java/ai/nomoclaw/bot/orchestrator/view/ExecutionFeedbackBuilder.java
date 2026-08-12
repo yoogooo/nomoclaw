@@ -79,6 +79,10 @@ public class ExecutionFeedbackBuilder {
         return i18n("agent.message.failed.authentication");
     }
 
+    public String messageFailedCodexConnection() {
+        return i18n("agent.message.failed.codexConnection");
+    }
+
     public String messageCompletedDefault() {
         return i18n("agent.message.completed");
     }

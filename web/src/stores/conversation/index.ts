@@ -85,6 +85,7 @@ export const useConversationStore = defineStore("conversation", () => {
     overallPercent: -1,
     completedArtifacts: []
   });
+  const messageRetries = ref<Record<string, any>>({});
   const skipConversationListRefresh = ref(false);
   const streamingAssistantByParentUid = ref<Record<string, number>>({});
 
@@ -184,6 +185,7 @@ export const useConversationStore = defineStore("conversation", () => {
       approvalMode,
       approval: approval as any,
       browserRuntimeOverlay: browserRuntimeOverlay as any,
+      messageRetries,
       skipConversationListRefresh,
       streamingAssistantByParentUid,
       filteredConversations,
@@ -350,6 +352,7 @@ export const useConversationStore = defineStore("conversation", () => {
     loading,
     approval,
     browserRuntimeOverlay,
+    messageRetries,
     modelConfig,
     availableModelOptions,
     currentModelOption,

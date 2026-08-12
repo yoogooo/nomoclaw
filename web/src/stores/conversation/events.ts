@@ -87,6 +87,10 @@ export function createConversationEventsModule(
       runtimeModule.handleReasoningEvent(event);
       return;
     }
+    if (type === "MESSAGE_RETRYING") {
+      runtimeModule.handleMessageRetryEvent(event);
+      return;
+    }
     if (type === "STEP_WAITING_APPROVAL") {
       storeDeps.runtimeLogStore.append(storeDeps.tr("chat.runtime.stepWaitingApproval", { stepUid: event.stepUid }));
       runtimeModule.handleRunStepEvent(event);
@@ -173,6 +177,7 @@ export function createConversationEventsModule(
       runtimeModule.clearBrowserRuntimeOverlay();
       if (event.messageUid) {
         runtimeModule.clearStreamingAssistantDraft(event.messageUid);
+        runtimeModule.clearMessageRetry(event.messageUid);
       }
       storeDeps.runtimeLogStore.append(storeDeps.tr("chat.runtime.messageCompleted", { status: event.payload.status, message: event.payload.message }));
       if (event.payload.stopReason) {
@@ -210,6 +215,7 @@ export function createConversationEventsModule(
       runtimeModule.clearBrowserRuntimeOverlay();
       if (event.messageUid) {
         runtimeModule.clearStreamingAssistantDraft(event.messageUid);
+        runtimeModule.clearMessageRetry(event.messageUid);
       }
       storeDeps.runtimeLogStore.append(storeDeps.tr("chat.runtime.messageCanceled"));
       const latestUserMessage = [...state.messages.value].reverse().find((item) => item.role === "user" && item.messageUid);

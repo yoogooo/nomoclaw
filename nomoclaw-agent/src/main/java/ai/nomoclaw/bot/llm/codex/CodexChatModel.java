@@ -1,5 +1,7 @@
 package ai.nomoclaw.bot.llm.codex;
 
+import ai.nomoclaw.bot.llm.debug.LlmTraceRecorder;
+
 import dev.langchain4j.model.ModelProvider;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
@@ -19,8 +21,9 @@ public class CodexChatModel implements ChatModel {
                           CodexTokenProvider tokenProvider,
                           String baseUrl,
                           String modelName,
-                          Duration timeout) {
-        this.client = new CodexApiClient(httpClient, tokenProvider, baseUrl, timeout);
+                          Duration timeout,
+                          LlmTraceRecorder traceRecorder) {
+        this.client = new CodexApiClient(httpClient, tokenProvider, baseUrl, timeout, traceRecorder);
         this.modelName = trim(modelName).isBlank() ? "gpt-5.4" : trim(modelName);
     }
 

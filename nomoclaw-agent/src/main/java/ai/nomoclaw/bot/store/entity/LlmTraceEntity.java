@@ -31,6 +31,14 @@ public class LlmTraceEntity {
     private String toolSpecifications;
     private String toolChoice;
     private String requestMetadata;
+    private String protocolType;
+    private String requestUrl;
+    private String requestMethod;
+    private String requestHeaders;
+    private String rawRequestJson;
+    private Integer responseStatus;
+    private String rawResponseJson;
+    private String rawStreamEvents;
     private String responseContent;
     private String responseThinking;
     private String responseToolCalls;
@@ -81,6 +89,22 @@ public class LlmTraceEntity {
     public void setToolChoice(String toolChoice) { this.toolChoice = toolChoice; }
     public String getRequestMetadata() { return requestMetadata; }
     public void setRequestMetadata(String requestMetadata) { this.requestMetadata = requestMetadata; }
+    public String getProtocolType() { return protocolType; }
+    public void setProtocolType(String protocolType) { this.protocolType = protocolType; }
+    public String getRequestUrl() { return requestUrl; }
+    public void setRequestUrl(String requestUrl) { this.requestUrl = requestUrl; }
+    public String getRequestMethod() { return requestMethod; }
+    public void setRequestMethod(String requestMethod) { this.requestMethod = requestMethod; }
+    public String getRequestHeaders() { return requestHeaders; }
+    public void setRequestHeaders(String requestHeaders) { this.requestHeaders = requestHeaders; }
+    public String getRawRequestJson() { return rawRequestJson; }
+    public void setRawRequestJson(String rawRequestJson) { this.rawRequestJson = rawRequestJson; }
+    public Integer getResponseStatus() { return responseStatus; }
+    public void setResponseStatus(Integer responseStatus) { this.responseStatus = responseStatus; }
+    public String getRawResponseJson() { return rawResponseJson; }
+    public void setRawResponseJson(String rawResponseJson) { this.rawResponseJson = rawResponseJson; }
+    public String getRawStreamEvents() { return rawStreamEvents; }
+    public void setRawStreamEvents(String rawStreamEvents) { this.rawStreamEvents = rawStreamEvents; }
     public String getResponseContent() { return responseContent; }
     public void setResponseContent(String responseContent) { this.responseContent = responseContent; }
     public String getResponseThinking() { return responseThinking; }

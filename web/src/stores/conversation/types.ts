@@ -59,6 +59,13 @@ export interface BrowserRuntimeOverlayState {
   completedArtifacts: string[];
 }
 
+export interface MessageRetryState {
+  retryIndex: number;
+  maxRetries: number;
+  retryDelaySeconds: number;
+  message: string;
+}
+
 export interface ConversationStoreStateRefs {
   conversations: Ref<ConversationSummary[]>;
   conversationListAsOf: Ref<string>;
@@ -90,6 +97,7 @@ export interface ConversationStoreStateRefs {
   approvalMode: Ref<ApprovalMode>;
   approval: Ref<ApprovalState>;
   browserRuntimeOverlay: Ref<BrowserRuntimeOverlayState>;
+  messageRetries: Ref<Record<string, MessageRetryState>>;
   skipConversationListRefresh: Ref<boolean>;
   streamingAssistantByParentUid: Ref<Record<string, number>>;
   filteredConversations: ComputedRef<ConversationSummary[]>;
@@ -184,6 +192,7 @@ export interface ConversationRuntimeModule {
   setApprovalMode: (mode: ApprovalMode) => void;
   clearApproval: () => void;
   clearBrowserRuntimeOverlay: () => void;
+  clearMessageRetry: (messageUid?: string) => void;
   restoreApprovalModeForConversation: (conversationUid: string | null) => void;
   restoreApprovalFromRuns: (runs: ConversationMessageRun[]) => void;
   updateBrowserRuntimeOverlayFromStepEvent: (event: AgentEvent) => void;
@@ -199,6 +208,7 @@ export interface ConversationRuntimeModule {
   handlePlanCreated: (event: AgentEvent) => void;
   handleRunStepEvent: (event: AgentEvent) => void;
   handleReasoningEvent: (event: AgentEvent) => void;
+  handleMessageRetryEvent: (event: AgentEvent) => void;
   showApprovalAlert: (event: AgentEvent) => void;
   renderPlanSteps: (steps: Record<string, any>[]) => void;
 }

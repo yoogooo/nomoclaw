@@ -19,6 +19,8 @@ import dev.langchain4j.model.output.TokenUsage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -26,6 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Persists complete, queryable LLM request traces without affecting the chat flow.
@@ -33,6 +36,9 @@ import java.util.Map;
 @Component
 @Slf4j
 public class LlmTraceRecorder {
+
+    private static final Set<String> SENSITIVE_KEYS = Set.of("authorization", "api_key", "apikey", "token", "secret", "password", "cookie");
+    private final ThreadLocal<TraceHandle> activeTrace = new ThreadLocal<>();
 
     private final LlmTraceRepository repository;
 
@@ -108,6 +114,71 @@ public class LlmTraceRecorder {
             repository.updateById(entity);
         } catch (Exception ex) {
             log.warn("[LlmTrace] failed to persist response traceUid={} err={}", handle.traceUid(), ex.toString());
+        }
+    }
+
+    /**
+     * Associates a provider HTTP request with the trace started by the planner.
+     */
+    public TraceScope activate(TraceHandle handle) {
+        TraceHandle previous = activeTrace.get();
+        activeTrace.set(handle);
+        return () -> {
+            if (previous == null) activeTrace.remove(); else activeTrace.set(previous);
+        };
+    }
+
+    public TraceHandle activeTrace() {
+        return activeTrace.get();
+    }
+
+    public void recordRawRequest(TraceHandle handle, String protocolType, String url, String method,
+                                 Map<String, ? extends List<String>> headers, String body) {
+        if (handle == null) return;
+        try {
+            LlmTraceEntity entity = repository.findByTraceUid(handle.traceUid());
+            if (entity == null) return;
+            entity.setProtocolType(value(protocolType));
+            entity.setRequestUrl(value(url));
+            entity.setRequestMethod(value(method));
+            entity.setRequestHeaders(JsonUtil.toJson(safeHeaders(headers)));
+            entity.setRawRequestJson(redactJson(body));
+            repository.updateById(entity);
+        } catch (Exception ex) {
+            log.warn("[LlmTrace] failed to persist raw request traceUid={} err={}", handle.traceUid(), ex.toString());
+        }
+    }
+
+    public void recordRawResponse(TraceHandle handle, int status, String body) {
+        if (handle == null) return;
+        try {
+            LlmTraceEntity entity = repository.findByTraceUid(handle.traceUid());
+            if (entity == null) return;
+            entity.setResponseStatus(status);
+            entity.setRawResponseJson(redactJson(body));
+            repository.updateById(entity);
+        } catch (Exception ex) {
+            log.warn("[LlmTrace] failed to persist raw response traceUid={} err={}", handle.traceUid(), ex.toString());
+        }
+    }
+
+    public void appendRawStreamEvent(TraceHandle handle, String event, String data) {
+        if (handle == null) return;
+        try {
+            LlmTraceEntity entity = repository.findByTraceUid(handle.traceUid());
+            if (entity == null) return;
+            List<Map<String, Object>> events = JsonUtil.fromJsonQuietly(value(entity.getRawStreamEvents()), List.class)
+                    .map(list -> new ArrayList<Map<String, Object>>(list)).orElseGet(ArrayList::new);
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("sequence", events.size() + 1);
+            payload.put("event", value(event));
+            payload.put("data", redactJson(data));
+            events.add(payload);
+            entity.setRawStreamEvents(JsonUtil.toJson(events));
+            entity.setRawResponseJson(redactJson(data));
+            repository.updateById(entity);
+        } catch (Exception ex) {
+            log.warn("[LlmTrace] failed to persist raw stream event traceUid={} err={}", handle.traceUid(), ex.toString());
         }
     }
 
@@ -200,10 +271,58 @@ public class LlmTraceRecorder {
         return value.replaceAll("(?i)(authorization\\s*[:=]\\s*|api[_-]?key\\s*[:=]\\s*)([^,\\s\\\"]+)", "$1<redacted>");
     }
 
+    private Map<String, List<String>> safeHeaders(Map<String, ? extends List<String>> headers) {
+        Map<String, List<String>> safe = new LinkedHashMap<>();
+        if (headers == null) return safe;
+        headers.forEach((name, values) -> {
+            String normalized = value(name).toLowerCase(Locale.ROOT);
+            if ("content-type".equals(normalized) || "accept".equals(normalized)) {
+                safe.put(name, values == null ? List.of() : List.copyOf(values));
+            }
+        });
+        return safe;
+    }
+
+    private String redactJson(String raw) {
+        String input = value(raw);
+        if (input.isBlank()) return input;
+        try {
+            JsonNode node = JsonUtil.fromJson(input, JsonNode.class).deepCopy();
+            redactNode(node);
+            return JsonUtil.toJson(node);
+        } catch (Exception ignored) {
+            return redact(input);
+        }
+    }
+
+    private void redactNode(JsonNode node) {
+        if (node instanceof ObjectNode objectNode) {
+            objectNode.properties().forEach(entry -> {
+                if (isSensitiveKey(entry.getKey())) {
+                    objectNode.put(entry.getKey(), "<redacted>");
+                } else {
+                    redactNode(entry.getValue());
+                }
+            });
+        } else if (node instanceof ArrayNode arrayNode) {
+            arrayNode.forEach(this::redactNode);
+        }
+    }
+
+    private boolean isSensitiveKey(String key) {
+        String normalized = value(key).replace("-", "_").toLowerCase(Locale.ROOT);
+        return SENSITIVE_KEYS.stream().anyMatch(normalized::contains);
+    }
+
     private int nonNegative(Integer value) { return value == null ? 0 : Math.max(0, value); }
     private long elapsedMillis(long startNanos) { return (System.nanoTime() - startNanos) / 1_000_000L; }
     private String value(String value) { return value == null ? "" : value; }
 
     public record TraceHandle(String traceUid, String requestUid, long startNanos) {
+    }
+
+    public interface TraceScope extends AutoCloseable {
+        @Override
+        void close();
     }
 }

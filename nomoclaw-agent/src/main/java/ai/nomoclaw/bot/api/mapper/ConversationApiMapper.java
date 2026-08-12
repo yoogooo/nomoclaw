@@ -174,7 +174,8 @@ public final class ConversationApiMapper {
         return new LlmTraceDetailResponse(dto.traceUid(), dto.requestUid(), dto.conversationUid(), dto.messageUid(), dto.scene(),
                 dto.roundIndex(), dto.attemptIndex(), dto.provider(), dto.modelName(), dto.status(), dto.requestStartedTime(),
                 dto.responseFinishedTime(), dto.latencyMs(), dto.systemPrompt(), dto.requestMessages(), dto.toolSpecifications(),
-                dto.toolChoice(), dto.requestMetadata(), dto.responseContent(), dto.responseThinking(), dto.responseToolCalls(), dto.finishReason(),
+                dto.toolChoice(), dto.requestMetadata(), dto.protocolType(), dto.requestUrl(), dto.requestMethod(), dto.requestHeaders(),
+                dto.rawRequestJson(), dto.responseStatus(), dto.rawResponseJson(), dto.rawStreamEvents(), dto.responseContent(), dto.responseThinking(), dto.responseToolCalls(), dto.finishReason(),
                 dto.inputTokens(), dto.cachedInputTokens(), dto.outputTokens(), dto.totalTokens(), dto.usageAvailable(),
                 dto.errorType(), dto.errorMessage());
     }

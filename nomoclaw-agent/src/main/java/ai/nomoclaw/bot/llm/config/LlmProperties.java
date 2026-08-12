@@ -13,7 +13,9 @@ public class LlmProperties {
     private String provider;
     private String systemPrompt;
     private Duration timeout = Duration.ofSeconds(120);
-    private Integer maxRetries = 2;
+    private Duration connectTimeout = Duration.ofSeconds(5);
+    private Integer maxRetries = 3;
+    private Duration retryInterval = Duration.ofSeconds(5);
 
     private final Ollama ollama = new Ollama();
     private final Qwen qwen = new Qwen();
@@ -45,12 +47,28 @@ public class LlmProperties {
         this.timeout = timeout;
     }
 
+    public Duration getConnectTimeout() {
+        return connectTimeout;
+    }
+
+    public void setConnectTimeout(Duration connectTimeout) {
+        this.connectTimeout = connectTimeout;
+    }
+
     public Integer getMaxRetries() {
         return maxRetries;
     }
 
     public void setMaxRetries(Integer maxRetries) {
         this.maxRetries = maxRetries;
+    }
+
+    public Duration getRetryInterval() {
+        return retryInterval;
+    }
+
+    public void setRetryInterval(Duration retryInterval) {
+        this.retryInterval = retryInterval;
     }
 
     public Ollama getOllama() {

@@ -6,6 +6,8 @@ import ai.nomoclaw.bot.llm.codex.CodexChatModel;
 import ai.nomoclaw.bot.llm.codex.CodexStreamingChatModel;
 import ai.nomoclaw.bot.llm.codex.CodexTokenProvider;
 import ai.nomoclaw.bot.llm.config.LlmProperties;
+import ai.nomoclaw.bot.llm.debug.LlmTraceRecorder;
+import ai.nomoclaw.bot.llm.debug.TraceHttpClientBuilder;
 import ai.nomoclaw.bot.modelconfig.ModelConfigAppService;
 import ai.nomoclaw.bot.prompt.PromptLoader;
 import ai.nomoclaw.bot.store.entity.AgentDefinitionEntity;
@@ -20,6 +22,7 @@ import dev.langchain4j.model.ollama.OllamaChatModel;
 import dev.langchain4j.model.ollama.OllamaStreamingChatModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
@@ -41,19 +44,22 @@ public class RuntimeChatModelResolver {
     private final AgentMessageRepository agentMessageRepository;
     private final ModelConfigAppService modelConfigAppService;
     private final HttpClient httpClient;
+    private final LlmTraceRecorder llmTraceRecorder;
 
     public RuntimeChatModelResolver(LlmProperties llmProperties,
                                     AgentDefinitionRepository agentDefinitionRepository,
                                     AgentConversationRepository agentConversationRepository,
                                     AgentMessageRepository agentMessageRepository,
                                     ModelConfigAppService modelConfigAppService,
-                                    HttpClient appHttpClient) {
+                                    @Qualifier("llmHttpClient") HttpClient llmHttpClient,
+                                    LlmTraceRecorder llmTraceRecorder) {
         this.llmProperties = llmProperties;
         this.agentDefinitionRepository = agentDefinitionRepository;
         this.agentConversationRepository = agentConversationRepository;
         this.agentMessageRepository = agentMessageRepository;
         this.modelConfigAppService = modelConfigAppService;
-        this.httpClient = appHttpClient;
+        this.httpClient = llmHttpClient;
+        this.llmTraceRecorder = llmTraceRecorder;
     }
 
     public ResolvedModel resolve(PromptLoader.PromptContext promptContext) {
@@ -110,14 +116,16 @@ public class RuntimeChatModelResolver {
                     tokenProvider,
                     provider.baseUrl(),
                     runtimeModelId,
-                    llmProperties.getTimeout()
+                    llmProperties.getTimeout(),
+                    llmTraceRecorder
             );
             StreamingChatModel streamingModel = new CodexStreamingChatModel(
                     httpClient,
                     tokenProvider,
                     provider.baseUrl(),
                     runtimeModelId,
-                    llmProperties.getTimeout()
+                    llmProperties.getTimeout(),
+                    llmTraceRecorder
             );
             return new ResolvedModel(provider.id(), runtimeModelId, model, streamingModel);
         }
@@ -125,12 +133,14 @@ public class RuntimeChatModelResolver {
         if (provider.local() || "ollama".equals(provider.id())) {
             String baseUrl = trim(provider.baseUrl()).isBlank() ? llmProperties.getOllama().getBaseUrl() : trim(provider.baseUrl());
             ChatModel model = OllamaChatModel.builder()
+                    .httpClientBuilder(new TraceHttpClientBuilder(llmTraceRecorder, "ollama"))
                     .baseUrl(baseUrl)
                     .modelName(runtimeModelId)
                     .timeout(llmProperties.getTimeout())
                     .maxRetries(llmProperties.getMaxRetries())
                     .build();
             StreamingChatModel streamingModel = OllamaStreamingChatModel.builder()
+                    .httpClientBuilder(new TraceHttpClientBuilder(llmTraceRecorder, "ollama"))
                     .baseUrl(baseUrl)
                     .modelName(runtimeModelId)
                     .timeout(llmProperties.getTimeout())
@@ -144,6 +154,7 @@ public class RuntimeChatModelResolver {
             throw new IllegalArgumentException("API key is required for provider=" + provider.id());
         }
         ChatModel model = OpenAiChatModel.builder()
+                .httpClientBuilder(new TraceHttpClientBuilder(llmTraceRecorder, "openai-compatible"))
                 .apiKey(Objects.requireNonNull(apiKey, "apiKey must not be null"))
                 .baseUrl(baseUrl)
                 .modelName(runtimeModelId)
@@ -151,6 +162,7 @@ public class RuntimeChatModelResolver {
                 .maxRetries(llmProperties.getMaxRetries())
                 .build();
         StreamingChatModel streamingModel = OpenAiStreamingChatModel.builder()
+                .httpClientBuilder(new TraceHttpClientBuilder(llmTraceRecorder, "openai-compatible"))
                 .apiKey(Objects.requireNonNull(apiKey, "apiKey must not be null"))
                 .baseUrl(baseUrl)
                 .modelName(runtimeModelId)
