@@ -26,10 +26,10 @@
         <java.version>21</java.version>
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
-        <langchain4j.version>1.16.3</langchain4j.version>
-        <langchain4j.onnx-scoring.version>1.17.2-beta27</langchain4j.onnx-scoring.version>
-        <langchain4j.skills.version>1.17.2-beta27</langchain4j.skills.version>
-        <langchain4j.dashscope.version>1.17.2-beta27</langchain4j.dashscope.version>
+        <langchain4j.version>1.18.1</langchain4j.version>
+        <langchain4j.onnx-scoring.version>1.18.1-beta28</langchain4j.onnx-scoring.version>
+        <langchain4j.mcp.version>1.18.1-beta28</langchain4j.mcp.version>
+        <langchain4j.dashscope.version>1.18.0-beta28</langchain4j.dashscope.version>
         <mybatis-plus.version>3.5.16</mybatis-plus.version>
         <springdoc.version>3.0.3</springdoc.version>
         <swagger.annotations.version>2.2.50</swagger.annotations.version>

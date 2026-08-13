@@ -62,11 +62,6 @@
         </dependency>
         <dependency>
             <groupId>dev.langchain4j</groupId>
-            <artifactId>langchain4j-community-dashscope</artifactId>
-            <version>${langchain4j.dashscope.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-open-ai</artifactId>
             <version>${langchain4j.version}</version>
         </dependency>
@@ -77,13 +72,8 @@
         </dependency>
         <dependency>
             <groupId>dev.langchain4j</groupId>
-            <artifactId>langchain4j-skills</artifactId>
-            <version>${langchain4j.skills.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-mcp</artifactId>
-            <version>${langchain4j.skills.version}</version>
+            <version>${langchain4j.mcp.version}</version>
         </dependency>
         <dependency>
             <groupId>dev.langchain4j</groupId>
