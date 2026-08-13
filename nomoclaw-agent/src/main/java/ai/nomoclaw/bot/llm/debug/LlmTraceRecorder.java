@@ -175,7 +175,6 @@ public class LlmTraceRecorder {
             payload.put("data", redactJson(data));
             events.add(payload);
             entity.setRawStreamEvents(JsonUtil.toJson(events));
-            entity.setRawResponseJson(redactJson(data));
             repository.updateById(entity);
         } catch (Exception ex) {
             log.warn("[LlmTrace] failed to persist raw stream event traceUid={} err={}", handle.traceUid(), ex.toString());
