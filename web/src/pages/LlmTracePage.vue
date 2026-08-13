@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { Copy } from "lucide-vue-next";
+import { ChevronDown, Copy } from "lucide-vue-next";
 import { NCard, NCollapse, NCollapseItem, NEmpty, NSpin, NTag } from "naive-ui";
 import { useRoute } from "vue-router";
 import { conversationApi } from "@/api/conversationApi";
@@ -18,6 +18,10 @@ const message = ref<ConversationMessage | null>(null);
 const loading = ref(false);
 const detailLoading = ref(false);
 const error = ref("");
+const rawRequestExpanded = ref(true);
+const rawResponseExpanded = ref(true);
+const rawStreamExpanded = ref(true);
+const requestHeadersExpanded = ref(true);
 const conversationUid = computed(() => String(route.query.conversationUid || "").trim());
 const messageUid = computed(() => String(route.query.messageUid || "").trim());
 const selectedSummary = computed(() => traces.value.find((item) => item.traceUid === selected.value?.traceUid) || null);
@@ -66,6 +70,10 @@ function statusType(status: string) {
   return status === "SUCCEEDED" ? "success" : status === "FAILED" ? "error" : "warning";
 }
 
+function statusDotClass(status: string) {
+  return status === "SUCCEEDED" ? "success" : status === "FAILED" ? "error" : "warning";
+}
+
 function formatTime(value?: string | null) {
   if (!value) return "—";
   const date = new Date(value);
@@ -77,8 +85,20 @@ function formatTime(value?: string | null) {
   }).format(date);
 }
 
+function formatTimelineTime(value?: string | null) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
 function tokenText(item: LlmTraceSummary) {
   return item.usageAvailable ? `${item.totalTokens.toLocaleString()} ${t("chat.trace.tokens")}` : t("chat.trace.unavailable");
+}
+
+function tokenValue(item: LlmTraceSummary) {
+  return item.usageAvailable ? item.totalTokens.toLocaleString() : "—";
 }
 
 function prettyJson(value: string) {
@@ -126,14 +146,15 @@ async function copy(value: string) {
               type="button"
               @click="loadDetail(item.traceUid)"
             >
-              <div class="trace-item-topline">
-                <span>{{ item.scene }}</span>
-                <n-tag size="small" :type="statusType(item.status)">{{ item.status }}
-                </n-tag>
+              <div class="trace-item-content">
+                <span class="trace-status-dot" :class="statusDotClass(item.status)" :aria-label="item.status" />
+                <div class="trace-item-details">
+                  <div class="trace-item-title">{{ t("chat.trace.round", { round: item.roundIndex }) }}</div>
+                  <div class="trace-item-meta">{{ item.provider }} / {{ item.modelName }}</div>
+                  <div class="trace-item-meta">{{ item.latencyMs }}ms · {{ tokenText(item) }}</div>
+                  <div class="trace-item-meta trace-item-time">{{ formatTimelineTime(item.requestStartedTime) }}</div>
+                </div>
               </div>
-              <div class="trace-item-title">{{ t("chat.trace.roundAttempt", { round: item.roundIndex, attempt: item.attemptIndex }) }}</div>
-              <div class="trace-item-meta"><span class="trace-model-label">{{ t("chat.trace.model") }}</span> {{ item.provider }} / {{ item.modelName }}</div>
-              <div class="trace-item-meta">{{ item.latencyMs }}ms · {{ tokenText(item) }} · {{ formatTime(item.requestStartedTime) }}</div>
             </button>
           </div>
         </n-card>
@@ -143,28 +164,27 @@ async function copy(value: string) {
             <n-spin v-if="detailLoading" />
             <template v-else-if="selected">
               <div class="trace-detail-overview">
-                <n-tag :type="statusType(selected.status)">{{ selected.status }}
-                </n-tag>
-                <span><strong>{{ t("chat.trace.provider") }}</strong> {{ selected.provider }}</span>
-                <span><strong>{{ t("chat.trace.model") }}</strong> {{ selected.modelName }}</span>
-                <span>{{ selected.latencyMs }}ms</span>
-                <span>{{ tokenText(selectedSummary || selected) }}</span>
+                <div class="trace-summary-main">
+                  <div class="trace-summary-identity">
+                    <span>{{ selected.provider }}</span>
+                    <span class="trace-summary-separator">/</span>
+                    <strong>{{ selected.modelName }}</strong>
+                  </div>
+                  <n-tag size="small" :type="statusType(selected.status)">{{ selected.status }}
+                  </n-tag>
+                </div>
+                <div class="trace-summary-metrics">
+                  <div class="trace-summary-metric">
+                    <span>{{ t("chat.trace.latency") }}</span>
+                    <strong>{{ selected.latencyMs }}<small>ms</small></strong>
+                  </div>
+                  <div class="trace-summary-metric">
+                    <span>{{ t("chat.trace.tokens") }}</span>
+                    <strong>{{ tokenValue(selectedSummary || selected) }}</strong>
+                  </div>
+                </div>
               </div>
               <n-collapse multiple :default-expanded-names="['protocol', 'overview', 'response']">
-              <n-collapse-item name="protocol" :title="t('chat.trace.rawProtocol')">
-                <div v-if="selected.rawRequestJson || selected.rawResponseJson || selected.rawStreamEvents" class="trace-protocol">
-                  <div class="trace-kv-grid">
-                    <span>{{ t('chat.trace.protocol') }}</span><strong>{{ selected.protocolType || '—' }}</strong>
-                    <span>{{ t('chat.trace.endpoint') }}</span><strong>{{ selected.requestMethod }} {{ selected.requestUrl }}</strong>
-                    <span>{{ t('chat.trace.responseStatus') }}</span><strong>{{ selected.responseStatus ?? '—' }}</strong>
-                  </div>
-                  <div class="trace-subsection"><h3>{{ t('chat.trace.requestHeaders') }}</h3><div class="trace-code-wrap trace-request-body"><button class="trace-copy" @click="copy(prettyJson(selected.requestHeaders))"><Copy :size="14" /></button><TraceJsonViewer :raw-text="selected.requestHeaders" /></div></div>
-                  <div class="trace-subsection"><h3>{{ t('chat.trace.rawRequestJson') }}</h3><div class="trace-code-wrap trace-request-body"><button class="trace-copy" @click="copy(prettyJson(selected.rawRequestJson))"><Copy :size="14" /></button><TraceJsonViewer :raw-text="selected.rawRequestJson" /></div></div>
-                  <div class="trace-subsection"><h3>{{ t('chat.trace.rawResponseJson') }}</h3><div class="trace-code-wrap trace-response-body"><button class="trace-copy" @click="copy(prettyJson(selected.rawResponseJson))"><Copy :size="14" /></button><TraceJsonViewer :raw-text="selected.rawResponseJson" /></div></div>
-                  <div class="trace-subsection"><h3>{{ t('chat.trace.streamEvents') }}</h3><div v-if="selected.rawStreamEvents" class="trace-code-wrap trace-response-body"><button class="trace-copy" @click="copy(prettyJson(selected.rawStreamEvents))"><Copy :size="14" /></button><TraceJsonViewer :raw-text="selected.rawStreamEvents" /></div><span v-else class="trace-empty-response">{{ t('chat.trace.nonStreaming') }}</span></div>
-                </div>
-                <div v-else class="trace-empty-response">{{ t('chat.trace.rawUnavailable') }}</div>
-              </n-collapse-item>
               <n-collapse-item name="overview" :title="t('chat.trace.overview')">
                 <div class="trace-kv-grid">
                   <span>{{ t("chat.trace.requestTime") }}</span><strong>{{ formatTime(selected.requestStartedTime) }}</strong>
@@ -173,10 +193,81 @@ async function copy(value: string) {
                   <span>{{ t("chat.trace.roundAttemptLabel") }}</span><strong>{{ selected.roundIndex }} / {{ selected.attemptIndex }}</strong>
                 </div>
               </n-collapse-item>
+              <n-collapse-item name="protocol" :title="t('chat.trace.rawProtocol')">
+                <div v-if="selected.rawRequestJson || selected.rawResponseJson || selected.rawStreamEvents" class="trace-protocol">
+                  <div class="trace-kv-grid">
+                    <span>{{ t('chat.trace.protocol') }}</span><strong>{{ selected.protocolType || '—' }}</strong>
+                    <span>{{ t('chat.trace.endpoint') }}</span><strong>{{ selected.requestMethod }} {{ selected.requestUrl }}</strong>
+                    <span>{{ t('chat.trace.responseStatus') }}</span><strong>{{ selected.responseStatus ?? '—' }}</strong>
+                  </div>
+                  <div class="trace-subsection">
+                    <button
+                      class="trace-subsection-toggle"
+                      type="button"
+                      :aria-expanded="requestHeadersExpanded"
+                      @click="requestHeadersExpanded = !requestHeadersExpanded"
+                    >
+                      <ChevronDown :size="16" class="trace-subsection-chevron" :class="{ collapsed: !requestHeadersExpanded }" />
+                      <h3>{{ t('chat.trace.requestHeaders') }}</h3>
+                    </button>
+                    <div v-if="requestHeadersExpanded" class="trace-code-wrap trace-request-body">
+                      <button class="trace-copy" @click="copy(prettyJson(selected.requestHeaders))"><Copy :size="14" /></button>
+                      <TraceJsonViewer :raw-text="selected.requestHeaders" />
+                    </div>
+                  </div>
+                  <div class="trace-subsection">
+                    <button
+                      class="trace-subsection-toggle"
+                      type="button"
+                      :aria-expanded="rawRequestExpanded"
+                      @click="rawRequestExpanded = !rawRequestExpanded"
+                    >
+                      <ChevronDown :size="16" class="trace-subsection-chevron" :class="{ collapsed: !rawRequestExpanded }" />
+                      <h3>{{ t('chat.trace.rawRequestJson') }}</h3>
+                    </button>
+                    <div v-if="rawRequestExpanded" class="trace-code-wrap trace-request-body">
+                      <button class="trace-copy" @click="copy(prettyJson(selected.rawRequestJson))"><Copy :size="14" /></button>
+                      <TraceJsonViewer :raw-text="selected.rawRequestJson" />
+                    </div>
+                  </div>
+                  <div class="trace-subsection">
+                    <button
+                      class="trace-subsection-toggle"
+                      type="button"
+                      :aria-expanded="rawResponseExpanded"
+                      @click="rawResponseExpanded = !rawResponseExpanded"
+                    >
+                      <ChevronDown :size="16" class="trace-subsection-chevron" :class="{ collapsed: !rawResponseExpanded }" />
+                      <h3>{{ t('chat.trace.rawResponseJson') }}</h3>
+                    </button>
+                    <div v-if="rawResponseExpanded" class="trace-code-wrap trace-response-body">
+                      <button class="trace-copy" @click="copy(prettyJson(selected.rawResponseJson))"><Copy :size="14" /></button>
+                      <TraceJsonViewer :raw-text="selected.rawResponseJson" />
+                    </div>
+                  </div>
+                  <div class="trace-subsection">
+                    <button
+                      class="trace-subsection-toggle"
+                      type="button"
+                      :aria-expanded="rawStreamExpanded"
+                      @click="rawStreamExpanded = !rawStreamExpanded"
+                    >
+                      <ChevronDown :size="16" class="trace-subsection-chevron" :class="{ collapsed: !rawStreamExpanded }" />
+                      <h3>{{ t('chat.trace.streamEvents') }}</h3>
+                    </button>
+                    <div v-if="rawStreamExpanded && selected.rawStreamEvents" class="trace-code-wrap trace-response-body">
+                      <button class="trace-copy" @click="copy(prettyJson(selected.rawStreamEvents))"><Copy :size="14" /></button>
+                      <TraceJsonViewer :raw-text="selected.rawStreamEvents" />
+                    </div>
+                    <span v-else-if="rawStreamExpanded" class="trace-empty-response">{{ t('chat.trace.nonStreaming') }}</span>
+                  </div>
+                </div>
+                <div v-else class="trace-empty-response">{{ t('chat.trace.rawUnavailable') }}</div>
+              </n-collapse-item>
               <n-collapse-item name="prompt" :title="t('chat.trace.systemPrompt')"><div class="trace-code-wrap trace-request-body"><button class="trace-copy" @click="copy(selected.systemPrompt)"><Copy :size="14" /></button><pre>{{ selected.systemPrompt || "—" }}</pre></div></n-collapse-item>
               <n-collapse-item name="tools" :title="t('chat.trace.tools')"><div class="trace-request-body"><TraceJsonViewer :raw-text="selected.toolSpecifications" /></div></n-collapse-item>
-              <n-collapse-item name="messages" :title="t('chat.trace.messages')"><div class="trace-code-wrap trace-request-body"><button class="trace-copy" @click="copy(prettyJson(selected.requestMessages))"><Copy :size="14" /></button><TraceJsonViewer :raw-text="selected.requestMessages" /></div></n-collapse-item>
               <n-collapse-item name="choice" :title="t('chat.trace.toolChoice')"><div class="trace-request-body"><TraceJsonViewer :raw-text="selected.toolChoice" /></div></n-collapse-item>
+              <n-collapse-item name="messages" :title="t('chat.trace.messages')"><div class="trace-code-wrap trace-request-body"><button class="trace-copy" @click="copy(prettyJson(selected.requestMessages))"><Copy :size="14" /></button><TraceJsonViewer :raw-text="selected.requestMessages" /></div></n-collapse-item>
               <n-collapse-item name="response" :title="t('chat.trace.response')">
                 <div v-if="selected.responseContent" class="trace-response-section">
                   <h3>{{ t("chat.trace.assistantContent") }}</h3>
@@ -189,7 +280,6 @@ async function copy(value: string) {
                 <div v-if="selected.responseToolCalls" class="trace-response-section"><h3>{{ t("chat.trace.toolCalls") }}</h3><div class="trace-response-body"><TraceJsonViewer :raw-text="selected.responseToolCalls" /></div></div>
                 <div v-if="!selected.responseContent && !selected.responseThinking && !selected.responseToolCalls" class="trace-empty-response">{{ t("chat.trace.noResponse") }}</div>
               </n-collapse-item>
-              <n-collapse-item name="raw" :title="t('chat.trace.rawRequest')"><div class="trace-request-body"><TraceJsonViewer :raw-text="selected.requestMetadata" /></div></n-collapse-item>
               <n-collapse-item v-if="selected.errorMessage" name="error" :title="t('chat.trace.error')"><pre class="trace-code trace-error-code">{{ selected.errorType }}\n{{ selected.errorMessage }}</pre></n-collapse-item>
               </n-collapse>
             </template>
@@ -210,21 +300,39 @@ async function copy(value: string) {
 .trace-layout { display: grid; grid-template-columns: minmax(280px, 340px) minmax(0, 1fr); gap: 0; width: 100%; height: 100vh; min-height: 0; align-items: stretch; }
 .trace-layout > * { min-width: 0; min-height: 0; }
 .trace-page :deep(.n-card) { border-radius: 0; height: 100%; }
-.trace-timeline-item { width: 100%; display: block; text-align: left; padding: 14px; margin-bottom: 8px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: inherit; cursor: pointer; }
+.trace-timeline-item { width: 100%; display: block; text-align: left; padding: 11px 12px; margin-bottom: 5px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: inherit; cursor: pointer; }
 .trace-timeline-item:hover, .trace-timeline-item.selected { background: #17191d; border-color: #287d72; }
-.trace-item-topline, .trace-detail-overview { display: flex; align-items: center; gap: 8px; }
-.trace-item-topline { justify-content: space-between; font-size: 12px; color: #a5aab3; }
-.trace-item-title { margin-top: 8px; font-weight: 650; }
-.trace-item-meta { margin-top: 5px; font-size: 12px; color: #a5aab3; }
-.trace-detail-overview { flex-wrap: wrap; margin-bottom: 18px; color: #c2c5ca; }
+.trace-item-content { display: grid; grid-template-columns: 8px minmax(0, 1fr); align-items: start; gap: 10px; }
+.trace-item-details { min-width: 0; }
+.trace-status-dot { width: 7px; height: 7px; margin-top: 6px; flex: none; border-radius: 50%; background: #f0b429; }
+.trace-status-dot.success { background: #27c281; }
+.trace-status-dot.error { background: #ef5b5b; }
+.trace-item-title { font-size: 13px; font-weight: 650; }
+.trace-item-meta { margin-top: 4px; overflow-wrap: anywhere; font-size: 12px; color: #a3aab5; line-height: 1.45; }
+.trace-item-time { color: #7f8792; font-size: 11px; }
+.trace-detail-overview { display: flex; align-items: stretch; flex-direction: column; gap: 14px; margin-bottom: 18px; padding: 0 0 16px; border-bottom: 1px solid #292d34; color: #c2c5ca; }
+.trace-summary-main { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+.trace-summary-identity { display: flex; align-items: baseline; gap: 7px; min-width: 0; color: #aeb4be; font-size: 14px; }
+.trace-summary-identity strong { min-width: 0; color: #eef0f2; font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+.trace-summary-separator { color: #68707c; }
+.trace-summary-main :deep(.n-tag) { flex: none; font-size: 11px; }
+.trace-summary-metrics { display: flex; align-items: stretch; gap: 20px; }
+.trace-summary-metric { display: flex; min-width: 76px; flex-direction: column; justify-content: center; gap: 3px; }
+.trace-summary-metric + .trace-summary-metric { padding-left: 20px; border-left: 1px solid #30343c; }
+.trace-summary-metric span { color: #8f96a1; font-size: 11px; }
+.trace-summary-metric strong { color: #e1e4e8; font-size: 15px; font-weight: 550; white-space: nowrap; }
+.trace-summary-metric small { margin-left: 3px; color: #9da3ad; font-size: 11px; font-weight: 400; }
 .trace-timeline-card { min-height: 0; height: 100%; }
 .trace-timeline-card :deep(.n-card__content) { min-height: 0; overflow: hidden; }
 .trace-timeline-scroll { height: calc(100vh - 72px); max-height: calc(100vh - 72px); margin-right: -24px; padding-right: 24px; box-sizing: border-box; overflow-y: auto; overflow-x: hidden; scrollbar-color: #4c515b #101114; }
 .trace-detail-card { min-height: 100%; height: 100vh; overflow-y: auto; overflow-x: hidden; scrollbar-color: #4c515b #101114; }
 .trace-detail-card :deep(.n-card__content) { min-height: 0; overflow: visible; }
 .trace-detail-scroll { height: auto; max-height: none; overflow: visible; padding-right: 8px; }
-.trace-kv-grid { display: grid; grid-template-columns: 150px 1fr; gap: 10px; font-size: 13px; }
-.trace-kv-grid span { color: #a5aab3; }
+.trace-kv-grid { display: grid; grid-template-columns: minmax(132px, 180px) minmax(0, 1fr); overflow: hidden; border: 1px solid #292d34; border-radius: 8px; background: #14161a; font-size: 13px; }
+.trace-kv-grid span, .trace-kv-grid strong { min-width: 0; padding: 10px 12px; border-bottom: 1px solid #252930; line-height: 1.5; }
+.trace-kv-grid span { color: #9da3ad; }
+.trace-kv-grid strong { color: #e1e4e8; font-weight: 500; overflow-wrap: anywhere; }
+.trace-kv-grid span:nth-last-child(2), .trace-kv-grid strong:last-child { border-bottom: 0; }
 .trace-code-wrap { position: relative; }
 .trace-code, pre { margin: 0; max-height: 420px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .trace-code-wrap pre { padding-right: 34px; }
@@ -237,6 +345,15 @@ async function copy(value: string) {
 .trace-empty-response { color: #a5aab3; font-size: 13px; }
 .trace-copy { position: absolute; top: 11px; right: 8px; border: 0; background: transparent; color: inherit; cursor: pointer; }
 .trace-subsection h3 { margin: 18px 0 8px; font-size: 13px; }
+.trace-subsection-toggle + .trace-code-wrap,
+.trace-subsection-toggle + .trace-empty-response { margin-left: 12px; }
+.trace-subsection-toggle { display: flex; align-items: center; justify-content: flex-start; width: 100%; padding: 0 0 0 12px; border: 0; background: transparent; color: inherit; cursor: pointer; text-align: left; }
+.trace-subsection-toggle h3 { flex: 1; }
+.trace-subsection-chevron { flex: none; margin: 10px 6px 0 0; color: #a5aab3; transition: transform 160ms ease; }
+.trace-subsection-chevron.collapsed { transform: rotate(-90deg); }
 .trace-error, .trace-error-code { color: #ff6b6b; }
 .trace-loading, .trace-empty { display: grid; place-items: center; min-height: 300px; }
+@media (max-width: 760px) {
+  .trace-summary-metrics { justify-content: flex-start; }
+}
 </style>
