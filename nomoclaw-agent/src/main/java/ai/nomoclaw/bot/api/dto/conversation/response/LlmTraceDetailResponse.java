@@ -13,7 +13,7 @@ public record LlmTraceDetailResponse(
         String requestMetadata, String protocolType, String requestUrl, String requestMethod, String requestHeaders,
         String rawRequestJson, Integer responseStatus, String rawResponseJson, String rawStreamEvents,
         String responseContent, String responseThinking, String responseToolCalls, String finishReason,
-        int inputTokens, int cachedInputTokens, int outputTokens, int totalTokens,
+        int inputTokens, int cachedInputTokens, int outputTokens, int reasoningTokens, int totalTokens,
         boolean usageAvailable, String errorType, String errorMessage
 ) {
 }

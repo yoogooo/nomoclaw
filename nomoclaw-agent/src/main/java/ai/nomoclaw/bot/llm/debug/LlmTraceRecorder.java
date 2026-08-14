@@ -1,8 +1,7 @@
 package ai.nomoclaw.bot.llm.debug;
 
 import ai.nomoclaw.bot.prompt.PromptLoader;
-import ai.nomoclaw.bot.store.entity.LlmTraceEntity;
-import ai.nomoclaw.bot.store.repository.LlmTraceRepository;
+import ai.nomoclaw.bot.llm.codex.CodexTokenUsage;
 import ai.nomoclaw.bot.orchestrator.TokenUsageCacheTokenExtractor;
 import ai.nomoclaw.bot.util.JsonUtil;
 import ai.nomoclaw.bot.util.UuidUtil;
@@ -37,13 +36,16 @@ import java.util.Set;
 @Slf4j
 public class LlmTraceRecorder {
 
-    private static final Set<String> SENSITIVE_KEYS = Set.of("authorization", "api_key", "apikey", "token", "secret", "password", "cookie");
+    private static final Set<String> SENSITIVE_KEYS = Set.of(
+            "authorization", "api_key", "apikey", "x_api_key", "access_token", "refresh_token",
+            "id_token", "token", "client_secret", "secret", "password", "cookie"
+    );
     private final ThreadLocal<TraceHandle> activeTrace = new ThreadLocal<>();
 
-    private final LlmTraceRepository repository;
+    private final LlmTraceStore store;
 
-    public LlmTraceRecorder(LlmTraceRepository repository) {
-        this.repository = repository;
+    public LlmTraceRecorder(LlmTraceStore store) {
+        this.store = store;
     }
 
     public TraceHandle start(String scene,
@@ -56,12 +58,13 @@ public class LlmTraceRecorder {
                              List<ToolSpecification> toolSpecifications,
                              int roundIndex,
                              int attemptIndex) {
-        TraceHandle handle = new TraceHandle(UuidUtil.newUuid(), UuidUtil.newUuid(), System.nanoTime());
+        String conversationUid = value(context == null ? null : context.sessionId());
+        TraceHandle handle = new TraceHandle(UuidUtil.newUuid(), UuidUtil.newUuid(), conversationUid, System.nanoTime());
         try {
-            LlmTraceEntity entity = new LlmTraceEntity();
+            LlmTraceRecord entity = new LlmTraceRecord();
             entity.setTraceUid(handle.traceUid());
             entity.setRequestUid(handle.requestUid());
-            entity.setConversationUid(value(context == null ? null : context.sessionId()));
+            entity.setConversationUid(conversationUid);
             entity.setMessageUid(value(context == null ? null : context.messageUid()));
             entity.setScene(value(scene));
             entity.setRoundIndex(Math.max(1, roundIndex));
@@ -78,9 +81,10 @@ public class LlmTraceRecorder {
             entity.setInputTokens(0);
             entity.setCachedInputTokens(0);
             entity.setOutputTokens(0);
+            entity.setReasoningTokens(0);
             entity.setTotalTokens(0);
             entity.setUsageAvailable(false);
-            repository.save(entity);
+            store.save(entity);
         } catch (Exception ex) {
             log.warn("[LlmTrace] failed to persist request trace requestUid={} err={}", handle.requestUid(), ex.toString());
         }
@@ -90,7 +94,7 @@ public class LlmTraceRecorder {
     public void complete(TraceHandle handle, ChatResponse response) {
         if (handle == null) return;
         try {
-            LlmTraceEntity entity = repository.findByTraceUid(handle.traceUid());
+            LlmTraceRecord entity = store.find(handle.conversationUid(), handle.traceUid());
             if (entity == null) return;
             TokenUsage usage = response == null || response.metadata() == null ? null : response.metadata().tokenUsage();
             entity.setStatus("SUCCEEDED");
@@ -105,13 +109,14 @@ public class LlmTraceRecorder {
             entity.setInputTokens(nonNegative(usage == null ? null : usage.inputTokenCount()));
             entity.setCachedInputTokens(TokenUsageCacheTokenExtractor.extractCachedInputTokens(usage));
             entity.setOutputTokens(nonNegative(usage == null ? null : usage.outputTokenCount()));
+            entity.setReasoningTokens(nonNegative(usage instanceof CodexTokenUsage codex ? codex.reasoningTokens() : 0));
             Integer total = usage == null ? null : usage.totalTokenCount();
             if (total == null && usage != null && usage.inputTokenCount() != null && usage.outputTokenCount() != null) {
                 total = usage.inputTokenCount() + usage.outputTokenCount();
             }
             entity.setTotalTokens(nonNegative(total));
             entity.setUsageAvailable(usage != null);
-            repository.updateById(entity);
+            store.save(entity);
         } catch (Exception ex) {
             log.warn("[LlmTrace] failed to persist response traceUid={} err={}", handle.traceUid(), ex.toString());
         }
@@ -136,14 +141,14 @@ public class LlmTraceRecorder {
                                  Map<String, ? extends List<String>> headers, String body) {
         if (handle == null) return;
         try {
-            LlmTraceEntity entity = repository.findByTraceUid(handle.traceUid());
+            LlmTraceRecord entity = store.find(handle.conversationUid(), handle.traceUid());
             if (entity == null) return;
             entity.setProtocolType(value(protocolType));
             entity.setRequestUrl(value(url));
             entity.setRequestMethod(value(method));
             entity.setRequestHeaders(JsonUtil.toJson(safeHeaders(headers)));
             entity.setRawRequestJson(redactJson(body));
-            repository.updateById(entity);
+            store.save(entity);
         } catch (Exception ex) {
             log.warn("[LlmTrace] failed to persist raw request traceUid={} err={}", handle.traceUid(), ex.toString());
         }
@@ -152,20 +157,47 @@ public class LlmTraceRecorder {
     public void recordRawResponse(TraceHandle handle, int status, String body) {
         if (handle == null) return;
         try {
-            LlmTraceEntity entity = repository.findByTraceUid(handle.traceUid());
+            LlmTraceRecord entity = store.find(handle.conversationUid(), handle.traceUid());
             if (entity == null) return;
             entity.setResponseStatus(status);
             entity.setRawResponseJson(redactJson(body));
-            repository.updateById(entity);
+            store.save(entity);
         } catch (Exception ex) {
             log.warn("[LlmTrace] failed to persist raw response traceUid={} err={}", handle.traceUid(), ex.toString());
         }
     }
 
+    /**
+     * Persists a completed streaming response and its buffered events in one file update.
+     */
+    public void recordRawStreamingResponse(TraceHandle handle,
+                                           int status,
+                                           String finalMessage,
+                                           List<RawStreamEvent> events) {
+        if (handle == null) return;
+        try {
+            LlmTraceRecord entity = store.find(handle.conversationUid(), handle.traceUid());
+            if (entity == null) return;
+            entity.setResponseStatus(status);
+            entity.setRawResponseJson(redactJson(finalMessage));
+            entity.setRawStreamEvents(JsonUtil.toJson(events == null ? List.of() : events));
+            store.save(entity);
+        } catch (Exception ex) {
+            log.warn("[LlmTrace] failed to persist streaming response traceUid={} err={}", handle.traceUid(), ex.toString());
+        }
+    }
+
+    /**
+     * Creates a redacted stream event for temporary in-memory buffering.
+     */
+    public RawStreamEvent newRawStreamEvent(int sequence, String event, String data) {
+        return new RawStreamEvent(Math.max(1, sequence), value(event), redactJson(data));
+    }
+
     public void appendRawStreamEvent(TraceHandle handle, String event, String data) {
         if (handle == null) return;
         try {
-            LlmTraceEntity entity = repository.findByTraceUid(handle.traceUid());
+            LlmTraceRecord entity = store.find(handle.conversationUid(), handle.traceUid());
             if (entity == null) return;
             List<Map<String, Object>> events = JsonUtil.fromJsonQuietly(value(entity.getRawStreamEvents()), List.class)
                     .map(list -> new ArrayList<Map<String, Object>>(list)).orElseGet(ArrayList::new);
@@ -175,7 +207,7 @@ public class LlmTraceRecorder {
             payload.put("data", redactJson(data));
             events.add(payload);
             entity.setRawStreamEvents(JsonUtil.toJson(events));
-            repository.updateById(entity);
+            store.save(entity);
         } catch (Exception ex) {
             log.warn("[LlmTrace] failed to persist raw stream event traceUid={} err={}", handle.traceUid(), ex.toString());
         }
@@ -184,14 +216,14 @@ public class LlmTraceRecorder {
     public void fail(TraceHandle handle, Throwable error) {
         if (handle == null) return;
         try {
-            LlmTraceEntity entity = repository.findByTraceUid(handle.traceUid());
+            LlmTraceRecord entity = store.find(handle.conversationUid(), handle.traceUid());
             if (entity == null) return;
             entity.setStatus("FAILED");
             entity.setResponseFinishedTime(LocalDateTime.now());
             entity.setLatencyMs(elapsedMillis(handle.startNanos()));
             entity.setErrorType(error == null ? "" : error.getClass().getName());
             entity.setErrorMessage(redact(error == null ? "" : value(error.getMessage())));
-            repository.updateById(entity);
+            store.save(entity);
         } catch (Exception ex) {
             log.warn("[LlmTrace] failed to persist error traceUid={} err={}", handle.traceUid(), ex.toString());
         }
@@ -310,14 +342,17 @@ public class LlmTraceRecorder {
 
     private boolean isSensitiveKey(String key) {
         String normalized = value(key).replace("-", "_").toLowerCase(Locale.ROOT);
-        return SENSITIVE_KEYS.stream().anyMatch(normalized::contains);
+        return SENSITIVE_KEYS.contains(normalized);
     }
 
     private int nonNegative(Integer value) { return value == null ? 0 : Math.max(0, value); }
     private long elapsedMillis(long startNanos) { return (System.nanoTime() - startNanos) / 1_000_000L; }
     private String value(String value) { return value == null ? "" : value; }
 
-    public record TraceHandle(String traceUid, String requestUid, long startNanos) {
+    public record TraceHandle(String traceUid, String requestUid, String conversationUid, long startNanos) {
+    }
+
+    public record RawStreamEvent(int sequence, String event, String data) {
     }
 
     public interface TraceScope extends AutoCloseable {

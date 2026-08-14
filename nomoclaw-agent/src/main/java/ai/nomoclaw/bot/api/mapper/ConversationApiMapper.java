@@ -166,7 +166,7 @@ public final class ConversationApiMapper {
     public static LlmTraceSummaryResponse toLlmTraceSummary(LlmTraceSummaryDto dto) {
         return new LlmTraceSummaryResponse(dto.traceUid(), dto.requestUid(), dto.scene(), dto.roundIndex(), dto.attemptIndex(),
                 dto.provider(), dto.modelName(), dto.status(), dto.latencyMs(), dto.inputTokens(), dto.cachedInputTokens(),
-                dto.outputTokens(), dto.totalTokens(), dto.usageAvailable(), dto.requestStartedTime(), dto.responseFinishedTime(),
+                dto.outputTokens(), dto.reasoningTokens(), dto.totalTokens(), dto.usageAvailable(), dto.requestStartedTime(), dto.responseFinishedTime(),
                 dto.responsePreview(), dto.errorMessage());
     }
 
@@ -176,7 +176,7 @@ public final class ConversationApiMapper {
                 dto.responseFinishedTime(), dto.latencyMs(), dto.systemPrompt(), dto.requestMessages(), dto.toolSpecifications(),
                 dto.toolChoice(), dto.requestMetadata(), dto.protocolType(), dto.requestUrl(), dto.requestMethod(), dto.requestHeaders(),
                 dto.rawRequestJson(), dto.responseStatus(), dto.rawResponseJson(), dto.rawStreamEvents(), dto.responseContent(), dto.responseThinking(), dto.responseToolCalls(), dto.finishReason(),
-                dto.inputTokens(), dto.cachedInputTokens(), dto.outputTokens(), dto.totalTokens(), dto.usageAvailable(),
+                dto.inputTokens(), dto.cachedInputTokens(), dto.outputTokens(), dto.reasoningTokens(), dto.totalTokens(), dto.usageAvailable(),
                 dto.errorType(), dto.errorMessage());
     }
 

@@ -23,7 +23,6 @@ import ai.nomoclaw.bot.store.repository.AgentEventRepository;
 import ai.nomoclaw.bot.store.repository.AgentMessageRepository;
 import ai.nomoclaw.bot.store.repository.AgentConversationRepository;
 import ai.nomoclaw.bot.store.repository.AgentStepRepository;
-import ai.nomoclaw.bot.store.repository.LlmTraceRepository;
 import ai.nomoclaw.bot.store.repository.TokenUsageRecordRepository;
 import ai.nomoclaw.bot.util.JsonUtil;
 import tools.jackson.databind.JsonNode;
@@ -45,20 +44,17 @@ public class MybatisPlusAgentStore implements AgentStore {
     private final AgentMessageRepository messageRepository;
     private final AgentStepRepository stepRepository;
     private final AgentEventRepository eventRepository;
-    private final LlmTraceRepository llmTraceRepository;
     private final TokenUsageRecordRepository tokenUsageRecordRepository;
 
     public MybatisPlusAgentStore(AgentConversationRepository conversationRepository,
                                  AgentMessageRepository messageRepository,
                                  AgentStepRepository stepRepository,
                                  AgentEventRepository eventRepository,
-                                 LlmTraceRepository llmTraceRepository,
                                  TokenUsageRecordRepository tokenUsageRecordRepository) {
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
         this.stepRepository = stepRepository;
         this.eventRepository = eventRepository;
-        this.llmTraceRepository = llmTraceRepository;
         this.tokenUsageRecordRepository = tokenUsageRecordRepository;
     }
 
@@ -147,7 +143,6 @@ public class MybatisPlusAgentStore implements AgentStore {
 
     @Override
     public void deleteConversation(String conversationUid) {
-        llmTraceRepository.deleteByConversationUid(conversationUid);
         tokenUsageRecordRepository.deleteByConversationUid(conversationUid);
         eventRepository.deleteByConversationUid(conversationUid);
         stepRepository.deleteByConversationUid(conversationUid);

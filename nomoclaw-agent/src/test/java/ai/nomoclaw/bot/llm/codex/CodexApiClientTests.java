@@ -1,5 +1,6 @@
 package ai.nomoclaw.bot.llm.codex;
 
+import ai.nomoclaw.bot.llm.debug.LlmTraceRecorder;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
@@ -19,7 +20,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class CodexApiClientTests {
@@ -183,5 +186,51 @@ class CodexApiClientTests {
 
         assertEquals(modelText, streamedText.get());
         assertEquals(modelText, completedResponse.get().aiMessage().text());
+    }
+
+    @Test
+    void streamShouldRecordTheActualHttpRequestAndFinalSseMessageBodies() throws Exception {
+        HttpClient httpClient = mock(HttpClient.class);
+        CodexTokenProvider tokenProvider = mock(CodexTokenProvider.class);
+        LlmTraceRecorder traceRecorder = mock(LlmTraceRecorder.class);
+        LlmTraceRecorder.TraceHandle trace = new LlmTraceRecorder.TraceHandle("trace-1", "request-1", "conversation-1", 1L);
+        when(tokenProvider.accessToken()).thenReturn("test-token");
+        when(tokenProvider.installationId()).thenReturn("installation-1");
+        when(tokenProvider.accountId()).thenReturn("");
+        when(traceRecorder.activeTrace()).thenReturn(trace);
+
+        String finalMessage = "{\"type\":\"response.completed\",\"response\":{\"id\":\"resp-1\",\"output\":[]}}";
+        LlmTraceRecorder.RawStreamEvent rawStreamEvent = new LlmTraceRecorder.RawStreamEvent(
+                1, "response.completed", finalMessage);
+        when(traceRecorder.newRawStreamEvent(1, "response.completed", finalMessage)).thenReturn(rawStreamEvent);
+        String sse = "event: response.completed\n"
+                + "data: " + finalMessage + "\n\n";
+        HttpResponse<InputStream> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(200);
+        when(response.body()).thenReturn(new ByteArrayInputStream(sse.getBytes(StandardCharsets.UTF_8)));
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(response);
+
+        CodexApiClient client = new CodexApiClient(httpClient, tokenProvider, "", Duration.ofSeconds(5), traceRecorder);
+        client.stream(ChatRequest.builder().messages(List.of(UserMessage.from("hello"))).build(), "gpt-5.5",
+                new StreamingChatResponseHandler() {
+                    @Override
+                    public void onPartialResponse(String partialResponse) {
+                    }
+
+                    @Override
+                    public void onCompleteResponse(ChatResponse completeResponse) {
+                    }
+
+                    @Override
+                    public void onError(Throwable throwable) {
+                        throw new AssertionError(throwable);
+                    }
+                });
+
+        String expectedRequestBody = "{\"model\":\"gpt-5.5\",\"instructions\":\"\",\"stream\":true,\"store\":false,"
+                + "\"input\":[{\"role\":\"user\",\"content\":\"hello\"}]}";
+        verify(traceRecorder).recordRawRequest(eq(trace), eq("codex-responses"), any(String.class), eq("POST"),
+                any(), eq(expectedRequestBody));
+        verify(traceRecorder).recordRawStreamingResponse(trace, 200, finalMessage, List.of(rawStreamEvent));
     }
 }

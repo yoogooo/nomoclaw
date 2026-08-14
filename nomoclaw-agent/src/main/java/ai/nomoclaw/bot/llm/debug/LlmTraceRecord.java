@@ -1,18 +1,11 @@
-package ai.nomoclaw.bot.store.entity;
-
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
+package ai.nomoclaw.bot.llm.debug;
 
 import java.time.LocalDateTime;
 
 /**
  * One persisted provider request/response trace.
  */
-@TableName("llm_trace")
-public class LlmTraceEntity {
-    @TableId(type = IdType.AUTO)
-    private Long id;
+public class LlmTraceRecord {
     private String traceUid;
     private String conversationUid;
     private String messageUid;
@@ -46,13 +39,12 @@ public class LlmTraceEntity {
     private Integer inputTokens;
     private Integer cachedInputTokens;
     private Integer outputTokens;
+    private Integer reasoningTokens;
     private Integer totalTokens;
     private Boolean usageAvailable;
     private String errorType;
     private String errorMessage;
 
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
     public String getTraceUid() { return traceUid; }
     public void setTraceUid(String traceUid) { this.traceUid = traceUid; }
     public String getConversationUid() { return conversationUid; }
@@ -119,6 +111,8 @@ public class LlmTraceEntity {
     public void setCachedInputTokens(Integer cachedInputTokens) { this.cachedInputTokens = cachedInputTokens; }
     public Integer getOutputTokens() { return outputTokens; }
     public void setOutputTokens(Integer outputTokens) { this.outputTokens = outputTokens; }
+    public Integer getReasoningTokens() { return reasoningTokens; }
+    public void setReasoningTokens(Integer reasoningTokens) { this.reasoningTokens = reasoningTokens; }
     public Integer getTotalTokens() { return totalTokens; }
     public void setTotalTokens(Integer totalTokens) { this.totalTokens = totalTokens; }
     public Boolean getUsageAvailable() { return usageAvailable; }

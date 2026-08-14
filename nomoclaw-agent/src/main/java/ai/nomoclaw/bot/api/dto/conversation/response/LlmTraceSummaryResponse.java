@@ -8,7 +8,7 @@ import java.time.Instant;
 public record LlmTraceSummaryResponse(
         String traceUid, String requestUid, String scene, int roundIndex, int attemptIndex,
         String provider, String modelName, String status, long latencyMs,
-        int inputTokens, int cachedInputTokens, int outputTokens, int totalTokens,
+        int inputTokens, int cachedInputTokens, int outputTokens, int reasoningTokens, int totalTokens,
         boolean usageAvailable, Instant requestStartedTime, Instant responseFinishedTime,
         String responsePreview, String errorMessage
 ) {

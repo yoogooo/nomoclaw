@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.ResultSet;
+import java.sql.Statement;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,9 +32,7 @@ public class H2SchemaInitializer {
             "V2__knowledge_base.sql", "V4__knowledge_base_vector_collection.sql",
             "V5__rename_agent_knowledge_relations.sql", "V6__knowledge_ingestion_reliability.sql",
             "V7__knowledge_import_builder.sql", "V8__knowledge_pdf_preprocessing.sql",
-            "V10__knowledge_structured_chunking.sql", "V11__knowledge_structure_quality.sql",
-            "V15__llm_trace.sql",
-            "V16__llm_trace_response_thinking.sql");
+            "V10__knowledge_structured_chunking.sql", "V11__knowledge_structure_quality.sql");
 
     private final DataSource dataSource;
 
@@ -48,6 +47,7 @@ public class H2SchemaInitializer {
             if (!isEmbeddedDatabase(databaseProductName)) {
                 return;
             }
+            dropLegacyLlmTrace(connection);
             if (hasTable(connection, "agent_definition")) {
                 log.info("[H2Schema] schema already initialized");
                 return;
@@ -64,6 +64,12 @@ public class H2SchemaInitializer {
             }
         } catch (Exception ex) {
             throw new IllegalStateException("failed to initialize H2 schema", ex);
+        }
+    }
+
+    private void dropLegacyLlmTrace(Connection connection) throws Exception {
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("DROP TABLE IF EXISTS llm_trace");
         }
     }
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { ChevronDown, Copy, Maximize2 } from "lucide-vue-next";
+import { AlertTriangle, ChevronDown, Copy, Maximize2, RefreshCw } from "lucide-vue-next";
 import { NCard, NCollapse, NCollapseItem, NEmpty, NModal, NSpin, NTag } from "naive-ui";
 import { useRoute } from "vue-router";
 import { conversationApi } from "@/api/conversationApi";
@@ -166,8 +166,19 @@ async function copy(value: string) {
       </header>
       </template>
 
-      <div v-if="error" class="trace-error">{{ error }}</div>
-      <n-spin v-else-if="loading" class="trace-loading" />
+      <section v-if="error" class="trace-state-panel trace-error-state" role="alert">
+        <div class="trace-state-icon"><AlertTriangle :size="22" /></div>
+        <h2>{{ error }}</h2>
+        <p>{{ t("chat.trace.loadFailedHint") }}</p>
+        <button v-if="conversationUid && messageUid" type="button" class="trace-retry-button" @click="load">
+          <RefreshCw :size="15" />
+          <span>{{ t("chat.trace.retry") }}</span>
+        </button>
+      </section>
+      <section v-else-if="loading" class="trace-state-panel trace-loading">
+        <n-spin size="medium" />
+        <p>{{ t("chat.trace.loading") }}</p>
+      </section>
       <n-empty v-else-if="!traces.length" :description="t('chat.trace.empty')" class="trace-empty" />
       <section v-else class="trace-layout">
         <n-card class="trace-timeline-card" :title="t('chat.trace.timeline')">
@@ -227,6 +238,10 @@ async function copy(value: string) {
                   <div class="trace-summary-metric">
                     <span>{{ t("chat.trace.outputTokens") }}</span>
                     <strong>{{ tokenBreakdownValue(selected, selected.outputTokens) }}</strong>
+                  </div>
+                  <div class="trace-summary-metric">
+                    <span>{{ t("chat.trace.reasoningTokens") }}</span>
+                    <strong>{{ tokenBreakdownValue(selected, selected.reasoningTokens) }}</strong>
                   </div>
                 </div>
               </div>
@@ -362,7 +377,7 @@ async function copy(value: string) {
 
 <style scoped>
 .trace-page-shell { height: 100vh; overflow: hidden; background: #000; color: #f2f3f5; }
-.trace-page { min-width: 0; height: 100%; box-sizing: border-box; }
+.trace-page { position: relative; min-width: 0; height: 100%; box-sizing: border-box; }
 .trace-page :deep(.n-card) { background: #101114; border-color: #2a2d33; color: #f2f3f5; }
 .trace-page :deep(.n-card-header) { color: #f2f3f5; }
 .trace-page :deep(.n-collapse-item__header) { color: #e5e7eb; }
@@ -441,8 +456,17 @@ async function copy(value: string) {
 .trace-subsection-toggle h3 { flex: 1; }
 .trace-subsection-chevron { flex: none; margin: 10px 6px 0 0; color: #a5aab3; transition: transform 160ms ease; }
 .trace-subsection-chevron.collapsed { transform: rotate(-90deg); }
-.trace-error, .trace-error-code { color: #ff6b6b; }
-.trace-loading, .trace-empty { display: grid; place-items: center; min-height: 300px; }
+.trace-error-code { color: #ff6b6b; }
+.trace-state-panel { display: flex; box-sizing: border-box; width: min(440px, calc(100% - 48px)); min-height: 260px; margin: 0 auto; padding: 40px 32px; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.trace-error-state { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border: 1px solid #3b2c2f; border-radius: 16px; background: linear-gradient(145deg, #17171b, #101114); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28); }
+.trace-state-icon { display: grid; width: 48px; height: 48px; place-items: center; margin-bottom: 18px; border: 1px solid rgba(239, 91, 91, 0.32); border-radius: 50%; background: rgba(239, 91, 91, 0.1); color: #ff8585; }
+.trace-state-panel h2 { margin: 0; color: #f2f3f5; font-size: 17px; font-weight: 650; }
+.trace-state-panel p { max-width: 320px; margin: 10px 0 0; color: #9299a5; font-size: 13px; line-height: 1.6; }
+.trace-retry-button { display: inline-flex; align-items: center; gap: 7px; margin-top: 24px; padding: 8px 14px; border: 1px solid #3d8178; border-radius: 7px; background: rgba(40, 125, 114, 0.16); color: #9fe1d6; font: inherit; font-size: 13px; cursor: pointer; transition: background 160ms ease, border-color 160ms ease; }
+.trace-retry-button:hover { border-color: #58b7a9; background: rgba(40, 125, 114, 0.28); }
+.trace-loading { position: absolute; top: 50%; left: 50%; min-height: 180px; gap: 14px; transform: translate(-50%, -50%); }
+.trace-loading p { margin-top: 0; }
+.trace-empty { display: grid; place-items: center; min-height: 300px; }
 @media (max-width: 760px) {
   .trace-summary-metrics { justify-content: flex-start; }
 }

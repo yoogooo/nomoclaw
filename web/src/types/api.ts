@@ -584,6 +584,7 @@ export interface LlmTraceSummary {
   inputTokens: number;
   cachedInputTokens: number;
   outputTokens: number;
+  reasoningTokens: number;
   totalTokens: number;
   usageAvailable: boolean;
   requestStartedTime: string;

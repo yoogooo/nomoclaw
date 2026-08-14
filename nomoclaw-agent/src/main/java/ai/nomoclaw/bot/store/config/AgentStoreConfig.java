@@ -6,7 +6,6 @@ import ai.nomoclaw.bot.store.repository.AgentEventRepository;
 import ai.nomoclaw.bot.store.repository.AgentMessageRepository;
 import ai.nomoclaw.bot.store.repository.AgentConversationRepository;
 import ai.nomoclaw.bot.store.repository.AgentStepRepository;
-import ai.nomoclaw.bot.store.repository.LlmTraceRepository;
 import ai.nomoclaw.bot.store.repository.TokenUsageRecordRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,14 +18,12 @@ public class AgentStoreConfig {
                                  AgentMessageRepository messageRepository,
                                  AgentStepRepository stepRepository,
                                  AgentEventRepository eventRepository,
-                                 LlmTraceRepository llmTraceRepository,
                                  TokenUsageRecordRepository tokenUsageRecordRepository) {
         return new MybatisPlusAgentStore(
                 sessionRepository,
                 messageRepository,
                 stepRepository,
                 eventRepository,
-                llmTraceRepository,
                 tokenUsageRecordRepository
         );
     }

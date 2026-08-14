@@ -846,7 +846,7 @@ function messageTokenUsageText(messageItem: ConversationMessage) {
 
 function openLlmTrace(messageItem: ConversationMessage) {
   const conversationUid = conversationStore.currentConversationUid;
-  const messageUid = String(messageItem.messageUid || "").trim();
+  const messageUid = String(messageItem.role === "user" ? messageItem.messageUid : messageItem.parentMessageUid || "").trim();
   if (!conversationUid || !messageUid) return;
   const traceRoute = router.resolve({
     path: "/trace",
@@ -1042,6 +1042,7 @@ onMounted(() => {
             :class="{
               user: message.role === 'user',
               'has-expand-toggle': shouldShowUserMessageToggle(message),
+              'has-trace-entry': message.role === 'assistant' && Boolean(message.parentMessageUid),
               'is-user-collapsed': message.role === 'user' && shouldShowUserMessageToggle(message) && !isUserMessageExpanded(message)
             }"
           >
@@ -1108,6 +1109,14 @@ onMounted(() => {
                 <p>{{ citation.excerpt }}</p>
               </div>
             </details>
+            <button
+              v-if="message.role === 'assistant' && message.parentMessageUid"
+              class="message-trace-button"
+              type="button"
+              @click.stop="openLlmTrace(message)"
+            >
+              {{ t("chat.trace.title") }}
+            </button>
           </div>
           <div v-if="message.role !== 'user'" class="message-meta">
             <div class="message-time">{{ formatMessageTime(message.createdTime) }}</div>
@@ -1187,13 +1196,6 @@ onMounted(() => {
                 <template #header>
                   <div class="run-header">
                     <div class="run-title">{{ t("chat.messages.runTitle") }}</div>
-                    <button
-                      class="run-trace-button"
-                      type="button"
-                      @click.stop="openLlmTrace(message)"
-                    >
-                      {{ t("chat.trace.title") }}
-                    </button>
                   </div>
                 </template>
                 <div class="run-summary">{{ runProgressText(message.messageUid || "") }}</div>
@@ -1893,6 +1895,47 @@ onMounted(() => {
 
 .run-trace-button:hover {
   background: color-mix(in srgb, var(--color-primary, #0f766e) 20%, transparent);
+}
+
+.message-bubble.has-trace-entry {
+  padding-right: calc(var(--space-4) + var(--size-80));
+}
+
+.message-trace-button {
+  position: absolute;
+  top: var(--space-2_5);
+  right: var(--space-2_5);
+  min-height: var(--size-28);
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-primary, #0f766e) 14%, transparent);
+  color: var(--color-text-brand-strong);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(calc(var(--size-1) * -1));
+  transition: opacity 0.14s ease, transform 0.14s ease, background 0.14s ease;
+}
+
+.message-bubble:hover .message-trace-button,
+.message-bubble:focus-within .message-trace-button,
+.message-trace-button:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.message-trace-button:hover {
+  background: color-mix(in srgb, var(--color-primary, #0f766e) 24%, transparent);
+}
+
+@media (hover: none) {
+  .message-trace-button {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+  }
 }
 
 .run-summary {

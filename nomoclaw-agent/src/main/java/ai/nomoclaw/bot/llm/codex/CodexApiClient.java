@@ -92,20 +92,21 @@ final class CodexApiClient {
     }
 
     void stream(ChatRequest request, String modelName, StreamingChatResponseHandler handler) {
-        Map<String, Object> payload = toCodexRequest(request, modelName, true);
-        HttpRequest httpRequest = request(payload, "text/event-stream");
+        String rawRequestBody = JsonUtil.toJson(toCodexRequest(request, modelName, true));
+        HttpRequest httpRequest = request(rawRequestBody, "text/event-stream");
         LlmTraceRecorder.TraceHandle trace = traceRecorder == null ? null : traceRecorder.activeTrace();
         if (traceRecorder != null) {
             traceRecorder.recordRawRequest(trace, "codex-responses", httpRequest.uri().toString(), httpRequest.method(),
-                    httpRequest.headers().map(), JsonUtil.toJson(payload));
+                    httpRequest.headers().map(), rawRequestBody);
         }
         StringBuilder fullText = new StringBuilder();
         List<ToolExecutionRequest> toolExecutionRequests = new ArrayList<>();
         ChatResponse[] completed = new ChatResponse[1];
+        String[] lastSseMessage = new String[]{""};
+        List<LlmTraceRecorder.RawStreamEvent> rawStreamEvents = new ArrayList<>();
 
         try {
             HttpResponse<InputStream> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofInputStream());
-            if (traceRecorder != null) traceRecorder.recordRawResponse(trace, response.statusCode(), "");
             if (!isSuccess(response.statusCode())) {
                 String body = new String(response.body().readAllBytes(), StandardCharsets.UTF_8);
                 if (traceRecorder != null) traceRecorder.recordRawResponse(trace, response.statusCode(), body);
@@ -118,8 +119,9 @@ final class CodexApiClient {
                 StringBuilder data = new StringBuilder();
                 while ((line = reader.readLine()) != null) {
                     if (line.isBlank()) {
-                        recordSseEvent(trace, event, data.toString());
-                        handleSseEvent(event, data.toString(), modelName, handler, fullText, toolExecutionRequests, completed);
+                        String message = data.toString();
+                        recordLastSseMessage(lastSseMessage, collectSseEvent(rawStreamEvents, event, message));
+                        handleSseEvent(event, message, modelName, handler, fullText, toolExecutionRequests, completed);
                         event = "";
                         data.setLength(0);
                         continue;
@@ -130,12 +132,17 @@ final class CodexApiClient {
                         if (!data.isEmpty()) {
                             data.append('\n');
                         }
-                        data.append(line.substring("data:".length()).trim());
+                        data.append(sseData(line));
                     }
                 }
                 if (!data.isEmpty()) {
-                    recordSseEvent(trace, event, data.toString());
-                    handleSseEvent(event, data.toString(), modelName, handler, fullText, toolExecutionRequests, completed);
+                    String message = data.toString();
+                    recordLastSseMessage(lastSseMessage, collectSseEvent(rawStreamEvents, event, message));
+                    handleSseEvent(event, message, modelName, handler, fullText, toolExecutionRequests, completed);
+                }
+            } finally {
+                if (traceRecorder != null) {
+                    traceRecorder.recordRawStreamingResponse(trace, response.statusCode(), lastSseMessage[0], rawStreamEvents);
                 }
             }
 
@@ -167,11 +174,26 @@ final class CodexApiClient {
         return new IllegalStateException("Codex streaming API failed: status=" + statusCode + ", body=" + safeBody(body));
     }
 
-    private void recordSseEvent(LlmTraceRecorder.TraceHandle trace, String event, String data) {
-        if (traceRecorder != null) traceRecorder.appendRawStreamEvent(trace, event, data);
+    private String collectSseEvent(List<LlmTraceRecorder.RawStreamEvent> rawStreamEvents, String event, String data) {
+        if (traceRecorder == null) return data;
+        LlmTraceRecorder.RawStreamEvent rawStreamEvent = traceRecorder.newRawStreamEvent(rawStreamEvents.size() + 1, event, data);
+        rawStreamEvents.add(rawStreamEvent);
+        return rawStreamEvent.data();
     }
 
-    private HttpRequest request(Map<String, Object> payload, String accept) {
+    private void recordLastSseMessage(String[] lastSseMessage, String data) {
+        String message = trim(data);
+        if (!message.isBlank() && !"[DONE]".equals(message)) {
+            lastSseMessage[0] = data;
+        }
+    }
+
+    private String sseData(String line) {
+        String data = line.substring("data:".length());
+        return data.startsWith(" ") ? data.substring(1) : data;
+    }
+
+    private HttpRequest request(String rawRequestBody, String accept) {
         String accessToken = trim(tokenProvider.accessToken());
         if (accessToken.isBlank()) {
             throw new IllegalStateException("Codex login token is missing. Please run `codex login` first.");
@@ -183,7 +205,7 @@ final class CodexApiClient {
                 .header("Content-Type", "application/json")
                 .header("Authorization", "Bearer " + accessToken)
                 .header("x-codex-installation-id", trim(tokenProvider.installationId()))
-                .POST(HttpRequest.BodyPublishers.ofString(JsonUtil.toJson(payload)));
+                .POST(HttpRequest.BodyPublishers.ofString(rawRequestBody));
 
         String accountId = trim(tokenProvider.accountId());
         if (!accountId.isBlank()) {
@@ -526,6 +548,7 @@ final class CodexApiClient {
         }
         Integer inputTokens = intOrNull(usage.path("input_tokens"));
         Integer outputTokens = intOrNull(usage.path("output_tokens"));
+        Integer reasoningTokens = intOrNull(usage.path("output_tokens_details").path("reasoning_tokens"));
         Integer totalTokens = intOrNull(usage.path("total_tokens"));
         int cachedInputTokens = maxTokenValue(
                 intOrNull(usage.path("input_cached_tokens")),
@@ -533,7 +556,7 @@ final class CodexApiClient {
                 intOrNull(usage.path("input_tokens_details").path("cached_tokens")),
                 intOrNull(usage.path("prompt_tokens_details").path("cached_tokens"))
         );
-        TokenUsage tokenUsage = new CodexTokenUsage(inputTokens, outputTokens, totalTokens, cachedInputTokens);
+        TokenUsage tokenUsage = new CodexTokenUsage(inputTokens, outputTokens, totalTokens, cachedInputTokens, reasoningTokens);
         return new ParsedUsage(tokenUsage);
     }
 

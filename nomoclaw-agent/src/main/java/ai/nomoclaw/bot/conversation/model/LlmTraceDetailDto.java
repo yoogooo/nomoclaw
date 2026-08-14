@@ -39,6 +39,7 @@ public record LlmTraceDetailDto(
         int inputTokens,
         int cachedInputTokens,
         int outputTokens,
+        int reasoningTokens,
         int totalTokens,
         boolean usageAvailable,
         String errorType,
