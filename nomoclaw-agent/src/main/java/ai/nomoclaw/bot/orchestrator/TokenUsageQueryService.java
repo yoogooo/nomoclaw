@@ -58,7 +58,8 @@ public class TokenUsageQueryService {
     private TokenUsageRecordResponse toResponse(TokenUsageRecordEntity item) {
         return new TokenUsageRecordResponse(value(item.getRecordUid()), value(item.getScene()), value(item.getProvider()), value(item.getModelName()),
                 value(item.getConversationUid()), value(item.getMessageUid()), number(item.getInputTokens()), number(item.getCachedInputTokens()),
-                number(item.getOutputTokens()), number(item.getTotalTokens()), Boolean.TRUE.equals(item.getUsageAvailable()), item.getOccurredTime());
+                number(item.getOutputTokens()), number(item.getReasoningTokens()), number(item.getTotalTokens()),
+                Boolean.TRUE.equals(item.getUsageAvailable()), item.getOccurredTime());
     }
     private String displayScene(String scene) {
         return "CHAT_REASONING".equals(scene) || "CHAT_SUMMARY".equals(scene) ? "CHAT" : value(scene);

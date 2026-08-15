@@ -20,6 +20,7 @@ public class TokenUsageRecordEntity {
     private Integer inputTokens;
     private Integer cachedInputTokens;
     private Integer outputTokens;
+    private Integer reasoningTokens;
     private Integer totalTokens;
     private Boolean usageAvailable;
     private LocalDateTime occurredTime;
@@ -46,6 +47,8 @@ public class TokenUsageRecordEntity {
     public void setCachedInputTokens(Integer cachedInputTokens) { this.cachedInputTokens = cachedInputTokens; }
     public Integer getOutputTokens() { return outputTokens; }
     public void setOutputTokens(Integer outputTokens) { this.outputTokens = outputTokens; }
+    public Integer getReasoningTokens() { return reasoningTokens; }
+    public void setReasoningTokens(Integer reasoningTokens) { this.reasoningTokens = reasoningTokens; }
     public Integer getTotalTokens() { return totalTokens; }
     public void setTotalTokens(Integer totalTokens) { this.totalTokens = totalTokens; }
     public Boolean getUsageAvailable() { return usageAvailable; }

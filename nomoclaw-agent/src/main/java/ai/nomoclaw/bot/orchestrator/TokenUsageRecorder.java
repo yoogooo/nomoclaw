@@ -1,6 +1,7 @@
 package ai.nomoclaw.bot.orchestrator;
 
 import ai.nomoclaw.bot.model.TokenUsageScene;
+import ai.nomoclaw.bot.llm.codex.CodexTokenUsage;
 import ai.nomoclaw.bot.store.entity.TokenUsageRecordEntity;
 import ai.nomoclaw.bot.store.repository.TokenUsageRecordRepository;
 import ai.nomoclaw.bot.util.UuidUtil;
@@ -44,6 +45,7 @@ public class TokenUsageRecorder {
         entity.setInputTokens(nonNegative(input));
         entity.setCachedInputTokens(TokenUsageCacheTokenExtractor.extractCachedInputTokens(usage));
         entity.setOutputTokens(nonNegative(output));
+        entity.setReasoningTokens(usage instanceof CodexTokenUsage codex ? nonNegative(codex.reasoningTokens()) : 0);
         entity.setTotalTokens(nonNegative(total));
         entity.setUsageAvailable(usage != null);
         entity.setOccurredTime(LocalDateTime.now());

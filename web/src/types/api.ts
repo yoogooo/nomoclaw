@@ -28,7 +28,7 @@ export interface TokenUsageOverview {
 }
 export interface TokenUsageRecord {
   recordUid: string; scene: string; provider: string; modelName: string; conversationUid: string; messageUid: string;
-  inputTokens: number; cachedInputTokens: number; outputTokens: number; totalTokens: number; usageAvailable: boolean; occurredTime: string;
+  inputTokens: number; cachedInputTokens: number; outputTokens: number; reasoningTokens?: number; totalTokens: number; usageAvailable: boolean; occurredTime: string;
 }
 export interface TokenUsageRecordPage { items: TokenUsageRecord[]; total: number; page: number; pageSize: number; totalPages: number; }
 
