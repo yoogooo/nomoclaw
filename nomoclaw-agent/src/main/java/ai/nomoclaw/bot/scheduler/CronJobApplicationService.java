@@ -690,7 +690,7 @@ public class CronJobApplicationService {
                 messageUid == null ? "" : messageUid,
                 reportPath == null ? "" : reportPath
         );
-        return "legacy-" + UUID.nameUUIDFromBytes(seed.getBytes(StandardCharsets.UTF_8));
+        return "legacy-" + UuidUtil.normalize(UUID.nameUUIDFromBytes(seed.getBytes(StandardCharsets.UTF_8)).toString());
     }
 
     private String readReportPreview(String reportPath) {

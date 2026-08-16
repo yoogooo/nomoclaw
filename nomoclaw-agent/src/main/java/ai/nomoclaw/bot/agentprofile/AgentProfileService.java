@@ -185,7 +185,7 @@ public class AgentProfileService {
         String agentType = normalizeAgentType(request.agentType());
 
         LocalDateTime now = LocalDateTime.now();
-        String agentUid = "agent_" + UuidUtil.newUuid().replace("-", "");
+        String agentUid = "agent_" + UuidUtil.newUuid();
         AgentDefinitionEntity agent = new AgentDefinitionEntity();
         agent.setAgentUid(agentUid);
         agent.setAgentName(agentName);
