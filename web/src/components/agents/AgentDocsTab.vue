@@ -123,12 +123,14 @@ const { t } = useI18n();
   gap: var(--space-3_5);
   height: 100%;
   min-height: 0;
+  min-width: 0;
   flex: 1 1 auto;
 }
 
 .docs-list {
   padding: var(--space-3);
   min-height: 0;
+  min-width: 0;
   height: 100%;
   overflow: auto;
 }
@@ -139,6 +141,7 @@ const { t } = useI18n();
 
 .doc-list-item {
   width: 100%;
+  min-width: 0;
   text-align: left;
   padding: var(--space-3_5) var(--space-3_5);
   min-height: var(--size-72);
@@ -161,24 +164,36 @@ const { t } = useI18n();
   gap: var(--space-2_5);
 }
 
+.doc-list-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .doc-list-meta {
   margin-top: var(--space-1);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2_5);
+  min-width: 0;
   font-size: var(--text-caption-size);
   color: var(--color-text-soft);
 }
 
 .doc-list-updated {
+  min-width: 0;
+  overflow: hidden;
   text-align: right;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .docs-editor {
   padding: var(--space-3);
   min-height: 0;
+  min-width: 0;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -188,18 +203,24 @@ const { t } = useI18n();
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: var(--space-3);
   margin-bottom: var(--space-2);
 }
 
 .docs-editor-head > div:first-child {
-  width: 50%;
+  flex: 1 1 220px;
+  width: auto;
   min-width: 0;
 }
 
 .docs-actions {
   display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: var(--space-2);
+  min-width: 0;
 }
 
 .docs-editor-title {
@@ -265,6 +286,7 @@ const { t } = useI18n();
   }
 
   .docs-editor-head > div:first-child {
+    flex: none;
     width: 100%;
   }
 
