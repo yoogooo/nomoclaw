@@ -489,7 +489,9 @@ onMounted(() => {
                   <n-input v-model:value="row.value" :placeholder="t('mcp.editor.headerValue')" />
                   <n-button quaternary circle @click="removeHeader(index)">×</n-button>
                 </div>
-                <n-button block secondary @click="addHeader">＋ {{ t("mcp.editor.addHeader") }}</n-button>
+                <n-button secondary size="small" class="row-editor-add" @click="addHeader">
+                  ＋ {{ t("mcp.editor.addHeader") }}
+                </n-button>
               </div>
             </n-form-item>
           </n-tab-pane>
@@ -503,7 +505,9 @@ onMounted(() => {
                   <n-input v-model:value="form.args[index]" placeholder="" />
                   <n-button quaternary circle @click="removeArgument(index)">×</n-button>
                 </div>
-                <n-button block secondary @click="addArgument">＋ {{ t("mcp.editor.addArgument") }}</n-button>
+                <n-button secondary size="small" class="row-editor-add" @click="addArgument">
+                  ＋ {{ t("mcp.editor.addArgument") }}
+                </n-button>
               </div>
             </n-form-item>
             <n-form-item :label="t('mcp.editor.env')">
@@ -513,7 +517,9 @@ onMounted(() => {
                   <n-input v-model:value="row.value" :placeholder="t('mcp.editor.envValue')" />
                   <n-button quaternary circle @click="removeEnv(index)">×</n-button>
                 </div>
-                <n-button block secondary @click="addEnv">＋ {{ t("mcp.editor.addEnv") }}</n-button>
+                <n-button secondary size="small" class="row-editor-add" @click="addEnv">
+                  ＋ {{ t("mcp.editor.addEnv") }}
+                </n-button>
               </div>
             </n-form-item>
             <n-form-item :label="t('mcp.editor.cwd')">
@@ -636,6 +642,11 @@ onMounted(() => {
   width: 100%;
   display: grid;
   gap: var(--space-2);
+}
+
+.row-editor-add {
+  justify-self: start;
+  height: 34px;
 }
 
 .row-editor-line {
