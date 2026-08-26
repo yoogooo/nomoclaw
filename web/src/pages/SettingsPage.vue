@@ -190,10 +190,14 @@ async function loadDiagnosticsSummary() {
                 </n-button>
               </div>
             </section>
-            <section class="surface-card">
-              <div class="surface-card-title">Token 用量</div>
-              <div class="settings-diagnostics-subtitle">查看聊天和锦囊总结的模型 token 消耗及调用明细。</div>
-              <div class="settings-diagnostics-actions"><n-button tertiary size="small" @click="openTokenUsagePage">查看 Token 用量</n-button></div>
+            <section class="surface-card settings-token-usage-card">
+              <div>
+                <div class="surface-card-title">Token 用量</div>
+                <div class="settings-diagnostics-subtitle">查看聊天和锦囊总结的模型 token 消耗及调用明细。</div>
+              </div>
+              <div class="settings-token-usage-actions">
+                <n-button tertiary @click="openTokenUsagePage">查看 Token 用量</n-button>
+              </div>
             </section>
           </div>
         </div>
@@ -253,6 +257,17 @@ async function loadDiagnosticsSummary() {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+}
+
+.settings-token-usage-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.settings-token-usage-actions {
+  display: flex;
+  justify-content: flex-start;
 }
 
 .settings-diagnostics-title-row,
