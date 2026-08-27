@@ -829,7 +829,9 @@ const enUS = {
       unlinked: "Not linked to any Agent"
     },
     tools: {
-      empty: "No tools"
+      empty: "No tools",
+      enableAll: "Enable all",
+      disableAll: "Disable all"
     },
     tips: {
       titlePlaceholder: "Tip title",

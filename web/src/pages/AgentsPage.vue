@@ -249,6 +249,12 @@ function onToggleMcpTool(toolId: string, enabled: boolean) {
   management.setMcpToolEnabled(selectedAgent.value, toolId, enabled);
 }
 
+function onToggleMcpGroup(toolIds: string[], enabled: boolean) {
+  for (const toolId of toolIds) {
+    management.setMcpToolEnabled(selectedAgent.value, toolId, enabled);
+  }
+}
+
 function onToggleDoc(key: string, enabled: boolean) {
   management.setDocEnabled(selectedAgent.value, key as DocKey, enabled);
 }
@@ -420,6 +426,7 @@ watch([selectedAgentUid, detailTab], ([agentUid, tab]) => {
                     :tools="selectedAgent.managedMcpTools"
                     group-by-server
                     @toggle="onToggleMcpTool"
+                    @toggle-group="onToggleMcpGroup"
                   />
                 </n-tab-pane>
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { NCollapse, NCollapseItem, NSwitch } from "naive-ui";
+import { NButton, NCollapse, NCollapseItem, NSwitch } from "naive-ui";
 
 interface ToolItem {
   id: string;
@@ -20,6 +20,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: "toggle", toolId: string, enabled: boolean): void;
+  (e: "toggle-group", toolIds: string[], enabled: boolean): void;
 }>();
 const { t } = useI18n();
 
@@ -40,6 +41,10 @@ const groupedTools = computed(() => {
   }
   return [...groups.values()];
 });
+
+function groupEnabled(group: { tools: ToolItem[] }) {
+  return group.tools.every((tool) => tool.enabled);
+}
 </script>
 
 <template>
@@ -56,6 +61,26 @@ const groupedTools = computed(() => {
             <div class="tool-server-title">
               <span>{{ group.name }}</span>
               <span class="tool-server-count">{{ group.tools.length }}</span>
+            </div>
+          </template>
+          <template #header-extra>
+            <div class="tool-server-actions" @click.stop>
+              <n-button
+                size="tiny"
+                tertiary
+                :disabled="groupEnabled(group)"
+                @click="emit('toggle-group', group.tools.map((tool) => tool.id), true)"
+              >
+                {{ t("agents.tools.enableAll") }}
+              </n-button>
+              <n-button
+                size="tiny"
+                tertiary
+                :disabled="!groupEnabled(group)"
+                @click="emit('toggle-group', group.tools.map((tool) => tool.id), false)"
+              >
+                {{ t("agents.tools.disableAll") }}
+              </n-button>
             </div>
           </template>
           <div class="tools-card-grid">
@@ -124,12 +149,22 @@ const groupedTools = computed(() => {
 
 .tool-server-title {
   display: inline-flex;
+  min-width: 0;
   align-items: center;
   gap: var(--space-2);
   color: var(--color-text-primary);
   font-size: var(--text-title-sm-size);
   font-weight: 800;
   letter-spacing: 0.01em;
+}
+
+.tool-server-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-1_5);
+  margin-left: var(--space-3);
 }
 
 .tool-server-count {

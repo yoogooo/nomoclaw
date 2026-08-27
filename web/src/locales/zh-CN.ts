@@ -829,7 +829,9 @@ const zhCN = {
       unlinked: "当前未关联任何 Agent"
     },
     tools: {
-      empty: "暂无工具"
+      empty: "暂无工具",
+      enableAll: "全部开启",
+      disableAll: "全部关闭"
     },
     tips: {
       titlePlaceholder: "锦囊标题",
